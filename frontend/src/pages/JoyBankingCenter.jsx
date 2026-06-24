@@ -194,7 +194,7 @@ export default function JoyBankingCenter() {
                                 name="favoriteTreat"
                                 value={treatPlan.favoriteTreat}
                                 onChange={handleTreatChange}
-                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                                 placeholder="Ice cream"
                             />
                         </div>
@@ -206,7 +206,7 @@ export default function JoyBankingCenter() {
                                 value={treatPlan.favoriteTreatCalories}
                                 onChange={handleTreatChange}
                                 min="1"
-                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                                 placeholder="1000"
                             />
                         </div>
@@ -217,7 +217,7 @@ export default function JoyBankingCenter() {
                                 name="nextTreat"
                                 value={treatPlan.nextTreat}
                                 onChange={handleTreatChange}
-                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                                 placeholder="Pizza night"
                             />
                         </div>
@@ -229,7 +229,7 @@ export default function JoyBankingCenter() {
                                 value={treatPlan.nextTreatCalories}
                                 onChange={handleTreatChange}
                                 min="1"
-                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                                 placeholder="750"
                             />
                         </div>

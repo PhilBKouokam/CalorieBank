@@ -1,57 +1,61 @@
 # CalorieBank
 
-CalorieBank is a full-stack calorie tracking app built around a simple idea: calories can be treated like a daily and weekly balance. Instead of only showing what a user has eaten, the app calculates what they have available based on their profile, food entries, and extra calories burned.
+**Live Demo:** [https://caloriebank-pi.vercel.app/](https://caloriebank-pi.vercel.app/)
 
-The project is built as a MERN-style application with a Vite React frontend, an Express API, MongoDB persistence, JWT authentication, and optional S3 food photo uploads.
+![CalorieBank Dashboard](screenshots/dashboard.png)
 
-## Why I Built It
+CalorieBank is a full-stack calorie tracking application that treats calories like a **daily and weekly bank**. Instead of just logging what you eat, it calculates how many calories you have "banked" based on your personal TDEE, food intake, and extra activity.
 
-Most food trackers focus on restriction. I wanted to build a more practical experience that helps users plan around real life: track meals, bank unused calories, log workouts, and see how today affects the week.
+The goal is to help users build a healthier, more positive relationship with food by giving them visibility into their calorie surplus or deficit over time.
 
-This project gave me a chance to practice full-stack product thinking, not just isolated CRUD. The app includes authenticated user data, profile-based calorie calculations, date-aware logs, file uploads, protected routes, and deployment-ready environment configuration.
+---
 
-## Features
+## ✨ Features
 
-- User registration and login with JWT authentication
-- TDEE calculation from height, weight, age, sex, and activity level
-- Daily food logging with calories, protein, carbs, and fats
-- Date-based log viewing for past or current entries
-- Extra burned-calorie logging by activity
-- Daily calorie bank calculation: `TDEE + extra burn - intake`
-- Weekly banking history with consumed, burned, and banked totals
-- Joy Banking Center for planning treats against saved calories
-- Optional food photo uploads backed by AWS S3
-- Light and dark theme support
-- Deployment-ready API URL and CORS configuration
+- User authentication with JWT
+- Personalized TDEE calculation (height, weight, age, sex, activity level)
+- Daily food logging with macros (calories, protein, carbs, fats)
+- Food photo uploads stored in AWS S3
+- Automatic daily calorie bank calculation (`TDEE + extra burn - intake`)
+- Weekly banking history and progress tracking
+- Dark/Light mode support
+- Responsive, modern UI with Tailwind CSS
 
-## Tech Stack
+---
+
+## 🛠️ Tech Stack
 
 **Frontend**
-
-- React
-- Vite
+- React + Vite
 - React Router
 - Tailwind CSS
-- Lucide React
-- Recharts
+- Lucide React (icons)
+- Context API for state management
 
 **Backend**
+- Node.js + Express
+- MongoDB + Mongoose
+- JWT Authentication
+- AWS SDK (S3 photo uploads)
+- bcrypt for password hashing
 
-- Node.js
-- Express
-- MongoDB
-- Mongoose
-- JWT
-- bcrypt
-- Multer
-- AWS SDK for S3
+---
+
+## Screenshots
+
+![Dashboard](screenshots/dashboard.png)
+![Add Entry](screenshots/add-entry.png)
+![Dark Mode](screenshots/dark-mode.png)
+![Food Entries List](screenshots/food-entries-list.png)
+![Joy Bank](screenshots/joybank.png)
+
+---
 
 ## Architecture
 
-```text
 CalorieBank/
-├── backend/
-│   ├── controllers/       # API request logic
+├── backend/               # Express API
+│   ├── controllers/       # Business logic
 │   ├── middleware/        # JWT protection
 │   ├── models/            # Mongoose schemas
 │   ├── routes/            # Express route definitions
@@ -123,16 +127,16 @@ VITE_API_BASE_URL=http://localhost:4700
 | Food Logs | `DELETE` | `/api/foodlog/entry/:entryId` | Delete an entry |
 | Food Logs | `POST` | `/api/foodlog/burned` | Log extra burned calories |
 | Bank | `GET` | `/api/foodlog/weekly-bank` | Get weekly banking history |
-| Uploads | `POST` | `/api/upload/food-photo/:entryId` | Upload a food photo |
+| Uploads | `POST` | `/api/upload/food-photo/:entryId` | Upload a food photo to S3 |
 
 ## What I Focused On
 
-- Keeping user data protected with token-based API routes
-- Modeling daily logs so each user has one log per date
-- Normalizing dates to avoid off-by-one issues in daily and weekly views
-- Making the frontend API base URL configurable for deployment
-- Separating route, controller, model, and UI concerns
-- Building a product concept that shows both technical implementation and user empathy
+- Building a practical and positive calorie tracking experience
+- Clean separation of concerns (controllers, routes, models, context)
+- Proper date normalization for daily logs
+- Secure file uploads with AWS S3
+- Responsive design with dark mode support
+- Production-ready deployment configuration
 
 ## Validation
 
@@ -151,8 +155,8 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for hosting setup, environment variables, a
 
 ## Future Improvements
 
-- Add automated backend route tests
-- Add frontend component tests for logged-in workflows
-- Add image validation and cleanup for replaced S3 uploads
-- Add password reset and profile editing
-- Add charts for longer-term calorie trends
+- Food database with auto calorie lookup
+- Password reset flow
+- Weekly/monthly trend charts
+- Unit tests
+- Progressive Web App (PWA) support

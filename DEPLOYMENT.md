@@ -1,61 +1,87 @@
-# CalorieBank Deployment
+# CalorieBank - Deployment Guide
 
-This app has two deployable services:
+This document explains how to deploy **CalorieBank V0.1** (Backend + Frontend).
 
-- `backend`: Node/Express API
-- `frontend`: Vite React static site
+## Overview
 
-## Backend
+- **Backend**: Node.js + Express API (deployed on Render)
+- **Frontend**: React + Vite (deployed on Vercel)
 
-Deploy `backend` as a Node web service.
+---
 
-- Root directory: `backend`
-- Node version: `>=20.19.0`
-- Build command: `npm install`
-- Start command: `npm start`
-- Health check path: `/`
+## Backend Deployment (Render)
 
-Set these environment variables in the host:
+### Settings
+- **Service Type**: Web Service
+- **Root Directory**: `backend`
+- **Runtime**: Node
+- **Build Command**: `npm install`
+- **Start Command**: `node server.js`
 
-- `MONGO_URI`
-- `JWT_SECRET`
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_REGION`
-- `AWS_BUCKET_NAME`
-- `FRONTEND_URL`
-- `NODE_ENV=production`
+### Environment Variables (Required)
 
-`FRONTEND_URL` should be the deployed frontend origin, for example `https://your-app.vercel.app`. For multiple origins, use a comma-separated list.
+| Variable                | Description                          | Example |
+|-------------------------|--------------------------------------|--------|
+| `MONGO_URI`             | MongoDB Atlas connection string      | `mongodb+srv://...` |
+| `JWT_SECRET`            | Secret key for JWT tokens            | Long random string |
+| `AWS_ACCESS_KEY_ID`     | AWS IAM Access Key                   | `AKIA...` |
+| `AWS_SECRET_ACCESS_KEY` | AWS IAM Secret Key                   | `...` |
+| `AWS_REGION`            | AWS Region                           | `us-east-1` |
+| `AWS_BUCKET_NAME`       | S3 Bucket name                       | `caloriebank-food-photos-2026-phil` |
+| `NODE_ENV`              | Environment                          | `production` |
 
-## Frontend
+> **Important**: Add `0.0.0.0/0` to your MongoDB Atlas **Network Access** (for development).
 
-Deploy `frontend` as a Vite static site.
+---
 
-- Root directory: `frontend`
-- Node version: `>=20.19.0`
-- Build command: `npm install && npm run build`
-- Publish/output directory: `dist`
+## Frontend Deployment (Vercel)
 
-Set this environment variable before building:
+### Settings
+- **Framework Preset**: Vite
+- **Root Directory**: `frontend`
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
 
-- `VITE_API_BASE_URL=https://your-backend-host`
+### Environment Variable
 
-## Suggested Order
+| Variable             | Value |
+|----------------------|-------|
+| `VITE_API_BASE_URL`  | Your Render backend URL (e.g. `https://caloriebank-backend.onrender.com`) |
 
-1. Deploy the backend first.
-2. Copy the backend URL into the frontend's `VITE_API_BASE_URL`.
-3. Deploy the frontend.
-4. Copy the frontend URL into the backend's `FRONTEND_URL`.
-5. Redeploy or restart the backend so the CORS setting is active.
+---
 
-## Local Check
+## Post-Deployment Steps
 
-From each service directory:
+1. Deploy the **backend** first.
+2. Copy the backend URL and set it as `VITE_API_BASE_URL` in the frontend.
+3. Deploy the **frontend**.
+4. Copy the frontend URL and add it to the backend's CORS settings (`origin` array in `server.js`).
+5. Redeploy the backend.
 
-```sh
+---
+
+## Local Development
+
+```bash
+# Backend
+cd backend
+cp .env.example .env
 npm install
-npm run build
-```
+npm run dev
 
-The backend has no build step; use `npm start` to verify it can connect to MongoDB with the configured environment.
+# Frontend (new terminal)
+cd frontend
+npm install
+npm run dev
+
+Troubleshooting
+
+CORS Error: Make sure the frontend URL is added in backend CORS configuration.
+MongoDB Connection: Verify IP whitelist includes 0.0.0.0/0.
+Photo Upload Fails: Check AWS credentials and bucket permissions.
+
+
+Live Links
+
+Frontend: https://caloriebank-pi.vercel.app/
+Backend: https://your-backend.onrender.com

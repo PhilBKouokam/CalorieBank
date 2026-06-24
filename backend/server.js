@@ -11,13 +11,9 @@ dotenv.config();
 
 const app = express();
 
-const allowedOrigins = (process.env.FRONTEND_URL || "")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
 app.use(cors({
-    origin: allowedOrigins.length > 0 ? allowedOrigins : true
+    origin: ["http://localhost:5173", "https://caloriebank-pi.vercel.app"],
+    credentials: true
 }));
 
 app.use("/api/upload", uploadRoutes);

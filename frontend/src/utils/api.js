@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4700";
+const API_BASE_URL = import.meta.env.MODE === "development"
+    ? "http://localhost:4700"
+    : "https://caloriebank-backend.onrender.com";   // ← Update this
 
 export const apiFetch = async (url, options = {}) => {
     const token = localStorage.getItem("token");
