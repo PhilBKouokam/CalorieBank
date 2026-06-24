@@ -68,7 +68,7 @@ export default function FoodLogList({ log, date }) {
         setEditPhotoPreview("");
     };
 
-    if (!log || log.entries.length === 0) {
+    if (!log || (log.entries || []).length === 0) {
         return (
             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 No entries yet. Add your first meal!
@@ -78,7 +78,7 @@ export default function FoodLogList({ log, date }) {
 
     return (
         <div className="space-y-3">
-            {log.entries.map((entry) => (
+            {(log.entries || []).map((entry) => (
                 <div key={entry._id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl">
                     {editingId === entry._id ? (
                         // Edit Mode

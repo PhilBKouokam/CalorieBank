@@ -3,6 +3,14 @@ import { s3Client } from "../config/aws.js";
 import FoodLog from "../models/FoodLog.js";
 import { normalizeLogDate } from "../utils/normalizeLogDate.js";
 
+const getDayRange = (dateValue) => {
+    const start = normalizeLogDate(dateValue);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 1);
+
+    return { start, end };
+};
+
 export const uploadFoodPhoto = async (req, res) => {
     try {
         if (!req.file) {
@@ -32,12 +40,15 @@ export const uploadFoodPhoto = async (req, res) => {
         const photoUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
 
         //Update the specific food entry
-        const targetDate = normalizeLogDate(date);
+        const { start, end } = getDayRange(date);
 
         const log = await FoodLog.findOneAndUpdate(
             {
                 user: req.user.userId,
-                date: targetDate,
+                date: {
+                    $gte: start,
+                    $lt: end
+                },
                 "entries._id": entryId
             },
             { $set: { "entries.$.photoUrl": photoUrl } },

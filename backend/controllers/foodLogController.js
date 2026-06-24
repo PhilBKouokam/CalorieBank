@@ -16,6 +16,14 @@ const getWeekStart = (date) => {
     return weekStart;
 };
 
+const getDayRange = (dateValue) => {
+    const start = normalizeLogDate(dateValue);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 1);
+
+    return { start, end };
+};
+
 export const getWeeklyBank = async (req, res) => {
     try {
         const today = normalizeLogDate();
@@ -76,17 +84,20 @@ export const getWeeklyBank = async (req, res) => {
 export const getDailyLog = async (req, res) => {
     try {
         const { date } = req.query;
-        const targetDate = normalizeLogDate(date);
+        const { start, end } = getDayRange(date);
 
         let log = await FoodLog.findOne({
             user: req.user.userId,
-            date: targetDate
+            date: {
+                $gte: start,
+                $lt: end
+            }
         });
 
         if (!log) {
             log = new FoodLog({
                 user: req.user.userId,
-                date: targetDate,
+                date: start,
                 entries: [],
                 burnedCalories: 0,
                 bankBalance: 0
@@ -111,11 +122,18 @@ export const addFoodEntry = async (req, res) => {
         const { foodName, calories, protein = 0, carbs = 0, fats = 0, photoUrl } = req.body;
         const { date } = req.query || {};
 
-        const targetDate = normalizeLogDate(date);
+        const { start, end } = getDayRange(date);
 
         let log = await FoodLog.findOneAndUpdate(
-            { user: req.user.userId, date: targetDate },
             {
+                user: req.user.userId,
+                date: {
+                    $gte: start,
+                    $lt: end
+                }
+            },
+            {
+                $setOnInsert: { date: start },
                 $push: {
                     entries: {
                         foodName: foodName.trim(),
@@ -152,12 +170,15 @@ export const updateFoodEntry = async (req, res) => {
         const { foodName, calories, protein, carbs, fats, photoUrl } = req.body;
         const { date } = req.query || {};
 
-        const targetDate = normalizeLogDate(date);
+        const { start, end } = getDayRange(date);
 
         const log = await FoodLog.findOneAndUpdate(
             {
                 user: req.user.userId,
-                date: targetDate,
+                date: {
+                    $gte: start,
+                    $lt: end
+                },
                 "entries._id": entryId
             },
             {
@@ -192,10 +213,16 @@ export const deleteFoodEntry = async (req, res) => {
         const { entryId } = req.params;
         const { date } = req.query || {};
 
-        const targetDate = normalizeLogDate(date);
+        const { start, end } = getDayRange(date);
 
         const log = await FoodLog.findOneAndUpdate(
-            { user: req.user.userId, date: targetDate },
+            {
+                user: req.user.userId,
+                date: {
+                    $gte: start,
+                    $lt: end
+                }
+            },
             { $pull: { entries: { _id: entryId } } },
             { new: true }
         );
@@ -218,7 +245,7 @@ export const logBurnedCalories = async (req, res) => {
     try {
         const { amount, activityType = "Activity" } = req.body;
         const { date } = req.query || {};
-        const targetDate = normalizeLogDate(date);
+        const { start, end } = getDayRange(date);
         const calories = Number(amount);
 
         if (!Number.isFinite(calories) || calories <= 0) {
@@ -226,8 +253,15 @@ export const logBurnedCalories = async (req, res) => {
         }
 
         const log = await FoodLog.findOneAndUpdate(
-            { user: req.user.userId, date: targetDate },
             {
+                user: req.user.userId,
+                date: {
+                    $gte: start,
+                    $lt: end
+                }
+            },
+            {
+                $setOnInsert: { date: start },
                 $inc: { burnedCalories: calories },
                 $push: {
                     burnedActivities: {
