@@ -28,6 +28,18 @@ export default function BurnedCaloriesLogger({ log, date }) {
 
     const activities = log?.burnedActivities || [];
 
+    const resetForm = () => {
+        setActivityType(activityOptions[0]);
+        setCustomActivityType("");
+        setAmount("");
+        setError("");
+    };
+
+    const handleCancel = () => {
+        resetForm();
+        setIsOpen(false);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
@@ -44,9 +56,7 @@ export default function BurnedCaloriesLogger({ log, date }) {
                 throw new Error("Failed to log burned calories");
             }
 
-            setActivityType(activityOptions[0]);
-            setCustomActivityType("");
-            setAmount("");
+            resetForm();
             setIsOpen(false);
         } catch (err) {
             setError(err.message || "Failed to log burned calories");
@@ -86,7 +96,7 @@ export default function BurnedCaloriesLogger({ log, date }) {
                         name="activityType"
                         value={activityType}
                         onChange={(e) => setActivityType(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:[color-scheme:dark]"
                         disabled={loading}
                     >
                         {activityOptions.map((option) => (
@@ -102,17 +112,27 @@ export default function BurnedCaloriesLogger({ log, date }) {
                         onChange={(e) => setAmount(e.target.value)}
                         required
                         min="1"
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                         placeholder="Calories"
                         disabled={loading}
                     />
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="px-5 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-70 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
-                    >
-                        {loading ? "Saving" : "Log"}
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={handleCancel}
+                            disabled={loading}
+                            className="px-4 py-3 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-70"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="px-5 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-70 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                        >
+                            {loading ? "Saving" : "Log"}
+                        </button>
+                    </div>
                     {activityType === "Other" && (
                         <input
                             type="text"
@@ -120,7 +140,7 @@ export default function BurnedCaloriesLogger({ log, date }) {
                             value={customActivityType}
                             onChange={(e) => setCustomActivityType(e.target.value)}
                             required
-                            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:col-span-3"
+                            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 sm:col-span-3"
                             placeholder="Custom activity"
                             disabled={loading}
                         />
