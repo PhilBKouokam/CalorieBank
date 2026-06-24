@@ -13,6 +13,21 @@ const getTodayDateString = () => {
     return `${year}-${month}-${day}`;
 };
 
+const getDateKey = (dateValue) => {
+    if (!dateValue) return "";
+    if (typeof dateValue === "string") return dateValue.split("T")[0];
+
+    return new Date(dateValue).toISOString().split("T")[0];
+};
+
+const findLogByDate = (logs = [], date) => {
+    const targetDate = getDateKey(date);
+
+    return logs.find((log) => getDateKey(log.date) === targetDate && (log.entries || []).length > 0)
+        || logs.find((log) => getDateKey(log.date) === targetDate)
+        || null;
+};
+
 export const FoodLogProvider = ({ children }) => {
     const { token } = useContext(AuthContext);
 
@@ -33,6 +48,21 @@ export const FoodLogProvider = ({ children }) => {
 
             if (res.ok) {
                 const data = await res.json();
+                if ((data.entries || []).length > 0) {
+                    setCurrentLog(data);
+                    return;
+                }
+
+                const weeklyRes = await apiFetch("/api/foodlog/weekly-bank");
+                if (weeklyRes.ok) {
+                    const weeklyData = await weeklyRes.json();
+                    setWeeklyBank(weeklyData);
+
+                    const matchingLog = findLogByDate(weeklyData.logs, date);
+                    setCurrentLog(matchingLog || data);
+                    return;
+                }
+
                 setCurrentLog(data);
             } else {
                 setError("Failed to load daily log");
