@@ -84,7 +84,7 @@ function AddEntry() {
                             value={formData.foodName}
                             onChange={handleChange}
                             required
-                            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                             placeholder="Grilled Chicken Breast"
                             disabled={loading}
                         />
@@ -99,7 +99,7 @@ function AddEntry() {
                                 value={formData.calories}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                                 placeholder="350"
                                 disabled={loading}
                             />
@@ -110,7 +110,7 @@ function AddEntry() {
                                 type="date"
                                 value={date}
                                 onChange={(e) => setDate(e.target.value)}
-                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:[color-scheme:dark]"
                                 disabled={loading}
                             />
                         </div>
@@ -124,7 +124,7 @@ function AddEntry() {
                                 name="protein"
                                 value={formData.protein}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                                 placeholder="30"
                                 disabled={loading}
                             />
@@ -136,7 +136,7 @@ function AddEntry() {
                                 name="carbs"
                                 value={formData.carbs}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                                 placeholder="10"
                                 disabled={loading}
                             />
@@ -148,7 +148,7 @@ function AddEntry() {
                                 name="fats"
                                 value={formData.fats}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                                 placeholder="15"
                                 disabled={loading}
                             />
@@ -162,7 +162,7 @@ function AddEntry() {
                             type="file"
                             accept="image/*"
                             onChange={handlePhotoChange}
-                            className="w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-emerald-600 file:text-white hover:file:bg-emerald-700"
+                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-4 file:py-2 file:text-white hover:file:bg-emerald-700"
                             disabled={loading}
                         />
                     </div>
