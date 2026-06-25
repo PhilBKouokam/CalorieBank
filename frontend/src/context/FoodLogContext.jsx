@@ -188,6 +188,47 @@ export const FoodLogProvider = ({ children }) => {
         }
     };
 
+    const updateBurnedActivity = async (activityId, amount, activityType, date = getTodayDateString()) => {
+        try {
+            const query = `?date=${date}`;
+            const res = await apiFetch(`/api/foodlog/burned/${activityId}${query}`, {
+                method: "PATCH",
+                body: JSON.stringify({ amount, activityType })
+            });
+
+            if (res.ok) {
+                const updatedLog = await res.json();
+                setCurrentLog(updatedLog);
+                fetchWeeklyBank();
+                return { success: true, log: updatedLog };
+            }
+            return { success: false };
+        } catch (err) {
+            console.error(err);
+            return { success: false };
+        }
+    };
+
+    const deleteBurnedActivity = async (activityId, date = getTodayDateString()) => {
+        try {
+            const query = `?date=${date}`;
+            const res = await apiFetch(`/api/foodlog/burned/${activityId}${query}`, {
+                method: "DELETE"
+            });
+
+            if (res.ok) {
+                const updatedLog = await res.json();
+                setCurrentLog(updatedLog);
+                fetchWeeklyBank();
+                return { success: true, log: updatedLog };
+            }
+            return { success: false };
+        } catch (err) {
+            console.error(err);
+            return { success: false };
+        }
+    };
+
     // Upload Photo for specific entry
     const uploadFoodPhoto = async (entryId, file, date = getTodayDateString()) => {
         try {
@@ -224,6 +265,8 @@ export const FoodLogProvider = ({ children }) => {
             updateFoodEntry,
             deleteFoodEntry,
             logBurnedCalories,
+            updateBurnedActivity,
+            deleteBurnedActivity,
             uploadFoodPhoto
          }}>
             {children}

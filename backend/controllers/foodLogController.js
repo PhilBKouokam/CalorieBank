@@ -312,3 +312,68 @@ export const logBurnedCalories = async (req, res) => {
         res.status(500).json({ message: "Failed to log burned calories" });
     }
 };
+
+export const updateBurnedActivity = async (req, res) => {
+    try {
+        const { activityId } = req.params;
+        const { amount, activityType = "Activity" } = req.body;
+        const { date } = req.query || {};
+        const calories = Number(amount);
+
+        if (!Number.isFinite(calories) || calories <= 0) {
+            return res.status(400).json({ message: "A valid calorie amount is required" });
+        }
+
+        const log = await mergeDailyLogs({
+            userId: req.user.userId,
+            date,
+            tdee: req.user.tdee,
+            createIfMissing: false
+        });
+        const activity = log?.burnedActivities.id(activityId);
+
+        if (!log || !activity) {
+            return res.status(404).json({ message: "Burned activity not found" });
+        }
+
+        activity.activityType = activityType.trim() || "Activity";
+        activity.calories = calories;
+        log.burnedCalories = log.burnedActivities.reduce((sum, item) => sum + (item.calories || 0), 0);
+        log.bankBalance = calculateDailyBank(log, req.user.tdee);
+        await log.save();
+
+        res.json(log);
+    } catch(error) {
+        console.error("Update Burned Activity Error:", error);
+        res.status(500).json({ message: "Failed to update burned activity" });
+    }
+};
+
+export const deleteBurnedActivity = async (req, res) => {
+    try {
+        const { activityId } = req.params;
+        const { date } = req.query || {};
+
+        const log = await mergeDailyLogs({
+            userId: req.user.userId,
+            date,
+            tdee: req.user.tdee,
+            createIfMissing: false
+        });
+        const activity = log?.burnedActivities.id(activityId);
+
+        if (!log || !activity) {
+            return res.status(404).json({ message: "Burned activity not found" });
+        }
+
+        activity.deleteOne();
+        log.burnedCalories = log.burnedActivities.reduce((sum, item) => sum + (item.calories || 0), 0);
+        log.bankBalance = calculateDailyBank(log, req.user.tdee);
+        await log.save();
+
+        res.json(log);
+    } catch(error) {
+        console.error("Delete Burned Activity Error:", error);
+        res.status(500).json({ message: "Failed to delete burned activity" });
+    }
+};

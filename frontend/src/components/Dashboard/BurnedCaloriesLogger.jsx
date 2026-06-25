@@ -1,5 +1,5 @@
 import { useContext, useState } from "react";
-import { Activity, Plus } from "lucide-react";
+import { Activity, Edit, Plus, Trash2 } from "lucide-react";
 import { FoodLogContext } from "../../context/FoodLogContext.jsx";
 
 const activityOptions = [
@@ -18,12 +18,15 @@ const activityOptions = [
 ];
 
 export default function BurnedCaloriesLogger({ log, date }) {
-    const { logBurnedCalories } = useContext(FoodLogContext);
+    const { logBurnedCalories, updateBurnedActivity, deleteBurnedActivity } = useContext(FoodLogContext);
     const [isOpen, setIsOpen] = useState(false);
     const [activityType, setActivityType] = useState(activityOptions[0]);
     const [customActivityType, setCustomActivityType] = useState("");
     const [amount, setAmount] = useState("");
+    const [editingId, setEditingId] = useState(null);
+    const [editForm, setEditForm] = useState({ activityType: "", amount: "" });
     const [loading, setLoading] = useState(false);
+    const [editLoading, setEditLoading] = useState(false);
     const [error, setError] = useState("");
 
     const activities = log?.burnedActivities || [];
@@ -38,6 +41,58 @@ export default function BurnedCaloriesLogger({ log, date }) {
     const handleCancel = () => {
         resetForm();
         setIsOpen(false);
+    };
+
+    const startEditing = (activity) => {
+        setEditingId(activity._id);
+        setEditForm({
+            activityType: activity.activityType || "Activity",
+            amount: activity.calories || ""
+        });
+        setError("");
+    };
+
+    const cancelEditing = () => {
+        setEditingId(null);
+        setEditForm({ activityType: "", amount: "" });
+        setError("");
+    };
+
+    const saveEdit = async () => {
+        if (!editingId) return;
+
+        setError("");
+        setEditLoading(true);
+
+        try {
+            const result = await updateBurnedActivity(
+                editingId,
+                editForm.amount,
+                editForm.activityType || "Activity",
+                date
+            );
+
+            if (!result.success) {
+                throw new Error("Failed to update burned calories");
+            }
+
+            cancelEditing();
+        } catch (err) {
+            setError(err.message || "Failed to update burned calories");
+        } finally {
+            setEditLoading(false);
+        }
+    };
+
+    const handleDelete = async (activityId) => {
+        if (!window.confirm("Delete this burned calorie entry?")) return;
+
+        setError("");
+        const result = await deleteBurnedActivity(activityId, date);
+
+        if (!result.success) {
+            setError("Failed to delete burned calories");
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -157,9 +212,74 @@ export default function BurnedCaloriesLogger({ log, date }) {
             {activities.length > 0 && (
                 <div className="mt-5 space-y-2">
                     {activities.slice().reverse().map((activity) => (
-                        <div key={activity._id || activity.addedAt} className="flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3">
-                            <span className="font-medium">{activity.activityType}</span>
-                            <span className="text-gray-500 dark:text-gray-400">{activity.calories} cal</span>
+                        <div key={activity._id || activity.addedAt} className="text-sm bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3">
+                            {editingId === activity._id ? (
+                                <div className="grid gap-3 sm:grid-cols-[1fr_140px_auto]">
+                                    <input
+                                        type="text"
+                                        name="activityType"
+                                        value={editForm.activityType}
+                                        onChange={(e) => setEditForm({ ...editForm, activityType: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+                                        placeholder="Activity"
+                                        disabled={editLoading}
+                                    />
+                                    <input
+                                        type="number"
+                                        name="amount"
+                                        value={editForm.amount}
+                                        onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+                                        required
+                                        min="1"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+                                        placeholder="Calories"
+                                        disabled={editLoading}
+                                    />
+                                    <div className="flex justify-end gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={cancelEditing}
+                                            disabled={editLoading}
+                                            className="px-3 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-70"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={saveEdit}
+                                            disabled={editLoading}
+                                            className="px-3 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-70"
+                                        >
+                                            {editLoading ? "Saving" : "Save"}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <span className="font-medium">{activity.activityType}</span>
+                                        <span className="ml-3 text-gray-500 dark:text-gray-400">{activity.calories} cal</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                                            onClick={() => startEditing(activity)}
+                                            aria-label={`Edit ${activity.activityType}`}
+                                        >
+                                            <Edit size={18} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                            onClick={() => handleDelete(activity._id)}
+                                            aria-label={`Delete ${activity.activityType}`}
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

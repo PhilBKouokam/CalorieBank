@@ -6,6 +6,8 @@ import {
     updateFoodEntry,
     deleteFoodEntry,
     logBurnedCalories,
+    updateBurnedActivity,
+    deleteBurnedActivity,
 } from "../controllers/foodLogController.js";
 import { protect } from "../middleware/auth.js";
 
@@ -19,5 +21,7 @@ router.post("/entry/", addFoodEntry);
 router.patch("/entry/:entryId", updateFoodEntry);
 router.delete("/entry/:entryId", deleteFoodEntry);
 router.post("/burned", logBurnedCalories);
+router.patch("/burned/:activityId", updateBurnedActivity);
+router.delete("/burned/:activityId", deleteBurnedActivity);
 
 export default router;
