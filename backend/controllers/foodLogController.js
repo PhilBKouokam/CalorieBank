@@ -63,6 +63,15 @@ const dedupeById = (items = []) => {
     });
 };
 
+const calculateBurnedCalories = (activities = []) => (
+    activities.reduce((sum, activity) => sum + (activity.calories || 0), 0)
+);
+
+const syncLogTotals = (log, tdee) => {
+    log.burnedCalories = calculateBurnedCalories(log.burnedActivities || []);
+    log.bankBalance = calculateDailyBank(log, tdee);
+};
+
 const mergeDailyLogs = async ({ userId, date, tdee, createIfMissing = false }) => {
     const day = getDayIdentity(date);
     const logs = await FoodLog.find(buildDailyLogQuery(userId, day)).sort({ createdAt: 1 });
@@ -91,10 +100,9 @@ const mergeDailyLogs = async ({ userId, date, tdee, createIfMissing = false }) =
 
     primary.entries = dedupeById(logs.flatMap((log) => log.entries || []));
     primary.burnedActivities = dedupeById(logs.flatMap((log) => log.burnedActivities || []));
-    primary.burnedCalories = logs.reduce((sum, log) => sum + (log.burnedCalories || 0), 0);
     primary.date = day.start;
     primary.logDate = day.logDate;
-    primary.bankBalance = calculateDailyBank(primary, tdee);
+    syncLogTotals(primary, tdee);
 
     await primary.save();
 
@@ -125,11 +133,12 @@ export const getWeeklyBank = async (req, res) => {
             const emptyLog = {
                 _id: day.toISOString(),
                 date: new Date(day),
+                logDate: getDateKey(day),
                 entries: [],
                 burnedCalories: 0
             };
             const logForDay = log || emptyLog;
-            const dayBank = log ? calculateDailyBank(log, req.user.tdee) : 0;
+            const dayBank = log ? log.bankBalance : 0;
             const consumedCalories = logForDay.entries.reduce((sum, entry) => sum + (entry.calories || 0), 0);
             bankBalance += dayBank;
 
@@ -138,6 +147,7 @@ export const getWeeklyBank = async (req, res) => {
             history.push({
                 _id: logForDay._id,
                 date: logForDay.date,
+                logDate: logForDay.logDate || getDateKey(logForDay.date),
                 consumedCalories,
                 burnedCalories: logForDay.burnedCalories || 0,
                 bankBalance: Math.round(dayBank)
@@ -168,8 +178,8 @@ export const getDailyLog = async (req, res) => {
             createIfMissing: true
         });
 
-        // Auto-update bank balance
-        log.bankBalance = calculateDailyBank(log, req.user.tdee);
+        // Auto-update totals
+        syncLogTotals(log, req.user.tdee);
         await log.save();
 
         res.json(log);
@@ -201,7 +211,7 @@ export const addFoodEntry = async (req, res) => {
             photoUrl: photoUrl || null
         });
 
-        log.bankBalance = calculateDailyBank(log, req.user.tdee);
+        syncLogTotals(log, req.user.tdee);
         await log.save();
 
         //  Get the ID of the newly added entry
@@ -242,7 +252,7 @@ export const updateFoodEntry = async (req, res) => {
         entry.fats = Number(fats);
         entry.photoUrl = photoUrl ?? null;
 
-        log.bankBalance = calculateDailyBank(log, req.user.tdee);
+        syncLogTotals(log, req.user.tdee);
         await log.save();
 
         res.json(log);
@@ -270,7 +280,7 @@ export const deleteFoodEntry = async (req, res) => {
         }
 
         entry.deleteOne();
-        log.bankBalance = calculateDailyBank(log, req.user.tdee);
+        syncLogTotals(log, req.user.tdee);
         await log.save();
 
         res.json(log);
@@ -297,13 +307,12 @@ export const logBurnedCalories = async (req, res) => {
             createIfMissing: true
         });
 
-        log.burnedCalories = (log.burnedCalories || 0) + calories;
         log.burnedActivities.push({
             activityType: activityType.trim() || "Activity",
             calories
         });
 
-        log.bankBalance = calculateDailyBank(log, req.user.tdee);
+        syncLogTotals(log, req.user.tdee);
         await log.save();
 
         res.json(log);
@@ -338,8 +347,7 @@ export const updateBurnedActivity = async (req, res) => {
 
         activity.activityType = activityType.trim() || "Activity";
         activity.calories = calories;
-        log.burnedCalories = log.burnedActivities.reduce((sum, item) => sum + (item.calories || 0), 0);
-        log.bankBalance = calculateDailyBank(log, req.user.tdee);
+        syncLogTotals(log, req.user.tdee);
         await log.save();
 
         res.json(log);
@@ -367,8 +375,7 @@ export const deleteBurnedActivity = async (req, res) => {
         }
 
         activity.deleteOne();
-        log.burnedCalories = log.burnedActivities.reduce((sum, item) => sum + (item.calories || 0), 0);
-        log.bankBalance = calculateDailyBank(log, req.user.tdee);
+        syncLogTotals(log, req.user.tdee);
         await log.save();
 
         res.json(log);

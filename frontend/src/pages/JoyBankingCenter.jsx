@@ -25,8 +25,17 @@ const defaultTreatPlan = {
     nextTreatCalories: ""
 };
 
-const formatDate = (dateValue) => {
-    const date = new Date(dateValue);
+const getDateKey = (day) => {
+    if (!day) return "";
+    if (typeof day === "object" && day.logDate) return day.logDate;
+    if (typeof day === "string") return day.split("T")[0];
+    return new Date(day).toISOString().split("T")[0];
+};
+
+const formatDate = (day) => {
+    const dateKey = getDateKey(day);
+    const [year, month, dateNumber] = dateKey.split("-").map(Number);
+    const date = new Date(year, month - 1, dateNumber);
     return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 };
 
@@ -49,6 +58,7 @@ const normalizeWeeklyHistory = (weeklyBank, user) => {
     return (weeklyBank?.logs || []).map((log) => ({
         _id: log._id,
         date: log.date,
+        logDate: log.logDate,
         ...calculateDayBank(log, user?.tdee)
     }));
 };
@@ -157,8 +167,8 @@ export default function JoyBankingCenter() {
 
                     <div className="space-y-2">
                         {weeklyHistory.map((day) => (
-                            <div key={day._id || day.date} className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center text-sm bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3">
-                                <span className="font-medium">{formatDate(day.date)}</span>
+                            <div key={day._id || day.logDate || day.date} className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center text-sm bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3">
+                                <span className="font-medium">{formatDate(day)}</span>
                                 <span className="text-gray-500 dark:text-gray-400">{day.consumedCalories} eaten</span>
                                 <span className="text-gray-500 dark:text-gray-400">{day.burnedCalories} burned</span>
                                 <span className={day.bankBalance >= 0 ? "text-emerald-600 font-semibold" : "text-red-600 font-semibold"}>

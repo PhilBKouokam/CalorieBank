@@ -15,6 +15,7 @@ const getTodayDateString = () => {
 
 const getDateKey = (dateValue) => {
     if (!dateValue) return "";
+    if (typeof dateValue === "object" && dateValue.logDate) return dateValue.logDate;
     if (typeof dateValue === "string") return dateValue.split("T")[0];
 
     return new Date(dateValue).toISOString().split("T")[0];
@@ -23,8 +24,8 @@ const getDateKey = (dateValue) => {
 const findLogByDate = (logs = [], date) => {
     const targetDate = getDateKey(date);
 
-    return logs.find((log) => getDateKey(log.date) === targetDate && (log.entries || []).length > 0)
-        || logs.find((log) => getDateKey(log.date) === targetDate)
+    return logs.find((log) => getDateKey(log) === targetDate && (log.entries || []).length > 0)
+        || logs.find((log) => getDateKey(log) === targetDate)
         || null;
 };
 
