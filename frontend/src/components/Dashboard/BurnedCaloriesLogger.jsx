@@ -24,7 +24,7 @@ export default function BurnedCaloriesLogger({ log, date }) {
     const [customActivityType, setCustomActivityType] = useState("");
     const [amount, setAmount] = useState("");
     const [editingId, setEditingId] = useState(null);
-    const [editForm, setEditForm] = useState({ activityType: "", amount: "" });
+    const [editForm, setEditForm] = useState({ activityType: activityOptions[0], customActivityType: "", amount: "" });
     const [loading, setLoading] = useState(false);
     const [editLoading, setEditLoading] = useState(false);
     const [error, setError] = useState("");
@@ -44,9 +44,13 @@ export default function BurnedCaloriesLogger({ log, date }) {
     };
 
     const startEditing = (activity) => {
+        const activityValue = activity.activityType || "Activity";
+        const isKnownActivity = activityOptions.includes(activityValue);
+
         setEditingId(activity._id);
         setEditForm({
-            activityType: activity.activityType || "Activity",
+            activityType: isKnownActivity ? activityValue : "Other",
+            customActivityType: isKnownActivity ? "" : activityValue,
             amount: activity.calories || ""
         });
         setError("");
@@ -54,7 +58,7 @@ export default function BurnedCaloriesLogger({ log, date }) {
 
     const cancelEditing = () => {
         setEditingId(null);
-        setEditForm({ activityType: "", amount: "" });
+        setEditForm({ activityType: activityOptions[0], customActivityType: "", amount: "" });
         setError("");
     };
 
@@ -65,10 +69,14 @@ export default function BurnedCaloriesLogger({ log, date }) {
         setEditLoading(true);
 
         try {
+            const selectedActivity = editForm.activityType === "Other"
+                ? editForm.customActivityType.trim()
+                : editForm.activityType;
+
             const result = await updateBurnedActivity(
                 editingId,
                 editForm.amount,
-                editForm.activityType || "Activity",
+                selectedActivity || "Activity",
                 date
             );
 
@@ -215,15 +223,23 @@ export default function BurnedCaloriesLogger({ log, date }) {
                         <div key={activity._id || activity.addedAt} className="text-sm bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3">
                             {editingId === activity._id ? (
                                 <div className="grid gap-3 sm:grid-cols-[1fr_140px_auto]">
-                                    <input
-                                        type="text"
+                                    <select
                                         name="activityType"
                                         value={editForm.activityType}
-                                        onChange={(e) => setEditForm({ ...editForm, activityType: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                                        placeholder="Activity"
+                                        onChange={(e) => setEditForm({
+                                            ...editForm,
+                                            activityType: e.target.value,
+                                            customActivityType: e.target.value === "Other" ? editForm.customActivityType : ""
+                                        })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:[color-scheme:dark]"
                                         disabled={editLoading}
-                                    />
+                                    >
+                                        {activityOptions.map((option) => (
+                                            <option key={option} value={option}>
+                                                {option}
+                                            </option>
+                                        ))}
+                                    </select>
                                     <input
                                         type="number"
                                         name="amount"
@@ -253,6 +269,18 @@ export default function BurnedCaloriesLogger({ log, date }) {
                                             {editLoading ? "Saving" : "Save"}
                                         </button>
                                     </div>
+                                    {editForm.activityType === "Other" && (
+                                        <input
+                                            type="text"
+                                            name="customActivityType"
+                                            value={editForm.customActivityType}
+                                            onChange={(e) => setEditForm({ ...editForm, customActivityType: e.target.value })}
+                                            required
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 sm:col-span-3"
+                                            placeholder="Custom activity"
+                                            disabled={editLoading}
+                                        />
+                                    )}
                                 </div>
                             ) : (
                                 <div className="flex items-center justify-between gap-3">
