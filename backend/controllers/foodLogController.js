@@ -16,37 +16,112 @@ const getWeekStart = (date) => {
     return weekStart;
 };
 
-const getDayRange = (dateValue) => {
-    const start = normalizeLogDate(dateValue);
+const getDateKey = (dateValue = null) => {
+    if (typeof dateValue === "string") {
+        const dateOnlyMatch = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (dateOnlyMatch) return dateValue;
+    }
+
+    const date = normalizeLogDate(dateValue);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+};
+
+const getDayIdentity = (dateValue) => {
+    const logDate = getDateKey(dateValue);
+    const start = normalizeLogDate(logDate);
     const end = new Date(start);
     end.setDate(start.getDate() + 1);
+    const utcStart = new Date(`${logDate}T00:00:00.000Z`);
+    const utcEnd = new Date(utcStart);
+    utcEnd.setUTCDate(utcStart.getUTCDate() + 1);
 
-    return { start, end };
+    return { logDate, start, end, utcStart, utcEnd };
+};
+
+const buildDailyLogQuery = (userId, day) => ({
+    user: userId,
+    $or: [
+        { logDate: day.logDate },
+        { date: { $gte: day.start, $lt: day.end } },
+        { date: { $gte: day.utcStart, $lt: day.utcEnd } }
+    ]
+});
+
+const dedupeById = (items = []) => {
+    const seen = new Set();
+
+    return items.filter((item) => {
+        const id = item._id?.toString();
+        if (!id) return true;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+    });
+};
+
+const mergeDailyLogs = async ({ userId, date, tdee, createIfMissing = false }) => {
+    const day = getDayIdentity(date);
+    const logs = await FoodLog.find(buildDailyLogQuery(userId, day)).sort({ createdAt: 1 });
+
+    if (logs.length === 0) {
+        if (!createIfMissing) return null;
+
+        const log = new FoodLog({
+            user: userId,
+            date: day.start,
+            logDate: day.logDate,
+            entries: [],
+            burnedCalories: 0,
+            burnedActivities: [],
+            bankBalance: 0
+        });
+        await log.save();
+        return log;
+    }
+
+    const primary = logs.find((log) => log.date?.getTime() === day.start.getTime())
+        || logs.find((log) => (log.entries || []).length > 0)
+        || logs.find((log) => (log.burnedActivities || []).length > 0 || (log.burnedCalories || 0) > 0)
+        || logs[0];
+    const duplicates = logs.filter((log) => !log._id.equals(primary._id));
+
+    primary.entries = dedupeById(logs.flatMap((log) => log.entries || []));
+    primary.burnedActivities = dedupeById(logs.flatMap((log) => log.burnedActivities || []));
+    primary.burnedCalories = logs.reduce((sum, log) => sum + (log.burnedCalories || 0), 0);
+    primary.date = day.start;
+    primary.logDate = day.logDate;
+    primary.bankBalance = calculateDailyBank(primary, tdee);
+
+    await primary.save();
+
+    if (duplicates.length > 0) {
+        await FoodLog.deleteMany({
+            _id: { $in: duplicates.map((log) => log._id) }
+        });
+    }
+
+    return primary;
 };
 
 export const getWeeklyBank = async (req, res) => {
     try {
         const today = normalizeLogDate();
         const weekStart = getWeekStart(today);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(today.getDate() + 1);
-
-        const logs = await FoodLog.find({
-            user: req.user.userId,
-            date: {
-                $gte: weekStart,
-                $lt: tomorrow
-            }
-        }).sort({ date: 1 });
-
-        const logsByDate = new Map(
-            logs.map((log) => [normalizeLogDate(log.date).toISOString(), log])
-        );
         let bankBalance = 0;
         const history = [];
+        const logs = [];
 
         for (const day = new Date(weekStart); day <= today; day.setDate(day.getDate() + 1)) {
-            const log = logsByDate.get(day.toISOString());
+            const log = await mergeDailyLogs({
+                userId: req.user.userId,
+                date: getDateKey(day),
+                tdee: req.user.tdee,
+                createIfMissing: false
+            });
             const emptyLog = {
                 _id: day.toISOString(),
                 date: new Date(day),
@@ -57,6 +132,8 @@ export const getWeeklyBank = async (req, res) => {
             const dayBank = log ? calculateDailyBank(log, req.user.tdee) : 0;
             const consumedCalories = logForDay.entries.reduce((sum, entry) => sum + (entry.calories || 0), 0);
             bankBalance += dayBank;
+
+            if (log) logs.push(log);
 
             history.push({
                 _id: logForDay._id,
@@ -84,26 +161,12 @@ export const getWeeklyBank = async (req, res) => {
 export const getDailyLog = async (req, res) => {
     try {
         const { date } = req.query;
-        const { start, end } = getDayRange(date);
-
-        let log = await FoodLog.findOne({
-            user: req.user.userId,
-            date: {
-                $gte: start,
-                $lt: end
-            }
+        const log = await mergeDailyLogs({
+            userId: req.user.userId,
+            date,
+            tdee: req.user.tdee,
+            createIfMissing: true
         });
-
-        if (!log) {
-            log = new FoodLog({
-                user: req.user.userId,
-                date: start,
-                entries: [],
-                burnedCalories: 0,
-                bankBalance: 0
-            });
-            await log.save();
-        }
 
         // Auto-update bank balance
         log.bankBalance = calculateDailyBank(log, req.user.tdee);
@@ -122,31 +185,21 @@ export const addFoodEntry = async (req, res) => {
         const { foodName, calories, protein = 0, carbs = 0, fats = 0, photoUrl } = req.body;
         const { date } = req.query || {};
 
-        const { start, end } = getDayRange(date);
+        const log = await mergeDailyLogs({
+            userId: req.user.userId,
+            date,
+            tdee: req.user.tdee,
+            createIfMissing: true
+        });
 
-        let log = await FoodLog.findOneAndUpdate(
-            {
-                user: req.user.userId,
-                date: {
-                    $gte: start,
-                    $lt: end
-                }
-            },
-            {
-                $setOnInsert: { date: start },
-                $push: {
-                    entries: {
-                        foodName: foodName.trim(),
-                        calories: Number(calories),
-                        protein: Number(protein),
-                        carbs: Number(carbs),
-                        fats: Number(fats),
-                        photoUrl: photoUrl || null
-                    }
-                }
-            },
-            { new: true, upsert: true }
-        );
+        log.entries.push({
+            foodName: foodName.trim(),
+            calories: Number(calories),
+            protein: Number(protein),
+            carbs: Number(carbs),
+            fats: Number(fats),
+            photoUrl: photoUrl || null
+        });
 
         log.bankBalance = calculateDailyBank(log, req.user.tdee);
         await log.save();
@@ -170,33 +223,24 @@ export const updateFoodEntry = async (req, res) => {
         const { foodName, calories, protein, carbs, fats, photoUrl } = req.body;
         const { date } = req.query || {};
 
-        const { start, end } = getDayRange(date);
+        const log = await mergeDailyLogs({
+            userId: req.user.userId,
+            date,
+            tdee: req.user.tdee,
+            createIfMissing: false
+        });
+        const entry = log?.entries.id(entryId);
 
-        const log = await FoodLog.findOneAndUpdate(
-            {
-                user: req.user.userId,
-                date: {
-                    $gte: start,
-                    $lt: end
-                },
-                "entries._id": entryId
-            },
-            {
-                $set: {
-                    "entries.$.foodName": foodName.trim(),
-                    "entries.$.calories": Number(calories),
-                    "entries.$.protein": Number(protein),
-                    "entries.$.carbs": Number(carbs),
-                    "entries.$.fats": Number(fats),
-                    "entries.$.photoUrl": photoUrl ?? null
-                }
-            }, 
-            { new: true }
-        );
-
-        if (!log) {
+        if (!log || !entry) {
             return res.status(404).json({ message: "Entry not found" });
         }
+
+        entry.foodName = foodName.trim();
+        entry.calories = Number(calories);
+        entry.protein = Number(protein);
+        entry.carbs = Number(carbs);
+        entry.fats = Number(fats);
+        entry.photoUrl = photoUrl ?? null;
 
         log.bankBalance = calculateDailyBank(log, req.user.tdee);
         await log.save();
@@ -213,24 +257,19 @@ export const deleteFoodEntry = async (req, res) => {
         const { entryId } = req.params;
         const { date } = req.query || {};
 
-        const { start, end } = getDayRange(date);
+        const log = await mergeDailyLogs({
+            userId: req.user.userId,
+            date,
+            tdee: req.user.tdee,
+            createIfMissing: false
+        });
+        const entry = log?.entries.id(entryId);
 
-        const log = await FoodLog.findOneAndUpdate(
-            {
-                user: req.user.userId,
-                date: {
-                    $gte: start,
-                    $lt: end
-                }
-            },
-            { $pull: { entries: { _id: entryId } } },
-            { new: true }
-        );
-
-        if (!log) {
+        if (!log || !entry) {
             return res.status(404).json({ message: "Entry not found" });
         }
 
+        entry.deleteOne();
         log.bankBalance = calculateDailyBank(log, req.user.tdee);
         await log.save();
 
@@ -245,33 +284,24 @@ export const logBurnedCalories = async (req, res) => {
     try {
         const { amount, activityType = "Activity" } = req.body;
         const { date } = req.query || {};
-        const { start, end } = getDayRange(date);
         const calories = Number(amount);
 
         if (!Number.isFinite(calories) || calories <= 0) {
             return res.status(400).json({ message: "A valid calorie amount is required" });
         }
 
-        const log = await FoodLog.findOneAndUpdate(
-            {
-                user: req.user.userId,
-                date: {
-                    $gte: start,
-                    $lt: end
-                }
-            },
-            {
-                $setOnInsert: { date: start },
-                $inc: { burnedCalories: calories },
-                $push: {
-                    burnedActivities: {
-                        activityType: activityType.trim() || "Activity",
-                        calories
-                    }
-                }
-            },
-            { new: true, upsert: true }
-        );
+        const log = await mergeDailyLogs({
+            userId: req.user.userId,
+            date,
+            tdee: req.user.tdee,
+            createIfMissing: true
+        });
+
+        log.burnedCalories = (log.burnedCalories || 0) + calories;
+        log.burnedActivities.push({
+            activityType: activityType.trim() || "Activity",
+            calories
+        });
 
         log.bankBalance = calculateDailyBank(log, req.user.tdee);
         await log.save();

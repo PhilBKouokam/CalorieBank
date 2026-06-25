@@ -11,6 +11,10 @@ const foodLogSchema = new mongoose.Schema({
         required: true,
         default: Date.now
     },
+    logDate: {
+        type: String,
+        trim: true
+    },
     entries: [{
         _id: {
             type: mongoose.Schema.Types.ObjectId,
@@ -73,6 +77,7 @@ const foodLogSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-foodLogSchema.index({ user: 1, date: 1 }, { unique: true });
+foodLogSchema.index({ user: 1, date: 1 });
+foodLogSchema.index({ user: 1, logDate: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model("FoodLog", foodLogSchema);
