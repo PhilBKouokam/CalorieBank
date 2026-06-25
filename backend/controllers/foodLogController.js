@@ -374,7 +374,7 @@ export const deleteBurnedActivity = async (req, res) => {
             return res.status(404).json({ message: "Burned activity not found" });
         }
 
-        activity.deleteOne();
+        log.burnedActivities.pull(activityId);
         syncLogTotals(log, req.user.tdee);
         await log.save();
 

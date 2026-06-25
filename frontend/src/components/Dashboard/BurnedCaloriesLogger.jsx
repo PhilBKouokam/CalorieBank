@@ -27,6 +27,7 @@ export default function BurnedCaloriesLogger({ log, date }) {
     const [editForm, setEditForm] = useState({ activityType: activityOptions[0], customActivityType: "", amount: "" });
     const [loading, setLoading] = useState(false);
     const [editLoading, setEditLoading] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
     const [error, setError] = useState("");
 
     const activities = log?.burnedActivities || [];
@@ -96,10 +97,16 @@ export default function BurnedCaloriesLogger({ log, date }) {
         if (!window.confirm("Delete this burned calorie entry?")) return;
 
         setError("");
-        const result = await deleteBurnedActivity(activityId, date);
+        setDeletingId(activityId);
 
-        if (!result.success) {
-            setError("Failed to delete burned calories");
+        try {
+            const result = await deleteBurnedActivity(activityId, date);
+
+            if (!result.success) {
+                setError("Failed to delete burned calories");
+            }
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -301,9 +308,10 @@ export default function BurnedCaloriesLogger({ log, date }) {
                                             type="button"
                                             className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                                             onClick={() => handleDelete(activity._id)}
+                                            disabled={deletingId === activity._id}
                                             aria-label={`Delete ${activity.activityType}`}
                                         >
-                                            <Trash2 size={18} />
+                                            <Trash2 size={18} className={deletingId === activity._id ? "opacity-40" : ""} />
                                         </button>
                                     </div>
                                 </div>
