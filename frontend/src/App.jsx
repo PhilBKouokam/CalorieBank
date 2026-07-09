@@ -27,10 +27,10 @@ function App() {
   const { isDark } = useContext(ThemeContext);
 
   return (
-    <div className={`min-h-screen ${isDark ? 'dark' : ''}`}>
+    <div className={`min-h-screen overflow-x-hidden ${isDark ? 'dark' : ''}`}>
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />

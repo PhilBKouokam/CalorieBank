@@ -79,7 +79,7 @@ export default function FoodLogList({ log, date }) {
     return (
         <div className="space-y-3">
             {(log.entries || []).map((entry) => (
-                <div key={entry._id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl">
+                <div key={entry._id} className="bg-gray-50 dark:bg-gray-800 p-3 rounded-2xl sm:p-4">
                     {editingId === entry._id ? (
                         // Edit Mode
                         <div className="space-y-3">
@@ -111,7 +111,7 @@ export default function FoodLogList({ log, date }) {
                                     placeholder="Food name"
                                 />
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div className="grid gap-2 sm:grid-cols-4">
                                 <div>
                                     <label className="block text-sm font-medium mb-1">Calories</label>
                                     <input
@@ -198,13 +198,13 @@ export default function FoodLogList({ log, date }) {
                                     />
                                 )}
                                 <div className="min-w-0">
-                                    <div className="font-medium">{entry.foodName}</div>
+                                    <div className="break-words font-medium">{entry.foodName}</div>
                                     <div className="text-sm text-gray-500 dark:text-gray-400">
                                         {entry.calories} cal • {entry.protein}p • {entry.carbs}c • {entry.fats}f 
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex shrink-0 gap-1 sm:gap-2">
                                 <button 
                                     className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                                     onClick={() => startEditing(entry)}

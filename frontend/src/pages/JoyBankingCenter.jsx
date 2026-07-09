@@ -122,9 +122,9 @@ export default function JoyBankingCenter() {
     };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
             <div>
-                <h1 className="text-4xl font-bold">Joy Banking Center</h1>
+                <h1 className="text-3xl font-bold leading-tight sm:text-4xl">Joy Banking Center</h1>
                 <p className="text-gray-600 dark:text-gray-400 mt-1">
                     Track your weekly bank and plan the treats you are saving room for.
                 </p>
@@ -137,7 +137,7 @@ export default function JoyBankingCenter() {
             )}
 
             <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-                <section className="card p-6">
+                <section className="card p-4 sm:p-6">
                     <div className="flex items-center gap-3 mb-5">
                         <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
                             <Landmark size={20} />
@@ -150,7 +150,7 @@ export default function JoyBankingCenter() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 mb-5">
+                    <div className="grid gap-3 mb-5 sm:grid-cols-3">
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
                             <p className="text-xs text-gray-500 dark:text-gray-400">Consumed</p>
                             <p className="text-2xl font-semibold">{weeklyTotals.consumed}</p>
@@ -167,7 +167,7 @@ export default function JoyBankingCenter() {
 
                     <div className="space-y-2">
                         {weeklyHistory.map((day) => (
-                            <div key={day._id || day.logDate || day.date} className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center text-sm bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3">
+                            <div key={day._id || day.logDate || day.date} className="grid gap-1 text-sm bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-3 sm:grid-cols-[1fr_auto_auto_auto] sm:gap-3 sm:items-center">
                                 <span className="font-medium">{formatDate(day)}</span>
                                 <span className="text-gray-500 dark:text-gray-400">{day.consumedCalories} eaten</span>
                                 <span className="text-gray-500 dark:text-gray-400">{day.burnedCalories} burned</span>
@@ -185,7 +185,7 @@ export default function JoyBankingCenter() {
                     </div>
                 </section>
 
-                <section className="card p-6">
+                <section className="card p-4 sm:p-6">
                     <div className="flex items-center gap-3 mb-5">
                         <div className="p-2 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                             <Gift size={20} />
@@ -248,7 +248,7 @@ export default function JoyBankingCenter() {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
-                <section className="card p-6">
+                <section className="card p-4 sm:p-6">
                     <div className="flex items-center gap-3 mb-5">
                         <div className="p-2 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
                             <Utensils size={20} />
@@ -257,9 +257,9 @@ export default function JoyBankingCenter() {
                     </div>
 
                     <div className="mb-3 flex items-end justify-between gap-3">
-                        <div>
+                        <div className="min-w-0">
                             <p className="text-sm text-gray-500 dark:text-gray-400">Goal</p>
-                            <p className="text-2xl font-semibold">{treatPlan.favoriteTreat || "Choose a treat"}</p>
+                            <p className="break-words text-xl font-semibold sm:text-2xl">{treatPlan.favoriteTreat || "Choose a treat"}</p>
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400">{Math.round(progress)}%</p>
                     </div>
@@ -278,7 +278,7 @@ export default function JoyBankingCenter() {
                     </p>
                 </section>
 
-                <section className="card p-6">
+                <section className="card p-4 sm:p-6">
                     <div className="flex items-center gap-3 mb-5">
                         <div className="p-2 rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
                             <Timer size={20} />
@@ -299,7 +299,7 @@ export default function JoyBankingCenter() {
                         ))}
                     </select>
 
-                    <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
                         <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
                             <p className="text-xs text-gray-500 dark:text-gray-400">Estimated Burn</p>
                             <p className="text-2xl font-semibold">{caloriesPerHour}/hr</p>

@@ -43,10 +43,10 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
             {/* Welcome Header */}
             <div>
-                <h1 className="text-4xl font-bold">Good morning, {user?.username} 👋</h1>
+                <h1 className="text-3xl font-bold leading-tight sm:text-4xl">Good morning, {user?.username} 👋</h1>
                 <p className="text-gray-600 dark:text-gray-400 mt-1">
                     Here's your progress for today
                 </p>
@@ -61,10 +61,10 @@ export default function Dashboard() {
             <BurnedCaloriesLogger log={currentLog} date={selectedDate} />
 
             {/* Today's Food Entries */}
-            <div className="card p-6">
+            <div className="card p-4 sm:p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
                     <div>
-                        <h2 className="text-2xl font-semibold">Food Entries</h2>
+                        <h2 className="text-xl font-semibold sm:text-2xl">Food Entries</h2>
                         <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mt-3 mb-1">
                             View Date
                         </label>
@@ -72,7 +72,7 @@ export default function Dashboard() {
                             type="date"
                             value={selectedDate}
                             onChange={(e) => setSelectedDate(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:[color-scheme:dark]"
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-900 dark:text-gray-100 dark:[color-scheme:dark] sm:w-auto"
                         />
                     </div>
                     <AddEntryButton date={selectedDate} />

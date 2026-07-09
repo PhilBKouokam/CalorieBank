@@ -9,16 +9,16 @@ export default function DailyBank({ log, user, weeklyBank }) {
     const extraBurn = log.burnedCalories || 0;
 
     return (
-        <div className="card p-8 text-center">
-            <p className="text-sm uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">
+        <div className="card p-5 text-center sm:p-8">
+            <p className="text-xs uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 sm:text-sm">
                 Calorie Bank
             </p>
 
-            <div className={`text-6xl font-bold mb-2 ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+            <div className={`text-5xl font-bold mb-2 sm:text-6xl ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
                 {isPositive ? '+' : ''}{bank}
             </div>
 
-            <p className="text-lg text-gray-600 dark:text-gray-400">
+            <p className="text-base text-gray-600 dark:text-gray-400 sm:text-lg">
                 calories {isPositive ? 'banked' : 'surplus'} this week through yesterday
             </p>
 

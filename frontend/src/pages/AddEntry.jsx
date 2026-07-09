@@ -63,9 +63,9 @@ function AddEntry() {
 
     return (
         <div className="max-w-2xl mx-auto">
-            <div className="card p-8">
-                <h1 className="text-3xl font-bold mb-2">Add New Entry</h1>
-                <p className="text-gray-600 dark:text-gray-400 mb-8">
+            <div className="card p-4 sm:p-8">
+                <h1 className="text-2xl font-bold mb-2 sm:text-3xl">Add New Entry</h1>
+                <p className="text-gray-600 dark:text-gray-400 mb-6 sm:mb-8">
                     Log your meal or snack
                 </p>
 
@@ -90,7 +90,7 @@ function AddEntry() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
                         <div>
                             <label className="block text-sm font-medium mb-1">Calories</label>
                             <input
@@ -116,7 +116,7 @@ function AddEntry() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid gap-4 sm:grid-cols-3">
                         <div>
                             <label className="block text-sm font-medium mb-1">Protein (g)</label>
                             <input

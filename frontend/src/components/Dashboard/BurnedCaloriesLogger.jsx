@@ -136,8 +136,8 @@ export default function BurnedCaloriesLogger({ log, date }) {
     };
 
     return (
-        <div className="card p-6">
-            <div className="flex items-center justify-between gap-4">
+        <div className="card p-4 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
                         <Activity size={20} />
@@ -153,7 +153,7 @@ export default function BurnedCaloriesLogger({ log, date }) {
                 <button
                     type="button"
                     onClick={() => setIsOpen((current) => !current)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors"
+                    className="inline-flex w-full items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors sm:w-auto"
                 >
                     <Plus size={18} />
                     Add Burn
@@ -186,7 +186,7 @@ export default function BurnedCaloriesLogger({ log, date }) {
                         placeholder="Calories"
                         disabled={loading}
                     />
-                    <div className="flex gap-2">
+                    <div className="flex justify-end gap-2">
                         <button
                             type="button"
                             onClick={handleCancel}
@@ -291,11 +291,11 @@ export default function BurnedCaloriesLogger({ log, date }) {
                                 </div>
                             ) : (
                                 <div className="flex items-center justify-between gap-3">
-                                    <div>
-                                        <span className="font-medium">{activity.activityType}</span>
+                                    <div className="min-w-0">
+                                        <span className="break-words font-medium">{activity.activityType}</span>
                                         <span className="ml-3 text-gray-500 dark:text-gray-400">{activity.calories} cal</span>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex shrink-0 gap-1 sm:gap-2">
                                         <button
                                             type="button"
                                             className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
