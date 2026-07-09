@@ -119,11 +119,13 @@ export const getWeeklyBank = async (req, res) => {
     try {
         const today = normalizeLogDate();
         const weekStart = getWeekStart(today);
+        const throughDate = new Date(today);
+        throughDate.setDate(today.getDate() - 1);
         let bankBalance = 0;
         const history = [];
         const logs = [];
 
-        for (const day = new Date(weekStart); day <= today; day.setDate(day.getDate() + 1)) {
+        for (const day = new Date(weekStart); day <= throughDate; day.setDate(day.getDate() + 1)) {
             const log = await mergeDailyLogs({
                 userId: req.user.userId,
                 date: getDateKey(day),
@@ -157,7 +159,7 @@ export const getWeeklyBank = async (req, res) => {
         res.json({
             bankBalance: Math.round(bankBalance),
             weekStart,
-            throughDate: today,
+            throughDate,
             logs,
             history
         });
