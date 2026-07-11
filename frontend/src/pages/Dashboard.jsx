@@ -19,17 +19,13 @@ const getTodayDateString = () => {
 };
 
 export default function Dashboard() {
-    const { currentLog, weeklyBank, loading, error, fetchDailyLog, fetchWeeklyBank } = useContext(FoodLogContext);
+    const { currentLog, weeklyBank, loading, error, fetchDailyLog } = useContext(FoodLogContext);
     const { user } = useContext(AuthContext);
     const [selectedDate, setSelectedDate] = useState(getTodayDateString());
 
     useEffect(() => {
         fetchDailyLog(selectedDate);
     }, [fetchDailyLog, selectedDate]);
-
-    useEffect(() => {
-        fetchWeeklyBank();
-    }, [fetchWeeklyBank]);
 
     if (loading && !currentLog) {
         return (

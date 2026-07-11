@@ -21,6 +21,20 @@ const getDateKey = (dateValue) => {
     return new Date(dateValue).toISOString().split("T")[0];
 };
 
+const createEmptyLog = (date = getTodayDateString()) => {
+    const logDate = getDateKey(date) || getTodayDateString();
+
+    return {
+        _id: `empty-${logDate}`,
+        date: logDate,
+        logDate,
+        entries: [],
+        burnedCalories: 0,
+        burnedActivities: [],
+        bankBalance: 0
+    };
+};
+
 const removeEntryFromLog = (log, entryId) => {
     if (!log) return log;
 
@@ -55,11 +69,12 @@ export const FoodLogProvider = ({ children }) => {
                 fetchWeeklyBank();
             } else {
                 const data = await res.json().catch(() => ({}));
-                setError(data.message || "Failed to load daily log");
+                console.error("Failed to load daily log:", data.message || res.statusText);
+                setCurrentLog(createEmptyLog(date));
             }
         } catch (err) {
             console.error(err);
-            setError("Network error");
+            setCurrentLog(createEmptyLog(date));
         } finally {
             setLoading(false);
         };
@@ -76,18 +91,16 @@ export const FoodLogProvider = ({ children }) => {
                 setWeeklyBank(data);
             } else {
                 const data = await res.json().catch(() => ({}));
-                setError(data.message || "Failed to load calorie bank");
+                console.error("Failed to load calorie bank:", data.message || res.statusText);
             }
         } catch (err) {
             console.error(err);
-            setError("Network error");
         }
     }, [token]);
 
     // Load today's log when token changes
     useEffect(() => {
         if (token) {
-            fetchDailyLog();
             fetchWeeklyBank();
         } else {
             setCurrentLog(null);
