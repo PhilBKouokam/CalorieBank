@@ -52,6 +52,25 @@ export const FoodLogProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
+    const fetchWeeklyBank = useCallback(async (date = getTodayDateString()) => {
+        if (!token) return;
+
+        try {
+            const query = `?date=${date}`;
+            const res = await apiFetch(`/api/foodlog/weekly-bank${query}`);
+
+            if (res.ok) {
+                const data = await res.json();
+                setWeeklyBank(data);
+            } else {
+                const data = await res.json().catch(() => ({}));
+                console.error("Failed to load calorie bank:", data.message || res.statusText);
+            }
+        } catch (err) {
+            console.error(err);
+        };
+    }, [token]);
+
     const fetchDailyLog = useCallback(async (date = getTodayDateString()) => {
         if (!token) return;
 
@@ -66,7 +85,7 @@ export const FoodLogProvider = ({ children }) => {
                 const data = await res.json();
                 setCurrentLog(data);
 
-                fetchWeeklyBank();
+                fetchWeeklyBank(date);
             } else {
                 const data = await res.json().catch(() => ({}));
                 console.error("Failed to load daily log:", data.message || res.statusText);
@@ -78,36 +97,18 @@ export const FoodLogProvider = ({ children }) => {
         } finally {
             setLoading(false);
         };
-    }, [token]);
-
-    const fetchWeeklyBank = useCallback(async () => {
-        if (!token) return;
-
-        try {
-            const res = await apiFetch("/api/foodlog/weekly-bank");
-
-            if (res.ok) {
-                const data = await res.json();
-                setWeeklyBank(data);
-            } else {
-                const data = await res.json().catch(() => ({}));
-                console.error("Failed to load calorie bank:", data.message || res.statusText);
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    }, [token]);
+    }, [fetchWeeklyBank, token]);
 
     // Load today's log when token changes
     useEffect(() => {
         if (token) {
-            fetchWeeklyBank();
+            fetchWeeklyBank(getTodayDateString());
         } else {
             setCurrentLog(null);
             setWeeklyBank(null);
             setLoading(false);
         }
-    }, [token, fetchDailyLog, fetchWeeklyBank]);
+    }, [token, fetchWeeklyBank]);
 
     const addFoodEntry = async (entryData, date = getTodayDateString()) => {
         try {
@@ -121,7 +122,7 @@ export const FoodLogProvider = ({ children }) => {
 
             const { log, entryId } = await res.json();
             setCurrentLog(log);
-            fetchWeeklyBank();
+            fetchWeeklyBank(date);
             return { success: true, log, entryId };
         } catch (err) {
             console.error(err);
@@ -140,7 +141,7 @@ export const FoodLogProvider = ({ children }) => {
             if (res.ok) {
                 const updatedLog = await res.json();
                 setCurrentLog(updatedLog);
-                fetchWeeklyBank();
+                fetchWeeklyBank(date || getDateKey(updatedLog));
                 return { success: true, log: updatedLog }
             }
             return { success: false };
@@ -163,7 +164,7 @@ export const FoodLogProvider = ({ children }) => {
             if (res.ok) {
                 const updatedLog = await res.json();
                 setCurrentLog(removeEntryFromLog(updatedLog, entryId));
-                fetchWeeklyBank();
+                fetchWeeklyBank(date || getDateKey(updatedLog));
                 return { success: true, log: updatedLog };
             }
 
@@ -187,7 +188,7 @@ export const FoodLogProvider = ({ children }) => {
             if (res.ok) {
                 const updatedLog = await res.json();
                 setCurrentLog(updatedLog);
-                fetchWeeklyBank();
+                fetchWeeklyBank(date);
                 return { success: true, log: updatedLog };
             }
             return { success: false };
@@ -208,7 +209,7 @@ export const FoodLogProvider = ({ children }) => {
             if (res.ok) {
                 const updatedLog = await res.json();
                 setCurrentLog(updatedLog);
-                fetchWeeklyBank();
+                fetchWeeklyBank(date);
                 return { success: true, log: updatedLog };
             }
             return { success: false };
@@ -228,7 +229,7 @@ export const FoodLogProvider = ({ children }) => {
             if (res.ok) {
                 const updatedLog = await res.json();
                 setCurrentLog(updatedLog);
-                fetchWeeklyBank();
+                fetchWeeklyBank(date);
                 return { success: true, log: updatedLog };
             }
             return { success: false };

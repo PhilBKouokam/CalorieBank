@@ -127,8 +127,9 @@ const mergeDailyLogs = async ({ userId, date, tdee, userCreatedAt = null, create
 
 export const getWeeklyBank = async (req, res) => {
     try {
+        const { date } = req.query || {};
         const { tdee, userCreatedAt } = await getBankContext(req);
-        const today = normalizeLogDate();
+        const today = normalizeLogDate(date);
         const weekStart = getWeekStart(today);
         const firstBankableDate = userCreatedAt ? normalizeLogDate(userCreatedAt) : weekStart;
         let bankBalance = 0;
@@ -136,8 +137,6 @@ export const getWeeklyBank = async (req, res) => {
         const logs = [];
 
         for (const day = new Date(weekStart); day <= today; day.setDate(day.getDate() + 1)) {
-            if (day < firstBankableDate) continue;
-
             const log = await mergeDailyLogs({
                 userId: req.user.userId,
                 date: getDateKey(day),
@@ -145,6 +144,9 @@ export const getWeeklyBank = async (req, res) => {
                 userCreatedAt,
                 createIfMissing: false
             });
+
+            if (day < firstBankableDate && !log) continue;
+
             const emptyLog = {
                 _id: day.toISOString(),
                 date: new Date(day),
