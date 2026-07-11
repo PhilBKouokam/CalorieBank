@@ -130,14 +130,12 @@ export const getWeeklyBank = async (req, res) => {
         const { tdee, userCreatedAt } = await getBankContext(req);
         const today = normalizeLogDate();
         const weekStart = getWeekStart(today);
-        const throughDate = new Date(today);
-        throughDate.setDate(today.getDate() - 1);
         const firstBankableDate = userCreatedAt ? normalizeLogDate(userCreatedAt) : weekStart;
         let bankBalance = 0;
         const history = [];
         const logs = [];
 
-        for (const day = new Date(weekStart); day <= throughDate; day.setDate(day.getDate() + 1)) {
+        for (const day = new Date(weekStart); day <= today; day.setDate(day.getDate() + 1)) {
             if (day < firstBankableDate) continue;
 
             const log = await mergeDailyLogs({
@@ -155,7 +153,8 @@ export const getWeeklyBank = async (req, res) => {
                 burnedCalories: 0
             };
             const logForDay = log || emptyLog;
-            const dayBank = log ? log.bankBalance : 0;
+            const isToday = day.getTime() === today.getTime();
+            const dayBank = log && !isToday ? log.bankBalance : 0;
             const consumedCalories = logForDay.entries.reduce((sum, entry) => sum + (entry.calories || 0), 0);
             bankBalance += dayBank;
 
@@ -174,7 +173,7 @@ export const getWeeklyBank = async (req, res) => {
         res.json({
             bankBalance: Math.round(bankBalance),
             weekStart,
-            throughDate,
+            throughDate: today,
             logs,
             history
         });

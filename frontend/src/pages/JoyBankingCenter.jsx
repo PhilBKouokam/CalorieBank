@@ -32,6 +32,15 @@ const getDateKey = (day) => {
     return new Date(day).toISOString().split("T")[0];
 };
 
+const getTodayDateKey = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const dateNumber = String(today.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${dateNumber}`;
+};
+
 const formatDate = (day) => {
     const dateKey = getDateKey(day);
     const [year, month, dateNumber] = dateKey.split("-").map(Number);
@@ -42,11 +51,12 @@ const formatDate = (day) => {
 const calculateDayBank = (log, tdee = 2000) => {
     const consumedCalories = (log.entries || []).reduce((sum, entry) => sum + (entry.calories || 0), 0);
     const burnedCalories = log.burnedCalories || 0;
+    const isToday = getDateKey(log) === getTodayDateKey();
 
     return {
         consumedCalories,
         burnedCalories,
-        bankBalance: Math.round((Number(tdee) || 2000) + burnedCalories - consumedCalories)
+        bankBalance: isToday ? 0 : Math.round((Number(tdee) || 2000) + burnedCalories - consumedCalories)
     };
 };
 
