@@ -1,10 +1,14 @@
 import FoodLog from "../models/FoodLog.js";
+import User from "../models/User.js";
 import { normalizeLogDate } from "../utils/normalizeLogDate.js";
 
 // Calculate Daily Bank Balance (TDEE + extra burn - intake)
-const calculateDailyBank = (log, tdee = 2000) => {
+const calculateDailyBank = (log, tdee = 2000, userCreatedAt = null) => {
     const totalIntake = log.entries.reduce((sum, entry) => sum + (entry.calories || 0), 0);
-    const totalBurn = tdee + (log.burnedCalories || 0);
+    const isSignupDay = userCreatedAt
+        && getDateKey(log.logDate || log.date) === getDateKey(userCreatedAt);
+    const baseBurn = isSignupDay ? 0 : tdee;
+    const totalBurn = baseBurn + (log.burnedCalories || 0);
 
     return Math.round(totalBurn - totalIntake);
 };
@@ -67,12 +71,21 @@ const calculateBurnedCalories = (activities = []) => (
     activities.reduce((sum, activity) => sum + (activity.calories || 0), 0)
 );
 
-const syncLogTotals = (log, tdee) => {
-    log.burnedCalories = calculateBurnedCalories(log.burnedActivities || []);
-    log.bankBalance = calculateDailyBank(log, tdee);
+const getBankContext = async (req) => {
+    const user = await User.findById(req.user.userId).select("createdAt tdee");
+
+    return {
+        tdee: user?.tdee || req.user.tdee || 2000,
+        userCreatedAt: user?.createdAt || null
+    };
 };
 
-const mergeDailyLogs = async ({ userId, date, tdee, createIfMissing = false }) => {
+const syncLogTotals = (log, tdee, userCreatedAt = null) => {
+    log.burnedCalories = calculateBurnedCalories(log.burnedActivities || []);
+    log.bankBalance = calculateDailyBank(log, tdee, userCreatedAt);
+};
+
+const mergeDailyLogs = async ({ userId, date, tdee, userCreatedAt = null, createIfMissing = false }) => {
     const day = getDayIdentity(date);
     const logs = await FoodLog.find(buildDailyLogQuery(userId, day)).sort({ createdAt: 1 });
 
@@ -102,7 +115,7 @@ const mergeDailyLogs = async ({ userId, date, tdee, createIfMissing = false }) =
     primary.burnedActivities = dedupeById(logs.flatMap((log) => log.burnedActivities || []));
     primary.date = day.start;
     primary.logDate = day.logDate;
-    syncLogTotals(primary, tdee);
+    syncLogTotals(primary, tdee, userCreatedAt);
 
     await primary.save();
 
@@ -117,6 +130,7 @@ const mergeDailyLogs = async ({ userId, date, tdee, createIfMissing = false }) =
 
 export const getWeeklyBank = async (req, res) => {
     try {
+        const { tdee, userCreatedAt } = await getBankContext(req);
         const today = normalizeLogDate();
         const weekStart = getWeekStart(today);
         const throughDate = new Date(today);
@@ -129,7 +143,8 @@ export const getWeeklyBank = async (req, res) => {
             const log = await mergeDailyLogs({
                 userId: req.user.userId,
                 date: getDateKey(day),
-                tdee: req.user.tdee,
+                tdee,
+                userCreatedAt,
                 createIfMissing: false
             });
             const emptyLog = {
@@ -173,15 +188,17 @@ export const getWeeklyBank = async (req, res) => {
 export const getDailyLog = async (req, res) => {
     try {
         const { date } = req.query;
+        const { tdee, userCreatedAt } = await getBankContext(req);
         const log = await mergeDailyLogs({
             userId: req.user.userId,
             date,
-            tdee: req.user.tdee,
+            tdee,
+            userCreatedAt,
             createIfMissing: true
         });
 
         // Auto-update totals
-        syncLogTotals(log, req.user.tdee);
+        syncLogTotals(log, tdee, userCreatedAt);
         await log.save();
 
         res.json(log);
@@ -196,11 +213,13 @@ export const addFoodEntry = async (req, res) => {
     try {
         const { foodName, calories, protein = 0, carbs = 0, fats = 0, photoUrl } = req.body;
         const { date } = req.query || {};
+        const { tdee, userCreatedAt } = await getBankContext(req);
 
         const log = await mergeDailyLogs({
             userId: req.user.userId,
             date,
-            tdee: req.user.tdee,
+            tdee,
+            userCreatedAt,
             createIfMissing: true
         });
 
@@ -213,7 +232,7 @@ export const addFoodEntry = async (req, res) => {
             photoUrl: photoUrl || null
         });
 
-        syncLogTotals(log, req.user.tdee);
+        syncLogTotals(log, tdee, userCreatedAt);
         await log.save();
 
         //  Get the ID of the newly added entry
@@ -234,11 +253,13 @@ export const updateFoodEntry = async (req, res) => {
         const { entryId } = req.params;
         const { foodName, calories, protein, carbs, fats, photoUrl } = req.body;
         const { date } = req.query || {};
+        const { tdee, userCreatedAt } = await getBankContext(req);
 
         const log = await mergeDailyLogs({
             userId: req.user.userId,
             date,
-            tdee: req.user.tdee,
+            tdee,
+            userCreatedAt,
             createIfMissing: false
         });
         const entry = log?.entries.id(entryId);
@@ -254,7 +275,7 @@ export const updateFoodEntry = async (req, res) => {
         entry.fats = Number(fats);
         entry.photoUrl = photoUrl ?? null;
 
-        syncLogTotals(log, req.user.tdee);
+        syncLogTotals(log, tdee, userCreatedAt);
         await log.save();
 
         res.json(log);
@@ -268,11 +289,13 @@ export const deleteFoodEntry = async (req, res) => {
     try {
         const { entryId } = req.params;
         const { date } = req.query || {};
+        const { tdee, userCreatedAt } = await getBankContext(req);
 
         const log = await mergeDailyLogs({
             userId: req.user.userId,
             date,
-            tdee: req.user.tdee,
+            tdee,
+            userCreatedAt,
             createIfMissing: false
         });
         const entry = log?.entries.id(entryId);
@@ -282,7 +305,7 @@ export const deleteFoodEntry = async (req, res) => {
         }
 
         entry.deleteOne();
-        syncLogTotals(log, req.user.tdee);
+        syncLogTotals(log, tdee, userCreatedAt);
         await log.save();
 
         res.json(log);
@@ -297,6 +320,7 @@ export const logBurnedCalories = async (req, res) => {
         const { amount, activityType = "Activity" } = req.body;
         const { date } = req.query || {};
         const calories = Number(amount);
+        const { tdee, userCreatedAt } = await getBankContext(req);
 
         if (!Number.isFinite(calories) || calories <= 0) {
             return res.status(400).json({ message: "A valid calorie amount is required" });
@@ -305,7 +329,8 @@ export const logBurnedCalories = async (req, res) => {
         const log = await mergeDailyLogs({
             userId: req.user.userId,
             date,
-            tdee: req.user.tdee,
+            tdee,
+            userCreatedAt,
             createIfMissing: true
         });
 
@@ -314,7 +339,7 @@ export const logBurnedCalories = async (req, res) => {
             calories
         });
 
-        syncLogTotals(log, req.user.tdee);
+        syncLogTotals(log, tdee, userCreatedAt);
         await log.save();
 
         res.json(log);
@@ -330,6 +355,7 @@ export const updateBurnedActivity = async (req, res) => {
         const { amount, activityType = "Activity" } = req.body;
         const { date } = req.query || {};
         const calories = Number(amount);
+        const { tdee, userCreatedAt } = await getBankContext(req);
 
         if (!Number.isFinite(calories) || calories <= 0) {
             return res.status(400).json({ message: "A valid calorie amount is required" });
@@ -338,7 +364,8 @@ export const updateBurnedActivity = async (req, res) => {
         const log = await mergeDailyLogs({
             userId: req.user.userId,
             date,
-            tdee: req.user.tdee,
+            tdee,
+            userCreatedAt,
             createIfMissing: false
         });
         const activity = log?.burnedActivities.id(activityId);
@@ -349,7 +376,7 @@ export const updateBurnedActivity = async (req, res) => {
 
         activity.activityType = activityType.trim() || "Activity";
         activity.calories = calories;
-        syncLogTotals(log, req.user.tdee);
+        syncLogTotals(log, tdee, userCreatedAt);
         await log.save();
 
         res.json(log);
@@ -363,11 +390,13 @@ export const deleteBurnedActivity = async (req, res) => {
     try {
         const { activityId } = req.params;
         const { date } = req.query || {};
+        const { tdee, userCreatedAt } = await getBankContext(req);
 
         const log = await mergeDailyLogs({
             userId: req.user.userId,
             date,
-            tdee: req.user.tdee,
+            tdee,
+            userCreatedAt,
             createIfMissing: false
         });
         const activity = log?.burnedActivities.id(activityId);
@@ -377,7 +406,7 @@ export const deleteBurnedActivity = async (req, res) => {
         }
 
         log.burnedActivities.pull(activityId);
-        syncLogTotals(log, req.user.tdee);
+        syncLogTotals(log, tdee, userCreatedAt);
         await log.save();
 
         res.json(log);
