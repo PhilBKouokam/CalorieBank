@@ -1,6 +1,17 @@
 # CalorieBank
 
-**Live Demo:** [https://caloriebank-pi.vercel.app/](https://caloriebank-pi.vercel.app/)
+CalorieBank is a full-stack calorie tracking application built with React, Node.js, Express, and MongoDB that treats calories like a bank account, helping users save calories throughout the week for planned treats while staying on track with their nutrition goals.
+
+## 🚀 Quick Links
+
+🎥 **2-Minute Project Walkthrough**  
+https://www.loom.com/share/3a0f06928e004bad80cd4ae181f65d1c
+
+🌐 **Live Application**  
+https://caloriebank-pi.vercel.app/
+
+💻 **Source Code**  
+This repository
 
 ![CalorieBank Dashboard](screenshots/dashboard.png)
 
