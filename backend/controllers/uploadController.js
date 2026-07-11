@@ -1,5 +1,5 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { s3Client } from "../config/aws.js";
+import { awsRegion, s3Client } from "../config/aws.js";
 import FoodLog from "../models/FoodLog.js";
 import { normalizeLogDate } from "../utils/normalizeLogDate.js";
 
@@ -31,6 +31,14 @@ const getDayIdentity = (dateValue) => {
 
 export const uploadFoodPhoto = async (req, res) => {
     try {
+        if (!awsRegion || !process.env.AWS_BUCKET_NAME) {
+            console.error("S3 upload config missing", {
+                hasRegion: Boolean(awsRegion),
+                hasBucket: Boolean(process.env.AWS_BUCKET_NAME)
+            });
+            return res.status(500).json({ message: "Photo upload is not configured" });
+        }
+
         if (!req.file) {
             return res.status(400).json({ message: "No file uploaded" });
         }
@@ -44,7 +52,8 @@ export const uploadFoodPhoto = async (req, res) => {
         const file = req.file;
 
         // Generate unique filename
-        const fileName = `food-photos/${req.user.userId}-${Date.now()}-${file.originalname}`;
+        const safeOriginalName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "-");
+        const fileName = `food-photos/${req.user.userId}-${Date.now()}-${safeOriginalName}`;
 
         const uploadParams = {
             Bucket: process.env.AWS_BUCKET_NAME,
@@ -55,7 +64,7 @@ export const uploadFoodPhoto = async (req, res) => {
 
         await s3Client.send(new PutObjectCommand(uploadParams));
 
-        const photoUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+        const photoUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${awsRegion}.amazonaws.com/${encodeURIComponent(fileName).replace(/%2F/g, "/")}`;
 
         //Update the specific food entry
         const day = getDayIdentity(date);
