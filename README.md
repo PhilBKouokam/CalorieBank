@@ -15,22 +15,29 @@ This repository
 
 ![CalorieBank Dashboard](screenshots/dashboard.png)
 
-CalorieBank is a full-stack calorie tracking application that treats calories like a **daily and weekly bank**. Instead of just logging what you eat, it calculates how many calories you have "banked" based on your personal TDEE, food intake, and extra activity.
+## ⚡ Built With
 
-The goal is to help users build a healthier, more positive relationship with food by giving them visibility into their calorie surplus or deficit over time.
+React • Node.js • Express • MongoDB • AWS S3 • JWT Authentication • Tailwind CSS
 
----
+## 👀 What You'll See
 
-## ✨ Features
+✔ Secure user registration and JWT authentication
 
-- User authentication with JWT
-- Personalized TDEE calculation (height, weight, age, sex, activity level)
-- Daily food logging with macros (calories, protein, carbs, fats)
-- Food photo uploads stored in AWS S3
-- Automatic daily calorie bank calculation (`TDEE + extra burn - intake`)
-- Weekly banking history and progress tracking
-- Dark/Light mode support
-- Responsive, modern UI with Tailwind CSS
+✔ Personalized TDEE calculation
+
+✔ Food logging with image uploads
+
+✔ Activity tracking
+
+✔ Automatic calorie banking
+
+✔ Joy Bank weekly planner
+
+## 💡 Why I Built This
+
+Most calorie tracking apps focus on restriction and daily calorie limits. I wanted to explore a different mental model: treating calories like a bank account.
+
+Instead of feeling like one higher-calorie meal ruins your progress, CalorieBank helps users budget calories across the week, making nutrition more flexible and sustainable while still supporting long-term fitness goals.
 
 ---
 
@@ -52,6 +59,55 @@ The goal is to help users build a healthier, more positive relationship with foo
 
 ---
 
+## ✨ Features
+
+- User authentication with JWT
+- Personalized TDEE calculation (height, weight, age, sex, activity level)
+- Daily food logging with macros (calories, protein, carbs, fats)
+- Food photo uploads stored in AWS S3
+- Automatic daily calorie bank calculation (`TDEE + extra burn - intake`)
+- Weekly banking history and progress tracking
+- Dark/Light mode support
+- Responsive, modern UI with Tailwind CSS
+
+---
+
+## 🏗️ Engineering Highlights
+
+- Built a RESTful Express API with JWT-protected routes.
+- Designed MongoDB schemas for users, daily food logs, meal entries, and burned activities.
+- Implemented automatic TDEE-based calorie banking logic on the backend.
+- Added date normalization to ensure each user has exactly one daily log per day.
+- Integrated AWS S3 using Multer for secure food image uploads.
+- Deployed a split frontend/backend architecture using Vercel, Render, MongoDB Atlas, and AWS S3.
+
+---
+
+## 🎯 Project Goals
+
+This project was built to demonstrate:
+
+- Full-stack application architecture
+- Secure JWT authentication
+- REST API design
+- MongoDB data modeling
+- AWS S3 integration
+- React Context state management
+- Responsive UI development
+- Production deployment
+
+---
+
+## 🔄 Key User Flows
+
+1. A new user registers and receives a personalized TDEE estimate.
+2. The dashboard initializes with today's food log and weekly calorie bank.
+3. The user logs meals, uploads food photos, and records extra burned activity.
+4. The backend recalculates the calorie bank after every update.
+5. The Joy Bank visualizes weekly progress and helps users plan treat meals using their accumulated calorie bank.
+
+---
+
 ## Screenshots
 
 ![Dashboard](screenshots/dashboard.png)
@@ -64,6 +120,9 @@ The goal is to help users build a healthier, more positive relationship with foo
 
 ## Architecture
 
+CalorieBank follows a clean client-server architecture. The React frontend communicates with a RESTful Express API, controllers contain the business logic, MongoDB stores application data, and AWS S3 stores uploaded food images.
+
+```text
 CalorieBank/
 ├── backend/               # Express API
 │   ├── controllers/       # Business logic
@@ -128,6 +187,8 @@ VITE_API_BASE_URL=http://localhost:4700
 
 ## API Overview
 
+> **Authentication:** All Food Log, Banking, and Upload endpoints require a valid JWT Bearer Token after login.
+
 | Area | Method | Route | Purpose |
 | --- | --- | --- | --- |
 | Auth | `POST` | `/api/auth/register` | Create a user and return a JWT |
@@ -151,18 +212,30 @@ VITE_API_BASE_URL=http://localhost:4700
 
 ## Validation
 
-Current checks:
+Current validation includes:
 
 ```sh
 cd frontend && npm run build
 cd backend && node --check server.js
 ```
 
-The production frontend build passes, and the backend entry file passes Node syntax validation.
+The frontend production build passes successfully, and the backend entry point passes Node.js syntax validation.
+
+Comprehensive unit and integration testing is planned for future iterations as the project continues to evolve.
 
 ## Deployment
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for hosting setup, environment variables, and deployment order.
+
+## ⚖️ Design Decisions
+
+**State Management**
+
+React Context was chosen because the application's shared state is relatively small and predictable. As the project grows, React Query or Redux Toolkit could provide improved server-state management and caching.
+
+**Backend Business Logic**
+
+Business logic intentionally lives on the backend so the frontend remains focused on rendering state while the server remains the source of truth for calorie banking calculations.
 
 ## Future Improvements
 
