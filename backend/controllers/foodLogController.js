@@ -3,12 +3,9 @@ import User from "../models/User.js";
 import { normalizeLogDate } from "../utils/normalizeLogDate.js";
 
 // Calculate Daily Bank Balance (TDEE + extra burn - intake)
-const calculateDailyBank = (log, tdee = 2000, userCreatedAt = null) => {
+const calculateDailyBank = (log, tdee = 2000) => {
     const totalIntake = log.entries.reduce((sum, entry) => sum + (entry.calories || 0), 0);
-    const isSignupDay = userCreatedAt
-        && getDateKey(log.logDate || log.date) === getDateKey(userCreatedAt);
-    const baseBurn = isSignupDay ? 0 : tdee;
-    const totalBurn = baseBurn + (log.burnedCalories || 0);
+    const totalBurn = tdee + (log.burnedCalories || 0);
 
     return Math.round(totalBurn - totalIntake);
 };
@@ -82,7 +79,7 @@ const getBankContext = async (req) => {
 
 const syncLogTotals = (log, tdee, userCreatedAt = null) => {
     log.burnedCalories = calculateBurnedCalories(log.burnedActivities || []);
-    log.bankBalance = calculateDailyBank(log, tdee, userCreatedAt);
+    log.bankBalance = calculateDailyBank(log, tdee);
 };
 
 const mergeDailyLogs = async ({ userId, date, tdee, userCreatedAt = null, createIfMissing = false }) => {
@@ -135,11 +132,14 @@ export const getWeeklyBank = async (req, res) => {
         const weekStart = getWeekStart(today);
         const throughDate = new Date(today);
         throughDate.setDate(today.getDate() - 1);
+        const firstBankableDate = userCreatedAt ? normalizeLogDate(userCreatedAt) : weekStart;
         let bankBalance = 0;
         const history = [];
         const logs = [];
 
         for (const day = new Date(weekStart); day <= throughDate; day.setDate(day.getDate() + 1)) {
+            if (day < firstBankableDate) continue;
+
             const log = await mergeDailyLogs({
                 userId: req.user.userId,
                 date: getDateKey(day),

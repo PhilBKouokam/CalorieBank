@@ -100,7 +100,10 @@ export default function Register() {
                 throw new Error(data.message || "Registration failed");
             }
 
-            login(data.token, data.user);
+            login(data.token, {
+                ...data.user,
+                createdAt: data.user?.createdAt || new Date().toISOString()
+            });
             navigate("/");
         } catch(err) {
             setError(err.message || "Something went wrong");

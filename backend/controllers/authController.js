@@ -32,6 +32,7 @@ const generateToken = (user) => {
         {
             userId: user._id,
             username: user.username,
+            createdAt: user.createdAt,
             tdee,
             dailyCalorieIntake
         },
@@ -123,7 +124,8 @@ export const register = async (req, res) => {
                 sex: user.sex,
                 activityLevel: user.activityLevel,
                 dailyCalorieIntake: dailyCalorieIntakeValue,
-                tdee: tdeeValue
+                tdee: tdeeValue,
+                createdAt: user.createdAt
             }
         });
     } catch (error) {
@@ -169,7 +171,8 @@ export const login = async (req, res) => {
                 sex: user.sex,
                 activityLevel: user.activityLevel,
                 dailyCalorieIntake: dailyCalorieIntakeValue,
-                tdee: tdeeValue
+                tdee: tdeeValue,
+                createdAt: user.createdAt
             }
         });
     } catch(error) {

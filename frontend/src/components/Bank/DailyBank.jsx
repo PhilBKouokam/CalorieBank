@@ -1,7 +1,17 @@
+const getDateKey = (dateValue = new Date()) => {
+    const date = new Date(dateValue);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+};
+
 export default function DailyBank({ log, user, weeklyBank }) {
     if (!log) return null;
 
-    const bank = weeklyBank?.bankBalance || 0;
+    const isSignupDay = user?.createdAt && getDateKey(user.createdAt) === getDateKey();
+    const bank = isSignupDay ? 0 : (weeklyBank?.bankBalance || 0);
     const isPositive = bank >= 0;
     const consumedCalories = log.entries.reduce((sum, e) => sum + (e.calories || 0), 0);
     const dailyCalorieIntake = user?.dailyCalorieIntake || 2000;
