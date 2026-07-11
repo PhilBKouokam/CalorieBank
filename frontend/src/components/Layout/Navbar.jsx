@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useContext, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { ThemeContext } from "../../context/ThemeContext";
@@ -8,6 +8,7 @@ export default function Navbar() {
     const { user, logout } = useContext(AuthContext);
     const { isDark, toggleTheme } = useContext(ThemeContext);
     const location = useLocation();
+    const navigate = useNavigate();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     const navLinks = [
@@ -21,6 +22,7 @@ export default function Navbar() {
     const handleLogout = () => {
         setIsMenuOpen(false);
         logout();
+        navigate("/login", { replace: true });
     };
 
     const navLinkClass = (path) =>
@@ -70,7 +72,7 @@ export default function Navbar() {
                                 </span>
                                 
                                 <button
-                                    onClick={logout}
+                                    onClick={handleLogout}
                                     className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg transition-colors"
                                 >
                                     <LogOut size={18} />

@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }) => {
                     dailyCalorieIntake: payload.dailyCalorieIntake || storedUser?.dailyCalorieIntake || 2000,
                     tdee: payload.tdee || storedUser?.tdee || 2000
                 });
-            } catch(error) {
+            } catch {
                 console.error("Invalid token");
                 localStorage.removeItem("token");
                 localStorage.removeItem("user");
@@ -67,8 +67,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem("user");
         setToken(null);
         setUser(null);
-        setLoading(true);
-        window.location.href = "/login";
+        setLoading(false);
     };
 
     return (
