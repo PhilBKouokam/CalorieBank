@@ -29,6 +29,15 @@ const findLogByDate = (logs = [], date) => {
         || null;
 };
 
+const removeEntryFromLog = (log, entryId) => {
+    if (!log) return log;
+
+    return {
+        ...log,
+        entries: (log.entries || []).filter((entry) => entry._id !== entryId)
+    };
+};
+
 export const FoodLogProvider = ({ children }) => {
     const { token } = useContext(AuthContext);
 
@@ -149,6 +158,9 @@ export const FoodLogProvider = ({ children }) => {
     };
 
     const deleteFoodEntry = async (entryId, date = null) => {
+        const previousLog = currentLog;
+        setCurrentLog((log) => removeEntryFromLog(log, entryId));
+
         try {
             const query = date ? `?date=${date}` : "";
             const res = await apiFetch(`/api/foodlog/entry/${entryId}${query}`, {
@@ -157,13 +169,16 @@ export const FoodLogProvider = ({ children }) => {
 
             if (res.ok) {
                 const updatedLog = await res.json();
-                setCurrentLog(updatedLog);
+                setCurrentLog(removeEntryFromLog(updatedLog, entryId));
                 fetchWeeklyBank();
                 return { success: true, log: updatedLog };
             }
+
+            setCurrentLog(previousLog);
             return { success: false };
         } catch (err) {
             console.error(err);
+            setCurrentLog(previousLog);
             return { success: false };
         }
     };
