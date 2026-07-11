@@ -21,14 +21,6 @@ const getDateKey = (dateValue) => {
     return new Date(dateValue).toISOString().split("T")[0];
 };
 
-const findLogByDate = (logs = [], date) => {
-    const targetDate = getDateKey(date);
-
-    return logs.find((log) => getDateKey(log) === targetDate && (log.entries || []).length > 0)
-        || logs.find((log) => getDateKey(log) === targetDate)
-        || null;
-};
-
 const removeEntryFromLog = (log, entryId) => {
     if (!log) return log;
 
@@ -58,24 +50,12 @@ export const FoodLogProvider = ({ children }) => {
 
             if (res.ok) {
                 const data = await res.json();
-                if ((data.entries || []).length > 0) {
-                    setCurrentLog(data);
-                    return;
-                }
-
-                const weeklyRes = await apiFetch("/api/foodlog/weekly-bank");
-                if (weeklyRes.ok) {
-                    const weeklyData = await weeklyRes.json();
-                    setWeeklyBank(weeklyData);
-
-                    const matchingLog = findLogByDate(weeklyData.logs, date);
-                    setCurrentLog(matchingLog || data);
-                    return;
-                }
-
                 setCurrentLog(data);
+
+                fetchWeeklyBank();
             } else {
-                setError("Failed to load daily log");
+                const data = await res.json().catch(() => ({}));
+                setError(data.message || "Failed to load daily log");
             }
         } catch (err) {
             console.error(err);

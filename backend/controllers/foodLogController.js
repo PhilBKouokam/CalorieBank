@@ -73,7 +73,7 @@ const getBankContext = async (req) => {
 
     return {
         tdee: user?.tdee || req.user.tdee || 2000,
-        userCreatedAt: user?.createdAt || null
+        userCreatedAt: user?.createdAt || req.user.createdAt || null
     };
 };
 
