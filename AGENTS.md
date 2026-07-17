@@ -2,9 +2,13 @@
 
 ## Product Priority
 
-The primary loop is: set target -> log calories -> calculate daily result -> update ledger -> explain balance.
+The primary V1 loop is: connect supported data sources -> configure goal and target -> automatically sync intake and expenditure data -> calculate bank changes -> update immutable ledger -> send one meaningful morning bank update -> explain the balance.
 
 Do not introduce features outside that loop without explicit approval.
+
+Food logging is secondary in V1. Treat manual entry as fallback, correction, supplementary input, or future expansion, not the dominant product workflow.
+
+The authoritative V1 product direction is `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. The connection-first direction change is recorded in `docs/product/adr-001-connection-first-v1.md`.
 
 ## Engineering Rules
 
@@ -14,6 +18,8 @@ Do not introduce features outside that loop without explicit approval.
 - Banking logic belongs in `packages/domain`.
 - Shared API schemas belong in `packages/schemas`.
 - Shared compiler and tooling config belongs in `packages/config`.
+- Follow `docs/product/bank-calculation-spec.md` for all bank terminology, formulas, initialization, ledger, history, correction, and notification calculation behavior.
+- Integration claims must be technically verified before being documented or implemented.
 - Ledger-style balance records are immutable.
 - Do not store the bank exclusively as one mutable balance.
 - Every balance change must be traceable.

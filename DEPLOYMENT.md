@@ -2,6 +2,8 @@
 
 This document explains how to deploy **CalorieBank V0.1** (Backend + Frontend).
 
+> Status: legacy prototype deployment reference. This is not the deployment plan for the connection-first mobile V1 described in `docs/product/v1-prd.md`.
+
 ## Overview
 
 - **Backend**: Node.js + Express API (deployed on Render)

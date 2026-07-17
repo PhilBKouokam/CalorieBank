@@ -2,6 +2,14 @@
 
 Date: 2026-07-16
 
+## 2026-07-16 Direction Update
+
+The original audit was written when V1 was assumed to be manual-food-logging-first. That assumption is superseded.
+
+The authoritative V1 direction is now connection-first automatic calorie banking: users connect supported calorie-intake and calorie-expenditure/health data sources, configure a goal and target, receive automatic bank calculations, and get one meaningful morning bank update. Manual food logging remains useful prototype work, but for first-10-user V1 it is fallback/correction/supplementary behavior rather than the promoted product loop.
+
+The current architecture inventory below remains valid as a description of the existing prototype. Forward-looking reuse, migration, database, and vertical-slice guidance has been updated to match `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`.
+
 ## 1. Current Architecture
 
 CalorieBank is currently a deployed web prototype split into two independent npm projects:
@@ -95,13 +103,13 @@ This is a useful prototype but does not match the V1 direction of Expo React Nat
 
 Reusable as product/domain reference:
 
-- Manual food logging fields: food name, calories, protein, carbs, fats, date, optional image.
+- Manual food logging fields: food name, calories, protein, carbs, fats, date, optional image. These should be reused only as fallback/correction/supplementary concepts for V1, not as the primary loop.
 - Registration profile fields: height, weight, age, sex, activity level, daily calorie target.
 - TDEE calculation concept, with medical/fitness disclaimers and formula review before production.
-- Extra-burn logging concept and CRUD behavior.
-- Daily and weekly summary UX.
-- Treat-planning/Joy Bank concept as a later feature, not the first mobile slice.
-- API route intent: auth, daily log, food entry, activity burn, weekly summary.
+- Extra-burn logging concept and CRUD behavior, especially source labeling and correction semantics for future imported expenditure data.
+- Daily and weekly summary UX as reference for balance explanations and history, not for a food-log-centered home screen.
+- Treat-planning/Joy Bank concept as a secondary saved food/meal/event planning feature.
+- API route intent: auth, daily log, food entry, activity burn, weekly summary. V1 API design should instead prioritize integrations, sync status, imported records, ledger/history, notifications, and corrections.
 - Date-only log concept using `YYYY-MM-DD` as a user-visible day key.
 - Screenshot and README material as product-reference artifacts.
 
@@ -111,6 +119,7 @@ Reusable with modification:
 - TDEE calculation should move into a typed shared or backend domain module with unit tests.
 - Existing REST endpoint names can inform V1 API naming, but payloads should be versioned and validated.
 - UI hierarchy can inspire React Native screens, but components must be rewritten with native primitives.
+- Prototype food-log state can inform manual correction/fallback flows, but should not drive onboarding, retention, or first beta success metrics.
 
 ## 5. Code That Should Be Rewritten
 
@@ -119,9 +128,9 @@ Reusable with modification:
 - Mongo/Mongoose models should not be carried forward because V1 calls for PostgreSQL and a transactional ledger.
 - Current mutable `FoodLog.bankBalance` should be replaced with derived balances from ledger transactions.
 - Current embedded `entries` and `burnedActivities` arrays should become relational rows.
-- Photo upload should be postponed until after the manual core loop unless it is required for beta. If kept, it should use stricter MIME validation, object ownership records, and private object access.
+- Photo upload should be postponed unless it becomes essential to a validated correction/fallback flow. If kept, it should use stricter MIME validation, object ownership records, and private object access.
 - Client-side JWT decoding and browser token storage should be replaced with mobile-appropriate secure token storage and server-backed session/token validation.
-- Joy Bank local-storage treat plan should be redesigned as either local-only Expo state or backend-owned goal records after the ledger core works.
+- Joy Bank local-storage treat plan should be redesigned as a saved food/meal/event goal that complements automatic bank updates.
 
 ## 6. Technical Debt, Security Issues, and Architectural Risks
 
@@ -148,6 +157,8 @@ Reusable with modification:
 - No health check beyond root text response.
 - No privacy/data-retention model for nutrition and health-adjacent data.
 - The current product has health and fitness-adjacent claims. V1 should use careful language and avoid medical claims.
+- No integration authorization model, sync state model, import batch model, duplicate prevention strategy, or notification pipeline exists yet.
+- Current docs and prototype UI over-emphasize food logging relative to the updated connection-first V1 mission.
 
 ## 7. Monorepo vs Clean Repository
 
@@ -183,8 +194,13 @@ CalorieBank/
 │       │   ├── modules/
 │       │   │   ├── auth/
 │       │   │   ├── users/
-│       │   │   ├── food-logs/
+│       │   │   ├── integrations/
+│       │   │   ├── sync/
+│       │   │   ├── imported-records/
 │       │   │   ├── activity/
+│       │   │   ├── notifications/
+│       │   │   ├── corrections/
+│       │   │   ├── saved-items/
 │       │   │   └── ledger/
 │       │   ├── db/
 │       │   ├── middleware/
@@ -242,6 +258,62 @@ Use PostgreSQL with UUID primary keys, timestamps, explicit ownership, and appen
 - `effective_from date not null`
 - `effective_to date`
 - `created_at timestamptz not null`
+
+`integration_connections`
+
+- `id uuid primary key`
+- `user_id uuid references users(id)`
+- `provider text not null`
+- `connection_type text not null` (`intake`, `expenditure`, `health`, `import`)
+- `status text not null` (`connected`, `revoked`, `error`, `pending`)
+- `scopes text[]`
+- `authorized_at timestamptz`
+- `revoked_at timestamptz`
+- `last_successful_sync_at timestamptz`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+
+`sync_batches`
+
+- `id uuid primary key`
+- `user_id uuid references users(id)`
+- `integration_connection_id uuid references integration_connections(id)`
+- `status text not null` (`pending`, `success`, `partial`, `failed`)
+- `started_at timestamptz not null`
+- `completed_at timestamptz`
+- `source_window_start timestamptz`
+- `source_window_end timestamptz`
+- `error_code text`
+- `created_at timestamptz not null`
+
+`imported_intake_records`
+
+- `id uuid primary key`
+- `user_id uuid references users(id)`
+- `sync_batch_id uuid references sync_batches(id)`
+- `source_record_id text`
+- `source_name text not null`
+- `log_date date not null`
+- `calories integer not null check (calories >= 0)`
+- `recorded_at timestamptz`
+- `confidence_state text not null` (`confirmed`, `pending`, `estimated`, `incomplete`)
+- `created_at timestamptz not null`
+- Unique index candidate: `(user_id, source_name, source_record_id)` when source IDs exist.
+
+`imported_expenditure_records`
+
+- `id uuid primary key`
+- `user_id uuid references users(id)`
+- `sync_batch_id uuid references sync_batches(id)`
+- `source_record_id text`
+- `source_name text not null`
+- `log_date date not null`
+- `calories integer not null check (calories >= 0)`
+- `expenditure_type text`
+- `recorded_at timestamptz`
+- `confidence_state text not null` (`confirmed`, `pending`, `estimated`, `incomplete`)
+- `created_at timestamptz not null`
+- Unique index candidate: `(user_id, source_name, source_record_id)` when source IDs exist.
 
 `food_logs`
 
@@ -301,12 +373,12 @@ Ledger convention:
 - Positive amount means calories deposited into the bank.
 - Negative amount means calories withdrawn from the bank.
 - Balance is `sum(amount_calories)` for the relevant user and date range.
-- Food entry creates or updates corresponding withdrawal transactions.
-- Activity entry creates or updates corresponding deposit transactions.
-- Daily target/TDEE closeout can create a daily deposit transaction after the day ends, or the service can project an in-progress day without committing a final daily transaction until closeout.
+- Imported intake, imported total expenditure, manual corrections, target snapshots, historical initialization, and reconciliation records may produce ledger transactions under `docs/product/bank-calculation-spec.md`.
+- The V1 calculation policy is `v1-total-expenditure-80`; implementation must keep the calculation transparent, source-labeled, versioned, and auditable.
 
 Future tables:
 
+- `record_reconciliations`
 - `food_entry_photos`
 - `favorite_foods`
 - `favorite_activities`
@@ -315,13 +387,17 @@ Future tables:
 - `food_database_items`
 - `beta_invites`
 - `sessions` or `refresh_tokens`
+- `notification_preferences`
+- `notification_deliveries`
+- `saved_items`
 
 ## 10. Phased Migration Plan
 
 ### Phase 0: Preserve Prototype and Lock Scope
 
 - Keep current code running as reference.
-- Add this audit and a V1 architecture decision record.
+- Treat `docs/product/v1-prd.md` as the authoritative V1 scope.
+- Add this audit update and the connection-first decision record.
 - Confirm whether secrets were ever committed or shared; rotate if uncertain.
 - Decide whether `legacy/` should hold the current web/API code or whether V1 will replace folders in place.
 
@@ -332,73 +408,83 @@ Future tables:
 - Add TypeScript, linting, formatting, test runner, and environment validation.
 - Add API health check and structured error format.
 
-### Phase 2: PostgreSQL and Auth Foundation
+### Phase 2: PostgreSQL, Auth, and Integration Foundation
 
 - Add PostgreSQL client/ORM and migrations.
 - Implement users, sessions/tokens, profiles, and calorie targets.
+- Implement integration connection state, authorization metadata, sync batches, imported record tables, and duplicate-prevention keys.
 - Add password hashing, rate limiting, request validation, and auth tests.
 - Create a private-beta invite or allowlist mechanism if needed.
 
-### Phase 3: Manual Core Loop
+### Phase 3: Smallest Credible Automatic Banking Loop
 
-- Implement food logs and manual food-entry CRUD.
-- Implement calorie ledger transaction creation for entries.
-- Implement daily summary and bank balance queries.
-- Build Expo screens for login/register, today's log, add/edit food, and bank summary.
+- Implement connection-first onboarding for one feasible intake source path and one feasible expenditure/health source path.
+- Implement data synchronization, imported record storage, source labeling, and sync status.
+- Implement automatic bank calculation from `docs/product/bank-calculation-spec.md` with explicit pending/incomplete/confirmed/corrected states.
+- Implement immutable ledger transaction creation for daily changes and adjustments.
+- Build Expo screens for onboarding, connections, bank home, history/explanation, notification settings, and manual correction/fallback.
 
 ### Phase 4: Migration and Compatibility
 
-- Write one-off migration scripts from MongoDB to PostgreSQL if existing user data matters.
+- Write one-off migration scripts from MongoDB to PostgreSQL if existing prototype user data matters.
 - Map `User` documents to `users`, `user_profiles`, and `calorie_targets`.
 - Map `FoodLog.entries` to `food_logs` and `food_entries`.
 - Map `burnedActivities` to `activity_entries`.
 - Convert historic `bankBalance` into either recomputed ledger transactions or a one-time opening balance adjustment.
+- Keep migrated manual data labeled as manual/prototype-origin data.
 
 ### Phase 5: Beta Readiness
 
 - Add observability, error tracking, backups, rate limits, privacy policy support, account deletion, and support tooling.
-- Add seed data and end-to-end tests for the core loop.
+- Add seed/sandbox data and end-to-end tests for connection-first onboarding, sync, ledger calculation, notification generation, and explanation history.
 - Add TestFlight build pipeline and beta environment separation.
 
 ### Phase 6: Integrations
 
-- Add Apple Health only after manual logging and ledger reconciliation are reliable.
-- Add USDA FoodData Central only after ledger behavior and manual entry UX are stable.
-- Add food photos only if they support a validated beta use case.
+- Expand from the smallest technically credible integration path only after the first path proves the automatic banking thesis.
+- Investigate Apple Health/HealthKit, Android Health Connect, supported direct APIs, user-authorized imports, and manual fallback without claiming unsupported third-party API access.
+- Add USDA FoodData Central or food photos only if they support a validated fallback/correction use case.
 
 ## 11. Smallest First Vertical Slice
 
 The smallest V1 vertical slice should be:
 
 1. Register or sign in.
-2. Set daily calorie target and timezone.
-3. View today's bank/log screen in the Expo app.
-4. Add one manual food entry with name and calories.
-5. API persists the food entry in PostgreSQL.
-6. API writes a corresponding ledger withdrawal transaction.
-7. App displays today's consumed calories and current projected bank impact.
+2. Confirm timezone, goal mode, and daily calorie target.
+3. Connect one technically feasible intake-data source path, even if sandbox/mock/user-authorized import is required for alpha.
+4. Connect one technically feasible expenditure/health-data source path.
+5. Sync recent data with source labels, sync batches, and duplicate-prevention keys.
+6. Initialize lifetime bank from up to 7 days of available supported history, starting at zero if the calculated value is zero/negative or data is incomplete.
+7. Calculate a daily bank update using `v1-total-expenditure-80` into immutable ledger transactions with confirmed/pending/incomplete/corrected states.
+8. Show current lifetime bank and history/explanation.
+9. Generate the morning bank-update notification payload.
 
 Defer for this slice:
 
 - Macros.
 - Photos.
-- Apple Health.
+- Broad Apple Health behavior beyond the selected feasible expenditure/health path.
 - USDA lookup.
-- Treat planning.
-- Weekly charts.
-- Activity import.
+- Full treat planning beyond naming one saved food/meal/event if needed for the notification.
+- Weekly charts not required for explanation.
+- Broad activity import.
 - Complex onboarding/TDEE estimation.
+- Full manual food logger.
 
-This slice proves the hardest V1 architectural decisions: mobile auth, PostgreSQL persistence, typed API, date ownership, and transactional calorie ledger.
+This slice proves the hardest V1 architectural decisions: mobile auth, integration authorization/sync, PostgreSQL persistence, typed API, date ownership, notification generation, source-labeled history, and transactional calorie ledger.
 
 ## 12. Blocking Questions
 
 These questions genuinely affect implementation choices:
 
-1. Should V1 use password auth, Sign in with Apple, or both for the private beta?
-2. Should the bank be based on user-selected daily calorie target, estimated TDEE, or both with separate meanings?
-3. When should the daily deposit be committed: at the start of the day, at day closeout, or only as a projected value until midnight in the user's timezone?
-4. What timezone should be authoritative for each user's `log_date`, and can users change it after onboarding?
-5. Does existing MongoDB production data need to be migrated, or can V1 start with fresh beta data?
-6. Are food photos required for private beta, or can they be removed from the first mobile release?
-7. What minimum privacy/security bar is required before inviting beta users, especially around health-adjacent data?
+1. Which intake-data source is genuinely feasible for the first 10 users?
+2. Which expenditure/health-data source is genuinely feasible for the first 10 users?
+3. Is HealthKit sufficient as an initial aggregation layer, or is a separate intake path required?
+4. Should V1 use password auth, Sign in with Apple, or both for the private beta?
+5. Which source can provide imported total daily expenditure for the first 10 users?
+6. How should active, resting, total, and unknown expenditure classifications be stored and displayed when source data contains multiple types?
+7. What fallback should be used when only intake or only expenditure data is available?
+8. How long should the system wait after midnight before marking a day's data incomplete?
+9. What timezone change behavior is allowed after onboarding?
+10. Does existing MongoDB production data need to be migrated, or can V1 start with fresh beta data?
+11. What minimum privacy/security bar is required before inviting beta users, especially around health-adjacent data?

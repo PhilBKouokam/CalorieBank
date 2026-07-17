@@ -2,212 +2,269 @@
 
 Date: 2026-07-16
 
-## Overview
+## Source Of Truth
 
-CalorieBank V1 is an iPhone-first mobile app that helps users intentionally save and spend calories over time. V1 prioritizes a trustworthy manual logging loop backed by an immutable calorie ledger. Apple Health, USDA FoodData Central, food photos, and advanced planning features come after the manual ledger experience is reliable.
+This PRD is the authoritative V1 product document. It supersedes prior food-logging-first assumptions in older audits, prototype docs, and implementation notes. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. Supporting architecture guidance lives in `docs/architecture/current-state-audit.md`; the direction change is recorded in `docs/product/adr-001-connection-first-v1.md`.
 
-## Target User
+## V1 Mission
 
-The target user is a calorie-aware adult who already understands basic calorie tracking but wants more flexibility than a strict daily reset. They may be cutting, maintaining, or bulking, and they want a simple answer to: "How many calories have I saved or overspent based on my plan?"
+Validate whether users can connect their existing health and calorie data, understand and trust an automatically updated calorie-bank balance, and use the morning bank update to plan enjoyable foods with less friction and guilt.
 
-V1 is not for users seeking medical nutrition therapy, eating disorder treatment, pediatric nutrition guidance, or automated meal coaching.
-
-## Problem
-
-Traditional calorie trackers reset emotionally and mathematically every day. A user who eats below target on Monday gets little clear credit for that effort later, while a higher-calorie meal can feel like failure. Users need a transparent way to carry unused calories forward, understand overages, and make deliberate choices across days.
+The first 10 users are not primarily testing whether CalorieBank is a good food logger. They are testing whether the automatic calorie-banking loop is easy to set up, understandable, accurate enough to trust, useful in daily life, emotionally motivating, and low friction enough to keep using.
 
 ## Core Promise
 
-CalorieBank tells the user where their calorie bank stands, why it changed, and what actions created every deposit or withdrawal.
+"Keep using the health and calorie-tracking tools you already use. CalorieBank automatically turns that data into a clear calorie balance that helps you plan and enjoy the foods you love while staying aligned with your goal."
 
-Every balance change must be explainable from ledger transactions tied to food, activity, target, day finalization, or adjustment records.
+Calorie trackers answer "what did I eat?" Health tools answer "how much did I burn?" CalorieBank answers "what is available in my bank, how did it get there, and am I ready for the food, meal, or event I planned?"
 
-## Primary Daily Loop
+## Target User
 
-1. User opens CalorieBank and sees today's target, consumed calories, projected bank change, and current balance.
-2. User manually logs food by name and calories.
-3. Optional: user manually logs activity calories.
-4. App updates today's projection immediately.
-5. At day finalization, the app creates immutable ledger transaction(s) for that day.
-6. User can review a ledger-style explanation of balance changes.
+The target user is a calorie-aware adult who already uses at least one calorie-intake or health-data tool and wants a lower-friction way to understand surplus or deficit over time. They may be cutting, maintaining, or bulking, but they do not want another daily logging obligation.
+
+V1 is not for users seeking medical nutrition therapy, eating disorder treatment, pediatric nutrition guidance, or automated meal coaching.
+
+## Product Principles
+
+- Lowest possible friction: connected users should not need to open CalorieBank or manually enter information every day for the core experience to work.
+- Connection-first onboarding: the primary setup path asks users to connect a supported calorie-intake data source and a supported expenditure or health-data source.
+- Automatic banking: once data and goals are available, CalorieBank imports, interprets, calculates, and explains the bank automatically.
+- One meaningful notification: the morning bank update is the primary notification. Generic engagement notifications are outside the V1 mission.
+- Food logging is secondary: manual entry is fallback, correction, supplementary input, or future expansion, not the promoted workflow.
+- Interpretation layer: CalorieBank should create value primarily through synchronization, calculation, history, and planning, not screen time.
+
+## Primary V1 Loop
+
+1. User installs CalorieBank.
+2. User connects a supported calorie-intake data source.
+3. User connects a supported calorie-expenditure or health-data source, such as Apple Health when feasible.
+4. User selects `cut`, `maintain`, or `bulk`, confirms a calorie target, and optionally names a food, meal, treat, or event they are saving toward.
+5. CalorieBank imports available data and initializes the bank from recent history when possible.
+6. CalorieBank calculates daily changes and updates the lifetime bank without requiring daily interaction.
+7. Every morning, the user receives one bank-update notification.
+8. User can inspect history and explanations when they want to understand or correct the balance.
 
 ## Required V1 Screens
 
-- Onboarding: account creation/sign-in, goal selection (`cut`, `maintain`, `bulk`), timezone confirmation, daily calorie target confirmation.
-- Today: current date, daily target, consumed calories, optional activity calories, projected daily bank change, current balance.
-- Add/Edit Food: manual food name and calories required; macros optional only if included without slowing the slice.
-- Food Log: list of today's entries and historical daily entries with edit/delete controls.
-- Activity Entry: simple manual activity calorie entry screen or modal.
-- Bank Ledger: chronological deposits, withdrawals, adjustments, and explanations.
-- History: day-level summary of target, consumed, activity, bank change, and finalization status.
-- Settings: target history/current target, timezone, goal mode, sign out, privacy/account basics.
+- Onboarding: account creation/sign-in, goal mode, target confirmation, timezone, integration education.
+- Connections: supported intake source connection, supported expenditure/health source connection, connection state, revoke/reconnect, troubleshooting.
+- Bank Home: lifetime bank, latest daily change, data freshness, pending/incomplete indicators, progress toward saved item.
+- Morning Update Detail: yesterday's result, added/deducted calories, current balance, saved-item readiness when applicable.
+- History: daily changes, imported intake, imported expenditure/activity, net contribution, running lifetime balance.
+- Explanation Detail: source labels, calculation inputs, duplicate/reconciliation status, confirmed/pending/estimated state.
+- Manual Correction/Fallback: add or adjust intake/activity only where necessary.
+- Notification Settings: morning update permission, timing, enable/disable.
+- Privacy/Account Settings: connected data summary, data export/delete, sign out.
 
-## Required V1 Functionality
+## Must-Have First-10-User Capabilities
 
-- iPhone-first Expo React Native app with TypeScript.
-- Node.js, Express, TypeScript API.
-- PostgreSQL persistence.
-- User authentication suitable for private beta.
-- User selects `cut`, `maintain`, or `bulk`.
-- User manually sets or confirms a daily calorie target.
-- Food intake is manually logged during the first implementation phase.
-- Manual activity calories are optional.
-- Bank balance is backed by immutable ledger transactions.
-- Historical days preserve the target, goal mode, timezone, and rules active on that day.
-- Users can view the explanation for each balance-changing transaction.
-- Users can edit prior food/activity records, but edits must create traceable reconciliation or adjustment records.
-- Saved calories do not expire during initial beta.
+- User onboarding.
+- Goal and calorie-target configuration.
+- Connection flow for at least one genuinely feasible intake-data source.
+- Connection flow for at least one genuinely feasible expenditure or health-data source.
+- Secure authorization and connection-state handling.
+- Data synchronization.
+- Handling for delayed, missing, incomplete, duplicated, and revoked data.
+- Automatic bank calculation.
+- Current lifetime bank-balance display.
+- Daily bank-update generation.
+- Morning notification with contextual permission request and user settings.
+- Basic history and explanation showing how balance changed.
+- Manual correction or fallback entry where technically necessary.
+- Privacy, consent, integration revocation, and data-deletion considerations.
+- Clear language explaining what is imported and how the bank is calculated.
 
-## Explicitly Excluded From V1 Alpha
+## Secondary Capabilities
 
-- Apple Health integration.
-- USDA FoodData Central lookup.
-- Food photo upload and recognition.
-- Barcode scanning.
-- Social features.
-- Coach/AI recommendations.
-- Meal plans.
-- Macro targets as a required flow.
-- Push notifications.
-- App Store launch hardening beyond what private alpha/beta requires.
-- Automatic activity calorie import.
-- Calorie expiration rules.
+- Basic manual food logging as fallback only.
+- Editing manually entered data.
+- Selecting or naming a saved food, meal, treat, or event.
+- Progress toward the saved item.
+- Basic integration troubleshooting.
 
-## Banking Formula
+## Explicitly Not Required For First-10-User V1
 
-For a finalized day:
+- Building a MyFitnessPal replacement.
+- Large food database, barcode scanning, recipe builder, or AI meal recognition.
+- Social feeds, friends/family sharing, group pools, advertising, brand partnerships, restaurant integrations, or grocery ordering.
+- CB Coin economy, advanced gamification, complex streaks, or screen-time-oriented engagement.
+- Broad support for every health platform.
+- Large-scale Android/iOS parity before the first experiment.
+- Generic notifications such as "open the app", "maintain your streak", "log your meal", "drink water", or "we miss you".
 
-```text
-eligible_daily_calories = daily_target_calories + eligible_manual_activity_calories
-bank_change = eligible_daily_calories - calories_consumed
-new_balance = prior_balance + bank_change + adjustments
-```
+## Integration Feasibility
 
-For today before finalization:
+Do not assume MyFitnessPal or any named third-party service has an open, approved, production-ready API for CalorieBank.
 
-```text
-projected_bank_change = daily_target_calories + eligible_manual_activity_calories - calories_consumed_so_far
-projected_balance = finalized_balance + projected_bank_change
-```
+### Confirmed Direction
 
-Only finalized ledger transactions define the official persisted balance. Today may show projections, but the UI must label them clearly.
+- V1 must choose the smallest technically credible integration path that can test automatic calorie banking.
+- All imported records must carry source labels and sync metadata.
+- Unsupported integrations must be described as aspirations or investigation items, not capabilities.
 
-## Definitions
+### Candidate Paths Requiring Validation
 
-- Daily target: the calorie allowance selected or confirmed by the user for a date, based on their `cut`, `maintain`, or `bulk` goal. It is snapshotted for each historical day.
-- Deposit: a positive ledger transaction that increases the calorie bank. Example: ending a finalized day under eligible calories.
-- Withdrawal: a negative ledger transaction that decreases the calorie bank. Example: ending a finalized day over eligible calories.
-- Balance: the sum of immutable ledger transactions for the user, plus any opening balance if migration requires one.
-- Eligible daily calories: daily target plus optional manual activity calories that are eligible for that day.
-- Adjustment: a traceable ledger transaction created to reconcile late edits, corrections, or administrative fixes.
+- Apple Health/HealthKit as an aggregation layer for iPhone users.
+- Android Health Connect after the first experiment if Android becomes relevant.
+- Supported direct APIs where access, terms, and production permissions are confirmed.
+- User-authorized import, export-file import, or sandbox/mock integration for early usability testing.
+- Manual fallback when an integration is unavailable or incomplete.
+
+## Banking Concepts
+
+- Daily target: the user's configured calorie target for a date, snapshotted with the goal mode and rules active on that date.
+- Imported intake: calories consumed from a supported source.
+- Imported expenditure/activity: calories burned or activity energy from a supported source.
+- Manual correction/fallback: user-entered data used to correct or fill a gap, visibly labeled as manual.
+- Daily change: the day's contribution to the bank based on approved calculation rules and available data.
+- Lifetime bank: cumulative available calories. Banked calories do not expire in initial beta.
+- Available balance: user-visible lifetime bank after confirmed transactions, with pending or estimated changes clearly separated.
+- Ledger transaction: immutable record explaining a balance-affecting change.
 
 ## Negative Balance Rules
 
-- The balance may become negative.
-- A negative balance means the user has consumed more than their eligible calories across finalized ledger history.
-- The app must not block logging, editing, or day finalization because of a negative balance.
-- UI language should be neutral: "negative balance" or "overdrawn by X calories", not shame-oriented.
-- Saved calories do not expire in initial beta, so negative balances are recovered only by later positive bank changes or adjustments.
+- Historical bank initialization should never start the user below zero.
+- After initialization, the lifetime bank may become negative if confirmed later data or corrections produce a negative cumulative balance.
+- A negative balance must not block synchronization, corrections, or continued use.
+- UI language should be neutral, such as "overdrawn by X calories", and must avoid shame or punishment.
+- The app should explain which days or corrections created the negative balance.
 
-## Late Food-Log Edit Rules
+## Calculation Methodology
 
-- Users may edit food and activity entries for historical days.
-- Historical edits must not mutate prior ledger transactions in place.
-- Each late edit creates a reconciliation record showing:
-  - original entry value,
-  - new entry value,
-  - affected date,
-  - calorie delta,
-  - created adjustment transaction,
-  - timestamp of the edit.
-- The ledger must preserve both the original finalization and the reconciliation transaction.
-- The user-facing explanation must say why the balance changed, for example: "Adjusted July 14 dinner from 600 to 750 calories: -150 calories."
+The V1 bank-calculation formula, historical initialization, lifetime bank behavior, correction rules, calculation status, and calculation-related notification content are defined in `docs/product/bank-calculation-spec.md`.
 
-## Day Finalization Rules
+Product and engineering must still distinguish:
 
-- A day is finalized according to the user's stored timezone.
-- Finalization creates immutable ledger transaction(s) using the target and rules active on that date.
-- V1 should support idempotent finalization: running finalization twice for the same user/date must not duplicate balance changes.
-- Today's day remains projected until finalized.
-- If a user opens the app after missed days, the API should finalize any unfinalized past days that have enough data, using the historical target for each date.
-- Days with no food entries still finalize as a deposit equal to eligible daily calories unless product testing shows this creates misleading balances. This rule must be visually explained because missed logging can inflate the bank.
+- Product principle: automatically turn connected intake, expenditure, and target data into a clear bank.
+- Confirmed implementation requirement: every balance change is traceable and explainable.
+- Approved V1 calculation policy: `v1-total-expenditure-80`.
+- Open decisions: source feasibility, rounding, completeness criteria, cutoff timing, overlapping sources, and safety guardrails.
 
-## Time-Zone Behavior
+Do not present the 0.80 expenditure adjustment as universal physiological truth. It is an approved V1 product policy and must be named, versioned, transparent, and configurable.
 
-- Each user has one authoritative timezone, confirmed during onboarding.
-- `log_date` is derived from the user's timezone, not server timezone.
-- Day boundaries, finalization, historical summaries, and target snapshots use the user's timezone.
-- If a user changes timezone, future days use the new timezone. Historical days retain the timezone active for those dates.
-- The app must avoid silently moving entries between dates when timezone changes.
+## Historical Bank Initialization
 
-## Manual Activity Entry
+After a user connects supported intake and expenditure data sources, CalorieBank should attempt to initialize the bank using up to the previous 7 days of available supported data.
 
-- Manual activity calories are optional.
-- Activity entries require activity name/type, calories, and date.
-- Manual activity calories increase eligible daily calories for that date.
-- Activity entries must be included in day explanations and ledger reconciliation.
-- V1 should avoid presenting manual activity calories as medically precise.
+- Calculate what the bank would have been during that period.
+- If the calculated value is positive, initialize lifetime bank with that value.
+- If the calculated value is zero or negative, initialize lifetime bank at zero.
+- If required historical data is missing or incomplete, initialize with zero or a clearly labeled partial/pending state, then explain why.
 
-## Future Apple Health Behavior
+This is an onboarding product-experience decision, not a physiological claim. The product intentionally avoids beginning a user's journey with a negative balance.
 
-- Apple Health is not required for internal alpha.
-- Future Apple Health import should create source-attributed activity records, not directly mutate balance.
-- Imported health data must be reviewable, deduplicated, and traceable to import batches.
-- Manual activity and Apple Health activity must have clear source labels.
-- The user must be able to disconnect Health access and understand what imported data remains.
+## Bank Update Behavior
+
+- Daily bank calculation runs after the user's day boundary in their configured timezone and before the morning notification when data is available.
+- The user's timezone controls daily boundaries, history, target snapshots, and notification scheduling.
+- Imported data arriving late may trigger retroactive recalculation through adjustment/reconciliation transactions, not silent mutation.
+- Corrections must show old value, new value, source, affected date, delta, and effect on lifetime bank.
+- Historical edits, late imports, and manual corrections must create traceable reconciliation/adjustment records rather than silently mutating prior ledger transactions.
+- If no intake data is available, show the day as missing or incomplete; do not assume zero intake without user-visible confirmation.
+- If no expenditure data is available, use the configured fallback rule only if approved; otherwise mark expenditure as missing/pending.
+- If an integration disconnects, stop future syncs, preserve already imported records according to consent/deletion settings, and show connection state.
+- Duplicate records must be prevented using source IDs, timestamps, import batch IDs, and reconciliation rules.
+- The UI must distinguish confirmed, pending, estimated, incomplete, imported, and manually entered data.
+- Users can disable morning notifications and should be able to manually refresh sync status.
+- Users must be able to inspect why the balance changed from the notification or history.
+
+## Manual Fallback And Activity Entry
+
+- Manual intake or activity entry is a fallback, correction, or supplementary tool, not the promoted daily workflow.
+- Manual activity entries must be source-labeled as manual and included in explanations.
+- Manual activity calories must not be presented as medically precise.
+- If manual data overlaps imported data, duplicate-prevention and reconciliation rules must decide which record contributes to the bank.
+
+## Notification Requirements
+
+The primary V1 notification is the morning bank update. It should include, when available:
+
+- Yesterday's relevant result.
+- Calories added to or deducted from the bank.
+- Current available lifetime bank balance.
+- Progress toward a saved food, meal, treat, or event.
+- Whether the user has accumulated enough for the planned item.
+- A clear incomplete/pending status when data is not ready.
+
+Request notification permission only after explaining this value.
+
+## Trust And Safety Requirements
+
+- Calculations must be transparent and inspectable.
+- Data-source labels are required for imported, manual, estimated, pending, missing, and corrected data.
+- Prevent double counting across sources.
+- Behave conservatively when data is incomplete; do not overstate available calories.
+- Provide user correction flows.
+- Avoid language implying exercise perfectly cancels food.
+- Avoid encouraging extreme restriction, compensatory behavior, or shame.
+- Guard against unsafe calorie targets.
+- Treat calorie, activity, and health data as sensitive.
+- Support integration revocation, data export, and data deletion before broader beta.
+- Never expose secrets to the client.
 
 ## Internal Alpha Success Criteria
 
-- A team member can create an account, set goal mode and daily target, log food, optionally log activity, and see projected balance.
-- Past days finalize into ledger transactions without duplicate entries.
-- Editing a finalized day creates a visible reconciliation adjustment.
-- Ledger balance can be recomputed from transactions and matches displayed balance.
-- Negative balances display correctly.
-- Timezone-specific date behavior is covered by tests.
-- No health integration is required.
-- No unexplained balance change appears in the UI.
+- A team member can complete connection-first onboarding.
+- At least one feasible intake-data path and one feasible expenditure/health-data path sync in a test or sandbox environment.
+- The app can generate an automatically calculated bank from synced data.
+- The morning update can be generated with confirmed, pending, or incomplete states.
+- History explains balance changes with source labels.
+- Manual fallback/correction can reconcile a bad or missing record.
+- Ledger balance can be recomputed from immutable transactions.
+- Timezone-specific calculation and notification behavior is tested.
 
 ## 10-User Private Beta Success Criteria
 
-- At least 10 invited users can complete onboarding without support.
-- At least 7 of 10 users log food on 3 separate days.
-- At least 7 of 10 users can explain what their balance means after using the app.
-- No known duplicate finalization or ledger corruption bugs.
-- Late edits remain understandable in user testing.
-- Support can diagnose any balance discrepancy from ledger records.
-- No critical privacy, auth, or data-loss incident occurs.
+- Percentage of users who complete connection-first onboarding.
+- Time required to connect necessary data sources.
+- Percentage who reach an automatically calculated bank.
+- Synchronization success and failure rate.
+- Percentage who understand where the balance came from.
+- Percentage who trust the balance enough to use it for planning.
+- Morning-notification delivery and usefulness.
+- Number of days the bank updates without manual intervention.
+- Frequency and reasons for manual corrections.
+- Whether users successfully plan a food, meal, or event using the bank.
+- Whether the experience reduces mental friction or guilt.
+- Reasons users disconnect, distrust, or abandon the product.
 
 ## Analytics Events To Measure Later
 
 - `account_created`
-- `signin_completed`
 - `onboarding_goal_selected`
 - `daily_target_confirmed`
-- `food_entry_created`
-- `food_entry_edited`
-- `food_entry_deleted`
-- `activity_entry_created`
-- `day_finalized`
-- `ledger_adjustment_created`
+- `integration_intro_viewed`
+- `intake_connection_started`
+- `intake_connection_completed`
+- `expenditure_connection_started`
+- `expenditure_connection_completed`
+- `integration_sync_started`
+- `integration_sync_completed`
+- `integration_sync_failed`
+- `historical_bank_initialized`
+- `daily_bank_update_generated`
+- `morning_notification_permission_requested`
+- `morning_notification_delivered`
+- `morning_notification_opened`
 - `balance_explanation_viewed`
-- `history_day_viewed`
-- `settings_timezone_changed`
-- `settings_target_changed`
-- `negative_balance_seen`
-- `beta_user_retained_day_3`
-- `beta_user_retained_day_7`
+- `manual_correction_created`
+- `integration_disconnected`
+- `saved_item_created`
+- `saved_item_reached`
+- `data_delete_requested`
 
-Analytics must not include raw food names, free-text notes, passwords, precise health data, or unnecessary personally identifying information.
+Analytics must not include raw food names, free-text notes, passwords, precise health payloads, or unnecessary personally identifying information.
 
-## Privacy and Safety Considerations
+## Open Product Decisions
 
-- Calorie and activity data is personal health-adjacent data and should be treated as sensitive.
-- Use careful language: CalorieBank is a tracking and planning tool, not medical advice.
-- Avoid shame, moralizing food, or punitive streak mechanics.
-- Support account deletion and data export before broader beta.
-- Use secure token storage on mobile.
-- Store passwords only as strong salted hashes.
-- Keep immutable ledger records auditable while respecting deletion requirements.
-- Collect the minimum data required for the beta.
-- Protect production secrets and rotate any secrets that may have been exposed.
-- Ensure balance explanations are transparent enough that users can challenge or correct wrong data.
+- Which intake-data source is genuinely feasible for the first 10 users?
+- Which expenditure/health-data source is genuinely feasible for the first 10 users?
+- Is HealthKit sufficient as the initial aggregation layer for both intake and expenditure, or is another intake path required?
+- Which exact source provides imported total daily expenditure for the approved V1 calculation?
+- How should active, resting, total, and unknown expenditure classifications be stored and explained when source data contains more than one type?
+- What fallback should be used when only intake or only expenditure data is available?
+- How long should the system wait after midnight before marking a day's data incomplete?
+- Should historical initialization use partial data if one source is missing?
+- What minimum and maximum calorie targets should be allowed?
+- What notification time should be the default, and should users choose it during onboarding?
+- What level of data export and deletion is required before the first 10 users?
