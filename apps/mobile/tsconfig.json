@@ -4,14 +4,9 @@
     "strict": true,
     "paths": {
       "@/*": [
-        "./src/*"
-      ],
-      "@/assets/*": [
-        "./assets/*"
+        "./*"
       ]
-    },
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    }
   },
   "include": [
     "**/*.ts",

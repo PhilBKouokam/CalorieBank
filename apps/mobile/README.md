@@ -1,26 +1,31 @@
 # CalorieBank Mobile
 
-Expo React Native foundation for CalorieBank mobile V1.
+Expo React Native foundation for CalorieBank V1.
 
-## Scope
+## Product Direction
 
-This app currently contains placeholder routes only:
+The mobile app should follow the repository-level V1 source of truth:
 
-- onboarding
-- sign in
-- today/home
-- log food
-- history
-- settings
+- `../../docs/product/v1-prd.md`
+- `../../docs/product/bank-calculation-spec.md`
+- `../../docs/product/adr-001-connection-first-v1.md`
+- `../../docs/architecture/current-state-audit.md`
 
-Business features, authentication, API calls, food logging, Apple Health, and ledger finalization are intentionally deferred until the foundation is verified.
+V1 is connection-first and low-friction. The primary experience is not daily manual food logging. The app should help users connect supported intake and expenditure/health data sources, calculate a transparent lifetime calorie bank, and receive one meaningful morning bank update.
 
-## Run
+Manual food entry belongs only as fallback, correction, supplementary input, or future expansion unless the PRD changes.
+
+## Current Scope
+
+This app is a mobile shell/foundation. Authentication, integration authorization, data sync, notifications, API persistence, and ledger finalization are not considered complete until implemented against the PRD and verified.
+
+## Development
 
 From the repository root:
 
 ```bash
+npm install
 npm run mobile:start
 ```
 
-The app uses Expo Router under `src/app`.
+Before completing implementation tasks, run the relevant lint, typecheck, and test commands from the root package scripts.
