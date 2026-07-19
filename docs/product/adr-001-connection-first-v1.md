@@ -29,6 +29,8 @@ That loop is now superseded by:
 
 Manual food logging remains allowed only as fallback, correction, supplementary input, or future expansion. It should not dominate onboarding, home-screen actions, retention metrics, or first-10-user success criteria.
 
+V1 includes a Planning Database for future meal and event estimates. This does not reverse the connection-first decision: Food Tracking remains the responsibility of the connected calorie-tracking application, and Planning Database estimates must not directly update the bank.
+
 ## Why
 
 The product thesis is lowest-friction calorie banking. Users should keep using tools they already use for intake and expenditure tracking. CalorieBank creates value by interpreting that data, maintaining a transparent lifetime bank, and helping users plan enjoyable foods while staying aligned with their goal.
@@ -43,14 +45,17 @@ If CalorieBank requires daily manual logging, it competes directly with establis
 - Success is measured by number of meals logged or daily app-opening streaks.
 - Generic engagement notifications are part of the V1 loop.
 - Weekly bank framing is the primary balance model.
+- Planning Database entries are confirmed intake records.
 
 ## Implementation Impact
 
 - Prioritize integration feasibility investigation before building food-logging features.
 - Build connection state, sync batches, imported record storage, duplicate prevention, and source-labeled history early.
+- Keep Planning Database records separate from imported intake and manual correction/fallback records.
 - Treat notification generation as part of the core product path.
 - Keep banking logic in `packages/domain` and schemas in `packages/schemas`.
 - Follow `docs/product/bank-calculation-spec.md` for all bank-calculation behavior.
+- Use Available Bank as the normal planned-spending balance, optional Emergency Bank as a protected reserve for unexpected overages, and Recovery Forecast as the primary experience only after Available Bank and Emergency Bank are exhausted.
 - Preserve immutable ledger transactions and traceable corrections.
 - Mark unsupported third-party integrations as investigation or aspiration until API access, permissions, and terms are confirmed.
 

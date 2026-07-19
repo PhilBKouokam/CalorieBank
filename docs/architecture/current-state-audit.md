@@ -8,6 +8,8 @@ The original audit was written when V1 was assumed to be manual-food-logging-fir
 
 The authoritative V1 direction is now connection-first automatic calorie banking: users connect supported calorie-intake and calorie-expenditure/health data sources, configure a goal and target, receive automatic bank calculations, and get one meaningful morning bank update. Manual food logging remains useful prototype work, but for first-10-user V1 it is fallback/correction/supplementary behavior rather than the promoted product loop.
 
+V1 also includes a Planning Database for future meal and event estimates. That database is planning-only: connected calorie-tracking applications remain the source of truth for Food Tracking, daily intake, historical intake, synchronization, and bank calculations. Planning Database estimates must not directly update the bank.
+
 The current architecture inventory below remains valid as a description of the existing prototype. Forward-looking reuse, migration, database, and vertical-slice guidance has been updated to match `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`.
 
 ## 1. Current Architecture
@@ -108,7 +110,7 @@ Reusable as product/domain reference:
 - TDEE calculation concept, with medical/fitness disclaimers and formula review before production.
 - Extra-burn logging concept and CRUD behavior, especially source labeling and correction semantics for future imported expenditure data.
 - Daily and weekly summary UX as reference for balance explanations and history, not for a food-log-centered home screen.
-- Treat-planning/Joy Bank concept as a secondary saved food/meal/event planning feature.
+- Treat-planning/Joy Bank concept can inform the V1 Planning Database and saved food/meal/event planning feature.
 - API route intent: auth, daily log, food entry, activity burn, weekly summary. V1 API design should instead prioritize integrations, sync status, imported records, ledger/history, notifications, and corrections.
 - Date-only log concept using `YYYY-MM-DD` as a user-visible day key.
 - Screenshot and README material as product-reference artifacts.
@@ -119,7 +121,7 @@ Reusable with modification:
 - TDEE calculation should move into a typed shared or backend domain module with unit tests.
 - Existing REST endpoint names can inform V1 API naming, but payloads should be versioned and validated.
 - UI hierarchy can inspire React Native screens, but components must be rewritten with native primitives.
-- Prototype food-log state can inform manual correction/fallback flows, but should not drive onboarding, retention, or first beta success metrics.
+- Prototype food-log state can inform manual correction/fallback flows, but should not drive onboarding, retention, or first beta success metrics. It should not be reused as the Planning Database without separating future planning estimates from confirmed intake.
 
 ## 5. Code That Should Be Rewritten
 
@@ -317,6 +319,8 @@ Use PostgreSQL with UUID primary keys, timestamps, explicit ownership, and appen
 
 `food_logs`
 
+Manual fallback/correction intake only. This is not the Planning Database and should not become the primary V1 food-tracking workflow.
+
 - `id uuid primary key`
 - `user_id uuid references users(id)`
 - `log_date date not null`
@@ -325,6 +329,8 @@ Use PostgreSQL with UUID primary keys, timestamps, explicit ownership, and appen
 - Unique index: `(user_id, log_date)`.
 
 `food_entries`
+
+Manual fallback/correction intake only. Confirmed bank calculations should prefer synchronized imported intake from connected calorie-tracking sources.
 
 - `id uuid primary key`
 - `food_log_id uuid references food_logs(id)`
@@ -354,6 +360,35 @@ Use PostgreSQL with UUID primary keys, timestamps, explicit ownership, and appen
 - `updated_at timestamptz not null`
 - `deleted_at timestamptz`
 
+`planning_items`
+
+Planning-only meal, food, drink, product, restaurant item, or event estimate. Planning items do not directly affect bank calculations.
+
+- `id uuid primary key`
+- `user_id uuid references users(id)` nullable for provider-sourced items
+- `name text not null`
+- `item_type text not null` (`restaurant_item`, `fast_food_item`, `grocery_product`, `packaged_snack`, `drink`, `dessert`, `homemade_meal`, `custom_meal`, `event`)
+- `estimated_calories integer not null check (estimated_calories >= 0)`
+- `nutrition_source_type text not null` (`official`, `manufacturer`, `restaurant_published`, `user_estimated`, `unknown`)
+- `provider text`
+- `provider_item_id text`
+- `is_user_created boolean not null default false`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+
+`planned_meals`
+
+Saved future planning records. These are not consumed-meal logs.
+
+- `id uuid primary key`
+- `user_id uuid references users(id)`
+- `planning_item_id uuid references planning_items(id)`
+- `planned_for date`
+- `estimated_calories integer not null check (estimated_calories >= 0)`
+- `status text not null` (`planned`, `saved`, `archived`)
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+
 `calorie_ledger_transactions`
 
 - `id uuid primary key`
@@ -374,7 +409,10 @@ Ledger convention:
 - Negative amount means calories withdrawn from the bank.
 - Balance is `sum(amount_calories)` for the relevant user and date range.
 - Imported intake, imported total expenditure, manual corrections, target snapshots, historical initialization, and reconciliation records may produce ledger transactions under `docs/product/bank-calculation-spec.md`.
+- Planning Database items and planned meals are advisory and must not produce calorie ledger transactions.
 - The V1 calculation policy is `v1-total-expenditure-80`; implementation must keep the calculation transparent, source-labeled, versioned, and auditable.
+- The user-facing bank model distinguishes Available Bank, optional Emergency Bank, and Recovery Forecast. Negative daily changes apply in the order Available Bank -> Emergency Bank -> Recovery Forecast.
+- Emergency Bank allocation and coverage must be traceable through the ledger or an equivalently auditable model; do not implement it as hidden mutable state.
 
 Future tables:
 
@@ -384,12 +422,14 @@ Future tables:
 - `favorite_activities`
 - `health_connections`
 - `health_import_batches`
-- `food_database_items`
+- `planning_data_providers`
 - `beta_invites`
 - `sessions` or `refresh_tokens`
 - `notification_preferences`
 - `notification_deliveries`
 - `saved_items`
+- `reserve_policies`
+- `bank_balance_allocations`
 
 ## 10. Phased Migration Plan
 
@@ -422,7 +462,8 @@ Future tables:
 - Implement data synchronization, imported record storage, source labeling, and sync status.
 - Implement automatic bank calculation from `docs/product/bank-calculation-spec.md` with explicit pending/incomplete/confirmed/corrected states.
 - Implement immutable ledger transaction creation for daily changes and adjustments.
-- Build Expo screens for onboarding, connections, bank home, history/explanation, notification settings, and manual correction/fallback.
+- Implement Planning Database storage/search for future meal and event estimates without connecting planning estimates to bank ledger inputs.
+- Build Expo screens for onboarding, connections, bank home with Available Bank, optional Emergency Bank state, Recovery Forecast when applicable, planning search/detail, history/explanation, notification settings, and manual correction/fallback.
 
 ### Phase 4: Migration and Compatibility
 
@@ -443,7 +484,7 @@ Future tables:
 
 - Expand from the smallest technically credible integration path only after the first path proves the automatic banking thesis.
 - Investigate Apple Health/HealthKit, Android Health Connect, supported direct APIs, user-authorized imports, and manual fallback without claiming unsupported third-party API access.
-- Add USDA FoodData Central or food photos only if they support a validated fallback/correction use case.
+- Add USDA FoodData Central, restaurant/packaged-food data, or food photos only if they support a validated planning or fallback/correction use case. Do not claim unsupported provider access.
 
 ## 11. Smallest First Vertical Slice
 
@@ -456,15 +497,16 @@ The smallest V1 vertical slice should be:
 5. Sync recent data with source labels, sync batches, and duplicate-prevention keys.
 6. Initialize lifetime bank from up to 7 days of available supported history, starting at zero if the calculated value is zero/negative or data is incomplete.
 7. Calculate a daily bank update using `v1-total-expenditure-80` into immutable ledger transactions with confirmed/pending/incomplete/corrected states.
-8. Show current lifetime bank and history/explanation.
-9. Generate the morning bank-update notification payload.
+8. Show current Available Bank, optional Emergency Bank status when enabled, Recovery Forecast when applicable, and history/explanation.
+9. Search or create a Planning Database entry and compare its estimated calories against Available Bank without changing the ledger.
+10. Generate the morning bank-update notification payload.
 
 Defer for this slice:
 
 - Macros.
 - Photos.
 - Broad Apple Health behavior beyond the selected feasible expenditure/health path.
-- USDA lookup.
+- Broad nutrition-provider coverage beyond the selected Planning Database path.
 - Full treat planning beyond naming one saved food/meal/event if needed for the notification.
 - Weekly charts not required for explanation.
 - Broad activity import.
@@ -488,3 +530,6 @@ These questions genuinely affect implementation choices:
 9. What timezone change behavior is allowed after onboarding?
 10. Does existing MongoDB production data need to be migrated, or can V1 start with fresh beta data?
 11. What minimum privacy/security bar is required before inviting beta users, especially around health-adjacent data?
+12. How should Emergency Bank historical initialization, allocation-rate range, rounding, target behavior, and disable behavior work?
+13. Which Planning Database provider path is feasible for restaurant meals, grocery products, packaged foods, homemade meals, and user-created planning entries?
+14. Can planning entries later be exported into supported calorie-tracking applications, or do users always log consumed meals directly in their tracker?

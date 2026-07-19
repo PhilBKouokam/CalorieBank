@@ -32,25 +32,31 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 - One meaningful notification: the morning bank update is the primary notification. Generic engagement notifications are outside the V1 mission.
 - Food logging is secondary: manual entry is fallback, correction, supplementary input, or future expansion, not the promoted workflow.
 - Interpretation layer: CalorieBank should create value primarily through synchronization, calculation, history, and planning, not screen time.
+- Planning, not tracking: CalorieBank helps users plan future meals and events using estimated nutrition information and their available calorie bank. Connected calorie-tracking applications remain the source of truth for food intake.
+- Prepare for life, not perfection: users may optionally reserve part of genuinely accumulated banked calories in an Emergency Bank for unexpected meals, celebrations, travel, or changes in plans.
+- Recovery, not punishment: when users exhaust both Available Bank and optional Emergency Bank, CalorieBank should guide them toward recovery with progress, planning, and transparency rather than making a large negative balance the primary experience.
 
 ## Primary V1 Loop
 
 1. User installs CalorieBank.
 2. User connects a supported calorie-intake data source.
 3. User connects a supported calorie-expenditure or health-data source, such as Apple Health when feasible.
-4. User selects `cut`, `maintain`, or `bulk`, confirms a calorie target, and optionally names a food, meal, treat, or event they are saving toward.
+4. User selects `cut`, `maintain`, or `bulk`, confirms a calorie target, optionally configures Emergency Bank reserve behavior, and optionally names a food, meal, treat, or event they are saving toward.
 5. CalorieBank imports available data and initializes the bank from recent history when possible.
 6. CalorieBank calculates daily changes and updates the lifetime bank without requiring daily interaction.
 7. Every morning, the user receives one bank-update notification.
-8. User can inspect history and explanations when they want to understand or correct the balance.
+8. User can search or create Planning Database entries to estimate future meals or events against the bank.
+9. User can inspect history and explanations when they want to understand or correct the balance.
 
 ## Required V1 Screens
 
-- Onboarding: account creation/sign-in, goal mode, target confirmation, timezone, integration education.
+- Onboarding: account creation/sign-in, goal mode, target confirmation, timezone, integration education, lightweight optional Emergency Bank education/configuration.
 - Connections: supported intake source connection, supported expenditure/health source connection, connection state, revoke/reconnect, troubleshooting.
-- Bank Home: lifetime bank, latest daily change, data freshness, pending/incomplete indicators, progress toward saved item.
-- Morning Update Detail: yesterday's result, added/deducted calories, current balance, saved-item readiness when applicable.
-- History: daily changes, imported intake, imported expenditure/activity, net contribution, running lifetime balance.
+- Bank Home: Available Bank, optional Emergency Bank status when enabled, Recovery Forecast when applicable, latest daily change, data freshness, pending/incomplete indicators, progress toward saved item.
+- Planning Search: estimated restaurant meals, grocery products, packaged foods, homemade meals, custom meals, favorites, and saved future plans.
+- Planning Detail: estimated calories, source/estimate label, whether the meal fits the Available Bank, additional calories needed when it does not fit, and approximate time to bank enough when available.
+- Morning Update Detail: yesterday's result, added/deducted calories, Available Bank, Emergency Bank coverage or allocation when relevant, Recovery Forecast state when applicable, saved-item readiness when applicable.
+- History: daily changes, imported intake, imported expenditure/activity, net contribution, allocation to Available Bank and Emergency Bank, withdrawals from each balance, running lifetime balance.
 - Explanation Detail: source labels, calculation inputs, duplicate/reconciliation status, confirmed/pending/estimated state.
 - Manual Correction/Fallback: add or adjust intake/activity only where necessary.
 - Notification Settings: morning update permission, timing, enable/disable.
@@ -66,7 +72,11 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 - Data synchronization.
 - Handling for delayed, missing, incomplete, duplicated, and revoked data.
 - Automatic bank calculation.
-- Current lifetime bank-balance display.
+- Current Available Bank display, floored at zero.
+- Optional Emergency Bank reserve model for users who choose to protect part of future positive deposits.
+- Recovery Forecast when Available Bank and optional Emergency Bank are exhausted.
+- Planning Database for future meal and event estimates.
+- User-created planning entries for custom meals, local restaurants, homemade meals, personal treats, and favorites.
 - Daily bank-update generation.
 - Morning notification with contextual permission request and user settings.
 - Basic history and explanation showing how balance changed.
@@ -80,13 +90,15 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 - Editing manually entered data.
 - Selecting or naming a saved food, meal, treat, or event.
 - Progress toward the saved item.
+- Advanced planning search/filtering, provider ranking, and favorite-meal management.
 - Basic integration troubleshooting.
+- Advanced Emergency Bank settings beyond the minimum optional reserve choice.
 
 ## Explicitly Not Required For First-10-User V1
 
 - Building a MyFitnessPal replacement.
-- Large food database, barcode scanning, recipe builder, or AI meal recognition.
-- Social feeds, friends/family sharing, group pools, advertising, brand partnerships, restaurant integrations, or grocery ordering.
+- Food tracking depth such as a full logging database, barcode scanning for intake logs, consumed-meal recipe builder, or AI meal recognition.
+- Social feeds, friends/family sharing, group pools, advertising, brand partnerships, transactional restaurant integrations, or grocery ordering.
 - CB Coin economy, advanced gamification, complex streaks, or screen-time-oriented engagement.
 - Broad support for every health platform.
 - Large-scale Android/iOS parity before the first experiment.
@@ -110,24 +122,100 @@ Do not assume MyFitnessPal or any named third-party service has an open, approve
 - User-authorized import, export-file import, or sandbox/mock integration for early usability testing.
 - Manual fallback when an integration is unavailable or incomplete.
 
+## Planning Versus Tracking
+
+V1 contains two separate food concepts.
+
+### Food Tracking
+
+Food Tracking is performed by the user's connected calorie-tracking application through approved supported integrations. CalorieBank should not ask users to log the same meal twice.
+
+Food Tracking remains the authoritative source for:
+
+- Daily calorie intake.
+- Historical intake.
+- Bank calculations.
+- Daily synchronization.
+
+Only confirmed intake synchronized from the connected calorie-tracking application, or an approved manual correction/fallback when technically necessary, changes the user's bank.
+
+### Planning Database
+
+The Planning Database is a separate V1 product capability used exclusively for planning future meals and events. It helps users estimate calorie costs before deciding what they want to spend their bank on.
+
+The Planning Database may support:
+
+- Restaurant meals.
+- Fast-food items.
+- Grocery products.
+- Packaged snacks.
+- Desserts.
+- Drinks.
+- Homemade meals.
+- User-created custom meals.
+- Saved favorite meals.
+- Future meal planning.
+- Event planning.
+
+Planning calculations are advisory. They may answer:
+
+- How many calories would this meal cost?
+- Do I already have enough banked calories?
+- If not, how many additional calories do I need to bank?
+- Approximately how many days will that take based on Recovery Forecast or normal banking pace?
+- Which planned meals fit inside my current Available Bank?
+
+Planning estimates do not modify the user's bank, do not become confirmed intake, and do not replace Food Tracking. If the user later eats the meal, the meal should be logged in the connected calorie-tracking application; confirmed synchronized intake then updates the bank.
+
+User-created planning entries may include homemade recipes, family meals, local restaurants, restaurants without published nutrition information, personal treats, custom desserts, and favorite meals. Creating a planning entry does not automatically log that food as consumed.
+
+Planning values may come from official nutrition information, manufacturer-provided values, restaurant-published values, or user-estimated values. Estimated planning values must be clearly identified as estimates when appropriate and must not be represented as confirmed intake.
+
+Preferred language:
+
+- "Plan before you eat."
+- "See whether your bank already covers this meal."
+- "Estimated calories for planning."
+- "Your connected calorie tracker records what you actually ate."
+
+Avoid language implying that the Planning Database is the official food log, that planning entries automatically become consumed meals, or that planning estimates automatically affect the bank.
+
 ## Banking Concepts
 
 - Daily target: the user's configured calorie target for a date, snapshotted with the goal mode and rules active on that date.
 - Imported intake: calories consumed from a supported source.
+- Planning Database entry: estimated meal, food, drink, product, or event calorie information used for future planning only. It is not confirmed intake and does not directly affect the bank.
 - Imported expenditure/activity: calories burned or activity energy from a supported source.
 - Manual correction/fallback: user-entered data used to correct or fill a gap, visibly labeled as manual.
 - Daily change: the day's contribution to the bank based on approved calculation rules and available data.
-- Lifetime bank: cumulative available calories. Banked calories do not expire in initial beta.
-- Available balance: user-visible lifetime bank after confirmed transactions, with pending or estimated changes clearly separated.
+- Lifetime bank: internal cumulative non-expiring bank after initialization and confirmed ledger events. A positive value represents accumulated banked calories; a negative value represents the uncovered recovery amount after Available Bank and Emergency Bank are exhausted.
+- Total Banked Calories: total genuinely accumulated calories available for allocation when no recovery amount exists.
+- Available Bank: non-negative allocation intended for planned meals, foods, events, and other deliberate spending. It must never display a negative value.
+- Emergency Bank: optional protected reserve allocation intended for unexpected overages and unplanned life events. It is not free calories, forgiveness, or a system-created amount.
+- Recovery Forecast: primary home-screen experience when Available Bank and Emergency Bank are exhausted and an uncovered recovery amount remains.
 - Ledger transaction: immutable record explaining a balance-affecting change.
 
-## Negative Balance Rules
+## Emergency Bank Rules
+
+- Emergency Bank is optional; users may decline it, enable it later, disable future allocations, set the allocation rate to `0%`, or choose a supported positive allocation percentage.
+- Emergency Bank allocation applies only to positive daily bank changes.
+- Positive daily changes are split under the active reserve policy into Available Bank allocation and Emergency Bank allocation.
+- Priority reserve building toward an initial Emergency Bank target may exist as an optional strategy, but it must not be the default for every user.
+- The recommended default should let users begin growing Available Bank immediately unless they deliberately choose a more conservative reserve strategy.
+- A fixed `5,000 kcal` reserve target is not a universal recommendation, requirement, or default.
+- Emergency Bank must contain only genuinely accumulated banked calories and must not erase overages.
+- Detailed allocation, spending order, history, policy-versioning, target behavior, and open decisions are governed by `docs/product/bank-calculation-spec.md`.
+
+## Recovery Rules
 
 - Historical bank initialization should never start the user below zero.
-- After initialization, the lifetime bank may become negative if confirmed later data or corrections produce a negative cumulative balance.
-- A negative balance must not block synchronization, corrections, or continued use.
-- UI language should be neutral, such as "overdrawn by X calories", and must avoid shame or punishment.
-- The app should explain which days or corrections created the negative balance.
+- After initialization, confirmed later data or corrections may exhaust Available Bank and optional Emergency Bank and create a recovery amount.
+- The Available Bank must display zero instead of a negative value.
+- Recovery Forecast replaces a large negative bank number as the primary home-screen focus only after Available Bank and Emergency Bank are exhausted.
+- A recovery state must not block synchronization, corrections, or continued use.
+- UI language should emphasize recovery, rebuilding, restoring flexibility, being back on track, estimated recovery, and progress.
+- UI language should avoid debt, punishment, failure, or owing calories.
+- The app should explain which days or corrections created the recovery state in history/explanation views.
 
 ## Calculation Methodology
 
@@ -136,7 +224,7 @@ The V1 bank-calculation formula, historical initialization, lifetime bank behavi
 Product and engineering must still distinguish:
 
 - Product principle: automatically turn connected intake, expenditure, and target data into a clear bank.
-- Confirmed implementation requirement: every balance change is traceable and explainable.
+- Confirmed implementation requirement: every balance change, allocation, withdrawal, reserve-policy version, and recovery amount is traceable and explainable.
 - Approved V1 calculation policy: `v1-total-expenditure-80`.
 - Open decisions: source feasibility, rounding, completeness criteria, cutoff timing, overlapping sources, and safety guardrails.
 
@@ -153,6 +241,8 @@ After a user connects supported intake and expenditure data sources, CalorieBank
 
 This is an onboarding product-experience decision, not a physiological claim. The product intentionally avoids beginning a user's journey with a negative balance.
 
+How historical initialization interacts with the optional Emergency Bank is not yet approved. Do not automatically split initialization into Available Bank and Emergency Bank until that decision is resolved in `docs/product/bank-calculation-spec.md`.
+
 ## Bank Update Behavior
 
 - Daily bank calculation runs after the user's day boundary in their configured timezone and before the morning notification when data is available.
@@ -161,12 +251,14 @@ This is an onboarding product-experience decision, not a physiological claim. Th
 - Corrections must show old value, new value, source, affected date, delta, and effect on lifetime bank.
 - Historical edits, late imports, and manual corrections must create traceable reconciliation/adjustment records rather than silently mutating prior ledger transactions.
 - If no intake data is available, show the day as missing or incomplete; do not assume zero intake without user-visible confirmation.
+- Planning Database estimates must not be used to fill missing intake data.
 - If no expenditure data is available, use the configured fallback rule only if approved; otherwise mark expenditure as missing/pending.
 - If an integration disconnects, stop future syncs, preserve already imported records according to consent/deletion settings, and show connection state.
 - Duplicate records must be prevented using source IDs, timestamps, import batch IDs, and reconciliation rules.
 - The UI must distinguish confirmed, pending, estimated, incomplete, imported, and manually entered data.
 - Users can disable morning notifications and should be able to manually refresh sync status.
 - Users must be able to inspect why the balance changed from the notification or history.
+- When Emergency Bank covers an overage, the UI must show how much was covered by Available Bank, how much was covered by Emergency Bank, and whether any recovery amount remains.
 
 ## Manual Fallback And Activity Entry
 
@@ -174,6 +266,7 @@ This is an onboarding product-experience decision, not a physiological claim. Th
 - Manual activity entries must be source-labeled as manual and included in explanations.
 - Manual activity calories must not be presented as medically precise.
 - If manual data overlaps imported data, duplicate-prevention and reconciliation rules must decide which record contributes to the bank.
+- Planning Database entries are not manual intake entries. They are future-planning estimates and must remain separate from confirmed intake and manual correction/fallback records.
 
 ## Notification Requirements
 
@@ -181,7 +274,9 @@ The primary V1 notification is the morning bank update. It should include, when 
 
 - Yesterday's relevant result.
 - Calories added to or deducted from the bank.
-- Current available lifetime bank balance.
+- Current Available Bank.
+- Emergency Bank allocation, withdrawal, or coverage when relevant.
+- Recovery Forecast state when Available Bank and Emergency Bank are exhausted.
 - Progress toward a saved food, meal, treat, or event.
 - Whether the user has accumulated enough for the planned item.
 - A clear incomplete/pending status when data is not ready.
@@ -192,6 +287,7 @@ Request notification permission only after explaining this value.
 
 - Calculations must be transparent and inspectable.
 - Data-source labels are required for imported, manual, estimated, pending, missing, and corrected data.
+- Planning estimates must be visibly separated from confirmed intake and must never be used as hidden bank inputs.
 - Prevent double counting across sources.
 - Behave conservatively when data is incomplete; do not overstate available calories.
 - Provide user correction flows.
@@ -209,6 +305,9 @@ Request notification permission only after explaining this value.
 - The app can generate an automatically calculated bank from synced data.
 - The morning update can be generated with confirmed, pending, or incomplete states.
 - History explains balance changes with source labels.
+- Planning Database entries can be searched or created without changing the bank.
+- Recovery Forecast appears instead of a large negative primary balance when Available Bank and Emergency Bank are exhausted.
+- Emergency Bank coverage can be explained from ledger/history data when enabled.
 - Manual fallback/correction can reconcile a bad or missing record.
 - Ledger balance can be recomputed from immutable transactions.
 - Timezone-specific calculation and notification behavior is tested.
@@ -224,7 +323,11 @@ Request notification permission only after explaining this value.
 - Morning-notification delivery and usefulness.
 - Number of days the bank updates without manual intervention.
 - Frequency and reasons for manual corrections.
+- Whether Recovery Forecast feels clear, motivating, and non-punitive.
+- Whether users understand Emergency Bank as optional protected previously accumulated calories.
+- Whether Emergency Bank helps users handle unexpected overages without reducing trust or encouraging unsafe restriction.
 - Whether users successfully plan a food, meal, or event using the bank.
+- Whether users understand that Planning Database estimates do not log food or change the bank.
 - Whether the experience reduces mental friction or guilt.
 - Reasons users disconnect, distrust, or abandon the product.
 
@@ -242,6 +345,10 @@ Request notification permission only after explaining this value.
 - `integration_sync_completed`
 - `integration_sync_failed`
 - `historical_bank_initialized`
+- `emergency_bank_intro_viewed`
+- `emergency_bank_configured`
+- `emergency_bank_allocation_recorded`
+- `emergency_bank_withdrawal_recorded`
 - `daily_bank_update_generated`
 - `morning_notification_permission_requested`
 - `morning_notification_delivered`
@@ -251,6 +358,11 @@ Request notification permission only after explaining this value.
 - `integration_disconnected`
 - `saved_item_created`
 - `saved_item_reached`
+- `planning_search_performed`
+- `planning_entry_viewed`
+- `planning_entry_created`
+- `planning_affordability_checked`
+- `recovery_forecast_viewed`
 - `data_delete_requested`
 
 Analytics must not include raw food names, free-text notes, passwords, precise health payloads, or unnecessary personally identifying information.
@@ -268,3 +380,38 @@ Analytics must not include raw food names, free-text notes, passwords, precise h
 - What minimum and maximum calorie targets should be allowed?
 - What notification time should be the default, and should users choose it during onboarding?
 - What level of data export and deletion is required before the first 10 users?
+- How are Recovery Forecast estimates calculated?
+- Minimum history required before Recovery Forecast becomes available.
+- How Recovery Forecast reacts to delayed or corrected data.
+- Whether users can manually adjust recovery goals.
+- How Recovery Forecast behaves when insufficient historical data exists.
+- Whether multiple recovery estimation strategies will exist in future versions.
+- What Emergency Bank allocation-rate range is supported?
+- What default Emergency Bank allocation rate, if any, should be recommended?
+- Should Emergency Bank be suggested during onboarding or after initial use?
+- Can users transfer calories manually between Available Bank and Emergency Bank?
+- Can users withdraw from Emergency Bank for planned spending?
+- Is automatic Emergency Bank coverage mandatory when the feature is enabled?
+- Can users disable Emergency Bank coverage while keeping the reserve?
+- Can Emergency Bank grow without limit?
+- Is there a maximum Emergency Bank reserve target?
+- What happens when allocation rate changes mid-day?
+- How are fractional Emergency Bank allocations rounded?
+- How are corrected historical deposits reallocated?
+- How does historical initialization interact with Emergency Bank?
+- Does an Emergency Bank target pause allocations or act only as a milestone?
+- What happens to the balance when Emergency Bank is disabled?
+- How should unusually large Emergency Bank balances be presented?
+- What safeguards prevent unsafe reserve-building behavior?
+- Which restaurant, grocery, packaged-food, and nutrition-data providers are supported for the Planning Database?
+- How should planning search rank, filter, and label results?
+- What fields are required for user-created planning entries?
+- How are custom planning meals edited or deleted?
+- Can users share planning entries?
+- How are duplicate planning foods or meals handled?
+- How do favorite meals work?
+- Is offline planning supported?
+- How fresh must Planning Database nutrition data be?
+- Is moderation required for community-created planning entries?
+- Can planning entries later be exported into supported calorie-tracking applications?
+- What disclaimer language is required for estimated planning calories?
