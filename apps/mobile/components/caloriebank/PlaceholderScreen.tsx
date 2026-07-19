@@ -1,11 +1,12 @@
 import { Link } from 'expo-router';
 import { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 
 type RouteLink = {
-  href: '/onboarding' | '/sign-in' | '/today' | '/add-food' | '/history' | '/ledger' | '/settings';
+  href: '/onboarding' | '/sign-in' | '/today' | '/history' | '/ledger' | '/settings';
   label: string;
   variant?: 'primary' | 'secondary';
 };
@@ -33,51 +34,57 @@ export function PlaceholderScreen({
   links = [],
 }: PlaceholderScreenProps) {
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.brandRow}>
-        <View style={styles.mark}>
-          <Text style={styles.markText}>CB</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.brandRow}>
+          <View style={styles.mark}>
+            <Text style={styles.markText}>CB</Text>
+          </View>
+          <Text style={styles.brand}>CalorieBank</Text>
         </View>
-        <Text style={styles.brand}>CalorieBank</Text>
-      </View>
 
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>{eyebrow}</Text>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.description}>{description}</Text>
-      </View>
-
-      {metrics.length > 0 ? (
-        <View style={styles.metricsGrid}>
-          {metrics.map((metric) => (
-            <View key={metric.label} style={styles.metricCard}>
-              <Text style={styles.metricLabel}>{metric.label}</Text>
-              <Text style={styles.metricValue}>{metric.value}</Text>
-            </View>
-          ))}
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>{eyebrow}</Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.description}>{description}</Text>
         </View>
-      ) : null}
 
-      {children ? <View style={styles.panel}>{children}</View> : null}
+        {metrics.length > 0 ? (
+          <View style={styles.metricsGrid}>
+            {metrics.map((metric) => (
+              <View key={metric.label} style={styles.metricCard}>
+                <Text style={styles.metricLabel}>{metric.label}</Text>
+                <Text style={styles.metricValue}>{metric.value}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
-      {links.length > 0 ? (
-        <View style={styles.actions}>
-          {links.map((link) => (
-            <Link key={link.href} href={link.href} asChild>
-              <Pressable style={[styles.button, link.variant === 'secondary' && styles.secondaryButton]}>
-                <Text style={[styles.buttonText, link.variant === 'secondary' && styles.secondaryButtonText]}>
-                  {link.label}
-                </Text>
-              </Pressable>
-            </Link>
-          ))}
-        </View>
-      ) : null}
-    </ScrollView>
+        {children ? <View style={styles.panel}>{children}</View> : null}
+
+        {links.length > 0 ? (
+          <View style={styles.actions}>
+            {links.map((link) => (
+              <Link key={link.href} href={link.href} asChild>
+                <Pressable style={[styles.button, link.variant === 'secondary' && styles.secondaryButton]}>
+                  <Text style={[styles.buttonText, link.variant === 'secondary' && styles.secondaryButtonText]}>
+                    {link.label}
+                  </Text>
+                </Pressable>
+              </Link>
+            ))}
+          </View>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   container: {
     flexGrow: 1,
     gap: spacing.lg,

@@ -55,13 +55,31 @@ npm install
 
 ## Run Mobile
 
+From the repository root:
+
 ```bash
-npm run mobile:start
+npm run mobile:start -- --clear
 ```
 
-Then open the project in Expo Go or use the iOS/Android commands when the local environment supports them.
+Other root mobile commands:
+
+```bash
+npm run mobile:ios
+npm run mobile:android
+npm run mobile:web
+```
+
+### Physical iPhone With Expo Go
+
+1. Install Expo Go from the App Store.
+2. Make sure the iPhone and development machine are on the same network.
+3. Run `npm run mobile:start -- --clear` from the repository root.
+4. Scan the QR code with the iPhone camera or Expo Go.
+5. If the connection cannot be reached on the local network, switch the Expo CLI connection mode as prompted by Expo.
 
 ## Checks
+
+From the repository root:
 
 ```bash
 npm run lint

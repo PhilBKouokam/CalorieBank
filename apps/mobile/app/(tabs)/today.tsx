@@ -7,19 +7,22 @@ export default function TodayScreen() {
     <PlaceholderScreen
       eyebrow="Mobile V1 Foundation"
       title="Today"
-      description="A placeholder for the daily calorie target, consumed calories, projected bank change, and current calorie-bank balance."
+      description="A placeholder for the current bank, latest sync state, projected progress, setup state, and planning access."
       metrics={[
-        { label: 'Bank Balance', value: '0 cal' },
-        { label: 'Projected Today', value: '0 cal' },
-        { label: 'Consumed', value: '0 cal' },
-        { label: 'Daily Target', value: '0 cal' },
+        { label: 'Available Bank', value: '0 cal' },
+        { label: 'Latest Sync', value: 'Pending' },
+        { label: 'Projected Progress', value: '0 cal' },
+        { label: 'Setup State', value: 'Not connected' },
       ]}
       links={[
-        { href: '/add-food', label: 'Add Food Placeholder' },
-        { href: '/ledger', label: 'View Ledger Placeholder', variant: 'secondary' },
+        { href: '/ledger', label: 'View Ledger Placeholder' },
+        { href: '/onboarding', label: 'Open Setup Placeholder', variant: 'secondary' },
       ]}
     >
-      <Text>Business logic will stay out of the mobile shell until the domain and API contracts are ready.</Text>
+      <Text>
+        Planning access will compare future meal estimates against the bank later. Business logic stays out of the
+        mobile shell until the domain and API contracts are ready.
+      </Text>
     </PlaceholderScreen>
   );
 }

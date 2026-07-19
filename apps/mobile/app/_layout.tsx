@@ -19,11 +19,10 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ title: 'Onboarding' }} />
-        <Stack.Screen name="sign-in" options={{ title: 'Sign In' }} />
-        <Stack.Screen name="add-food" options={{ title: 'Add Food' }} />
-        <Stack.Screen name="ledger" options={{ title: 'Ledger' }} />
+        <Stack.Screen name="(modals)" options={{ presentation: 'modal' }} />
       </Stack>
       <StatusBar style="dark" />
     </>

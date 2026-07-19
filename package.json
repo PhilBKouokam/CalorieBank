@@ -8,10 +8,10 @@
     "packages/*"
   ],
   "scripts": {
-    "mobile:start": "npm --workspace @caloriebank/mobile run start",
-    "mobile:ios": "npm --workspace @caloriebank/mobile run ios",
-    "mobile:android": "npm --workspace @caloriebank/mobile run android",
-    "mobile:web": "npm --workspace @caloriebank/mobile run web",
+    "mobile:start": "npm --workspace @caloriebank/mobile run start --",
+    "mobile:ios": "npm --workspace @caloriebank/mobile run ios --",
+    "mobile:android": "npm --workspace @caloriebank/mobile run android --",
+    "mobile:web": "npm --workspace @caloriebank/mobile run web --",
     "lint": "npm --workspace @caloriebank/mobile run lint",
     "typecheck": "npm --workspaces --if-present run typecheck",
     "test": "npm --workspaces --if-present run test"
