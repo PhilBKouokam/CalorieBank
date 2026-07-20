@@ -53,6 +53,37 @@ From the repository root:
 npm install
 ```
 
+## Run API
+
+From the repository root:
+
+```bash
+npm run api:dev
+```
+
+The API listens on port `3000` by default and exposes:
+
+```bash
+curl http://localhost:3000/health
+```
+
+Expected response:
+
+```json
+{
+  "status": "ok",
+  "service": "caloriebank-api"
+}
+```
+
+For physical iPhone testing, `localhost` on the phone points to the phone, not the Mac. Set the mobile API URL to the Mac's LAN IP address, for example:
+
+```bash
+EXPO_PUBLIC_API_URL=http://192.168.0.154:3000
+```
+
+Copy `apps/mobile/.env.example` to an untracked local env file and replace the example IP with the Mac's current LAN IP before launching Expo Go.
+
 ## Run Mobile
 
 From the repository root:
