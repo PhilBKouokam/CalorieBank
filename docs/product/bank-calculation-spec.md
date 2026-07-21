@@ -32,11 +32,13 @@ This specification preserves the current V1 direction from:
 
 - `docs/product/v1-prd.md`
 - `docs/product/adr-001-connection-first-v1.md`
+- `docs/product/adr-002-expenditure-relative-goal-adjustment.md`
+- `docs/product/adr-003-interactive-summary-and-explanation.md`
 - `docs/architecture/current-state-audit.md`
 - `README.md`
 - `AGENTS.md`
 
-Superseded ideas include manual-food-logging-first V1, weekly-bank framing as the primary model, mutable bank balances, and generic engagement notifications.
+Superseded ideas include manual-food-logging-first V1, user-entered absolute daily calorie targets, weekly-bank framing as the primary model, mutable bank balances, and generic engagement notifications.
 
 ## Design Principles
 
@@ -51,6 +53,8 @@ Supported intake and expenditure data should synchronize automatically, and the 
 ### Transparent Calculations
 
 Users must be able to understand where their balance came from.
+
+Users may inspect finalized history and selected-day calculation inputs by opening the read-only Bank History experience from Available Bank. History and explanation views must not allow users to manually edit calculated bank values.
 
 ### Conservative Crediting
 
@@ -95,22 +99,31 @@ CalorieBank answers:
 - Why did the balance change?
 - Have I accumulated enough flexibility for a desired food, meal, or event?
 - Can a planned future meal or event fit inside my current Available Bank?
+- How close am I to one active Planned Treat I intentionally chose?
 
 CalorieBank must not claim to measure a person's exact metabolism or exact physiological energy expenditure.
 
 The Planning Database described in `docs/product/v1-prd.md` supports future meal and event planning only. Planning estimates are not confirmed intake, are not Food Tracking records, and must not directly change the bank.
 
+The Planned Treat described in `docs/product/v1-prd.md` is a purpose layer over the bank. Planned Treat progress is derived from the all-time Available Bank and the treat's required calories. Creating, editing, reaching, or removing a Planned Treat must not create deposits, withdrawals, confirmed intake, or automatic bank-spending transactions.
+
 ## Required Terminology
 
-- Base calorie target: the user's configured calorie goal context. In the approved V1 formula, the operative target input is `desired_daily_deficit` applied against imported total daily expenditure. If future flows introduce a fixed calorie target that already includes activity, double-counting rules must be explicitly defined before implementation.
+- Goal mode: the user's selected goal context for an effective date: `cut`, `maintain`, or `bulk`.
+- Daily energy adjustment: signed calorie adjustment relative to adjusted imported total expenditure. Cut uses a negative adjustment, maintain uses zero, and bulk uses a positive adjustment.
+- Adjustment source: the source of the daily energy adjustment, such as `manual_calories` or `estimated_weight_rate`.
+- Desired weekly weight change: optional planning preference used to estimate a daily energy adjustment. This is not a guaranteed physiological outcome.
+- Adjusted daily expenditure: imported total daily expenditure after applying CalorieBank's approved V1 conservative `0.80` policy.
+- Goal-adjusted spending allowance: adjusted daily expenditure plus the signed daily energy adjustment.
 - Imported calorie intake: calories consumed for an effective date from a supported intake source or approved manual fallback.
 - Planning Database entry: estimated meal, food, drink, grocery product, restaurant item, homemade meal, or event calorie information used for future planning only. It is not confirmed intake and does not directly affect bank calculations.
+- Planned Treat: one active food, meal, treat, or event the user is saving toward. It has a name, required calories, optional target date, and progress derived from Available Bank.
 - Raw imported active calories: activity-only calories reported by a source before CalorieBank adjustment. These are distinct from total expenditure and are not separately added in the approved V1 primary formula.
 - Raw imported total expenditure: total daily calorie expenditure reported by a supported expenditure or health-data source for an effective date.
 - Eligible active calories: active calories allowed to influence a calculation under an approved policy. In V1's primary formula, this value is recorded for provenance when available but is not separately added after applying the total-expenditure formula.
 - Expenditure credit rate: named, versioned calculation parameter applied to the approved expenditure input. V1 uses `0.80`.
 - Credited active calories: active-calorie credit after policy adjustment. In V1's total-expenditure formula, this value may be displayed for explanation only when source data supports it; it is not an extra additive input.
-- Base-target savings: the amount left after comparing adjusted spending allowance to imported intake for a day.
+- Allowance savings: the amount left after comparing goal-adjusted spending allowance to imported intake for a day.
 - Daily bank contribution: the calculated daily bank change before it is represented as a deposit, withdrawal, or zero-change ledger event.
 - Bank deposit: positive balance-changing event.
 - Bank withdrawal: negative balance-changing event.
@@ -146,7 +159,10 @@ Approved V1 policy:
 - `calculation_policy_version`: `v1-total-expenditure-80`
 - `expenditure_input`: `imported_total_daily_expenditure`
 - `expenditure_credit_rate`: `0.80`
-- `deficit_input`: `desired_daily_deficit`
+- `goal_mode`: `cut | maintain | bulk`
+- `goal_adjustment_input`: `daily_energy_adjustment`
+- `adjustment_source`: `manual_calories | estimated_weight_rate`
+- `desired_weekly_weight_change`: optional planning value
 - `intake_input`: `imported_daily_calorie_intake`
 
 The `0.80` rate is an authoritative V1 product policy. It must be stored as a named, versioned calculation parameter so later versions can adjust it without rewriting the bank model.
@@ -180,17 +196,19 @@ For CalorieBank V1, the connected calorie-expenditure source's total daily calor
 
 CalorieBank does not separately calculate resting expenditure and active expenditure for the primary V1 bank formula.
 
+Users do not enter an absolute daily calorie target in V1. The connected total-expenditure source remains the operational source of truth for determining the user's daily allowance, after CalorieBank applies the approved conservative expenditure adjustment and the user's signed goal adjustment.
+
 The approved V1 calculation is:
 
 ```text
 adjusted_daily_expenditure =
   imported_total_daily_expenditure * 0.80
 
-daily_spending_target =
-  adjusted_daily_expenditure - desired_daily_deficit
+daily_spending_allowance =
+  adjusted_daily_expenditure + daily_energy_adjustment
 
 daily_bank_change =
-  daily_spending_target - imported_daily_calorie_intake
+  daily_spending_allowance - imported_daily_calorie_intake
 ```
 
 Equivalent form:
@@ -198,15 +216,21 @@ Equivalent form:
 ```text
 daily_bank_change =
   (imported_total_daily_expenditure * 0.80)
-  - desired_daily_deficit
+  + daily_energy_adjustment
   - imported_daily_calorie_intake
 ```
+
+Signed adjustment behavior:
+
+- `cut`: negative adjustment, configured as a desired daily deficit.
+- `maintain`: zero adjustment. Do not ask the user for a calorie target, deficit, or surplus.
+- `bulk`: positive adjustment, configured as a desired daily surplus.
 
 Interpretation:
 
 - A positive `daily_bank_change` is deposited into the user's lifetime bank.
 - A negative `daily_bank_change` is withdrawn from the user's lifetime bank.
-- A zero result means the user consumed exactly the amount permitted while preserving their selected daily deficit.
+- A zero result means the user consumed exactly the goal-adjusted spending allowance for that day.
 - Banked calories do not expire.
 - The lifetime bank represents the cumulative sum of confirmed deposits and withdrawals after initialization.
 - Positive daily changes may be allocated between Available Bank and optional Emergency Bank under the user's active reserve policy.
@@ -224,7 +248,8 @@ Planning Database estimates are not operational sources of truth for intake. If 
 Imported total expenditure: 3,000 kcal
 V1 expenditure adjustment: 0.80
 Adjusted daily expenditure: 2,400 kcal
-Desired daily deficit: 500 kcal
+Goal mode: cut
+Daily energy adjustment: -500 kcal
 Imported intake: 1,900 kcal
 Daily bank change: 0 kcal
 ```
@@ -232,7 +257,8 @@ Daily bank change: 0 kcal
 ```text
 Imported total expenditure: 3,000 kcal
 Adjusted daily expenditure: 2,400 kcal
-Desired daily deficit: 500 kcal
+Goal mode: cut
+Daily energy adjustment: -500 kcal
 Imported intake: 1,700 kcal
 Daily bank change: +200 kcal
 ```
@@ -240,10 +266,29 @@ Daily bank change: +200 kcal
 ```text
 Imported total expenditure: 3,000 kcal
 Adjusted daily expenditure: 2,400 kcal
-Desired daily deficit: 500 kcal
+Goal mode: cut
+Daily energy adjustment: -500 kcal
 Imported intake: 2,200 kcal
 Daily bank change: -300 kcal
 ```
+
+Given adjusted expenditure of `2,400 kcal`:
+
+```text
+Cut by 500:
+daily_energy_adjustment = -500
+daily_spending_allowance = 1,900 kcal
+
+Maintain:
+daily_energy_adjustment = 0
+daily_spending_allowance = 2,400 kcal
+
+Bulk by 300:
+daily_energy_adjustment = +300
+daily_spending_allowance = 2,700 kcal
+```
+
+If weekly weight-change options are offered, they must be labeled as estimates. The common `3,500 kcal per pound` conversion is a planning approximation; actual weight change is affected by metabolism, body composition, adherence, water changes, measurement error, and physiological adaptation.
 
 ## Data-Source Requirements
 
@@ -257,6 +302,16 @@ Bank inputs may come from:
 Do not claim support for every application.
 
 Planning Database entries are explicitly excluded from bank-calculation inputs. They may be used to compare estimated future calorie costs against Available Bank or estimated time-to-bank, but they must not create deposits, withdrawals, confirmed intake, or ledger transactions unless a later approved integration explicitly exports the consumed item to a supported intake source and that source syncs it back as confirmed intake.
+
+Planned Treat progress is also excluded from bank-calculation inputs. The derived progress rules are:
+
+```text
+progress_ratio = available_bank_calories / required_calories
+display_progress = clamp(progress_ratio, 0, 1)
+remaining_calories = max(required_calories - max(available_bank_calories, 0), 0)
+```
+
+If the all-time Available Bank is zero or negative, the Planned Treat displays `0%` progress and the full required amount remaining. If the Available Bank exceeds the requirement, the visual progress displays `100%` while the real saved amount may remain visible in supporting copy. A ready Planned Treat does not automatically spend from the bank; spending requires a future approved withdrawal flow backed by auditable ledger/history records.
 
 For each data point, preserve enough provenance to identify:
 
@@ -285,6 +340,8 @@ Approved V1 onboarding behavior:
 8. Avoid double counting historical records during later synchronization.
 
 The zero floor is an onboarding and product-experience decision, not a claim that previous excess intake did not occur physiologically.
+
+Historical calculations must snapshot the active goal mode, daily energy adjustment, adjustment source, desired weekly weight-change preference when applicable, expenditure-credit rate, and calculation-policy version for each effective date.
 
 Completeness criteria for a historical day are not fully approved. Until resolved, a historical day should not be treated as complete unless both required daily intake and required daily total-expenditure inputs are available and source-labeled.
 
@@ -531,14 +588,32 @@ The product should acknowledge that users intentionally spent calories from thei
 
 Bank changes must be explainable and auditable. The exact database schema may evolve, but each balance-changing event must preserve enough information to explain:
 
+The current implemented finalized-bank read model uses `finalized_daily_bank_records` plus `calorie_ledger_transactions`. A finalized daily record snapshots the calculation inputs and outputs for one completed day. Its matching ledger transaction stores the immutable balance-changing amount.
+
+Finalization rules:
+
+- A user can have only one finalized daily bank record per `logDate`.
+- Finalization and ledger creation happen in one database transaction.
+- The ledger transaction amount must equal the finalized record's daily bank change.
+- The ledger idempotency key is unique per user.
+- Running development finalization twice for the same user and date returns the existing finalized result instead of creating another ledger transaction.
+- Adjusted expenditure is rounded deterministically to the nearest integer calorie after applying the expenditure adjustment rate.
+- The current development seed/finalization path is not a production ingestion endpoint.
+
 - Effective date.
 - Event type.
 - Intake input.
+- Raw imported total-expenditure input.
 - Raw active-calorie input.
 - Eligible active calories.
 - Expenditure credit rate.
 - Credited active calories.
-- Base-target savings.
+- Goal mode.
+- Daily energy adjustment.
+- Adjustment source.
+- Desired weekly weight change when applicable.
+- Goal-adjusted spending allowance.
+- Allowance savings.
 - Daily contribution.
 - Manual adjustment.
 - Previous running balance.
@@ -572,18 +647,19 @@ Conceptual lifecycle:
 3. Normalize records.
 4. Classify expenditure as active, resting, total, or unknown.
 5. Deduplicate source records.
-6. Determine whether the base target or selected data source already includes activity.
+6. Determine the active goal mode, daily energy adjustment, adjustment source, and calculation-policy version for the effective date.
 7. Determine whether active-calorie fields are applicable for explanation or future calibration.
 8. Apply the V1 expenditure credit rate to imported total daily expenditure.
-9. Determine whether sufficient data exists to calculate the day.
-10. Calculate or recalculate the daily contribution.
-11. Record the ledger change.
-12. Update the running lifetime bank.
-13. Allocate positive changes between Available Bank and optional Emergency Bank under the active reserve policy.
-14. Apply negative changes in order: Available Bank, Emergency Bank, Recovery Forecast.
-15. Derive current Total Banked Calories, Available Bank, Emergency Bank, and recovery amount.
-16. Generate an understandable history explanation.
-17. Determine whether the morning notification can truthfully be generated.
+9. Calculate the goal-adjusted spending allowance.
+10. Determine whether sufficient data exists to calculate the day.
+11. Calculate or recalculate the daily contribution.
+12. Record the ledger change.
+13. Update the running lifetime bank.
+14. Allocate positive changes between Available Bank and optional Emergency Bank under the active reserve policy.
+15. Apply negative changes in order: Available Bank, Emergency Bank, Recovery Forecast.
+16. Derive current Total Banked Calories, Available Bank, Emergency Bank, and recovery amount.
+17. Generate an understandable history explanation.
+18. Determine whether the morning notification can truthfully be generated.
 
 Exact synchronization windows and cutoff times are not approved.
 
@@ -591,7 +667,7 @@ Exact synchronization windows and cutoff times are not approved.
 
 - Pending: required records or cutoff timing are not yet available.
 - Complete: required data exists and the approved calculation policy has run.
-- Incomplete: required intake, expenditure, target, or policy inputs are missing.
+- Incomplete: required intake, expenditure, goal-adjustment, or policy inputs are missing.
 - Corrected: a previous calculation has been superseded or adjusted by late data, source correction, deletion, or manual correction.
 - Estimated: source data or derived values are approximate and must be labeled as such.
 
@@ -629,7 +705,7 @@ Principles:
 - Partial days: do not confirm bank deposits or withdrawals without required inputs.
 - Timezone changes: do not silently move historical records between days; behavior is an open decision.
 - Manual corrections: label as manual and explain their effect on running balance.
-- Retroactive target changes: open decision; do not silently recalculate history unless approved.
+- Retroactive goal-adjustment changes: open decision; do not silently recalculate history unless approved.
 - Recalculation after late data: must preserve explanation of previous and resulting balance.
 - Notification already delivered before a correction: open decision; requires user-visible correction messaging.
 - Integration reconnects: resume sync with duplicate prevention and gap detection.
@@ -647,6 +723,10 @@ The user experience must distinguish:
 - Imported raw active calories.
 - Credited active calories.
 - The 0.80 expenditure credit rate.
+- Goal mode.
+- Daily energy adjustment.
+- Adjustment source.
+- Goal-adjusted spending allowance.
 - Manual entries.
 - Corrections.
 - Estimated or incomplete calculations.
@@ -663,6 +743,14 @@ The user experience must distinguish:
 
 The user should be able to inspect why their bank changed.
 
+The Available Bank card should open read-only Bank History. The default view should stay simple: all-time Available Bank, latest finalized date, range filters, and a minimal history visualization or list. Selecting a finalized day should reveal imported total daily expenditure using consumer language such as calories burned, source labeling when useful, the `0.80` policy as `80% credited`, adjusted expenditure, goal mode, signed goal adjustment, daily allowance, calories eaten, daily bank change, prior balance, ledger/reconciliation records, current Available Bank, data freshness, and calculation status when those data exist.
+
+Consumer UI must not expose raw internal identifiers, database field names, API field names, or variable names. Raw equations belong in technical documentation, not the default consumer interface.
+
+Unavailable inputs must be shown as missing, pending, or incomplete. They must not be displayed as zero unless zero is a confirmed source value. If a source eventually provides resting and active expenditure components, those components may be displayed to explain the reported total expenditure, but they must not be added again after using imported total daily expenditure in the approved formula.
+
+Goal configuration can be changed through settings, but changes must not silently rewrite historical calculations. Historical records must remain explainable with the goal mode, signed adjustment, adjustment source, expenditure-credit rate, calculation-policy version, and effective date that applied at the time.
+
 Use language equivalent to:
 
 > CalorieBank conservatively credits 80% of the reported daily expenditure from your connected source because calorie estimates are not exact.
@@ -676,6 +764,8 @@ Do not use language equivalent to:
 The first-10-user validation plan should evaluate:
 
 - Whether users understand the 80% expenditure-adjustment rule.
+- Whether users understand cut as a deficit, maintain as zero adjustment, and bulk as a surplus.
+- Whether users understand weekly weight-change conversions as planning estimates, not promises.
 - Whether they perceive it as fair.
 - Whether they trust the resulting bank.
 - Whether the bank broadly aligns with observed weight trends over sufficient time.
@@ -724,7 +814,13 @@ Any future personalized calibration must include safeguards against reacting to 
 - Do not describe wearable estimates as exact.
 - Do not imply that every exercise calorie perfectly cancels a food calorie.
 - Do not encourage extreme restriction or compulsive compensation.
-- Avoid unsafe calorie targets.
+- Avoid unsafe deficit or surplus selections.
+- Weight-rate conversions are estimates, not promises.
+- The common `3,500 kcal per pound` conversion is a planning approximation, not a guarantee.
+- Actual weight change is affected by metabolism, body composition, adherence, water changes, measurement error, and physiological adaptation.
+- CalorieBank must not promise that a selected deficit or surplus will produce an exact weekly weight change.
+- The application should eventually consider minimum-intake and other safety protections before recommending or displaying an allowance.
+- Users with medical or nutrition concerns should consult a qualified healthcare professional.
 - Make incomplete data visible.
 - Prevent expenditure double counting.
 - Support corrections.
@@ -737,7 +833,7 @@ Any future personalized calibration must include safeguards against reacting to 
 - Users should not be encouraged to accumulate extreme reserves through unsafe restriction.
 - The product should avoid presenting unusually large reserves as inherently better.
 - Allocation settings must not encourage compulsive compensation.
-- Existing calorie-target and minimum-intake safeguards remain applicable.
+- Existing minimum-intake safeguard requirements remain applicable; exact numerical limits are unresolved.
 - When both Available Bank and Emergency Bank are exhausted, use Recovery Forecast as planning guidance rather than punishment.
 
 ## Superseded Or Contradictory Rules
@@ -749,13 +845,16 @@ Any future personalized calibration must include safeguards against reacting to 
 - Earlier guidance that would make a large negative bank balance the primary display is superseded. Available Bank displays zero while Recovery Forecast explains the path back.
 - Earlier single-bank guidance that moved directly from Available Bank to Recovery Forecast is superseded. The approved V1 protection sequence is Available Bank -> optional Emergency Bank -> Recovery Forecast.
 - Any guidance that would make Planning Database entries a bank-calculation input is superseded. Planning estimates are advisory only until confirmed intake syncs from a supported calorie-tracking source or an approved manual correction/fallback path.
+- Any guidance requiring users to configure an absolute daily calorie target is superseded. V1 uses imported total daily expenditure, the `0.80` expenditure adjustment, and the user's signed daily energy adjustment.
 
 ## Open Product Decisions
 
 - Which supported intake-data source is feasible for the first 10 users?
 - Which supported total-expenditure source is feasible for the first 10 users?
-- Is the base calorie target activity-exclusive?
-- How should a fixed user calorie target coexist with the approved total-expenditure formula without double counting?
+- What minimum and maximum daily deficits and surpluses should be allowed?
+- Should weekly weight-change preferences be included in V1 onboarding, and what exact options and copy should be used?
+- What minimum-intake or allowance safeguards are required before broader beta?
+- How should existing implementation fields, API contracts, and database columns with absolute-target names be migrated to goal-adjustment terminology?
 - How are Recovery Forecast estimates calculated?
 - Minimum history required before forecasts become available.
 - How forecasts react to delayed or corrected data.
@@ -783,7 +882,7 @@ Any future personalized calibration must include safeguards against reacting to 
 - What happens to the balance when Emergency Bank is disabled?
 - How should unusually large Emergency Bank balances be presented?
 - What safeguards prevent unsafe reserve-building behavior?
-- What is the rounding policy for adjusted expenditure, spending target, daily change, and running balance?
+- What is the rounding policy for adjusted expenditure, spending allowance, daily change, and running balance?
 - What qualifies a historical day as complete beyond requiring intake and total expenditure?
 - What happens when fewer than seven complete historical days exist?
 - What data is required before a day becomes confirmed?
@@ -791,7 +890,7 @@ Any future personalized calibration must include safeguards against reacting to 
 - When does the morning calculation run?
 - How are late corrections communicated if a morning notification was already delivered?
 - How are overlapping expenditure sources resolved?
-- How are imported calorie targets that already include activity handled?
+- How are imported third-party goals or calorie targets handled if a connected source provides them?
 - Can users inspect or change the expenditure credit rate in V1?
 - Are historical ledger entries recalculated after a future policy change?
 - What safeguards apply to unusually large balances?
@@ -805,6 +904,7 @@ Any future personalized calibration must include safeguards against reacting to 
 - Bank calculation logic belongs in `packages/domain`.
 - API schemas for calculation inputs, statuses, and ledger events belong in `packages/schemas`.
 - The V1 policy must be represented as named, versioned configuration.
+- Goal mode, daily energy adjustment, adjustment source, desired weekly weight-change preference when applicable, expenditure-credit rate, and calculation-policy version must be snapshotted for each effective date.
 - Emergency Bank allocation and coverage rules must be represented as named, versioned reserve-policy configuration.
 - Tests are required for calculation changes, historical initialization, missing data states, duplicate prevention, corrections, and rounding once approved.
 - No production implementation is defined by this document; this is a product and architecture specification.

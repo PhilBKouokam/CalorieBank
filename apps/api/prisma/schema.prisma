@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+enum GoalMode {
+  cut
+  maintain
+  bulk
+}
+
+enum AdjustmentSource {
+  manual_calories
+  estimated_weight_rate
+}
+
+enum LedgerTransactionType {
+  daily_finalization
+  adjustment
+}
+
+enum LedgerSourceType {
+  finalized_daily_bank_record
+  manual_adjustment
+}
+
+model User {
+  id                        String                     @id @default(uuid()) @db.Uuid
+  email                     String                     @unique
+  profile                   UserProfile?
+  goalConfiguration         GoalConfiguration?
+  plannedTreat              PlannedTreat?
+  finalizedDailyBankRecords FinalizedDailyBankRecord[]
+  calorieLedgerTransactions CalorieLedgerTransaction[]
+  createdAt                 DateTime                   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                 DateTime                   @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("users")
+}
+
+model UserProfile {
+  userId    String   @id @map("user_id") @db.Uuid
+  timezone  String   @default("UTC")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("user_profiles")
+}
+
+model GoalConfiguration {
+  userId                    String           @id @map("user_id") @db.Uuid
+  goalMode                  GoalMode         @map("goal_mode")
+  dailyEnergyAdjustment     Int              @map("daily_energy_adjustment")
+  adjustmentSource          AdjustmentSource @map("adjustment_source")
+  desiredWeeklyWeightChange Decimal?         @map("desired_weekly_weight_change") @db.Decimal(4, 2)
+  user                      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt                 DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                 DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("goal_configurations")
+}
+
+model PlannedTreat {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @unique @map("user_id") @db.Uuid
+  name             String
+  requiredCalories Int       @map("required_calories")
+  targetDate       DateTime? @map("target_date") @db.Date
+  completedAt      DateTime? @map("completed_at") @db.Timestamptz
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("planned_treats")
+}
+
+model FinalizedDailyBankRecord {
+  id                            String                     @id @default(uuid()) @db.Uuid
+  userId                        String                     @map("user_id") @db.Uuid
+  logDate                       DateTime                   @map("log_date") @db.Date
+  timezone                      String
+  importedTotalDailyExpenditure Int                        @map("imported_total_daily_expenditure")
+  expenditureAdjustmentRate     Decimal                    @map("expenditure_adjustment_rate") @db.Decimal(4, 2)
+  adjustedExpenditure           Int                        @map("adjusted_expenditure")
+  goalMode                      GoalMode                   @map("goal_mode")
+  goalAdjustmentCalories        Int                        @map("goal_adjustment_calories")
+  importedCalorieIntake         Int                        @map("imported_calorie_intake")
+  dailyAllowance                Int                        @map("daily_allowance")
+  dailyBankChange               Int                        @map("daily_bank_change")
+  finalizedAt                   DateTime                   @map("finalized_at") @db.Timestamptz
+  createdAt                     DateTime                   @default(now()) @map("created_at") @db.Timestamptz
+  user                          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calorieLedgerTransactions     CalorieLedgerTransaction[]
+
+  @@unique([userId, logDate])
+  @@index([userId, logDate])
+  @@map("finalized_daily_bank_records")
+}
+
+model CalorieLedgerTransaction {
+  id                       String                   @id @default(uuid()) @db.Uuid
+  userId                   String                   @map("user_id") @db.Uuid
+  logDate                  DateTime                 @map("log_date") @db.Date
+  type                     LedgerTransactionType
+  amountCalories           Int                      @map("amount_calories")
+  sourceType               LedgerSourceType         @map("source_type")
+  sourceId                 String                   @map("source_id") @db.Uuid
+  idempotencyKey           String                   @map("idempotency_key")
+  description              String
+  createdAt                DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  user                     User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  finalizedDailyBankRecord FinalizedDailyBankRecord @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, logDate])
+  @@map("calorie_ledger_transactions")
+}

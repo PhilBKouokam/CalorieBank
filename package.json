@@ -11,6 +11,10 @@
     "api:dev": "npm --workspace @caloriebank/api run dev",
     "api:build": "npm --workspace @caloriebank/api run build",
     "api:start": "npm --workspace @caloriebank/api run start",
+    "db:generate": "npm --workspace @caloriebank/api run db:generate",
+    "db:migrate": "npm --workspace @caloriebank/api run db:migrate",
+    "db:deploy": "npm --workspace @caloriebank/api run db:deploy",
+    "bank:seed": "npm --workspace @caloriebank/api run seed:bank-history",
     "mobile:start": "npm --workspace @caloriebank/mobile run start --",
     "mobile:ios": "npm --workspace @caloriebank/mobile run ios --",
     "mobile:android": "npm --workspace @caloriebank/mobile run android --",
@@ -20,6 +24,6 @@
     "test": "npm --workspaces --if-present run test"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=20.19.0 <21"
   }
 }

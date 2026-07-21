@@ -3,14 +3,18 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "prestart": "npm --workspace @caloriebank/schemas run build",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "prelint": "npm --workspace @caloriebank/schemas run build",
     "lint": "expo lint",
+    "pretypecheck": "npm --workspace @caloriebank/schemas run build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@caloriebank/schemas": "*",
     "@expo/vector-icons": "^15.0.3",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",

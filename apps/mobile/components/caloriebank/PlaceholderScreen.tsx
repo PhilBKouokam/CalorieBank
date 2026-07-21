@@ -6,7 +6,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 
 type RouteLink = {
-  href: '/onboarding' | '/sign-in' | '/today' | '/history' | '/ledger' | '/settings';
+  href:
+    | '/onboarding'
+    | '/sign-in'
+    | '/today'
+    | '/history'
+    | '/ledger'
+    | '/settings'
+    | '/bank-history'
+    | '/goal-settings'
+    | '/planned-treat';
   label: string;
   variant?: 'primary' | 'secondary';
 };

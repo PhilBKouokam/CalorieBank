@@ -6,11 +6,13 @@ Date: 2026-07-16
 
 The original audit was written when V1 was assumed to be manual-food-logging-first. That assumption is superseded.
 
-The authoritative V1 direction is now connection-first automatic calorie banking: users connect supported calorie-intake and calorie-expenditure/health data sources, configure a goal and target, receive automatic bank calculations, and get one meaningful morning bank update. Manual food logging remains useful prototype work, but for first-10-user V1 it is fallback/correction/supplementary behavior rather than the promoted product loop.
+The authoritative V1 direction is now connection-first automatic calorie banking: users connect supported calorie-intake and calorie-expenditure/health data sources, configure goal mode and a deficit/surplus adjustment when applicable, receive automatic bank calculations, and get one meaningful morning bank update. Manual food logging remains useful prototype work, but for first-10-user V1 it is fallback/correction/supplementary behavior rather than the promoted product loop.
 
 V1 also includes a Planning Database for future meal and event estimates. That database is planning-only: connected calorie-tracking applications remain the source of truth for Food Tracking, daily intake, historical intake, synchronization, and bank calculations. Planning Database estimates must not directly update the bank.
 
-The current architecture inventory below remains valid as a description of the existing prototype. Forward-looking reuse, migration, database, and vertical-slice guidance has been updated to match `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`.
+The approved mobile information architecture is bank-first. The default experience should show the all-time Available Bank first, include finalized days only through the previous completed day, keep the current day pending or explicitly estimated, and reveal history by day/week/month/3 months/year/all time only when requested. Selecting a finalized day reveals a short consumer-readable breakdown. Implementation should preserve immutable finalized daily bank transactions as the source of the all-time bank and should avoid exposing raw internal identifiers or variable names in consumer UI.
+
+The current architecture inventory below remains valid as a description of the existing prototype. Forward-looking reuse, migration, database, and vertical-slice guidance has been updated to match `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`; the rejection of absolute user-entered daily calorie targets is recorded in `docs/product/adr-002-expenditure-relative-goal-adjustment.md`.
 
 ## 1. Current Architecture
 
@@ -106,7 +108,7 @@ This is a useful prototype but does not match the V1 direction of Expo React Nat
 Reusable as product/domain reference:
 
 - Manual food logging fields: food name, calories, protein, carbs, fats, date, optional image. These should be reused only as fallback/correction/supplementary concepts for V1, not as the primary loop.
-- Registration profile fields: height, weight, age, sex, activity level, daily calorie target.
+- Registration profile fields: height, weight, age, sex, activity level, and historical target fields are useful prototype reference only. V1 must replace absolute daily calorie target behavior with goal mode plus signed goal adjustment.
 - TDEE calculation concept, with medical/fitness disclaimers and formula review before production.
 - Extra-burn logging concept and CRUD behavior, especially source labeling and correction semantics for future imported expenditure data.
 - Daily and weekly summary UX as reference for balance explanations and history, not for a food-log-centered home screen.
@@ -251,12 +253,15 @@ Use PostgreSQL with UUID primary keys, timestamps, explicit ownership, and appen
 - `created_at timestamptz not null`
 - `updated_at timestamptz not null`
 
-`calorie_targets`
+`goal_adjustment_snapshots`
 
 - `id uuid primary key`
 - `user_id uuid references users(id)`
-- `daily_target_calories integer not null`
-- `estimated_tdee_calories integer`
+- `goal_mode text not null` (`cut`, `maintain`, `bulk`)
+- `daily_energy_adjustment integer not null`
+- `adjustment_source text not null` (`manual_calories`, `estimated_weight_rate`)
+- `desired_weekly_weight_change numeric`
+- `calculation_policy_version text not null`
 - `effective_from date not null`
 - `effective_to date`
 - `created_at timestamptz not null`
@@ -389,28 +394,51 @@ Saved future planning records. These are not consumed-meal logs.
 - `created_at timestamptz not null`
 - `updated_at timestamptz not null`
 
+`finalized_daily_bank_records`
+
+Implemented V1 read-model table for one completed day. This is currently populated only by a guarded development seed/finalization script until real integrations and day-finalization jobs exist.
+
+- `id uuid primary key`
+- `user_id uuid references users(id)`
+- `log_date date not null`
+- `timezone text not null`
+- `imported_total_daily_expenditure integer not null`
+- `expenditure_adjustment_rate numeric not null`
+- `adjusted_expenditure integer not null`
+- `goal_mode text not null` (`cut`, `maintain`, `bulk`)
+- `goal_adjustment_calories integer not null`
+- `imported_calorie_intake integer not null`
+- `daily_allowance integer not null`
+- `daily_bank_change integer not null`
+- `finalized_at timestamptz not null`
+- `created_at timestamptz not null`
+- Unique index: `(user_id, log_date)`.
+
 `calorie_ledger_transactions`
 
 - `id uuid primary key`
 - `user_id uuid references users(id)`
 - `log_date date not null`
-- `type text not null` (`daily_deposit`, `food_withdrawal`, `activity_deposit`, `adjustment`, `reversal`)
+- `type text not null` (`daily_finalization`, `adjustment`)
 - `amount_calories integer not null`
-- `source_type text`
-- `source_id uuid`
-- `idempotency_key text`
-- `description text`
+- `source_type text not null` (`finalized_daily_bank_record`, `manual_adjustment`)
+- `source_id uuid not null`
+- `idempotency_key text not null`
+- `description text not null`
 - `created_at timestamptz not null`
-- Unique index: `(user_id, idempotency_key)` where `idempotency_key is not null`.
+- Unique index: `(user_id, idempotency_key)`.
 
 Ledger convention:
 
 - Positive amount means calories deposited into the bank.
 - Negative amount means calories withdrawn from the bank.
-- Balance is `sum(amount_calories)` for the relevant user and date range.
+- Official all-time bank is `sum(amount_calories)` across finalized daily ledger transactions. Filtered history ranges may show a separate range net change but must not replace the all-time bank.
 - Imported intake, imported total expenditure, manual corrections, target snapshots, historical initialization, and reconciliation records may produce ledger transactions under `docs/product/bank-calculation-spec.md`.
 - Planning Database items and planned meals are advisory and must not produce calorie ledger transactions.
+- Planned Treat records store one active user-selected food, meal, treat, or event goal. They must not duplicate the Available Bank; progress is derived from the same all-time ledger sum used by Bank Summary.
 - The V1 calculation policy is `v1-total-expenditure-80`; implementation must keep the calculation transparent, source-labeled, versioned, and auditable.
+- Adjusted expenditure is rounded deterministically to the nearest integer calorie after applying the expenditure adjustment rate.
+- Finalized daily record creation and ledger transaction creation must happen in one database transaction.
 - The user-facing bank model distinguishes Available Bank, optional Emergency Bank, and Recovery Forecast. Negative daily changes apply in the order Available Bank -> Emergency Bank -> Recovery Forecast.
 - Emergency Bank allocation and coverage must be traceable through the ledger or an equivalently auditable model; do not implement it as hidden mutable state.
 
@@ -451,7 +479,7 @@ Future tables:
 ### Phase 2: PostgreSQL, Auth, and Integration Foundation
 
 - Add PostgreSQL client/ORM and migrations.
-- Implement users, sessions/tokens, profiles, and calorie targets.
+- Implement users, sessions/tokens, profiles, and goal-adjustment snapshots.
 - Implement integration connection state, authorization metadata, sync batches, imported record tables, and duplicate-prevention keys.
 - Add password hashing, rate limiting, request validation, and auth tests.
 - Create a private-beta invite or allowlist mechanism if needed.
@@ -463,12 +491,13 @@ Future tables:
 - Implement automatic bank calculation from `docs/product/bank-calculation-spec.md` with explicit pending/incomplete/confirmed/corrected states.
 - Implement immutable ledger transaction creation for daily changes and adjustments.
 - Implement Planning Database storage/search for future meal and event estimates without connecting planning estimates to bank ledger inputs.
-- Build Expo screens for onboarding, connections, bank home with Available Bank, optional Emergency Bank state, Recovery Forecast when applicable, planning search/detail, history/explanation, notification settings, and manual correction/fallback.
+- Implement one active Planned Treat that compares required calories against the all-time Available Bank without creating ledger transactions or automatic withdrawals.
+- Build Expo screens for onboarding, connections, bank-first home with all-time Available Bank, optional Emergency Bank state, Recovery Forecast when applicable, planning search/detail, Bank History with finalized-day ranges, selected-day detail, notification settings, and manual correction/fallback.
 
 ### Phase 4: Migration and Compatibility
 
 - Write one-off migration scripts from MongoDB to PostgreSQL if existing prototype user data matters.
-- Map `User` documents to `users`, `user_profiles`, and `calorie_targets`.
+- Map `User` documents to `users`, `user_profiles`, and goal-adjustment snapshots where enough information exists. Legacy absolute target values must not be treated as approved V1 configuration without a migration decision.
 - Map `FoodLog.entries` to `food_logs` and `food_entries`.
 - Map `burnedActivities` to `activity_entries`.
 - Convert historic `bankBalance` into either recomputed ledger transactions or a one-time opening balance adjustment.
@@ -491,13 +520,13 @@ Future tables:
 The smallest V1 vertical slice should be:
 
 1. Register or sign in.
-2. Confirm timezone, goal mode, and daily calorie target.
+2. Confirm timezone, goal mode, and the signed daily energy adjustment when applicable.
 3. Connect one technically feasible intake-data source path, even if sandbox/mock/user-authorized import is required for alpha.
 4. Connect one technically feasible expenditure/health-data source path.
 5. Sync recent data with source labels, sync batches, and duplicate-prevention keys.
 6. Initialize lifetime bank from up to 7 days of available supported history, starting at zero if the calculated value is zero/negative or data is incomplete.
 7. Calculate a daily bank update using `v1-total-expenditure-80` into immutable ledger transactions with confirmed/pending/incomplete/corrected states.
-8. Show current Available Bank, optional Emergency Bank status when enabled, Recovery Forecast when applicable, and history/explanation.
+8. Show all-time Available Bank, optional Emergency Bank status when enabled, Recovery Forecast when applicable, Bank History ranges, and selected-day calculation detail.
 9. Search or create a Planning Database entry and compare its estimated calories against Available Bank without changing the ledger.
 10. Generate the morning bank-update notification payload.
 

@@ -5,9 +5,39 @@ import type { ApiEnv } from './env';
 import { env } from './env';
 import { errorHandler, notFoundHandler } from './errors';
 import { requestLogger } from './logger';
+import { prisma } from './db/client';
+import {
+  PrismaBankHistoryRepository,
+  type BankHistoryRepository,
+} from './modules/bank-history/bank-history.repository';
+import { createBankHistoryRouter } from './modules/bank-history/bank-history.routes';
+import {
+  PrismaGoalConfigurationRepository,
+  type GoalConfigurationRepository,
+} from './modules/goal-configuration/goal-configuration.repository';
+import { createGoalConfigurationRouter } from './modules/goal-configuration/goal-configuration.routes';
+import {
+  PrismaPlannedTreatRepository,
+  type PlannedTreatRepository,
+} from './modules/planned-treat/planned-treat.repository';
+import { createPlannedTreatRouter } from './modules/planned-treat/planned-treat.routes';
 
-export function createApp(config: ApiEnv = env) {
+type AppDependencies = {
+  goalConfigurationRepository?: GoalConfigurationRepository;
+  bankHistoryRepository?: BankHistoryRepository;
+  plannedTreatRepository?: PlannedTreatRepository;
+};
+
+export function createApp(config: ApiEnv = env, dependencies: AppDependencies = {}) {
   const app = express();
+  const goalConfigurationRepository =
+    dependencies.goalConfigurationRepository ?? new PrismaGoalConfigurationRepository(prisma);
+  const bankHistoryRepository = dependencies.bankHistoryRepository ?? new PrismaBankHistoryRepository(prisma);
+  const plannedTreatRepository = dependencies.plannedTreatRepository ?? new PrismaPlannedTreatRepository(prisma);
+  const developmentUser = {
+    id: config.DEV_USER_ID,
+    email: config.DEV_USER_EMAIL,
+  };
 
   app.use(
     cors({
@@ -23,6 +53,12 @@ export function createApp(config: ApiEnv = env) {
       service: 'caloriebank-api',
     });
   });
+  app.use(
+    '/v1/me/goal-configuration',
+    createGoalConfigurationRouter(goalConfigurationRepository, developmentUser),
+  );
+  app.use('/v1/me', createBankHistoryRouter(bankHistoryRepository, developmentUser));
+  app.use('/v1/me/planned-treat', createPlannedTreatRouter(plannedTreatRepository, developmentUser));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -16,13 +16,13 @@ The first-user mission is:
 
 ## What Changed
 
-Previous V1 planning emphasized a manual food logging loop: set target, log food, calculate daily result, update ledger, explain balance.
+Previous V1 planning emphasized a manual food logging loop: set an absolute target, log food, calculate daily result, update ledger, explain balance.
 
 That loop is now superseded by:
 
 1. Connect supported calorie-intake data source.
 2. Connect supported calorie-expenditure or health-data source.
-3. Configure goal, target, timezone, and optional saved food/meal/event.
+3. Configure goal mode, deficit/surplus adjustment when applicable, timezone, and optional saved food/meal/event.
 4. Sync data automatically.
 5. Calculate and explain bank changes.
 6. Deliver one meaningful morning bank update.
