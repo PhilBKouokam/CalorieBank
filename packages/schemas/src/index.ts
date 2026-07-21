@@ -4,6 +4,18 @@ export const goalModeSchema = z.enum(['cut', 'maintain', 'bulk']);
 export const adjustmentSourceSchema = z.enum(['manual_calories', 'estimated_weight_rate']);
 export const bankHistoryRangeSchema = z.enum(['D', 'W', 'M', '3M', 'Y', 'ALL']);
 export const plannedTreatStatusSchema = z.enum(['no_plan', 'saving', 'ready']);
+export const activityEstimationMethodSchema = z.enum(['population_model', 'wearable_history']);
+export const activityOpportunityDeliveryEligibilitySchema = z.enum(['eligible', 'blocked']);
+export const activityOpportunityNotificationCategorySchema = z.enum(['personalized_activity_opportunity']);
+export const todaySoFarDataFreshnessStatusSchema = z.enum([
+  'unavailable',
+  'not_connected',
+  'syncing',
+  'partial',
+  'stale',
+  'ready',
+  'error',
+]);
 
 export const MIN_DAILY_ENERGY_ADJUSTMENT = -2_000;
 export const MAX_DAILY_ENERGY_ADJUSTMENT = 2_000;
@@ -139,6 +151,66 @@ export const plannedTreatInputSchema = z.object({
   targetDate: dateStringSchema.nullable().optional(),
 });
 
+export const todaySoFarAwarenessSchema = z.object({
+  localDate: dateStringSchema,
+  timezone: z.string().min(1),
+  adjustedExpenditureCalories: z.number().int().nonnegative().nullable(),
+  rawImportedExpenditureCalories: z.number().int().nonnegative().nullable(),
+  expenditureAdjustmentRate: z.number().min(0).max(1),
+  expenditureSource: z.string().min(1).nullable(),
+  expenditureLastSyncedAt: z.string().datetime().nullable(),
+  importedCalorieIntake: z.number().int().nonnegative().nullable(),
+  intakeSource: z.string().min(1).nullable(),
+  intakeLastSyncedAt: z.string().datetime().nullable(),
+  dataFreshnessStatus: todaySoFarDataFreshnessStatusSchema,
+  isCurrentDay: z.literal(true),
+  isPartial: z.literal(true),
+});
+
+export const todayDashboardVisibilityPreferencesSchema = z.object({
+  availableBank: z.literal(true).default(true),
+  plannedTreat: z.boolean().default(true),
+  todaySoFar: z.boolean().default(false),
+  yesterday: z.boolean().default(true),
+  currentGoal: z.boolean().default(true),
+  emergencyBank: z.boolean().default(false),
+  connectionStatus: z.boolean().default(false),
+});
+
+export const activityOpportunityCandidateSchema = z.object({
+  opportunityId: z.string().uuid(),
+  userId: z.string().uuid(),
+  plannedTreatId: z.string().uuid(),
+  activityCode: z.string().min(1),
+  activityDisplayName: z.string().min(1),
+  durationMinutes: z.number().int().positive(),
+  estimatedLowCalories: z.number().int().nonnegative(),
+  estimatedHighCalories: z.number().int().nonnegative(),
+  estimationMethod: activityEstimationMethodSchema,
+  estimationModelVersion: z.string().min(1),
+  remainingTreatCalories: z.number().int().nonnegative(),
+  plannedTreatDate: dateStringSchema.nullable(),
+  hoursUntilPlannedTreat: z.number().nonnegative().nullable(),
+  opportunityReasonCodes: z.array(z.string().min(1)),
+  opportunityScore: z.number().min(0).max(1).nullable(),
+  generatedAt: z.string().datetime(),
+  expiresAt: z.string().datetime().nullable(),
+  notificationCategory: activityOpportunityNotificationCategorySchema,
+  suggestedTitle: z.string().min(1),
+  suggestedBody: z.string().min(1),
+  deliveryEligibility: activityOpportunityDeliveryEligibilitySchema,
+  blockedReason: z.string().min(1).nullable(),
+  deduplicationKey: z.string().min(1),
+}).superRefine((input, context) => {
+  if (input.estimatedLowCalories > input.estimatedHighCalories) {
+    context.addIssue({
+      code: 'custom',
+      path: ['estimatedLowCalories'],
+      message: 'Estimated low calories cannot exceed estimated high calories.',
+    });
+  }
+});
+
 export const bankSummaryResponseSchema = z.object({
   availableBankCalories: z.number().int(),
   latestFinalizedDate: dateStringSchema.nullable(),
@@ -210,6 +282,13 @@ export type PlannedTreatInput = z.infer<typeof plannedTreatInputSchema>;
 export type ActivePlannedTreatResponse = z.infer<typeof activePlannedTreatResponseSchema>;
 export type NoActivePlannedTreatResponse = z.infer<typeof noActivePlannedTreatResponseSchema>;
 export type PlannedTreatGetResponse = z.infer<typeof plannedTreatGetResponseSchema>;
+export type TodaySoFarDataFreshnessStatus = z.infer<typeof todaySoFarDataFreshnessStatusSchema>;
+export type TodaySoFarAwareness = z.infer<typeof todaySoFarAwarenessSchema>;
+export type TodayDashboardVisibilityPreferences = z.infer<
+  typeof todayDashboardVisibilityPreferencesSchema
+>;
+export type ActivityEstimationMethod = z.infer<typeof activityEstimationMethodSchema>;
+export type ActivityOpportunityCandidate = z.infer<typeof activityOpportunityCandidateSchema>;
 
 export function getGoalModeLabel(goalMode: GoalMode) {
   return `${goalMode.charAt(0).toUpperCase()}${goalMode.slice(1)}`;

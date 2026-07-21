@@ -156,4 +156,11 @@ describe('planned treat API', () => {
       .send({ name: 'Cookies', requiredCalories: 0 })
       .expect(400);
   });
+
+  it('does not expose a manual planned-treat spend action', async () => {
+    await request(createApp(undefined, { plannedTreatRepository: new MemoryPlannedTreatRepository() }))
+      .post('/v1/me/planned-treat/spend')
+      .send({ id: '00000000-0000-4000-8000-000000000010' })
+      .expect(404);
+  });
 });

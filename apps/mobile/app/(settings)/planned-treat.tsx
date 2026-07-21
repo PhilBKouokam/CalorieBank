@@ -144,7 +144,7 @@ export default function PlannedTreatScreen() {
                 </Text>
                 <Text style={styles.help}>
                   {activeTreat.status === 'ready'
-                    ? 'You have enough banked. Saving this plan does not spend from your bank.'
+                    ? 'Your Available Bank has reached this goal. Saving this plan does not change your bank.'
                     : `${activeTreat.remainingCalories.toLocaleString()} kcal to go.`}
                 </Text>
               </View>
@@ -183,7 +183,7 @@ export default function PlannedTreatScreen() {
               value={targetDate}
             />
             <Text style={styles.help}>
-              Reaching a Planned Treat means it is ready. It does not automatically withdraw calories from your bank.
+              Reaching a Planned Treat means it is ready. Your connected calorie tracker still records what you eat.
             </Text>
 
             {message ? (

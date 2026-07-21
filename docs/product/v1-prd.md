@@ -4,7 +4,7 @@ Date: 2026-07-16
 
 ## Source Of Truth
 
-This PRD is the authoritative V1 product document. It supersedes prior food-logging-first assumptions in older audits, prototype docs, and implementation notes. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. Supporting architecture guidance lives in `docs/architecture/current-state-audit.md`; the connection-first direction change is recorded in `docs/product/adr-001-connection-first-v1.md`, the expenditure-relative goal model is recorded in `docs/product/adr-002-expenditure-relative-goal-adjustment.md`, and the interactive summary/history model is recorded in `docs/product/adr-003-interactive-summary-and-explanation.md`.
+This PRD is the authoritative V1 product document. It supersedes prior food-logging-first assumptions in older audits, prototype docs, and implementation notes. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. Supporting architecture guidance lives in `docs/architecture/current-state-audit.md`; the connection-first direction change is recorded in `docs/product/adr-001-connection-first-v1.md`, the expenditure-relative goal model is recorded in `docs/product/adr-002-expenditure-relative-goal-adjustment.md`, the interactive summary/history model is recorded in `docs/product/adr-003-interactive-summary-and-explanation.md`, automatic bank usage plus dashboard awareness are recorded in `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`, and future personalized activity opportunities are recorded in `docs/product/adr-005-personalized-activity-opportunity-notifications.md`.
 
 ## V1 Mission
 
@@ -32,8 +32,10 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 - One meaningful notification: the morning bank update is the primary notification. Generic engagement notifications are outside the V1 mission.
 - Food logging is secondary: manual entry is fallback, correction, supplementary input, or future expansion, not the promoted workflow.
 - Interpretation layer: CalorieBank should create value primarily through synchronization, calculation, history, and planning, not screen time.
+- Automatic bank usage: completed-day finalization records deposits or withdrawals automatically from imported totals. V1 must not include a manual `Use Bank`, `Spend Bank`, or Planned Treat withdrawal action.
 - Bank-first hierarchy: the default interface should show the all-time Available Bank first, keep the screen visually simple, and reveal history or calculation detail only when requested. Fitbit is a reference for information hierarchy and progressive disclosure only; CalorieBank must not copy its branding or exact visual design.
 - Planning, not tracking: CalorieBank helps users plan future meals and events using estimated nutrition information and their available calorie bank. Connected calorie-tracking applications remain the source of truth for food intake.
+- Personalized opportunities, not generic tips: future activity suggestions must be tied to the user's explicit preferences, active Planned Treat, remaining gap, timing, consent, and qualified calorie-burn ranges.
 - Prepare for life, not perfection: users may optionally reserve part of genuinely accumulated banked calories in an Emergency Bank for unexpected meals, celebrations, travel, or changes in plans.
 - Recovery, not punishment: when users exhaust both Available Bank and optional Emergency Bank, CalorieBank should guide them toward recovery with progress, planning, and transparency rather than making a large negative balance the primary experience.
 
@@ -108,6 +110,7 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 - Broad support for every health platform.
 - Large-scale Android/iOS parity before the first experiment.
 - Multiple simultaneous treat goals.
+- Production Activity Opportunity Engine, AI-generated recommendations, wearable-personalized activity estimates, or activity-nudge push delivery before source-attributed ingestion and notification consent are stable.
 - Generic notifications such as "open the app", "maintain your streak", "log your meal", "drink water", or "we miss you".
 
 ## Integration Feasibility
@@ -190,6 +193,21 @@ Avoid language implying that the Planning Database is the official food log, tha
 
 V1 supports one active Planned Treat per user. A Planned Treat gives the all-time Available Bank a concrete purpose, such as cookies and milk, ice cream, a restaurant dinner, pizza night, or a birthday meal.
 
+Planned Treat is planning awareness only:
+
+- Planned Treat estimates how close Available Bank is to a desired food, meal, restaurant order, or experience.
+- It does not log food.
+- It does not confirm consumption.
+- It does not deduct calories.
+- It does not create bank transactions.
+- It does not replace the user's calorie-tracking application.
+
+The separation is authoritative:
+
+- Planned Treat = awareness.
+- Intake tracker = source of truth for what the user actually ate.
+- Finalized daily calculation = automatic deposit or withdrawal after imported daily totals are available.
+
 A Planned Treat includes:
 
 - Name.
@@ -213,7 +231,7 @@ Treat status:
 
 If Available Bank is zero or negative, progress displays as `0%` and remaining calories equals the full required amount. If Available Bank exceeds the requirement, visual progress displays as `100%` while supporting copy may still show the real saved amount, such as `1,650 / 1,500 kcal`.
 
-Reaching a Planned Treat does not automatically deduct calories from the bank. Treat readiness and bank spending are separate concepts. Spending or withdrawal flows require a later approved milestone and must create transparent ledger/history records when implemented.
+Reaching a Planned Treat does not automatically deduct calories from the bank. Treat readiness and bank usage are separate concepts. The user still records actual consumption in their normal calorie tracker. CalorieBank later receives total intake and automatically reflects any daily overage during finalization.
 
 The Planned Treat card appears directly below Available Bank on Today because it answers the next user question after seeing the primary bank number: what can this bank help me enjoy? Empty, saving, ready, loading, and unavailable states should use friendly consumer language and must not show raw infrastructure errors.
 
@@ -244,12 +262,23 @@ CalorieBank V1 is an all-time calorie-bank interface powered by connected expend
 - The official bank includes finalized days only, through the previous completed day.
 - The current day is not part of the official bank.
 - The current day may show a clearly labeled estimate or pending state later, but it must never look official before finalization.
+- Current-day live awareness may later show adjusted calories burned so far and calories eaten so far, with source and sync freshness, but it must remain separate from official bank calculations.
 - The all-time bank is the sum of immutable finalized daily bank transactions, after applying approved Available Bank, Emergency Bank, and Recovery Forecast behavior.
 - The bank updates after a day is finalized according to the user's timezone. Product language may say the bank updates at midnight, but implementation must remain reliable when actual reconciliation occurs during the next sync or app session.
 - Default UI should show the bank first, then use progressive disclosure for history and per-day calculation detail.
 - Users can inspect history by day, week, month, 3 months, year, and all time.
 - Selecting a specific finalized day reveals a short human-readable breakdown.
 - Consumer UI must use plain language and must not expose raw internal identifiers, database fields, API field names, or variable names.
+
+For a user who hides Emergency Bank, the intended Today hierarchy is:
+
+1. Available Bank.
+2. Planned Treat.
+3. Today so far, only after real current-day expenditure and intake ingestion exists.
+4. Yesterday or latest finalized result.
+5. Current Goal.
+
+Available Bank is mandatory, always visible, and always first.
 
 Selected-day breakdowns should use consumer labels such as:
 
@@ -266,6 +295,12 @@ For maintenance, omit the goal-adjustment row when space is tight or label it `M
 ## Emergency Bank Rules
 
 - Emergency Bank is optional; users may decline it, enable it later, disable future allocations, set the allocation rate to `0%`, or choose a supported positive allocation percentage.
+- Emergency Bank is separate from Available Bank and excluded from ordinary planned spending.
+- Planned Treat progress must use Available Bank only. It must not include Emergency Bank calories.
+- Emergency Bank is not automatically shown on Today. Users may choose whether its card is visible.
+- A hidden Emergency Bank remains accessible through an intentional route such as Settings or a future Today menu. Hiding the card does not change its balance, contribution rule, or protection behavior.
+- Emergency Bank detail should eventually show protected balance, contribution rule, visibility setting, and an explanation that it is excluded from normal planned spending.
+- The product must avoid language that encourages casual use of the reserve.
 - Emergency Bank allocation applies only to positive daily bank changes.
 - Positive daily changes are split under the active reserve policy into Available Bank allocation and Emergency Bank allocation.
 - Priority reserve building toward an initial Emergency Bank target may exist as an optional strategy, but it must not be the default for every user.
@@ -357,6 +392,10 @@ How historical initialization interacts with the optional Emergency Bank is not 
 ## Bank Update Behavior
 
 - Daily bank calculation runs after the user's day boundary in their configured timezone and before the morning notification when data is available.
+- Bank usage is automatic. There is no manual `Use Bank`, `Spend Bank`, or treat-withdrawal action in V1.
+- If `daily_bank_change` is positive, finalization creates a positive immutable ledger transaction.
+- If `daily_bank_change` is negative, finalization creates a negative immutable ledger transaction that automatically reduces Available Bank under the approved Available Bank, Emergency Bank, and Recovery Forecast order.
+- The immutable finalized daily transaction is the withdrawal when the completed day is negative.
 - The user's timezone controls daily boundaries, history, goal-adjustment snapshots, and notification scheduling.
 - Imported data arriving late may trigger retroactive recalculation through adjustment/reconciliation transactions, not silent mutation.
 - Corrections must show old value, new value, source, affected date, delta, and effect on lifetime bank.
@@ -371,16 +410,81 @@ How historical initialization interacts with the optional Emergency Bank is not 
 - Users must be able to inspect why the balance changed from the notification or history.
 - When Emergency Bank covers an overage, the UI must show how much was covered by Available Bank, how much was covered by Emergency Bank, and whether any recovery amount remains.
 
+## Current-Day Live Awareness
+
+CalorieBank should later show current-day expenditure and intake together in one `Today so far` card. This supports CalorieBank's role as the banking center that connects expenditure and intake in one place while still leaving decisions to the user.
+
+Concept:
+
+```text
+Today so far
+
+Burned
+1,600 kcal
+2,000 from Fitbit x 80%
+
+Eaten
+1,500 kcal
+Imported from MyFitnessPal
+
+Last synced 8 minutes ago
+```
+
+Rules:
+
+- Current-day values may update throughout the day.
+- Current-day values are incomplete until the day ends.
+- The large burned value is adjusted current-day expenditure:
+
+```text
+adjusted_current_day_expenditure =
+  imported_total_daily_expenditure_so_far * 0.80
+```
+
+- Raw imported device expenditure remains visible only as brief supporting context, such as `2,000 from Fitbit x 80%`.
+- Use the connected expenditure source name dynamically when available.
+- Do not double-count active calories. If the source exposes total daily expenditure, use that total once.
+- Calories eaten uses source-attributed current-day total calorie intake.
+- Use the connected intake source name dynamically when available.
+- Current-day values must not be added to Available Bank before finalization.
+- Today must not show an estimated deposit, estimated withdrawal, official bank change, calories remaining, recommendation to eat less, recommendation to exercise more, or forecasted midnight balance.
+- UI must not imply current expenditure is already banked, deposited, earned, or available.
+- Source and sync freshness should be displayed where useful.
+- If unavailable, use friendly setup or unavailable states for the missing source.
+- Do not create food entries in CalorieBank from this card.
+- Do not make CalorieBank the primary food logger.
+- Do not show raw API, job, or infrastructure terminology.
+
+Future read model concept:
+
+- Local date.
+- Timezone.
+- Adjusted expenditure calories.
+- Raw imported expenditure calories.
+- Expenditure adjustment rate.
+- Expenditure source.
+- Expenditure last synced time.
+- Imported calorie intake.
+- Intake source.
+- Intake last synced time.
+- Data freshness status.
+- Current-day flag.
+- Partial flag.
+
+The read model should be derived from source-attributed ingestion records and must not store a projected bank result.
+
 ## Today And Bank History Interaction
 
 Today uses a bank-first hierarchy.
 
 - Available Bank is the visually dominant first element and opens Bank History.
+- Available Bank is mandatory, always visible, and cannot be hidden by dashboard customization.
 - Available Bank must show `Not calculated`, `Waiting for data`, `Pending`, `Incomplete`, or another honest status until finalized ledger inputs exist.
 - Available Bank must not be manually editable and must not display fabricated `0 kcal` values as though they were calculated.
 - Supporting copy should be compact, such as `Through yesterday` or `Updated this morning`.
 - Planned Treat appears directly below Available Bank. It shows empty, saving, ready, loading, or unavailable state and opens Planned Treat setup/edit.
 - Planned Treat progress must use the same real all-time Available Bank source as Bank Summary. It must not cache a separate bank balance or create fake ledger transactions.
+- Today so far should appear only after real current-day expenditure and intake data exist or an honest setup/unavailable state exists. It must not use mock values and must not imply an official current-day bank change.
 - Today shows compact previous-day or latest-finalized status and current goal configuration.
 - Today should not persistently show current-day forecast, projected daily bank change, or midnight-pending copy. If current-day estimates are introduced later, they must be clearly labeled and should not compete with the official Available Bank.
 - Infrastructure diagnostics such as API health, service names, or backend connectivity details are not consumer home-screen content.
@@ -394,6 +498,35 @@ Today uses a bank-first hierarchy.
 - Interactive summary cards require visible labels, current value or honest status, a navigation affordance, press feedback, accessible button semantics, descriptive accessibility labels and hints, and practical touch targets.
 - Noninteractive information should not look tappable.
 
+### Customizable Today Dashboard
+
+Today should eventually support simple card-visibility toggles before any drag-and-drop or ordering engine.
+
+Mandatory:
+
+- Available Bank: always visible and always first.
+
+Optional cards:
+
+- Planned Treat.
+- Today so far.
+- Yesterday or latest finalized result.
+- Current Goal.
+- Emergency Bank.
+- Future connection status cards.
+
+Initial customization should prefer visibility toggles such as:
+
+```text
+Show Planned Treat       On
+Show Today so far        On
+Show Yesterday           On
+Show Current Goal        On
+Show Emergency Bank      Off
+```
+
+Drag-and-drop reordering and complex dashboard engines are deferred.
+
 ## Manual Fallback And Activity Entry
 
 - Manual intake or activity entry is a fallback, correction, or supplementary tool, not the promoted daily workflow.
@@ -401,6 +534,37 @@ Today uses a bank-first hierarchy.
 - Manual activity calories must not be presented as medically precise.
 - If manual data overlaps imported data, duplicate-prevention and reconciliation rules must decide which record contributes to the bank.
 - Planning Database entries are not manual intake entries. They are future-planning estimates and must remain separate from confirmed intake and manual correction/fallback records.
+
+## Source-Attributed Ingestion Roadmap
+
+Future expenditure records should preserve enough provenance for automatic finalization and reconciliation:
+
+- User ID.
+- Log date.
+- Source.
+- External source ID.
+- Total daily expenditure.
+- Imported time.
+- Source updated time.
+- Sync batch ID.
+- Timezone.
+- Whether the record represents the current day.
+- Deduplication identity.
+
+Future intake records should preserve:
+
+- User ID.
+- Log date.
+- Source.
+- External source ID.
+- Total daily calorie intake.
+- Imported time.
+- Source updated time.
+- Sync batch ID.
+- Timezone.
+- Deduplication identity.
+
+Prefer daily aggregate imports when that is what the provider exposes. Do not double-count active calories on top of a source's total daily expenditure. Preserve the approved `0.80` expenditure adjustment policy. Finalization consumes source-attributed daily aggregates. Late source corrections must create traceable reconciliation behavior. Integration data must remain auditable.
 
 ## Notification Requirements
 
@@ -417,6 +581,50 @@ The primary V1 notification is the morning bank update. It should include, when 
 
 Request notification permission only after explaining this value.
 
+### Future Activity Opportunity Engine
+
+CalorieBank should eventually include an Activity Opportunity Engine that detects useful moments when an activity suggestion may help a user make progress toward an active Planned Treat. This is future architecture, not a blocker for the first-10-user V1.
+
+The engine should generate structured recommendation candidates and remain separate from push-notification delivery. It should evaluate:
+
+- Active Planned Treat name, required calories, optional planned date/time, and remaining gap.
+- All-time Available Bank only; Emergency Bank must be excluded.
+- User timezone, quiet hours, preferred notification windows, and consent.
+- Explicit activity preferences and activities the user does not want recommended.
+- Preferred durations, days, and time windows.
+- Recent notification history, cooldowns, and weekly frequency caps.
+- Population-based or wearable-personalized calorie-burn range estimates.
+
+Activity preferences must be explicit or learned only from behavior the user authorized CalorieBank to use. Do not infer preferred activities from sex, age, ethnicity, or stereotypes.
+
+The engine may eventually suggest activities such as dancing, fitness gaming, walking, running, cycling, swimming, strength training, recreational sports, hiking, home workouts, group activities, solo activities, indoor activities, outdoor activities, low-impact activities, or high-intensity activities.
+
+Numerical estimates must be qualified ranges, not promises:
+
+```text
+You're about 300 kcal from Friday's dinner goal. Based on your profile,
+a 30-minute dance session may burn around 220-320 kcal.
+```
+
+Do not use language such as `will burn`, `guaranteed`, `exactly`, `earn your food`, `burn off what you ate`, `undo your meal`, `compensate for overeating`, `you failed`, or `work this off`.
+
+The recommendation estimate is planning information only. It must not create a ledger transaction, directly change Available Bank, mark a Planned Treat consumed, or replace actual imported expenditure. If the user performs the activity, CalorieBank waits for the connected expenditure source to report the actual result and uses completed-day finalization.
+
+The staged estimation strategy is:
+
+1. Curated population-based activity-energy estimates from a versioned activity catalogue.
+2. Wearable-personalized estimates only after sufficient consented historical activity data exists.
+3. Fallback to population estimates when personal history lacks enough data confidence.
+
+Do not scrape search results at notification time. Do not let an LLM invent calorie numbers. Deterministic, auditable services must provide all numerical estimates and delivery eligibility decisions.
+
+The notification taxonomy remains restrained:
+
+- Daily finalized bank update: primary V1 notification.
+- Planned Treat progress milestone.
+- Personalized activity opportunity: optional future category.
+- Positive momentum message that combines finalized bank progress and Planned Treat progress.
+
 ## Trust And Safety Requirements
 
 - Calculations must be transparent and inspectable.
@@ -427,6 +635,7 @@ Request notification permission only after explaining this value.
 - Provide user correction flows.
 - Avoid language implying exercise perfectly cancels food.
 - Avoid encouraging extreme restriction, compensatory behavior, or shame.
+- Future activity opportunities must support autonomy, not guilt. They must not be triggered as direct punishment after a high-intake event.
 - Guard against unsafe deficit or surplus selections.
 - Weight-rate conversions are planning estimates, not promises. The common `3,500 kcal per pound` conversion is an approximation affected by metabolism, body composition, adherence, water changes, measurement error, and physiological adaptation.
 - CalorieBank must not promise that a selected deficit or surplus will produce an exact weekly weight change.
@@ -508,6 +717,18 @@ Request notification permission only after explaining this value.
 - `planning_entry_viewed`
 - `planning_entry_created`
 - `planning_affordability_checked`
+- `planned_treat_created`
+- `planned_treat_ready_viewed`
+- `today_so_far_viewed`
+- `today_customization_opened`
+- `today_card_visibility_changed`
+- `emergency_bank_detail_viewed`
+- `activity_preferences_configured`
+- `activity_opportunity_candidate_generated`
+- `activity_opportunity_suppressed`
+- `activity_opportunity_delivered`
+- `activity_opportunity_opened`
+- `activity_opportunity_dismissed`
 - `recovery_forecast_viewed`
 - `data_delete_requested`
 
@@ -539,9 +760,10 @@ Analytics must not include raw food names, free-text notes, passwords, precise h
 - What default Emergency Bank allocation rate, if any, should be recommended?
 - Should Emergency Bank be suggested during onboarding or after initial use?
 - Can users transfer calories manually between Available Bank and Emergency Bank?
-- Can users withdraw from Emergency Bank for planned spending?
 - Is automatic Emergency Bank coverage mandatory when the feature is enabled?
 - Can users disable Emergency Bank coverage while keeping the reserve?
+- Where should hidden Emergency Bank be accessible: Today overflow, Settings, or both?
+- What exact copy explains that Emergency Bank is excluded from Planned Treat progress?
 - Can Emergency Bank grow without limit?
 - Is there a maximum Emergency Bank reserve target?
 - What happens when allocation rate changes mid-day?
@@ -552,6 +774,12 @@ Analytics must not include raw food names, free-text notes, passwords, precise h
 - What happens to the balance when Emergency Bank is disabled?
 - How should unusually large Emergency Bank balances be presented?
 - What safeguards prevent unsafe reserve-building behavior?
+- What minimum sync freshness is required before showing Today so far values?
+- Which sync statuses should Today so far display, and when should it show setup versus unavailable for expenditure, intake, or both?
+- Should Today so far show when only expenditure or only intake is connected?
+- Should Today card visibility preferences sync across devices or remain local?
+- Which optional Today cards are visible by default before customization exists?
+- When, if ever, should drag-and-drop Today card reordering be introduced?
 - Which restaurant, grocery, packaged-food, and nutrition-data providers are supported for the Planning Database?
 - How should planning search rank, filter, and label results?
 - What fields are required for user-created planning entries?
@@ -564,3 +792,14 @@ Analytics must not include raw food names, free-text notes, passwords, precise h
 - Is moderation required for community-created planning entries?
 - Can planning entries later be exported into supported calorie-tracking applications?
 - What disclaimer language is required for estimated planning calories?
+- Which activity categories should appear in the first explicit preference settings?
+- What profile fields are required for population-based activity estimates, and which are optional?
+- Which curated activity-energy data source and model version should be approved for population estimates?
+- What minimum data confidence is required before using wearable-personalized activity estimates?
+- Should Planned Treat evolve from `targetDate` to a `plannedFor` date/time for timing-aware opportunities?
+- What useful time window should activity opportunities use before a Planned Treat?
+- What maximum activity nudges per week should be allowed?
+- What quiet-hours defaults and preferred notification windows should be offered?
+- What duplicate-suppression and cooldown rules apply by activity and notification category?
+- What delivery-history retention period is appropriate for fatigue controls and privacy?
+- What user controls are required to mute a specific activity, disable activity nudges, or disable goal-linked nudges?

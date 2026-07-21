@@ -59,6 +59,12 @@ describe('planned treat PostgreSQL persistence', () => {
       progressPercent: 100,
     });
 
+    const ledgerTransactionsAfterReady = await prisma.calorieLedgerTransaction.findMany({
+      where: { userId: user.id },
+    });
+    expect(ledgerTransactionsAfterReady).toHaveLength(1);
+    expect(ledgerTransactionsAfterReady[0]?.amountCalories).toBe(200);
+
     const rows = await prisma.plannedTreat.findMany({ where: { userId: user.id } });
     expect(rows).toHaveLength(1);
 

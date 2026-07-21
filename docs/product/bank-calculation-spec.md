@@ -34,6 +34,8 @@ This specification preserves the current V1 direction from:
 - `docs/product/adr-001-connection-first-v1.md`
 - `docs/product/adr-002-expenditure-relative-goal-adjustment.md`
 - `docs/product/adr-003-interactive-summary-and-explanation.md`
+- `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`
+- `docs/product/adr-005-personalized-activity-opportunity-notifications.md`
 - `docs/architecture/current-state-audit.md`
 - `README.md`
 - `AGENTS.md`
@@ -105,7 +107,9 @@ CalorieBank must not claim to measure a person's exact metabolism or exact physi
 
 The Planning Database described in `docs/product/v1-prd.md` supports future meal and event planning only. Planning estimates are not confirmed intake, are not Food Tracking records, and must not directly change the bank.
 
-The Planned Treat described in `docs/product/v1-prd.md` is a purpose layer over the bank. Planned Treat progress is derived from the all-time Available Bank and the treat's required calories. Creating, editing, reaching, or removing a Planned Treat must not create deposits, withdrawals, confirmed intake, or automatic bank-spending transactions.
+The Planned Treat described in `docs/product/v1-prd.md` is a purpose layer over the bank. Planned Treat progress is derived from the all-time Available Bank and the treat's required calories. Creating, editing, reaching, or removing a Planned Treat must not create deposits, withdrawals, confirmed intake, or automatic bank-spending transactions. Actual consumption remains in the user's calorie tracker; CalorieBank reflects it later through imported daily intake and completed-day finalization.
+
+Future Activity Opportunity Engine estimates are also planning information only. Estimated activity calories may help a user understand one possible way to make progress toward a Planned Treat, but they must not create ledger transactions, change Available Bank, mark a Planned Treat consumed, or replace imported expenditure. If a user performs an activity, the connected expenditure source remains the source of truth for the actual expenditure used in completed-day finalization.
 
 ## Required Terminology
 
@@ -229,12 +233,14 @@ Signed adjustment behavior:
 Interpretation:
 
 - A positive `daily_bank_change` is deposited into the user's lifetime bank.
-- A negative `daily_bank_change` is withdrawn from the user's lifetime bank.
+- A negative `daily_bank_change` creates a negative finalized ledger transaction and automatically reduces the user's bank according to the approved Available Bank, Emergency Bank, and Recovery Forecast order.
 - A zero result means the user consumed exactly the goal-adjusted spending allowance for that day.
 - Banked calories do not expire.
 - The lifetime bank represents the cumulative sum of confirmed deposits and withdrawals after initialization.
 - Positive daily changes may be allocated between Available Bank and optional Emergency Bank under the user's active reserve policy.
-- Negative daily changes are applied in this conceptual order: Available Bank, then Emergency Bank, then Recovery Forecast for any remaining uncovered amount.
+- Negative daily changes are applied automatically in this conceptual order: Available Bank, then Emergency Bank, then Recovery Forecast for any remaining uncovered amount.
+
+There is no manual `Use Bank`, `Spend Bank`, or Planned Treat withdrawal action in V1. The immutable finalized daily transaction is the withdrawal when a completed day is negative.
 
 The 0.80 adjustment applies to the complete imported total daily expenditure value used by CalorieBank. Do not add imported active calories separately after applying this formula. Do not combine this formula with a separate fixed calorie target that already represents estimated daily expenditure. Doing either would double count expenditure.
 
@@ -311,7 +317,9 @@ display_progress = clamp(progress_ratio, 0, 1)
 remaining_calories = max(required_calories - max(available_bank_calories, 0), 0)
 ```
 
-If the all-time Available Bank is zero or negative, the Planned Treat displays `0%` progress and the full required amount remaining. If the Available Bank exceeds the requirement, the visual progress displays `100%` while the real saved amount may remain visible in supporting copy. A ready Planned Treat does not automatically spend from the bank; spending requires a future approved withdrawal flow backed by auditable ledger/history records.
+If the all-time Available Bank is zero or negative, the Planned Treat displays `0%` progress and the full required amount remaining. If the Available Bank exceeds the requirement, the visual progress displays `100%` while the real saved amount may remain visible in supporting copy. A ready Planned Treat does not spend from the bank. If the user later eats the planned item, the user's calorie tracker remains the source of truth for actual consumption; the next completed-day finalization automatically reflects the imported total intake.
+
+Planned Treat progress must use `available_bank_calories` only. It must not include Emergency Bank calories.
 
 For each data point, preserve enough provenance to identify:
 
@@ -518,7 +526,11 @@ An Emergency Bank target may be optional. Possible future or configurable behavi
 
 No target behavior is authoritative until approved in a later product decision.
 
-Users should eventually be able to manage Emergency Bank settings, including enabled/disabled state, allocation percentage, initial reserve target, priority reserve building, contribution behavior after the target is reached, and whether automatic Emergency Bank coverage is enabled. Exact settings screens and controls are not approved by this specification.
+Users should eventually be able to manage Emergency Bank settings, including enabled/disabled state, allocation percentage, initial reserve target, priority reserve building, contribution behavior after the target is reached, whether automatic Emergency Bank coverage is enabled, and whether the Emergency Bank card is visible on Today. Exact settings screens and controls are not approved by this specification.
+
+Emergency Bank is not automatically shown on Today. Users may choose whether its card is visible. A hidden Emergency Bank must remain accessible through an intentional menu or Settings route, and hiding the card must not change the reserve balance, contribution policy, or protection behavior.
+
+Emergency Bank is excluded from ordinary Available Bank and Planned Treat progress.
 
 ## Recovery Forecast
 
@@ -663,6 +675,46 @@ Conceptual lifecycle:
 
 Exact synchronization windows and cutoff times are not approved.
 
+## Current-Day Awareness And Dashboard Visibility
+
+Current-day expenditure and intake awareness are not part of the official bank until a day is complete and finalized.
+
+Future `Today so far` data should be modeled as partial awareness with:
+
+- Local date.
+- Timezone.
+- Adjusted expenditure calories.
+- Raw imported expenditure calories.
+- Expenditure adjustment rate.
+- Expenditure source.
+- Expenditure last synced time.
+- Imported calorie intake.
+- Intake source.
+- Intake last synced time.
+- Data freshness status.
+- Partial/current-day flag.
+
+Rules:
+
+- The primary burned value shown to users is adjusted current-day expenditure:
+
+```text
+adjusted_current_day_expenditure =
+  imported_total_daily_expenditure_so_far * 0.80
+```
+
+- Raw imported device expenditure remains available as supporting context only, such as `2,000 from Fitbit x 80%`.
+- Use source-attributed current-day total calorie intake for the eaten value.
+- Do not double-count active calories. If the source exposes total daily expenditure, use that total once.
+- Do not add current-day expenditure or intake to Available Bank before finalization.
+- Do not show an estimated current-day deposit, withdrawal, calories remaining, or forecasted midnight balance on Today.
+- Do not imply current-day expenditure is already banked.
+- Do not display mock or hard-coded Today so far values as real data.
+- Source and sync freshness should be visible where useful.
+- The Today so far read model must not include projected bank result fields.
+
+Today dashboard preferences must not allow Available Bank to be hidden. Available Bank is mandatory and always first. Optional cards may include Planned Treat, Today so far, Yesterday/latest finalized result, Current Goal, Emergency Bank, and future connection status cards. Simple visibility toggles are the preferred initial customization model; drag-and-drop ordering is deferred.
+
 ## Calculation Status
 
 - Pending: required records or cutoff timing are not yet available.
@@ -690,6 +742,14 @@ It should communicate, when available:
 - Whether the selected target is now covered by the available bank.
 
 The notification must not imply that the imported wearable number was exact. Generic engagement notifications are not part of the primary V1 loop.
+
+Future notification categories are allowed only when they preserve trust and do not compete with the primary finalized bank update:
+
+- Planned Treat progress milestone.
+- Personalized activity opportunity.
+- Positive momentum message.
+
+Personalized activity opportunities are governed by `docs/product/adr-005-personalized-activity-opportunity-notifications.md`. They must use qualified estimated ranges, such as `may burn around 220-320 kcal`, and must not imply that estimated activity calories are banked, guaranteed, or actual expenditure.
 
 ## Missing, Delayed, Duplicated, And Corrected Data
 
@@ -806,8 +866,45 @@ Future possibilities, not V1 requirements:
 - Bookable activities.
 - Adaptive recovery forecasting.
 - Personalized confidence intervals.
+- Activity Opportunity Engine based on explicit activity preferences.
+- Curated population-based activity-energy estimates.
+- Wearable-personalized activity opportunity estimates after enough consented history exists.
 
 Any future personalized calibration must include safeguards against reacting to short-term weight fluctuations, hydration changes, or insufficient data.
+
+### Activity Opportunity Estimate Requirements
+
+Future activity opportunity estimates should be deterministic and versioned. A pure estimation service may accept:
+
+- Activity code.
+- Duration in minutes.
+- Body weight in kilograms.
+- Optional profile fields when voluntarily provided and scientifically relevant.
+- Intensity assumption or range.
+- Estimation method.
+- Model version.
+
+It should return:
+
+- Estimated low calories.
+- Estimated high calories.
+- Duration.
+- Activity code.
+- Estimation method.
+- Model version.
+- Confidence level.
+- Explanatory label.
+
+Rules:
+
+- Outputs must be integer calories with deterministic rounding.
+- Low estimate cannot exceed high estimate.
+- Invalid duration, weight, or coefficient inputs must be rejected.
+- Estimates must never be negative.
+- Estimates must preserve model version.
+- Estimates must never be written into the calorie ledger.
+- Estimates must never be treated as actual expenditure.
+- A future opportunity's remaining gap must be calculated from Available Bank only and must exclude Emergency Bank.
 
 ## Safety Principles
 
@@ -835,6 +932,8 @@ Any future personalized calibration must include safeguards against reacting to 
 - Allocation settings must not encourage compulsive compensation.
 - Existing minimum-intake safeguard requirements remain applicable; exact numerical limits are unresolved.
 - When both Available Bank and Emergency Bank are exhausted, use Recovery Forecast as planning guidance rather than punishment.
+- Future activity opportunities must not frame movement as repayment for food. Avoid language such as `burn off what you ate`, `undo your meal`, `earn your food`, `compensate for overeating`, `you failed`, or `work this off`.
+- Future activity opportunity estimates must be qualified ranges, not exact promises.
 
 ## Superseded Or Contradictory Rules
 
@@ -846,6 +945,7 @@ Any future personalized calibration must include safeguards against reacting to 
 - Earlier single-bank guidance that moved directly from Available Bank to Recovery Forecast is superseded. The approved V1 protection sequence is Available Bank -> optional Emergency Bank -> Recovery Forecast.
 - Any guidance that would make Planning Database entries a bank-calculation input is superseded. Planning estimates are advisory only until confirmed intake syncs from a supported calorie-tracking source or an approved manual correction/fallback path.
 - Any guidance requiring users to configure an absolute daily calorie target is superseded. V1 uses imported total daily expenditure, the `0.80` expenditure adjustment, and the user's signed daily energy adjustment.
+- Any guidance requiring a manual `Use Bank`, `Spend Bank`, treat withdrawal, or confirm-consumption action is superseded. V1 bank usage is automatic through completed-day finalization.
 
 ## Open Product Decisions
 
@@ -865,9 +965,10 @@ Any future personalized calibration must include safeguards against reacting to 
 - What is the default recommended Emergency Bank allocation rate?
 - Is Emergency Bank suggested during onboarding or after initial use?
 - Can users transfer calories manually between Available Bank and Emergency Bank?
-- Can users withdraw from Emergency Bank for planned spending?
 - Is automatic Emergency Bank coverage mandatory when the feature is enabled?
 - Can users disable automatic Emergency Bank coverage while keeping the reserve?
+- Where should hidden Emergency Bank be accessible: Today overflow, Settings, or both?
+- What exact copy explains that Emergency Bank is excluded from Planned Treat progress?
 - Can Emergency Bank grow without limit?
 - Is there a maximum reserve target?
 - What happens when the user changes the allocation rate mid-day?
@@ -882,6 +983,12 @@ Any future personalized calibration must include safeguards against reacting to 
 - What happens to the balance when Emergency Bank is disabled?
 - How should unusually large Emergency Bank balances be presented?
 - What safeguards prevent unsafe reserve-building behavior?
+- What minimum sync freshness is required before showing Today so far values?
+- Which sync statuses should Today so far display, and when should it show setup versus unavailable for expenditure, intake, or both?
+- Should Today so far show when only expenditure or only intake is connected?
+- Should Today card visibility preferences sync across devices or remain local?
+- Which optional Today cards are visible by default before customization exists?
+- When, if ever, should drag-and-drop Today card reordering be introduced?
 - What is the rounding policy for adjusted expenditure, spending allowance, daily change, and running balance?
 - What qualifies a historical day as complete beyond requiring intake and total expenditure?
 - What happens when fewer than seven complete historical days exist?
@@ -898,6 +1005,15 @@ Any future personalized calibration must include safeguards against reacting to 
 - How should deleted source records affect already-confirmed ledger entries?
 - What user consent and deletion rules apply after integration revocation?
 - How should source records with no stable provider identifier be deduplicated?
+- Which activity categories should be supported in explicit activity-preference settings?
+- Which curated activity-energy source and model version should power initial population-based estimates?
+- What minimum data confidence is required before wearable-personalized activity estimates can replace population estimates?
+- What profile fields are required for estimates, and how should users consent to optional fields?
+- Should Planned Treat store a future `plannedFor` date/time rather than only a date?
+- What policy thresholds determine whether a remaining Planned Treat gap is realistically addressable?
+- What quiet-hours, frequency-cap, cooldown, and duplicate-suppression policies govern activity opportunities?
+- How long should opportunity candidates and notification-delivery history be retained?
+- Which user controls are required for muting an activity or disabling goal-linked activity nudges?
 
 ## Implementation Requirements
 

@@ -1,6 +1,11 @@
 import {
   BankCalculationError,
+  buildActivityOpportunityBody,
+  calculateAdjustedCurrentDayExpenditure,
   calculateFinalizedDailyBankChange,
+  calculateRemainingTreatGapFromAvailableBank,
+  estimateActivityCalorieRange,
+  evaluateActivityOpportunityEligibility,
   roundCalories,
 } from '@caloriebank/domain';
 import { describe, expect, it } from 'vitest';
@@ -71,6 +76,22 @@ describe('finalized daily bank calculation', () => {
     expect(roundCalories(100.5)).toBe(101);
   });
 
+  it('calculates adjusted current-day expenditure for live awareness display', () => {
+    expect(
+      calculateAdjustedCurrentDayExpenditure({
+        rawImportedExpenditureCalories: 2000,
+        expenditureAdjustmentRate: 0.8,
+      }),
+    ).toBe(1600);
+
+    expect(
+      calculateAdjustedCurrentDayExpenditure({
+        rawImportedExpenditureCalories: 2001,
+        expenditureAdjustmentRate: 0.8,
+      }),
+    ).toBe(1601);
+  });
+
   it('rejects invalid inputs', () => {
     expect(() =>
       calculateFinalizedDailyBankChange({
@@ -101,5 +122,162 @@ describe('finalized daily bank calculation', () => {
         importedCalorieIntake: 2000,
       }),
     ).toThrow(BankCalculationError);
+  });
+});
+
+describe('activity opportunity domain utilities', () => {
+  it('estimates an activity calorie range deterministically with model provenance', () => {
+    expect(
+      estimateActivityCalorieRange({
+        activityCode: 'dance',
+        durationMinutes: 30,
+        bodyWeightKg: 80,
+        lowCaloriesPerKgHour: 5.5,
+        highCaloriesPerKgHour: 8,
+        estimationMethod: 'population_model',
+        modelVersion: 'activity-energy-population-v0',
+      }),
+    ).toEqual({
+      activityCode: 'dance',
+      durationMinutes: 30,
+      estimatedLowCalories: 220,
+      estimatedHighCalories: 320,
+      estimationMethod: 'population_model',
+      modelVersion: 'activity-energy-population-v0',
+      confidenceLevel: 'low',
+      explanatoryLabel: 'estimated range',
+    });
+  });
+
+  it('rejects invalid activity estimate inputs', () => {
+    expect(() =>
+      estimateActivityCalorieRange({
+        activityCode: 'dance',
+        durationMinutes: 0,
+        bodyWeightKg: 80,
+        lowCaloriesPerKgHour: 5.5,
+        highCaloriesPerKgHour: 8,
+        estimationMethod: 'population_model',
+        modelVersion: 'activity-energy-population-v0',
+      }),
+    ).toThrow(BankCalculationError);
+
+    expect(() =>
+      estimateActivityCalorieRange({
+        activityCode: 'dance',
+        durationMinutes: 30,
+        bodyWeightKg: -80,
+        lowCaloriesPerKgHour: 5.5,
+        highCaloriesPerKgHour: 8,
+        estimationMethod: 'population_model',
+        modelVersion: 'activity-energy-population-v0',
+      }),
+    ).toThrow(BankCalculationError);
+
+    expect(() =>
+      estimateActivityCalorieRange({
+        activityCode: 'dance',
+        durationMinutes: 30,
+        bodyWeightKg: 80,
+        lowCaloriesPerKgHour: 9,
+        highCaloriesPerKgHour: 8,
+        estimationMethod: 'population_model',
+        modelVersion: 'activity-energy-population-v0',
+      }),
+    ).toThrow(BankCalculationError);
+  });
+
+  it('calculates remaining Planned Treat gap from Available Bank only', () => {
+    expect(calculateRemainingTreatGapFromAvailableBank(305, 1500)).toBe(1195);
+    expect(calculateRemainingTreatGapFromAvailableBank(-200, 1500)).toBe(1500);
+    expect(calculateRemainingTreatGapFromAvailableBank(1650, 1500)).toBe(0);
+  });
+
+  it('allows an opportunity only when timing, consent, and explicit preference are valid', () => {
+    const currentAt = new Date('2026-07-21T18:00:00.000Z');
+    const plannedTreatAt = new Date('2026-07-24T23:00:00.000Z');
+
+    expect(
+      evaluateActivityOpportunityEligibility({
+        notificationsEnabled: true,
+        activityNudgesEnabled: true,
+        quietHoursActive: false,
+        frequencyCapReached: false,
+        duplicateRecentlySent: false,
+        hasMatchingExplicitActivityPreference: true,
+        plannedTreatReady: false,
+        remainingTreatCalories: 300,
+        currentAt,
+        plannedTreatAt,
+      }),
+    ).toEqual({
+      deliveryEligibility: 'eligible',
+      blockedReason: null,
+      opportunityReasonCodes: [
+        'active_planned_treat',
+        'remaining_gap',
+        'matching_explicit_activity_preference',
+        'allowed_notification_window',
+      ],
+      expiresAt: plannedTreatAt,
+    });
+  });
+
+  it('blocks opportunities for quiet hours, disabled nudges, duplicates, missing preference, passed events, or ready treats', () => {
+    const base = {
+      notificationsEnabled: true,
+      activityNudgesEnabled: true,
+      quietHoursActive: false,
+      frequencyCapReached: false,
+      duplicateRecentlySent: false,
+      hasMatchingExplicitActivityPreference: true,
+      plannedTreatReady: false,
+      remainingTreatCalories: 300,
+      currentAt: new Date('2026-07-21T18:00:00.000Z'),
+      plannedTreatAt: new Date('2026-07-24T23:00:00.000Z'),
+    };
+
+    expect(evaluateActivityOpportunityEligibility({ ...base, quietHoursActive: true }).blockedReason).toBe(
+      'quiet_hours',
+    );
+    expect(evaluateActivityOpportunityEligibility({ ...base, activityNudgesEnabled: false }).blockedReason).toBe(
+      'activity_nudges_disabled',
+    );
+    expect(evaluateActivityOpportunityEligibility({ ...base, frequencyCapReached: true }).blockedReason).toBe(
+      'frequency_cap_reached',
+    );
+    expect(evaluateActivityOpportunityEligibility({ ...base, duplicateRecentlySent: true }).blockedReason).toBe(
+      'duplicate_recently_sent',
+    );
+    expect(
+      evaluateActivityOpportunityEligibility({
+        ...base,
+        hasMatchingExplicitActivityPreference: false,
+      }).blockedReason,
+    ).toBe('no_matching_explicit_activity_preference');
+    expect(evaluateActivityOpportunityEligibility({ ...base, plannedTreatReady: true }).blockedReason).toBe(
+      'planned_treat_ready',
+    );
+    expect(
+      evaluateActivityOpportunityEligibility({
+        ...base,
+        plannedTreatAt: new Date('2026-07-20T23:00:00.000Z'),
+      }).blockedReason,
+    ).toBe('planned_treat_passed');
+  });
+
+  it('builds qualified recommendation copy without guilt-based language', () => {
+    const body = buildActivityOpportunityBody({
+      remainingTreatCalories: 300,
+      plannedTreatName: "Friday's dinner goal",
+      activityDisplayName: 'dance',
+      durationMinutes: 30,
+      estimatedLowCalories: 220,
+      estimatedHighCalories: 320,
+    });
+
+    expect(body).toContain('may burn around 220-320 kcal');
+    expect(body).toContain('Based on your profile');
+    expect(body).not.toMatch(/will burn|guaranteed|exactly|earn|burn off|undo|failed|work this off/i);
   });
 });

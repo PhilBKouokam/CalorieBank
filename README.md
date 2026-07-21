@@ -7,6 +7,9 @@ CalorieBank is moving from a web prototype into an iPhone-first mobile V1. The c
 - `docs/product/bank-calculation-spec.md`
 - `docs/product/adr-001-connection-first-v1.md`
 - `docs/product/adr-002-expenditure-relative-goal-adjustment.md`
+- `docs/product/adr-003-interactive-summary-and-explanation.md`
+- `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`
+- `docs/product/adr-005-personalized-activity-opportunity-notifications.md`
 
 ## V1 Mission
 
@@ -36,7 +39,9 @@ screenshots/       Existing prototype screenshots
 
 This branch includes the mobile/API foundation and the first finalized-bank read model. Product direction no longer uses a user-entered absolute daily calorie target; V1 derives allowance from imported total daily expenditure, CalorieBank's `0.80` adjustment, and the user's goal-mode adjustment. Any existing endpoint, payload, or database naming that still says "target" is transitional implementation debt and requires a separate migration task. Production authentication, live integration sync, notifications, and midnight/background finalization jobs are intentionally deferred.
 
-The first implementation milestones should prioritize connection-first onboarding, technically credible supported data-source sync, automatic bank calculation, transparent history, Planning Database estimates for future meals/events, and the morning bank update. Manual food logging is a fallback/correction path, not the dominant V1 loop. Bank-calculation behavior, including Available Bank, optional Emergency Bank, Recovery Forecast, and reserve-policy history, is governed by `docs/product/bank-calculation-spec.md`.
+The first implementation milestones should prioritize connection-first onboarding, technically credible supported data-source sync, automatic bank calculation, transparent history, Planning Database estimates for future meals/events, and the morning bank update. Manual food logging is a fallback/correction path, not the dominant V1 loop. Bank-calculation behavior, including Available Bank, optional Emergency Bank, Recovery Forecast, and reserve-policy history, is governed by `docs/product/bank-calculation-spec.md`. Automatic bank usage and dashboard awareness are recorded in `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`.
+
+Future personalized Activity Opportunity Engine work is documented in `docs/product/adr-005-personalized-activity-opportunity-notifications.md`. It is intentionally deferred until real intake/expenditure ingestion, Today-so-far awareness, notification consent, stable Planned Treat timing, and explicit activity preferences exist. Estimated activity calories must never be deposited into the bank or treated as actual expenditure.
 
 The user-facing Available Bank never displays below zero. Users may optionally reserve genuinely accumulated calories in an Emergency Bank for unexpected overages. The V1 protection sequence is Available Bank -> optional Emergency Bank -> Recovery Forecast, rather than making a large negative balance the primary focus.
 
@@ -167,7 +172,7 @@ Example write payload:
 }
 ```
 
-Only one Planned Treat is active per user. Its progress is derived from the same all-time ledger sum returned by `GET /v1/me/bank-summary`; the Planned Treat table does not store or cache bank balance.
+Only one Planned Treat is active per user. Its progress is derived from the same all-time Available Bank returned by `GET /v1/me/bank-summary`; the Planned Treat table does not store or cache bank balance. Planned Treat is planning awareness only: it does not log food, deduct calories, or create ledger transactions. Actual consumption remains recorded in the user's calorie tracker and later affects the bank through imported total intake and completed-day finalization.
 
 Until real integrations and finalization jobs exist, seed development bank history explicitly:
 

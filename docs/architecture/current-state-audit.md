@@ -431,16 +431,33 @@ Implemented V1 read-model table for one completed day. This is currently populat
 Ledger convention:
 
 - Positive amount means calories deposited into the bank.
-- Negative amount means calories withdrawn from the bank.
+- Negative amount means the completed day automatically reduced the bank. The finalized daily transaction is the withdrawal; V1 must not add a separate manual `Use Bank` or treat-withdrawal action.
 - Official all-time bank is `sum(amount_calories)` across finalized daily ledger transactions. Filtered history ranges may show a separate range net change but must not replace the all-time bank.
 - Imported intake, imported total expenditure, manual corrections, target snapshots, historical initialization, and reconciliation records may produce ledger transactions under `docs/product/bank-calculation-spec.md`.
 - Planning Database items and planned meals are advisory and must not produce calorie ledger transactions.
-- Planned Treat records store one active user-selected food, meal, treat, or event goal. They must not duplicate the Available Bank; progress is derived from the same all-time ledger sum used by Bank Summary.
+- Planned Treat records store one active user-selected food, meal, treat, or event goal. They must not duplicate the Available Bank; progress is derived from the same all-time ledger sum used by Bank Summary and must exclude Emergency Bank.
 - The V1 calculation policy is `v1-total-expenditure-80`; implementation must keep the calculation transparent, source-labeled, versioned, and auditable.
 - Adjusted expenditure is rounded deterministically to the nearest integer calorie after applying the expenditure adjustment rate.
 - Finalized daily record creation and ledger transaction creation must happen in one database transaction.
 - The user-facing bank model distinguishes Available Bank, optional Emergency Bank, and Recovery Forecast. Negative daily changes apply in the order Available Bank -> Emergency Bank -> Recovery Forecast.
 - Emergency Bank allocation and coverage must be traceable through the ledger or an equivalently auditable model; do not implement it as hidden mutable state.
+- Emergency Bank visibility is a user preference. Hiding the Today card must not change reserve balance or rules.
+
+Future source-attributed ingestion records:
+
+- Expenditure daily aggregate: user ID, log date, source, external source ID, total daily expenditure, imported time, source updated time, sync batch ID, timezone, current-day flag, and deduplication identity.
+- Intake daily aggregate: user ID, log date, source, external source ID, total daily calorie intake, imported time, source updated time, sync batch ID, timezone, and deduplication identity.
+- Today so far awareness read model: local date, timezone, adjusted expenditure calories, raw imported expenditure calories, expenditure adjustment rate, expenditure source, expenditure last synced time, imported calorie intake, intake source, intake last synced time, data freshness status, and partial/current-day flags.
+- Prefer daily aggregate imports when providers expose daily aggregate totals. Do not double-count active calories on top of total daily expenditure.
+- Finalization consumes source-attributed daily aggregates, preserves the `v1-total-expenditure-80` calculation policy, and creates reconciliation records for late source corrections.
+
+Future Activity Opportunity Engine records:
+
+- Activity preferences: user ID, selected activity codes/categories, preferred durations, preferred days or time windows, muted activities, activity-nudge opt-in, maximum nudges per week, quiet hours, created and updated timestamps.
+- Activity catalogue: activity code, consumer name, category, intensity level, supported durations, estimation method, low/high intensity coefficients, model version, source reference, and active flag.
+- Activity opportunity candidate: opportunity ID, user ID, Planned Treat ID, activity code/display name, duration, estimated low/high calories, estimation method/model version, remaining treat calories, planned treat date/time, reason codes, score, generated/expiration timestamps, notification category, delivery eligibility, blocked reason, and deduplication key.
+- Notification delivery history: user ID, opportunity ID, notification category, activity code, scheduled/delivered/opened/dismissed timestamps, delivery status, suppression reason, deduplication key, and template version.
+- Estimated activity calories are planning estimates only. They must not be stored in `calorie_ledger_transactions`, must not change Available Bank, and must not replace connected-source expenditure.
 
 Future tables:
 
@@ -455,6 +472,9 @@ Future tables:
 - `sessions` or `refresh_tokens`
 - `notification_preferences`
 - `notification_deliveries`
+- `activity_preferences`
+- `activity_catalogue_items`
+- `activity_opportunity_candidates`
 - `saved_items`
 - `reserve_policies`
 - `bank_balance_allocations`
@@ -491,8 +511,8 @@ Future tables:
 - Implement automatic bank calculation from `docs/product/bank-calculation-spec.md` with explicit pending/incomplete/confirmed/corrected states.
 - Implement immutable ledger transaction creation for daily changes and adjustments.
 - Implement Planning Database storage/search for future meal and event estimates without connecting planning estimates to bank ledger inputs.
-- Implement one active Planned Treat that compares required calories against the all-time Available Bank without creating ledger transactions or automatic withdrawals.
-- Build Expo screens for onboarding, connections, bank-first home with all-time Available Bank, optional Emergency Bank state, Recovery Forecast when applicable, planning search/detail, Bank History with finalized-day ranges, selected-day detail, notification settings, and manual correction/fallback.
+- Implement one active Planned Treat that compares required calories against the all-time Available Bank without creating ledger transactions. Negative completed days handle bank reduction through finalized daily ledger transactions.
+- Build Expo screens for onboarding, connections, bank-first home with all-time Available Bank, one active Planned Treat, Today so far only after real current-day expenditure and intake ingestion exists or honest setup/unavailable states exist, optional Emergency Bank visibility, Recovery Forecast when applicable, planning search/detail, Bank History with finalized-day ranges, selected-day detail, notification settings, and manual correction/fallback.
 
 ### Phase 4: Migration and Compatibility
 
@@ -515,6 +535,15 @@ Future tables:
 - Investigate Apple Health/HealthKit, Android Health Connect, supported direct APIs, user-authorized imports, and manual fallback without claiming unsupported third-party API access.
 - Add USDA FoodData Central, restaurant/packaged-food data, or food photos only if they support a validated planning or fallback/correction use case. Do not claim unsupported provider access.
 
+### Phase 7: Activity Opportunity Engine
+
+- Implement only after real source-attributed intake and expenditure ingestion, Today-so-far awareness, notification permission, stable Planned Treat timing, and explicit activity preference collection exist.
+- Start with a curated, versioned population-based activity-energy catalogue and deterministic estimate service.
+- Add wearable-personalized estimates only after enough consented activity history exists.
+- Keep candidate generation separate from push delivery.
+- Add fatigue controls, quiet hours, duplicate suppression, and notification delivery history before sending production activity opportunities.
+- Do not use AI to invent calorie ranges or override policy validation.
+
 ## 11. Smallest First Vertical Slice
 
 The smallest V1 vertical slice should be:
@@ -526,7 +555,7 @@ The smallest V1 vertical slice should be:
 5. Sync recent data with source labels, sync batches, and duplicate-prevention keys.
 6. Initialize lifetime bank from up to 7 days of available supported history, starting at zero if the calculated value is zero/negative or data is incomplete.
 7. Calculate a daily bank update using `v1-total-expenditure-80` into immutable ledger transactions with confirmed/pending/incomplete/corrected states.
-8. Show all-time Available Bank, optional Emergency Bank status when enabled, Recovery Forecast when applicable, Bank History ranges, and selected-day calculation detail.
+8. Show all-time Available Bank, one active Planned Treat based on Available Bank only, optional Emergency Bank status when enabled and visible, Recovery Forecast when applicable, Bank History ranges, and selected-day calculation detail.
 9. Search or create a Planning Database entry and compare its estimated calories against Available Bank without changing the ledger.
 10. Generate the morning bank-update notification payload.
 
@@ -539,6 +568,7 @@ Defer for this slice:
 - Full treat planning beyond naming one saved food/meal/event if needed for the notification.
 - Weekly charts not required for explanation.
 - Broad activity import.
+- Activity Opportunity Engine, personalized activity nudges, activity catalogue, notification fatigue controls, and wearable-personalized estimates.
 - Complex onboarding/TDEE estimation.
 - Full manual food logger.
 

@@ -41,7 +41,7 @@ If CalorieBank requires daily manual logging, it competes directly with establis
 
 - V1 is primarily a manual food logger.
 - Apple Health and other integrations can wait until after manual logging works.
-- The smallest vertical slice is add-food-entry -> ledger withdrawal.
+- The smallest vertical slice is source-attributed intake/expenditure sync -> finalized daily calculation -> immutable ledger deposit or withdrawal.
 - Success is measured by number of meals logged or daily app-opening streaks.
 - Generic engagement notifications are part of the V1 loop.
 - Weekly bank framing is the primary balance model.
