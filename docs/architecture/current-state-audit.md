@@ -10,9 +10,9 @@ The authoritative V1 direction is now connection-first automatic calorie banking
 
 V1 also includes a Planning Database for future meal and event estimates. That database is planning-only: connected calorie-tracking applications remain the source of truth for Food Tracking, daily intake, historical intake, synchronization, and bank calculations. Planning Database estimates must not directly update the bank.
 
-The approved mobile information architecture is bank-first. The default experience should show the all-time Available Bank first, include finalized days only through the previous completed day, keep the current day pending or explicitly estimated, and reveal history by day/week/month/3 months/year/all time only when requested. Selecting a finalized day reveals a short consumer-readable breakdown. Implementation should preserve immutable finalized daily bank transactions as the source of the all-time bank and should avoid exposing raw internal identifiers or variable names in consumer UI.
+The approved mobile information architecture is bank-first. The default experience shows the all-time Available Bank first, includes provisional and locked completed days through the previous day, keeps the current day awareness-only, and reveals history by day/week/month/3 months/year/all time only when requested. Foreground Apple Health sync now refreshes current day plus the prior two local dates, then scheduler-neutral orchestration delegates posting, reconciliation, and locking to the banking engine. Completed days affect Available Bank immediately as provisional, reconcile through append-only correction transactions for two local calendar days, and then lock.
 
-The current architecture inventory below remains valid as a description of the existing prototype. Forward-looking reuse, migration, database, and vertical-slice guidance has been updated to match `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`; the rejection of absolute user-entered daily calorie targets is recorded in `docs/product/adr-002-expenditure-relative-goal-adjustment.md`.
+The current architecture inventory below remains valid as a description of the existing prototype. Forward-looking reuse, migration, database, and vertical-slice guidance has been updated to match `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`; the rejection of absolute user-entered daily calorie targets is recorded in ADR 002. Provider-neutral ingestion is governed by ADR 006, Apple Health and the development-build boundary by ADR 007, activity context by ADR 008, provisional reconciliation by ADR 009, and reliable rolling synchronization/orchestration by ADR 010.
 
 ## 1. Current Architecture
 
@@ -396,7 +396,7 @@ Saved future planning records. These are not consumed-meal logs.
 
 `finalized_daily_bank_records`
 
-Implemented V1 read-model table for one completed day. This is currently populated only by a guarded development seed/finalization script until real integrations and day-finalization jobs exist.
+Implemented report table for one completed day. Provider expenditure/intake aggregate changes can now post or reconcile the report automatically; the development seed remains available for deterministic local history.
 
 - `id uuid primary key`
 - `user_id uuid references users(id)`
@@ -410,9 +410,21 @@ Implemented V1 read-model table for one completed day. This is currently populat
 - `imported_calorie_intake integer not null`
 - `daily_allowance integer not null`
 - `daily_bank_change integer not null`
+- `original_daily_bank_change integer not null`
+- `effective_daily_bank_change integer not null`
+- `status text not null` (`PROVISIONAL`, `LOCKED`; persisted `OPEN` is prohibited)
+- `correction_count integer not null`
+- `current_version integer not null`
+- `lock_at timestamptz not null`
+- `locked_at timestamptz nullable`
+- `locked_by_sync_session_id uuid nullable`
 - `finalized_at timestamptz not null`
 - `created_at timestamptz not null`
 - Unique index: `(user_id, log_date)`.
+
+`bank_calculation_snapshots`
+
+Append-only calculation versions. Each version preserves provider records, trigger sync session, raw and adjusted expenditure, intake, goal snapshot, allowance, expected contribution, correction delta, reason, and input fingerprint. Unique report/version and report/fingerprint constraints prevent duplicate versions.
 
 `calorie_ledger_transactions`
 
@@ -426,30 +438,78 @@ Implemented V1 read-model table for one completed day. This is currently populat
 - `idempotency_key text not null`
 - `description text not null`
 - `created_at timestamptz not null`
+- `calculation_snapshot_id uuid nullable unique`
 - Unique index: `(user_id, idempotency_key)`.
 
 Ledger convention:
 
 - Positive amount means calories deposited into the bank.
 - Negative amount means the completed day automatically reduced the bank. The finalized daily transaction is the withdrawal; V1 must not add a separate manual `Use Bank` or treat-withdrawal action.
-- Official all-time bank is `sum(amount_calories)` across finalized daily ledger transactions. Filtered history ranges may show a separate range net change but must not replace the all-time bank.
+- Official all-time bank is `sum(amount_calories)` across initial and correction ledger transactions. A day's effective contribution is its original posting plus all correction deltas. Filtered history ranges may show a separate range net change but must not replace the all-time bank.
 - Imported intake, imported total expenditure, manual corrections, target snapshots, historical initialization, and reconciliation records may produce ledger transactions under `docs/product/bank-calculation-spec.md`.
 - Planning Database items and planned meals are advisory and must not produce calorie ledger transactions.
 - Planned Treat records store one active user-selected food, meal, treat, or event goal. They must not duplicate the Available Bank; progress is derived from the same all-time ledger sum used by Bank Summary and must exclude Emergency Bank.
 - The V1 calculation policy is `v1-total-expenditure-80`; implementation must keep the calculation transparent, source-labeled, versioned, and auditable.
 - Adjusted expenditure is rounded deterministically to the nearest integer calorie after applying the expenditure adjustment rate.
-- Finalized daily record creation and ledger transaction creation must happen in one database transaction.
+- Initial posting and each correction snapshot/ledger pair happen transactionally. PostgreSQL advisory transaction locks serialize work for one user/date; idempotency and uniqueness constraints prevent duplicate posting and corrections.
 - The user-facing bank model distinguishes Available Bank, optional Emergency Bank, and Recovery Forecast. Negative daily changes apply in the order Available Bank -> Emergency Bank -> Recovery Forecast.
 - Emergency Bank allocation and coverage must be traceable through the ledger or an equivalently auditable model; do not implement it as hidden mutable state.
 - Emergency Bank visibility is a user preference. Hiding the Today card must not change reserve balance or rules.
 
-Future source-attributed ingestion records:
+Implemented current-day source-attributed ingestion records:
 
 - Expenditure daily aggregate: user ID, log date, source, external source ID, total daily expenditure, imported time, source updated time, sync batch ID, timezone, current-day flag, and deduplication identity.
 - Intake daily aggregate: user ID, log date, source, external source ID, total daily calorie intake, imported time, source updated time, sync batch ID, timezone, and deduplication identity.
 - Today so far awareness read model: local date, timezone, adjusted expenditure calories, raw imported expenditure calories, expenditure adjustment rate, expenditure source, expenditure last synced time, imported calorie intake, intake source, intake last synced time, data freshness status, and partial/current-day flags.
 - Prefer daily aggregate imports when providers expose daily aggregate totals. Do not double-count active calories on top of total daily expenditure.
-- Finalization consumes source-attributed daily aggregates, preserves the `v1-total-expenditure-80` calculation policy, and creates reconciliation records for late source corrections.
+- Provisional posting consumes source-attributed daily intake and total-expenditure aggregates, preserves `v1-total-expenditure-80`, and changes Available Bank immediately. Changed banking aggregates reconcile for two local calendar days through immutable versions and delta transactions. Steps and workouts remain awareness-only.
+- Implemented provider-neutral ingestion foundation: shared domain interfaces `ExpenditureProvider` and `IntakeProvider`, normalized daily aggregate models, persistent aggregate tables, read-only `GET /v1/me/today`, and validated device-ingestion commands.
+- Implemented activity-context abstractions: `StepProvider` and `WorkoutProvider`, cumulative step aggregates, normalized current-day workouts, stable provider workout identity, and independent Today states.
+- Implemented first real adapter: Apple Health queries active energy, basal energy, dietary energy, steps, and workouts on the iOS device. The app uses an Expo development client because HealthKit cannot run in Expo Go.
+- Current Apple Health synchronization is foreground-only and coordinated through durable lightweight sync sessions. It queries current day, yesterday, and the day before independently, skips accepted unchanged values, and retains failed uploads in an ordered device outbox. Newer cumulative daily totals replace older totals; stale snapshots are ignored; workout snapshots remove provider workouts no longer present for that date; partial category failures remain visible; current-day ingestion never writes the finalized ledger.
+- Implemented finalization orchestration records queried/uploaded/skipped/reconciled/locked/waiting dates and delegates all accounting to the existing provisional pipeline. Durable day states distinguish missing intake, missing expenditure, unavailable provider, missing sync, and other missing required inputs. A schedulable CLI uses the same service as sync-session completion.
+- Dashboard visibility preferences are account-level. Available Bank is always first and cannot be hidden; all six supporting cards are visible by default and may be hidden without disabling ingestion.
+- Development adapters remain test or explicit local fallback. Device and production modes exclude synthetic provider rows.
+
+Implemented aggregate tables:
+
+`daily_expenditure_aggregates`
+
+- `id uuid primary key`
+- `user_id uuid references users(id)`
+- `local_date date not null`
+- `timezone text not null`
+- `provider text not null`
+- `provider_record_id text not null`
+- `raw_total_daily_expenditure integer not null`
+- `adjusted_daily_expenditure integer not null`
+- `adjustment_factor numeric not null`
+- `imported_at timestamptz not null`
+- `provider_updated_at timestamptz`
+- `sync_status text/enum not null`
+- `is_current_day boolean not null`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+- Unique provider record index: `(user_id, provider, provider_record_id)`.
+
+`daily_intake_aggregates`
+
+- `id uuid primary key`
+- `user_id uuid references users(id)`
+- `local_date date not null`
+- `timezone text not null`
+- `provider text not null`
+- `provider_record_id text not null`
+- `total_calories_consumed integer not null`
+- `imported_at timestamptz not null`
+- `provider_updated_at timestamptz`
+- `sync_status text/enum not null`
+- `is_current_day boolean not null`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+- Unique provider record index: `(user_id, provider, provider_record_id)`.
+
+The aggregate tables are not the immutable calorie ledger. Current-day values remain awareness-only. Once a local day completes and both banking aggregates exist, the implemented provisional pipeline may consume them to create an immediate posting and later correction deltas.
 
 Future Activity Opportunity Engine records:
 
@@ -506,10 +566,9 @@ Future tables:
 
 ### Phase 3: Smallest Credible Automatic Banking Loop
 
-- Implement connection-first onboarding for one feasible intake source path and one feasible expenditure/health source path.
-- Implement data synchronization, imported record storage, source labeling, and sync status.
-- Implement automatic bank calculation from `docs/product/bank-calculation-spec.md` with explicit pending/incomplete/confirmed/corrected states.
-- Implement immutable ledger transaction creation for daily changes and adjustments.
+- Complete connection-first onboarding around the implemented Apple Health path and validate whether users' nutrition tools supply dietary energy to HealthKit.
+- Validate the implemented rolling three-day Apple Health query and offline outbox on a physical device. Keep provider-specific payload translation inside adapters.
+- Deploy hosted scheduling around the implemented scheduler-neutral, idempotent provisional posting, reconciliation, retry, and locking pipeline; exact execution cadence remains an operations decision.
 - Implement Planning Database storage/search for future meal and event estimates without connecting planning estimates to bank ledger inputs.
 - Implement one active Planned Treat that compares required calories against the all-time Available Bank without creating ledger transactions. Negative completed days handle bank reduction through finalized daily ledger transactions.
 - Build Expo screens for onboarding, connections, bank-first home with all-time Available Bank, one active Planned Treat, Today so far only after real current-day expenditure and intake ingestion exists or honest setup/unavailable states exist, optional Emergency Bank visibility, Recovery Forecast when applicable, planning search/detail, Bank History with finalized-day ranges, selected-day detail, notification settings, and manual correction/fallback.
@@ -578,14 +637,14 @@ This slice proves the hardest V1 architectural decisions: mobile auth, integrati
 
 These questions genuinely affect implementation choices:
 
-1. Which intake-data source is genuinely feasible for the first 10 users?
-2. Which expenditure/health-data source is genuinely feasible for the first 10 users?
-3. Is HealthKit sufficient as an initial aggregation layer, or is a separate intake path required?
+1. Is Apple Health dietary energy sufficiently available from the first 10 users' calorie trackers, or is a second intake adapter required?
+2. What completeness rule should govern the separate up-to-seven-day onboarding initialization import? Operational provisional posting now uses the approved rolling three-day HealthKit window.
+3. What travel/timezone policy governs open-day aggregate replacement and later reconciliation?
 4. Should V1 use password auth, Sign in with Apple, or both for the private beta?
 5. Which source can provide imported total daily expenditure for the first 10 users?
 6. How should active, resting, total, and unknown expenditure classifications be stored and displayed when source data contains multiple types?
 7. What fallback should be used when only intake or only expenditure data is available?
-8. How long should the system wait after midnight before marking a day's data incomplete?
+8. What missing-input retry and user messaging policy applies when a completed day cannot post provisionally after midnight?
 9. What timezone change behavior is allowed after onboarding?
 10. Does existing MongoDB production data need to be migrated, or can V1 start with fresh beta data?
 11. What minimum privacy/security bar is required before inviting beta users, especially around health-adjacent data?

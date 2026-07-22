@@ -58,7 +58,7 @@ const seedDays = [
 
 async function main() {
   for (const day of seedDays) {
-    const finalized = await repository.finalizeDailyRecord(developmentUser, day);
+    const finalized = await repository.postProvisionalDailyRecord(developmentUser, day);
     console.log(
       `${finalized.logDate}: ${finalized.goalMode} ${finalized.dailyBankChange >= 0 ? '+' : ''}${finalized.dailyBankChange} kcal`,
     );

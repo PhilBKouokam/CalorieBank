@@ -10,7 +10,7 @@ Food logging is secondary in V1. Treat manual entry as fallback, correction, sup
 
 V1 includes a Planning Database for future meals and events. Treat Planning Database entries as planning estimates only; they are not confirmed intake, not Food Tracking records, and must not directly change the bank. Connected calorie-tracking applications remain the source of truth for consumed intake.
 
-The authoritative V1 product direction is `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. The connection-first direction change is recorded in `docs/product/adr-001-connection-first-v1.md`. Interactive Today summary and Bank History behavior is recorded in `docs/product/adr-003-interactive-summary-and-explanation.md`. Automatic bank usage and dashboard awareness are recorded in `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`. Future personalized activity opportunities are recorded in `docs/product/adr-005-personalized-activity-opportunity-notifications.md`.
+The authoritative V1 product direction is `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. The connection-first direction change is recorded in `docs/product/adr-001-connection-first-v1.md`. Interactive Today summary and Bank History behavior is recorded in `docs/product/adr-003-interactive-summary-and-explanation.md`. Automatic bank usage and dashboard awareness are recorded in `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`. Future personalized activity opportunities are recorded in `docs/product/adr-005-personalized-activity-opportunity-notifications.md`. Provider-neutral ingestion is recorded in `docs/product/adr-006-provider-neutral-ingestion-architecture.md`. The first native provider and development-build boundary are recorded in `docs/product/adr-007-apple-healthkit-device-ingestion.md`. Current-day steps, workouts, sync sessions, and Today visibility rules are recorded in `docs/product/adr-008-activity-context-and-customizable-today.md`. Provisional posting, two-day provider reconciliation, correction transactions, and permanent locking are governed by `docs/product/adr-009-provisional-finalization-and-rolling-reconciliation.md`. Reliable three-day HealthKit synchronization, missing-input states, retries, and scheduler-neutral orchestration are governed by `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md`.
 
 ## Engineering Rules
 
@@ -28,7 +28,11 @@ The authoritative V1 product direction is `docs/product/v1-prd.md`. Bank-calcula
 - Do not use AI or hard-coded copy to invent calorie-burn numbers. Future activity estimates must be deterministic, versioned, qualified as ranges, and based on explicit user preferences or authorized history.
 - Do not implement a user-entered absolute daily calorie target for V1. The daily allowance is derived from imported total daily expenditure, CalorieBank's `0.80` V1 adjustment, and the user's signed goal adjustment.
 - Integration claims must be technically verified before being documented or implemented.
+- Provider ingestion must use provider-neutral interfaces and normalized aggregates. Do not put concrete provider payloads or provider-name switches in domain logic.
+- HealthKit queries belong on the iOS device. Do not query HealthKit from the API, claim it works in Expo Go, or let current-day HealthKit data mutate the finalized ledger.
+- Steps and workout calories are context only. Never add them to active plus basal expenditure, the ledger, Available Bank, or Planned Treat progress.
 - Ledger-style balance records are immutable.
+- Completed days post immediately as provisional, reconcile through append-only correction transactions for two local calendar days, and then lock permanently. Never edit an existing ledger transaction or automatically reconcile a locked day.
 - Do not store the bank exclusively as one mutable balance.
 - Every balance change must be traceable.
 - Add tests for calculation changes.

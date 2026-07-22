@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.caloriebank.mobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -27,6 +28,15 @@
     },
     "plugins": [
       "expo-router",
+      "expo-dev-client",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "CalorieBank reads calories burned, calories consumed, steps, and workouts to show your daily activity context and calculate finalized bank updates.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
+      ],
       [
         "expo-splash-screen",
         {

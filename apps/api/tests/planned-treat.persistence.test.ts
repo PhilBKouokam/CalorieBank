@@ -20,7 +20,7 @@ describe('planned treat PostgreSQL persistence', () => {
       email: `treat-${randomUUID()}@caloriebank.local`,
     };
 
-    await bankRepository.finalizeDailyRecord(user, {
+    await bankRepository.postProvisionalDailyRecord(user, {
       logDate: '2026-07-19',
       timezone: 'America/Chicago',
       importedTotalDailyExpenditure: 3000,
@@ -91,7 +91,7 @@ describe('planned treat PostgreSQL persistence', () => {
       email: `treat-${randomUUID()}@caloriebank.local`,
     };
 
-    await bankRepository.finalizeDailyRecord(firstUser, {
+    await bankRepository.postProvisionalDailyRecord(firstUser, {
       logDate: '2026-07-19',
       timezone: 'America/Chicago',
       importedTotalDailyExpenditure: 3000,
@@ -100,7 +100,7 @@ describe('planned treat PostgreSQL persistence', () => {
       importedCalorieIntake: 2500,
       finalizedAt: new Date('2026-07-20T05:30:00.000Z'),
     });
-    await bankRepository.finalizeDailyRecord(secondUser, {
+    await bankRepository.postProvisionalDailyRecord(secondUser, {
       logDate: '2026-07-19',
       timezone: 'America/Chicago',
       importedTotalDailyExpenditure: 2500,

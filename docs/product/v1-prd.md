@@ -4,7 +4,7 @@ Date: 2026-07-16
 
 ## Source Of Truth
 
-This PRD is the authoritative V1 product document. It supersedes prior food-logging-first assumptions in older audits, prototype docs, and implementation notes. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. Supporting architecture guidance lives in `docs/architecture/current-state-audit.md`; the connection-first direction change is recorded in `docs/product/adr-001-connection-first-v1.md`, the expenditure-relative goal model is recorded in `docs/product/adr-002-expenditure-relative-goal-adjustment.md`, the interactive summary/history model is recorded in `docs/product/adr-003-interactive-summary-and-explanation.md`, automatic bank usage plus dashboard awareness are recorded in `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`, and future personalized activity opportunities are recorded in `docs/product/adr-005-personalized-activity-opportunity-notifications.md`.
+This PRD is the authoritative V1 product document. It supersedes prior food-logging-first assumptions in older audits, prototype docs, and implementation notes. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. Supporting architecture guidance lives in `docs/architecture/current-state-audit.md`; the connection-first direction change is recorded in `docs/product/adr-001-connection-first-v1.md`, the expenditure-relative goal model is recorded in `docs/product/adr-002-expenditure-relative-goal-adjustment.md`, the interactive summary/history model is recorded in `docs/product/adr-003-interactive-summary-and-explanation.md`, automatic bank usage plus dashboard awareness are recorded in `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`, future personalized activity opportunities are recorded in `docs/product/adr-005-personalized-activity-opportunity-notifications.md`, provider-neutral ingestion is recorded in `docs/product/adr-006-provider-neutral-ingestion-architecture.md`, Apple Health device ingestion is recorded in `docs/product/adr-007-apple-healthkit-device-ingestion.md`, and activity context plus Today customization are recorded in `docs/product/adr-008-activity-context-and-customizable-today.md`.
 
 ## V1 Mission
 
@@ -43,7 +43,7 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 
 1. User installs CalorieBank.
 2. User connects a supported calorie-intake data source.
-3. User connects a supported calorie-expenditure or health-data source, such as Apple Health when feasible.
+3. On iPhone, the user connects Apple Health for the currently implemented foreground intake and expenditure path.
 4. User selects `cut`, `maintain`, or `bulk`; configures a daily deficit for cut or daily surplus for bulk; uses a zero adjustment for maintain; optionally configures Emergency Bank reserve behavior; and optionally names a food, meal, treat, or event they are saving toward.
 5. CalorieBank imports available data and initializes the bank from recent history when possible.
 6. CalorieBank calculates daily changes and updates the lifetime bank without requiring daily interaction.
@@ -55,15 +55,15 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 
 - Onboarding: account creation/sign-in, goal mode, daily deficit or surplus configuration when applicable, timezone, integration education, lightweight optional Emergency Bank education/configuration.
 - Connections: supported intake source connection, supported expenditure/health source connection, connection state, revoke/reconnect, troubleshooting.
-- Bank Home: compact product header, all-time Available Bank as the dominant standalone card, one active Planned Treat card directly beneath it when available or as an empty setup prompt, compact latest finalized result, and current goal configuration. Current-day pending rules remain part of the product model but should not be repeated as persistent home-screen copy.
-- Bank History: read-only all-time Available Bank, latest finalized date, range controls for day/week/month/3 months/year/all time, minimal history visualization or list, and selected-day calculation breakdown.
+- Bank Home: compact product header, all-time Available Bank as the dominant standalone card, one active Planned Treat card when visible, compact latest completed contribution with provisional/locked status, and current goal configuration. Current-day awareness rules remain part of the product model but should not be repeated as bank-forecast copy.
+- Bank History: read-only all-time Available Bank, latest completed date, range controls for day/week/month/3 months/year/all time, minimal history list, status/correction context, and selected-day calculation breakdown.
 - Goal Settings: editable goal mode and goal-adjustment configuration using the approved cut/maintain/bulk model.
 - Planning Search: estimated restaurant meals, grocery products, packaged foods, homemade meals, custom meals, favorites, and saved future plans.
 - Planning Detail: estimated calories, source/estimate label, whether the meal fits the Available Bank, additional calories needed when it does not fit, and approximate time to bank enough when available.
 - Planned Treat Setup/Edit: one active planned food, meal, treat, or event with name, required calories, optional target date, derived progress, ready state, edit/replace, and remove actions.
 - Morning Update Detail: yesterday's result, added/deducted calories, Available Bank, Emergency Bank coverage or allocation when relevant, Recovery Forecast state when applicable, saved-item readiness when applicable.
 - History: daily changes, imported intake, imported expenditure/activity, net contribution, allocation to Available Bank and Emergency Bank, withdrawals from each balance, running lifetime balance.
-- Day Detail: selected finalized day, daily bank change, calories burned, 80% credited, goal adjustment, calories eaten, final banked amount, duplicate/reconciliation status, and confirmed/pending/estimated state. Available Bank and finalized history are read-only.
+- Day Detail: selected completed day, effective contribution, original contribution, correction deltas, calories burned, 80% credited, goal adjustment, calories eaten, lock date, and provisional/locked state. Available Bank and history are read-only.
 - Manual Correction/Fallback: add or adjust intake/activity only where necessary.
 - Notification Settings: morning update permission, timing, enable/disable.
 - Privacy/Account Settings: connected data summary, data export/delete, sign out.
@@ -122,10 +122,13 @@ Do not assume MyFitnessPal or any named third-party service has an open, approve
 - V1 must choose the smallest technically credible integration path that can test automatic calorie banking.
 - All imported records must carry source labels and sync metadata.
 - Unsupported integrations must be described as aspirations or investigation items, not capabilities.
+- Apple HealthKit is the first implemented iPhone adapter. Foreground synchronization reads active energy, basal energy, dietary energy, steps, and workouts on-device for the rolling window of current day, yesterday, and the day before, then sends normalized daily aggregates independently to the API.
+- HealthKit requires an Expo development build; it is not supported in Expo Go.
+- HealthKit dietary energy is usable only when an authorized nutrition source or manual Health entry has written it. CalorieBank must not imply that every food tracker writes dietary energy to Apple Health.
 
-### Candidate Paths Requiring Validation
+### Paths Requiring Validation
 
-- Apple Health/HealthKit as an aggregation layer for iPhone users.
+- HealthKit history beyond the approved rolling three-day window and background HealthKit delivery.
 - Android Health Connect after the first experiment if Android becomes relevant.
 - Supported direct APIs where access, terms, and production permissions are confirmed.
 - User-authorized import, export-file import, or sandbox/mock integration for early usability testing.
@@ -233,7 +236,7 @@ If Available Bank is zero or negative, progress displays as `0%` and remaining c
 
 Reaching a Planned Treat does not automatically deduct calories from the bank. Treat readiness and bank usage are separate concepts. The user still records actual consumption in their normal calorie tracker. CalorieBank later receives total intake and automatically reflects any daily overage during finalization.
 
-The Planned Treat card appears directly below Available Bank on Today because it answers the next user question after seeing the primary bank number: what can this bank help me enjoy? Empty, saving, ready, loading, and unavailable states should use friendly consumer language and must not show raw infrastructure errors.
+The Planned Treat card is a default-visible supporting card on Today. Empty, saving, ready, loading, and unavailable states should use friendly consumer language and must not show raw infrastructure errors. It follows official bank and current-day awareness cards in the fixed hierarchy defined below.
 
 ## Banking Concepts
 
@@ -259,12 +262,14 @@ The Planned Treat card appears directly below Available Bank on Today because it
 CalorieBank V1 is an all-time calorie-bank interface powered by connected expenditure and calorie-intake data. It is not primarily a calorie-tracking interface.
 
 - The primary number is the user's all-time Available Bank.
-- The official bank includes finalized days only, through the previous completed day.
+- The official bank includes completed days that have posted provisionally or locked, through the previous completed day. Provisional contributions affect Available Bank immediately.
 - The current day is not part of the official bank.
 - The current day may show a clearly labeled estimate or pending state later, but it must never look official before finalization.
 - Current-day live awareness may later show adjusted calories burned so far and calories eaten so far, with source and sync freshness, but it must remain separate from official bank calculations.
-- The all-time bank is the sum of immutable finalized daily bank transactions, after applying approved Available Bank, Emergency Bank, and Recovery Forecast behavior.
-- The bank updates after a day is finalized according to the user's timezone. Product language may say the bank updates at midnight, but implementation must remain reliable when actual reconciliation occurs during the next sync or app session.
+- The all-time bank is the sum of immutable initial and correction ledger transactions for provisional and locked days, after applying approved Available Bank, Emergency Bank, and Recovery Forecast behavior.
+- The bank updates when the completed day is first processed after local midnight. Product language may say the bank updates at midnight, but implementation must remain reliable when posting occurs during the next sync or app session.
+- A completed day is `PROVISIONAL` for the next two complete local calendar days. Provider intake or total-expenditure corrections in that window recalculate the effective contribution and append only the correction delta to the ledger.
+- At the third local midnight after `logDate`, the contribution becomes `LOCKED`. Automatic provider changes cannot alter a locked contribution. Administrative reconciliation is deferred.
 - Default UI should show the bank first, then use progressive disclosure for history and per-day calculation detail.
 - Users can inspect history by day, week, month, 3 months, year, and all time.
 - Selecting a specific finalized day reveals a short human-readable breakdown.
@@ -273,10 +278,12 @@ CalorieBank V1 is an all-time calorie-bank interface powered by connected expend
 For a user who hides Emergency Bank, the intended Today hierarchy is:
 
 1. Available Bank.
-2. Planned Treat.
-3. Today so far, only after real current-day expenditure and intake ingestion exists.
-4. Yesterday or latest finalized result.
-5. Current Goal.
+2. Latest Finalized Contribution.
+3. Today So Far.
+4. Planned Treat.
+5. Steps Today.
+6. Logged Workouts.
+7. Current Goal.
 
 Available Bank is mandatory, always visible, and always first.
 
@@ -358,15 +365,16 @@ Do not add active calories separately after using imported total daily expenditu
 
 ### Implemented Finalized Bank Read Model
 
-The current backend milestone persists immutable finalized daily bank records and matching ledger transactions for development and read-only Bank History.
+The current backend persists provisional/locked daily reports, immutable calculation versions, and append-only ledger transactions for read-only Bank History.
 
-- Finalized daily records snapshot calories burned, 80% credited expenditure, goal mode, goal adjustment, calories eaten, daily allowance, daily bank change, timezone, and finalization time.
-- Each finalized record writes one `daily_finalization` ledger transaction in the same database transaction.
-- The ledger transaction amount equals the finalized day's bank change.
-- A unique user/date constraint prevents duplicate finalization for the same day.
-- A unique user/idempotency-key constraint prevents duplicate ledger writes for the same finalization.
+- Initial provisional posting snapshots calories burned, 80% credited expenditure, goal mode, goal adjustment, calories eaten, daily allowance, contribution, timezone, provider provenance, sync-session provenance, and posting time.
+- Initial posting writes one `daily_finalization` ledger transaction immediately in the same database transaction.
+- Each contribution-changing recalculation creates an immutable calculation version and one `adjustment` transaction equal to `new contribution - current effective contribution`.
+- The report retains original and effective contributions, status, lock time, correction count, and current version. Previous versions and ledger transactions are never edited.
+- Unique user/date, snapshot-version, snapshot-fingerprint, ledger-snapshot, and ledger-idempotency constraints prevent duplicate posting and correction writes.
+- PostgreSQL transaction advisory locks serialize work for the same user and local date.
 - Rounding policy: adjusted expenditure is rounded deterministically to the nearest integer calorie after multiplying imported total daily expenditure by the expenditure adjustment rate.
-- Development seed/finalization exists only for local testing until real integrations and day-finalization jobs are implemented.
+- Development seed/posting exists only for local testing. Provider aggregate ingestion now invokes the same idempotent provisional posting and reconciliation service for completed dates.
 - `GET /v1/me/bank-summary` returns the all-time bank summary.
 - `GET /v1/me/bank-history?range=D|W|M|3M|Y|ALL` returns filtered finalized days plus the all-time bank; range filters do not replace the official all-time bank.
 - `GET /v1/me/bank-history/:logDate` returns the selected finalized day detail needed by the mobile Bank History screen.
@@ -393,11 +401,11 @@ How historical initialization interacts with the optional Emergency Bank is not 
 
 - Daily bank calculation runs after the user's day boundary in their configured timezone and before the morning notification when data is available.
 - Bank usage is automatic. There is no manual `Use Bank`, `Spend Bank`, or treat-withdrawal action in V1.
-- If `daily_bank_change` is positive, finalization creates a positive immutable ledger transaction.
-- If `daily_bank_change` is negative, finalization creates a negative immutable ledger transaction that automatically reduces Available Bank under the approved Available Bank, Emergency Bank, and Recovery Forecast order.
-- The immutable finalized daily transaction is the withdrawal when the completed day is negative.
+- If `daily_bank_change` is positive, provisional posting creates a positive immutable ledger transaction.
+- If `daily_bank_change` is negative, provisional posting creates a negative immutable ledger transaction that immediately reduces Available Bank under the approved Available Bank, Emergency Bank, and Recovery Forecast order.
+- A correction never edits that transaction. It appends a positive or negative delta transaction so the ledger sum equals the newest effective contribution.
 - The user's timezone controls daily boundaries, history, goal-adjustment snapshots, and notification scheduling.
-- Imported data arriving late may trigger retroactive recalculation through adjustment/reconciliation transactions, not silent mutation.
+- Imported intake or total-expenditure data arriving during the two-day provisional window triggers automatic recalculation through adjustment transactions, not silent mutation. Steps and workout calories are never reconciliation inputs.
 - Corrections must show old value, new value, source, affected date, delta, and effect on lifetime bank.
 - Historical edits, late imports, and manual corrections must create traceable reconciliation/adjustment records rather than silently mutating prior ledger transactions.
 - If no intake data is available, show the day as missing or incomplete; do not assume zero intake without user-visible confirmation.
@@ -412,7 +420,9 @@ How historical initialization interacts with the optional Emergency Bank is not 
 
 ## Current-Day Live Awareness
 
-CalorieBank should later show current-day expenditure and intake together in one `Today so far` card. This supports CalorieBank's role as the banking center that connects expenditure and intake in one place while still leaving decisions to the user.
+CalorieBank shows current-day expenditure and intake together in one `Today so far` card when Apple Health returns matching data. This supports CalorieBank's role as the banking center that connects expenditure and intake in one place while still leaving decisions to the user.
+
+The implemented flow exposes this through a provider-neutral read model at `GET /v1/me/today`. The iOS device queries HealthKit, maps results through focused expenditure, intake, step, and workout adapters, and sends validated normalized aggregates to provider-neutral ingestion commands. The API calculates adjusted expenditure and persists cumulative current-day aggregates and normalized workout summaries. Development adapters are limited to tests or explicit local fallback.
 
 Concept:
 
@@ -421,11 +431,11 @@ Today so far
 
 Burned
 1,600 kcal
-2,000 from Fitbit x 80%
+2,000 from Apple Health x 80%
 
 Eaten
 1,500 kcal
-Imported from MyFitnessPal
+Imported from Apple Health
 
 Last synced 8 minutes ago
 ```
@@ -441,7 +451,8 @@ adjusted_current_day_expenditure =
   imported_total_daily_expenditure_so_far * 0.80
 ```
 
-- Raw imported device expenditure remains visible only as brief supporting context, such as `2,000 from Fitbit x 80%`.
+- For Apple Health, raw total expenditure is active energy plus basal energy. The sum is adjusted once; workout or Move energy is not added separately.
+- Raw imported device expenditure remains visible only as brief supporting context, such as `2,000 from Apple Health x 80%`.
 - Use the connected expenditure source name dynamically when available.
 - Do not double-count active calories. If the source exposes total daily expenditure, use that total once.
 - Calories eaten uses source-attributed current-day total calorie intake.
@@ -451,9 +462,13 @@ adjusted_current_day_expenditure =
 - UI must not imply current expenditure is already banked, deposited, earned, or available.
 - Source and sync freshness should be displayed where useful.
 - If unavailable, use friendly setup or unavailable states for the missing source.
+- HealthKit does not reveal whether read access was denied. Empty Apple Health queries must use conservative language such as `No data found today` or `Waiting for data`, not an unsupported `Permission denied` claim.
 - Do not create food entries in CalorieBank from this card.
 - Do not make CalorieBank the primary food logger.
 - Do not show raw API, job, or infrastructure terminology.
+- Step count is context only. It does not estimate calories or modify burned calories.
+- Logged workouts are context only. Workout energy is already represented in Apple Health active energy and must not be added to raw or adjusted expenditure.
+- `No workouts logged today` is an empty state, not an error or exercise prompt.
 
 Future read model concept:
 
@@ -470,8 +485,18 @@ Future read model concept:
 - Data freshness status.
 - Current-day flag.
 - Partial flag.
+- Cumulative step count, source, status, and last sync time.
+- Normalized current-day workouts, source, status, and last sync time.
 
 The read model should be derived from source-attributed ingestion records and must not store a projected bank result.
+
+Provider-specific translation belongs inside adapters. Domain and bank logic must not depend on Apple Health fields, Fitbit JSON, MyFitnessPal response structures, or switches on provider names. Future providers should be added by implementing the relevant provider interface and registering the adapter.
+
+Apple Health synchronization runs as one coordinated rolling-window session after explicit connection, on app launch/Today focus, when the app returns to the foreground, and on manual refresh, subject to a five-minute cooldown. Manual refresh bypasses the cooldown. Current day, yesterday, and the day before are queried independently for expenditure, intake, steps, and workouts. Accepted unchanged values are skipped; changed values are uploaded per category/date through an ordered local outbox that survives offline failures. A lightweight server record stores queried, uploaded, skipped, reconciled, locked, waiting, and errored dates plus category outcomes, counts, versions, trigger, and duration without raw health samples. Completing the session invokes the existing posting/reconciliation/locking services. `GET /v1/me/today` remains read-only, and current-day aggregates never write the ledger.
+
+Completed days without required inputs must enter an explicit `waiting_for_intake`, `waiting_for_expenditure`, `waiting_for_provider`, `waiting_for_sync`, or `waiting_for_required_inputs` state. Missing intake and expenditure are never treated as zero. Foreground sync, manual refresh, provider reconnection, and scheduler invocation are retry opportunities; orchestration coordinates the accounting engine but does not duplicate its calculations.
+
+Each Today section owns its freshness state so a missing category does not hide usable data from another category. Current implementation marks a previously ready value stale after 30 minutes without a successful sync. This is a named, adjustable technical policy rather than a physiological or bank-calculation rule.
 
 ## Today And Bank History Interaction
 
@@ -482,17 +507,17 @@ Today uses a bank-first hierarchy.
 - Available Bank must show `Not calculated`, `Waiting for data`, `Pending`, `Incomplete`, or another honest status until finalized ledger inputs exist.
 - Available Bank must not be manually editable and must not display fabricated `0 kcal` values as though they were calculated.
 - Supporting copy should be compact, such as `Through yesterday` or `Updated this morning`.
-- Planned Treat appears directly below Available Bank. It shows empty, saving, ready, loading, or unavailable state and opens Planned Treat setup/edit.
+- Planned Treat shows empty, saving, ready, loading, or unavailable state and opens Planned Treat setup/edit.
 - Planned Treat progress must use the same real all-time Available Bank source as Bank Summary. It must not cache a separate bank balance or create fake ledger transactions.
 - Today so far should appear only after real current-day expenditure and intake data exist or an honest setup/unavailable state exists. It must not use mock values and must not imply an official current-day bank change.
-- Today shows compact previous-day or latest-finalized status and current goal configuration.
+- Today shows the previous-day or latest completed contribution, its `Provisional` or `Locked` status, lock date when provisional, and `Adjusted from` context after a correction. It does not expose raw reconciliation identifiers.
 - Today should not persistently show current-day forecast, projected daily bank change, or midnight-pending copy. If current-day estimates are introduced later, they must be clearly labeled and should not compete with the official Available Bank.
 - Infrastructure diagnostics such as API health, service names, or backend connectivity details are not consumer home-screen content.
 - Today must not contain long explanatory paragraphs, raw formula blocks, or internal variable names.
 - Goal Mode, Daily Deficit, Daily Surplus, or Maintenance opens Goal Settings.
 - Maintain displays a zero adjustment and explains that no deficit or surplus is applied; it must not show an editable calorie target.
 - Calculated bank data is read-only. User preferences such as goal mode, daily deficit, daily surplus, estimated weekly weight-change preference, and future reserve settings are editable through settings/configuration flows.
-- Bank History shows the all-time Available Bank, latest finalized date, range filters, a simple history visualization or list, and selected-day calculation detail.
+- Bank History shows the all-time Available Bank, latest completed date, range filters, effective contribution, status, correction count, and selected-day calculation detail. Day detail shows original contribution, each correction delta, effective contribution, and lock date.
 - Selected-day detail must use plain language, not raw internal identifiers or variable names.
 - UI states must distinguish loading, unavailable, pending, incomplete, finalized, and calculated data.
 - Interactive summary cards require visible labels, current value or honest status, a navigation affordance, press feedback, accessible button semantics, descriptive accessibility labels and hints, and practical touch targets.
@@ -500,7 +525,7 @@ Today uses a bank-first hierarchy.
 
 ### Customizable Today Dashboard
 
-Today should eventually support simple card-visibility toggles before any drag-and-drop or ordering engine.
+Today supports account-level card-visibility toggles with a fixed order. Drag-and-drop and custom ordering remain deferred.
 
 Mandatory:
 
@@ -508,24 +533,25 @@ Mandatory:
 
 Optional cards:
 
+- Latest Finalized Contribution.
+- Today So Far.
 - Planned Treat.
-- Today so far.
-- Yesterday or latest finalized result.
+- Steps Today.
+- Logged Workouts.
 - Current Goal.
-- Emergency Bank.
-- Future connection status cards.
 
 Initial customization should prefer visibility toggles such as:
 
 ```text
-Show Planned Treat       On
-Show Today so far        On
-Show Yesterday           On
-Show Current Goal        On
-Show Emergency Bank      Off
+Show Latest contribution On
+Show Today so far         On
+Show Planned Treat        On
+Show Steps                On
+Show Workouts             On
+Show Current Goal         On
 ```
 
-Drag-and-drop reordering and complex dashboard engines are deferred.
+All optional cards above are visible by default. Preferences persist through the account-level API and hiding a card does not disable ingestion. Available Bank is not part of the mutable preference contract. Drag-and-drop reordering, Emergency Bank presentation, and complex dashboard engines are deferred.
 
 ## Manual Fallback And Activity Entry
 
@@ -535,9 +561,9 @@ Drag-and-drop reordering and complex dashboard engines are deferred.
 - If manual data overlaps imported data, duplicate-prevention and reconciliation rules must decide which record contributes to the bank.
 - Planning Database entries are not manual intake entries. They are future-planning estimates and must remain separate from confirmed intake and manual correction/fallback records.
 
-## Source-Attributed Ingestion Roadmap
+## Source-Attributed Ingestion
 
-Future expenditure records should preserve enough provenance for automatic finalization and reconciliation:
+Expenditure records preserve enough provenance for automatic finalization and reconciliation:
 
 - User ID.
 - Log date.
@@ -551,7 +577,7 @@ Future expenditure records should preserve enough provenance for automatic final
 - Whether the record represents the current day.
 - Deduplication identity.
 
-Future intake records should preserve:
+Intake records preserve:
 
 - User ID.
 - Log date.
@@ -565,6 +591,10 @@ Future intake records should preserve:
 - Deduplication identity.
 
 Prefer daily aggregate imports when that is what the provider exposes. Do not double-count active calories on top of a source's total daily expenditure. Preserve the approved `0.80` expenditure adjustment policy. Finalization consumes source-attributed daily aggregates. Late source corrections must create traceable reconciliation behavior. Integration data must remain auditable.
+
+Provider corrections must not overwrite ledger records destructively. During the provisional window, ingestion compares corrected source-attributed daily intake and total expenditure with the newest immutable calculation version and appends the exact adjustment delta. After lock, ingestion may retain provider data for audit but cannot automatically alter the contribution.
+
+The approved HealthKit historical scope is intentionally limited to three local calendar days. The current day is awareness-only. The two completed dates align with the provisional correction window. HealthKit remains device-only, and scheduling can retry already imported completed-day data but cannot query Apple Health from the backend.
 
 ## Notification Requirements
 
@@ -736,9 +766,8 @@ Analytics must not include raw food names, free-text notes, passwords, precise h
 
 ## Open Product Decisions
 
-- Which intake-data source is genuinely feasible for the first 10 users?
-- Which expenditure/health-data source is genuinely feasible for the first 10 users?
-- Is HealthKit sufficient as the initial aggregation layer for both intake and expenditure, or is another intake path required?
+- Is Apple Health dietary energy sufficiently available among the first 10 users' existing calorie trackers, or is a second supported intake path required?
+- The rolling HealthKit operational sync window is approved as current day plus the prior two local dates. A separate seven-day onboarding initialization import remains unresolved.
 - Which exact source provides imported total daily expenditure for the approved V1 calculation?
 - How should active, resting, total, and unknown expenditure classifications be stored and explained when source data contains more than one type?
 - What fallback should be used when only intake or only expenditure data is available?
@@ -774,11 +803,8 @@ Analytics must not include raw food names, free-text notes, passwords, precise h
 - What happens to the balance when Emergency Bank is disabled?
 - How should unusually large Emergency Bank balances be presented?
 - What safeguards prevent unsafe reserve-building behavior?
-- What minimum sync freshness is required before showing Today so far values?
-- Which sync statuses should Today so far display, and when should it show setup versus unavailable for expenditure, intake, or both?
-- Should Today so far show when only expenditure or only intake is connected?
-- Should Today card visibility preferences sync across devices or remain local?
-- Which optional Today cards are visible by default before customization exists?
+- Should the current 30-minute stale threshold change after physical-device observation?
+- Should dashboard visibility preferences gain local-only overrides after production authentication exists?
 - When, if ever, should drag-and-drop Today card reordering be introduced?
 - Which restaurant, grocery, packaged-food, and nutrition-data providers are supported for the Planning Database?
 - How should planning search rank, filter, and label results?

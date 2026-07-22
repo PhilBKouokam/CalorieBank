@@ -12,6 +12,7 @@ const EnvSchema = z.object({
     .default('postgresql://caloriebank:caloriebank@localhost:5432/caloriebank'),
   DEV_USER_ID: z.string().uuid().default('00000000-0000-4000-8000-000000000001'),
   DEV_USER_EMAIL: z.string().email().default('developer@caloriebank.local'),
+  TODAY_INGESTION_MODE: z.enum(['disabled', 'development', 'device']).default('disabled'),
 });
 
 const parsedEnv = EnvSchema.safeParse(process.env);

@@ -1,0 +1,5 @@
+ALTER INDEX "daily_expenditure_aggregates_user_date_provider_key"
+  RENAME TO "daily_expenditure_aggregates_user_id_local_date_provider_key";
+
+ALTER INDEX "daily_intake_aggregates_user_date_provider_key"
+  RENAME TO "daily_intake_aggregates_user_id_local_date_provider_key";

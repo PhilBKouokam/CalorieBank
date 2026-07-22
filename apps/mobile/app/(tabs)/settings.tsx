@@ -7,13 +7,15 @@ export default function SettingsScreen() {
     <PlaceholderScreen
       eyebrow="Controls"
       title="Settings"
-      description="A placeholder for goal mode, target, timezone, privacy controls, and account actions."
+      description="Manage your goal and the data sources CalorieBank uses."
       links={[
+        { href: '/customize-today', label: 'Customize Today' },
+        { href: '/integrations', label: 'Health Connections' },
         { href: '/onboarding', label: 'Open Onboarding Placeholder' },
         { href: '/sign-in', label: 'Open Sign In Placeholder', variant: 'secondary' },
       ]}
     >
-      <Text>Authentication, secure storage, and account management are intentionally not wired yet.</Text>
+      <Text>Health data access is controlled by you in iOS Settings and the Health app.</Text>
     </PlaceholderScreen>
   );
 }

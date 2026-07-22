@@ -133,7 +133,7 @@ Scores may be used to rank candidates later, but arbitrary score values must not
 
 The restrained notification taxonomy is:
 
-- Daily finalized bank update: primary V1 notification.
+- Daily completed-bank update: primary V1 notification. It must label a provisional contribution honestly; correction-notification behavior remains deferred under ADR 009.
 - Planned Treat progress milestone: optional progress or ready notification; no withdrawal occurs.
 - Personalized activity opportunity: optional, goal-aware activity suggestion.
 - Positive momentum: optional combination of finalized bank progress and Planned Treat progress.

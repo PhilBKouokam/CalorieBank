@@ -5,18 +5,42 @@ import {
   bankSummaryResponseSchema,
   goalConfigurationInputSchema,
   goalConfigurationResponseSchema,
+  currentDayExpenditureSyncSchema,
+  currentDayIntakeSyncSchema,
+  currentDayStepSyncSchema,
+  currentDayWorkoutSyncSchema,
+  dashboardPreferencesPatchSchema,
+  dashboardPreferencesResponseSchema,
+  ingestionSyncResultSchema,
+  ingestionSyncSessionCompleteSchema,
+  ingestionSyncSessionResponseSchema,
+  ingestionSyncSessionStartSchema,
+  workoutSyncResultSchema,
   activePlannedTreatResponseSchema,
   plannedTreatGetResponseSchema,
   plannedTreatInputSchema,
+  todayResponseSchema,
   type BankHistoryDayDetailResponse,
   type BankHistoryRange,
   type BankHistoryResponse,
   type BankSummaryResponse,
   type GoalConfigurationInput,
   type GoalConfigurationResponse,
+  type CurrentDayExpenditureSync,
+  type CurrentDayIntakeSync,
+  type CurrentDayStepSync,
+  type CurrentDayWorkoutSync,
+  type DashboardPreferencesPatch,
+  type DashboardPreferencesResponse,
+  type IngestionSyncResult,
+  type IngestionSyncSessionComplete,
+  type IngestionSyncSessionResponse,
+  type IngestionSyncSessionStart,
+  type WorkoutSyncResult,
   type PlannedTreatGetResponse,
   type PlannedTreatInput,
   type ActivePlannedTreatResponse,
+  type TodayResponse,
 } from '@caloriebank/schemas';
 
 export type HealthResponse = {
@@ -151,6 +175,116 @@ export async function fetchPlannedTreat(): Promise<PlannedTreatGetResponse> {
   }
 
   return plannedTreatGetResponseSchema.parse(await response.json());
+}
+
+export async function fetchToday(timezone?: string): Promise<TodayResponse> {
+  const query = timezone ? `?timezone=${encodeURIComponent(timezone)}` : '';
+  const response = await apiRequest(`/v1/me/today${query}`);
+
+  if (!response.ok) {
+    throw new Error(`Unable to load today's awareness values (${response.status}).`);
+  }
+
+  return todayResponseSchema.parse(await response.json());
+}
+
+export async function syncCurrentDayExpenditure(
+  input: CurrentDayExpenditureSync,
+): Promise<IngestionSyncResult> {
+  const validInput = currentDayExpenditureSyncSchema.parse(input);
+  const response = await apiRequest('/v1/me/ingestion/expenditure', {
+    method: 'POST',
+    body: JSON.stringify(validInput),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Unable to sync current-day expenditure (${response.status}).`);
+  }
+
+  return ingestionSyncResultSchema.parse(await response.json());
+}
+
+export async function syncCurrentDayIntake(
+  input: CurrentDayIntakeSync,
+): Promise<IngestionSyncResult> {
+  const validInput = currentDayIntakeSyncSchema.parse(input);
+  const response = await apiRequest('/v1/me/ingestion/intake', {
+    method: 'POST',
+    body: JSON.stringify(validInput),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Unable to sync current-day intake (${response.status}).`);
+  }
+
+  return ingestionSyncResultSchema.parse(await response.json());
+}
+
+export async function syncCurrentDaySteps(
+  input: CurrentDayStepSync,
+): Promise<IngestionSyncResult> {
+  const validInput = currentDayStepSyncSchema.parse(input);
+  const response = await apiRequest('/v1/me/ingestion/steps', {
+    method: 'POST',
+    body: JSON.stringify(validInput),
+  });
+  if (!response.ok) throw new Error(`Unable to sync current-day steps (${response.status}).`);
+  return ingestionSyncResultSchema.parse(await response.json());
+}
+
+export async function syncCurrentDayWorkouts(
+  input: CurrentDayWorkoutSync,
+): Promise<WorkoutSyncResult> {
+  const validInput = currentDayWorkoutSyncSchema.parse(input);
+  const response = await apiRequest('/v1/me/ingestion/workouts', {
+    method: 'POST',
+    body: JSON.stringify(validInput),
+  });
+  if (!response.ok) throw new Error(`Unable to sync current-day workouts (${response.status}).`);
+  return workoutSyncResultSchema.parse(await response.json());
+}
+
+export async function startIngestionSyncSession(
+  input: IngestionSyncSessionStart,
+): Promise<IngestionSyncSessionResponse> {
+  const validInput = ingestionSyncSessionStartSchema.parse(input);
+  const response = await apiRequest('/v1/me/ingestion/sync-sessions', {
+    method: 'POST',
+    body: JSON.stringify(validInput),
+  });
+  if (!response.ok) throw new Error(`Unable to start health sync (${response.status}).`);
+  return ingestionSyncSessionResponseSchema.parse(await response.json());
+}
+
+export async function completeIngestionSyncSession(
+  sessionId: string,
+  input: IngestionSyncSessionComplete,
+): Promise<IngestionSyncSessionResponse> {
+  const validInput = ingestionSyncSessionCompleteSchema.parse(input);
+  const response = await apiRequest(`/v1/me/ingestion/sync-sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(validInput),
+  });
+  if (!response.ok) throw new Error(`Unable to complete health sync (${response.status}).`);
+  return ingestionSyncSessionResponseSchema.parse(await response.json());
+}
+
+export async function fetchDashboardPreferences(): Promise<DashboardPreferencesResponse> {
+  const response = await apiRequest('/v1/me/dashboard-preferences');
+  if (!response.ok) throw new Error(`Unable to load Today preferences (${response.status}).`);
+  return dashboardPreferencesResponseSchema.parse(await response.json());
+}
+
+export async function updateDashboardPreferences(
+  patch: DashboardPreferencesPatch,
+): Promise<DashboardPreferencesResponse> {
+  const validPatch = dashboardPreferencesPatchSchema.parse(patch);
+  const response = await apiRequest('/v1/me/dashboard-preferences', {
+    method: 'PATCH',
+    body: JSON.stringify(validPatch),
+  });
+  if (!response.ok) throw new Error(`Unable to save Today preferences (${response.status}).`);
+  return dashboardPreferencesResponseSchema.parse(await response.json());
 }
 
 export async function createOrReplacePlannedTreat(

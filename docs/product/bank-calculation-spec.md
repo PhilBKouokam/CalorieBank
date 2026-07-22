@@ -36,6 +36,7 @@ This specification preserves the current V1 direction from:
 - `docs/product/adr-003-interactive-summary-and-explanation.md`
 - `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`
 - `docs/product/adr-005-personalized-activity-opportunity-notifications.md`
+- `docs/product/adr-006-provider-neutral-ingestion-architecture.md`
 - `docs/architecture/current-state-audit.md`
 - `README.md`
 - `AGENTS.md`
@@ -56,7 +57,7 @@ Supported intake and expenditure data should synchronize automatically, and the 
 
 Users must be able to understand where their balance came from.
 
-Users may inspect finalized history and selected-day calculation inputs by opening the read-only Bank History experience from Available Bank. History and explanation views must not allow users to manually edit calculated bank values.
+Users may inspect provisional and locked completed-day history and selected-day calculation inputs by opening the read-only Bank History experience from Available Bank. History and explanation views must not allow users to manually edit calculated bank values.
 
 ### Conservative Crediting
 
@@ -600,17 +601,31 @@ The product should acknowledge that users intentionally spent calories from thei
 
 Bank changes must be explainable and auditable. The exact database schema may evolve, but each balance-changing event must preserve enough information to explain:
 
-The current implemented finalized-bank read model uses `finalized_daily_bank_records` plus `calorie_ledger_transactions`. A finalized daily record snapshots the calculation inputs and outputs for one completed day. Its matching ledger transaction stores the immutable balance-changing amount.
+The implemented bank model uses `finalized_daily_bank_records`, immutable `bank_calculation_snapshots`, and append-only `calorie_ledger_transactions`. ADR 009 governs this lifecycle; ADR 010 governs how rolling provider data and scheduler-neutral orchestration reach it.
 
-Finalization rules:
+Contribution lifecycle:
 
-- A user can have only one finalized daily bank record per `logDate`.
-- Finalization and ledger creation happen in one database transaction.
-- The ledger transaction amount must equal the finalized record's daily bank change.
-- The ledger idempotency key is unique per user.
-- Running development finalization twice for the same user and date returns the existing finalized result instead of creating another ledger transaction.
-- Adjusted expenditure is rounded deterministically to the nearest integer calorie after applying the expenditure adjustment rate.
-- The current development seed/finalization path is not a production ingestion endpoint.
+- `OPEN`: the current calendar day in the user's local timezone. It is awareness-only and cannot affect Available Bank.
+- `PROVISIONAL`: the completed day has posted immediately and already affects Available Bank. Provider intake and total-expenditure corrections may change its effective contribution during the next two complete local calendar days.
+- `LOCKED`: the correction window has expired. Automatic provider updates cannot change the contribution.
+
+A July 21 contribution posts provisionally at the first eligible processing after July 22 00:00 local time and locks at July 24 00:00 in the timezone captured for the day. Processing may occur during the next ingestion, app session, or API read; the local calendar boundary does not require an exact midnight worker.
+
+Posting and correction rules:
+
+- A user can have only one daily report per `logDate`.
+- Initial posting, snapshot creation, and ledger creation happen in one database transaction and update Available Bank immediately.
+- Version 1 preserves the original inputs, original contribution, provider references, sync-session reference, policy inputs, timezone, posting time, and lock time.
+- A changed provisional intake or total-expenditure aggregate recalculates the expected contribution using the original goal and policy snapshot.
+- `correction_delta = new_contribution - current_effective_contribution`.
+- A nonzero delta creates one immutable snapshot and one `adjustment` ledger transaction. Existing snapshots and ledger transactions are never edited.
+- A zero delta creates no snapshot or ledger transaction.
+- Effective contribution is the original contribution plus all correction transactions and must equal the newest calculation version.
+- Steps and individual workout calories never trigger posting or reconciliation.
+- Database uniqueness constraints and a transaction-level PostgreSQL advisory lock keyed by user/date prevent duplicate posting or concurrent correction writes.
+- Running posting, reconciliation, or locking repeatedly is idempotent.
+- Adjusted expenditure is rounded deterministically to the nearest integer calorie after applying the expenditure adjustment rate once.
+- Existing pre-ADR-009 records are preserved as locked version-1 reports without changing their ledger amounts.
 
 - Effective date.
 - Event type.
@@ -664,22 +679,26 @@ Conceptual lifecycle:
 8. Apply the V1 expenditure credit rate to imported total daily expenditure.
 9. Calculate the goal-adjusted spending allowance.
 10. Determine whether sufficient data exists to calculate the day.
-11. Calculate or recalculate the daily contribution.
-12. Record the ledger change.
-13. Update the running lifetime bank.
-14. Allocate positive changes between Available Bank and optional Emergency Bank under the active reserve policy.
-15. Apply negative changes in order: Available Bank, Emergency Bank, Recovery Forecast.
-16. Derive current Total Banked Calories, Available Bank, Emergency Bank, and recovery amount.
-17. Generate an understandable history explanation.
-18. Determine whether the morning notification can truthfully be generated.
+11. Keep the current local day open and outside the ledger.
+12. For a completed day with sufficient inputs, post an immediate provisional version and immutable ledger transaction.
+13. During the two-day correction window, compare changed provider totals with the current effective contribution and append only a nonzero correction delta.
+14. At `lockAt`, permanently lock automatic reconciliation for that day.
+15. Update the running lifetime bank from the complete append-only ledger.
+16. Allocate positive changes between Available Bank and optional Emergency Bank under the active reserve policy.
+17. Apply negative changes in order: Available Bank, Emergency Bank, Recovery Forecast.
+18. Derive current Total Banked Calories, Available Bank, Emergency Bank, and recovery amount.
+19. Generate an understandable history explanation including status and correction history.
+20. Determine whether the morning notification can truthfully be generated.
 
-Exact synchronization windows and cutoff times are not approved.
+Exact synchronization execution times are not approved. The local-day completion and two-day lock boundaries are approved; processing may occur at the next ingestion or app/API opportunity.
 
 ## Current-Day Awareness And Dashboard Visibility
 
-Current-day expenditure and intake awareness are not part of the official bank until a day is complete and finalized.
+Current-day expenditure and intake awareness are not part of the official bank. A completed day enters the official bank only when its initial provisional contribution posts.
 
-Future `Today so far` data should be modeled as partial awareness with:
+Current-day awareness is exposed through a provider-neutral Today read model. Concrete provider adapters normalize source-specific payloads into internal daily expenditure and intake aggregates before any bank, ledger, Planned Treat, or Today logic sees the data.
+
+The implemented `Today so far` read model is partial awareness with:
 
 - Local date.
 - Timezone.
@@ -693,6 +712,7 @@ Future `Today so far` data should be modeled as partial awareness with:
 - Intake last synced time.
 - Data freshness status.
 - Partial/current-day flag.
+- Cumulative current-day steps and normalized logged workouts as separate context sections.
 
 Rules:
 
@@ -703,7 +723,8 @@ adjusted_current_day_expenditure =
   imported_total_daily_expenditure_so_far * 0.80
 ```
 
-- Raw imported device expenditure remains available as supporting context only, such as `2,000 from Fitbit x 80%`.
+- For the Apple Health adapter, raw total expenditure is the deterministic integer sum of cumulative active energy and basal energy for the current local day. The `0.80` rate is applied once to that total. Workout or Move calories are not added separately.
+- Raw imported device expenditure remains available as supporting context only, such as `2,000 from Apple Health x 80%`.
 - Use source-attributed current-day total calorie intake for the eaten value.
 - Do not double-count active calories. If the source exposes total daily expenditure, use that total once.
 - Do not add current-day expenditure or intake to Available Bank before finalization.
@@ -712,15 +733,23 @@ adjusted_current_day_expenditure =
 - Do not display mock or hard-coded Today so far values as real data.
 - Source and sync freshness should be visible where useful.
 - The Today so far read model must not include projected bank result fields.
+- Provider-specific fields, JSON shapes, and provider-name switches must not enter domain logic.
+- HealthKit is queried only on the iOS device after explicit connection. The client sends raw normalized aggregates; it cannot override the server's adjustment factor or identify another user.
+- The read endpoint is read-only. Device sync commands may upsert the open current-day aggregate; `GET /v1/me/today` must not create ledger rows or mutate Available Bank.
+- Current-day cumulative updates replace the prior value for the same user, local date, provider, and aggregate type. They are never added together. Older provider timestamps must not overwrite newer values.
+- Missing Apple Health dietary energy does not invalidate available expenditure. Apple does not disclose denied read access, so empty results must not be labeled definitively as permission denial.
+- Steps do not estimate calories and never modify expenditure. Logged workout energy is already represented within Apple Health active energy and must never be added again.
+- Steps, workouts, and sync-session outcomes are awareness and observability records only. They never create ledger transactions, modify Available Bank, alter Planned Treat progress, or change finalized history.
 
-Today dashboard preferences must not allow Available Bank to be hidden. Available Bank is mandatory and always first. Optional cards may include Planned Treat, Today so far, Yesterday/latest finalized result, Current Goal, Emergency Bank, and future connection status cards. Simple visibility toggles are the preferred initial customization model; drag-and-drop ordering is deferred.
+Today dashboard preferences must not allow Available Bank to be hidden. Available Bank is mandatory and always first. The fixed default order is Available Bank, Latest Finalized Contribution, Today So Far, Planned Treat, Steps Today, Logged Workouts, and Current Goal. All supporting cards are visible by default and have account-level visibility toggles. Hiding a card does not disable ingestion. Drag-and-drop ordering is deferred.
 
 ## Calculation Status
 
-- Pending: required records or cutoff timing are not yet available.
-- Complete: required data exists and the approved calculation policy has run.
-- Incomplete: required intake, expenditure, goal-adjustment, or policy inputs are missing.
-- Corrected: a previous calculation has been superseded or adjusted by late data, source correction, deletion, or manual correction.
+- Open: current local day; awareness only.
+- Pending or incomplete: a completed day lacks required intake, expenditure, goal-adjustment, or policy inputs and has not posted.
+- Provisional: required data exists, the contribution has posted, and automatic provider correction remains open until `lockAt`.
+- Corrected provisional: one or more immutable adjustment transactions changed the effective contribution during the provisional window.
+- Locked: automatic correction is permanently closed for the day.
 - Estimated: source data or derived values are approximate and must be labeled as such.
 
 Do not send a definitive balance notification for a day that lacks required data without clearly labeling it as pending, partial, or estimated.
@@ -757,20 +786,24 @@ Principles:
 
 - Missing intake: do not treat as zero, do not substitute Planning Database estimates for confirmed intake, and mark the day incomplete or pending.
 - Missing expenditure: do not treat as zero; mark the day incomplete or pending.
-- Delayed synchronization: recalculate through traceable correction or supersession records.
+- Delayed synchronization: during the provisional window, recalculate and append only the difference between the new and current effective contribution.
 - Duplicate source records: prevent double counting with provider, source record ID, timestamps, effective dates, sync batch IDs, and record type.
-- Corrected source records: preserve the original calculation and create a correction/supersession relationship.
-- Deleted source records: record that the source removed or revoked the data and recalculate through an auditable correction.
+- Corrected source records: preserve the original calculation and append a versioned correction transaction while provisional.
+- Deleted source records: preserve provenance and recalculate through an auditable provisional correction when a complete replacement aggregate remains available. Exact missing-after-deletion behavior remains open.
 - Revoked integrations: stop future sync, preserve or delete prior data according to user consent and deletion rules, and display connection state.
 - Partial days: do not confirm bank deposits or withdrawals without required inputs.
 - Timezone changes: do not silently move historical records between days; behavior is an open decision.
 - Manual corrections: label as manual and explain their effect on running balance.
 - Retroactive goal-adjustment changes: open decision; do not silently recalculate history unless approved.
-- Recalculation after late data: must preserve explanation of previous and resulting balance.
+- Recalculation after late data: must preserve original contribution, every correction delta, effective contribution, and resulting balance. Locked days reject automatic recalculation.
 - Notification already delivered before a correction: open decision; requires user-visible correction messaging.
 - Integration reconnects: resume sync with duplicate prevention and gap detection.
 - Device changes: preserve data-source provenance and avoid double counting.
 - Multiple expenditure sources reporting the same activity: open decision; do not sum overlapping sources unless approved.
+
+Operational HealthKit sync is limited to current day, yesterday, and the day before in the device's local timezone. The device uploads each normalized category/date independently, skips accepted unchanged values, and retains failed uploads for ordered retry. Sync-session completion invokes the existing posting, reconciliation, and locking services. The orchestrator must not calculate a parallel contribution or mutate ledger rows directly.
+
+Completed dates without required inputs use explicit durable waiting states: `waiting_for_intake`, `waiting_for_expenditure`, `waiting_for_provider`, `waiting_for_sync`, or `waiting_for_required_inputs`. Missing values are never replaced with zero. Current day remains awareness-only even though it is part of the rolling query window.
 
 Do not reward a user with a completed bank deposit based on data that may simply be absent.
 
@@ -946,11 +979,12 @@ Rules:
 - Any guidance that would make Planning Database entries a bank-calculation input is superseded. Planning estimates are advisory only until confirmed intake syncs from a supported calorie-tracking source or an approved manual correction/fallback path.
 - Any guidance requiring users to configure an absolute daily calorie target is superseded. V1 uses imported total daily expenditure, the `0.80` expenditure adjustment, and the user's signed daily energy adjustment.
 - Any guidance requiring a manual `Use Bank`, `Spend Bank`, treat withdrawal, or confirm-consumption action is superseded. V1 bank usage is automatic through completed-day finalization.
+- Any guidance treating the first completed-day calculation as immediately and permanently locked is superseded by ADR 009. Completed days post immediately as provisional, reconcile for two local calendar days through compensating transactions, and then lock.
 
 ## Open Product Decisions
 
-- Which supported intake-data source is feasible for the first 10 users?
-- Which supported total-expenditure source is feasible for the first 10 users?
+- Is Apple Health dietary energy sufficiently available for the first 10 users, or is another supported intake path required?
+- The operational HealthKit query window for finalization is resolved as three local days. The separate completeness policy and up-to-seven-day onboarding initialization query remain open.
 - What minimum and maximum daily deficits and surpluses should be allowed?
 - Should weekly weight-change preferences be included in V1 onboarding, and what exact options and copy should be used?
 - What minimum-intake or allowance safeguards are required before broader beta?
@@ -983,13 +1017,9 @@ Rules:
 - What happens to the balance when Emergency Bank is disabled?
 - How should unusually large Emergency Bank balances be presented?
 - What safeguards prevent unsafe reserve-building behavior?
-- What minimum sync freshness is required before showing Today so far values?
-- Which sync statuses should Today so far display, and when should it show setup versus unavailable for expenditure, intake, or both?
-- Should Today so far show when only expenditure or only intake is connected?
-- Should Today card visibility preferences sync across devices or remain local?
-- Which optional Today cards are visible by default before customization exists?
+- Should the current 30-minute stale threshold change after physical-device observation?
+- Should account-level Today visibility preferences later support per-device overrides?
 - When, if ever, should drag-and-drop Today card reordering be introduced?
-- What is the rounding policy for adjusted expenditure, spending allowance, daily change, and running balance?
 - What qualifies a historical day as complete beyond requiring intake and total expenditure?
 - What happens when fewer than seven complete historical days exist?
 - What data is required before a day becomes confirmed?
@@ -1018,6 +1048,7 @@ Rules:
 ## Implementation Requirements
 
 - Bank calculation logic belongs in `packages/domain`.
+- Provider-neutral ingestion interfaces and normalization logic belong in `packages/domain`; concrete provider adapters must depend on those abstractions.
 - API schemas for calculation inputs, statuses, and ledger events belong in `packages/schemas`.
 - The V1 policy must be represented as named, versioned configuration.
 - Goal mode, daily energy adjustment, adjustment source, desired weekly weight-change preference when applicable, expenditure-credit rate, and calculation-policy version must be snapshotted for each effective date.

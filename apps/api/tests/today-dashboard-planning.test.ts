@@ -2,10 +2,22 @@ import {
   activityOpportunityCandidateSchema,
   todaySoFarAwarenessSchema,
   todayDashboardVisibilityPreferencesSchema,
+  TODAY_CARD_ORDER,
 } from '@caloriebank/schemas';
 import { describe, expect, it } from 'vitest';
 
 describe('Today dashboard planning schemas', () => {
+  it('keeps Available Bank first in the approved fixed card order', () => {
+    expect(TODAY_CARD_ORDER).toEqual([
+      'availableBank',
+      'latestFinalizedContribution',
+      'todaySoFar',
+      'plannedTreat',
+      'steps',
+      'workouts',
+      'currentGoal',
+    ]);
+  });
   it('does not allow Available Bank to be hidden', () => {
     expect(todayDashboardVisibilityPreferencesSchema.parse({}).availableBank).toBe(true);
 

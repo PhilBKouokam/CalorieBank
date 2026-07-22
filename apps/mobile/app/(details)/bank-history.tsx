@@ -25,6 +25,17 @@ function formatCalories(value: number) {
   return `${sign}${value.toLocaleString()} kcal`;
 }
 
+function formatDate(value: string) {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T12:00:00`)
+    : new Date(value);
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
+}
+
+function contributionStatus(status: 'provisional' | 'locked', locksAt: string) {
+  return status === 'locked' ? 'Locked' : `Provisional · Locks ${formatDate(locksAt)}`;
+}
+
 function goalAdjustmentText(day: BankHistoryDayDetailResponse) {
   if (day.goalMode === 'maintain') return 'Maintenance · no adjustment';
 
@@ -107,13 +118,13 @@ export default function BankHistoryScreen() {
 
   const hasFinalizedDays = history && history.finalizedDays.length > 0;
   const bankValue = hasFinalizedDays ? formatCalories(history.availableBankCalories) : 'Not calculated';
-  const throughText = hasFinalizedDays ? `Through ${history.endDate}` : 'No finalized days yet';
+  const throughText = hasFinalizedDays ? `Through ${formatDate(history.endDate ?? '')}` : 'No finalized days yet';
 
   return (
     <PlaceholderScreen
       eyebrow="Bank History"
       title="Available Bank"
-      description="Your official bank includes finalized days only, through the previous completed day."
+      description="Your bank includes posted completed days through the previous day."
     >
       <View style={styles.hero}>
         <Text style={styles.heroLabel}>Available Bank</Text>
@@ -139,13 +150,13 @@ export default function BankHistoryScreen() {
       </View>
 
       <View style={styles.timelinePanel}>
-        <Text style={styles.sectionTitle}>Finalized days</Text>
+        <Text style={styles.sectionTitle}>Completed days</Text>
         {status === 'loading' ? <ActivityIndicator color={colors.primary} /> : null}
         {status === 'error' ? <Text style={styles.errorText}>Bank history is unavailable.</Text> : null}
         {status === 'empty' ? (
           <>
-            <Text style={styles.bodyText}>No finalized bank days yet.</Text>
-            <Text style={styles.mutedText}>Completed days will appear here after finalization.</Text>
+            <Text style={styles.bodyText}>No completed bank days yet.</Text>
+            <Text style={styles.mutedText}>Completed days appear after their first provisional posting.</Text>
           </>
         ) : null}
         {status === 'ready'
@@ -161,10 +172,20 @@ export default function BankHistoryScreen() {
                   onPress={() => void handleSelectDay(day.logDate)}
                   style={[styles.dayRow, selected && styles.selectedDayRow]}
                 >
-                  <Text style={styles.dayDate}>{day.logDate}</Text>
-                  <Text style={[styles.dayChange, day.dailyBankChange < 0 && styles.negativeChange]}>
-                    {formatCalories(day.dailyBankChange)}
-                  </Text>
+                  <View style={styles.dayIdentity}>
+                    <Text style={styles.dayDate}>{formatDate(day.logDate)}</Text>
+                    <Text style={styles.dayStatus}>{contributionStatus(day.status, day.locksAt)}</Text>
+                  </View>
+                  <View style={styles.dayAmount}>
+                    <Text style={[styles.dayChange, day.dailyBankChange < 0 && styles.negativeChange]}>
+                      {formatCalories(day.dailyBankChange)}
+                    </Text>
+                    {day.correctionCount > 0 ? (
+                      <Text style={styles.dayStatus}>
+                        Adjusted from {formatCalories(day.originalDailyBankChange)}
+                      </Text>
+                    ) : null}
+                  </View>
                 </Pressable>
               );
             })
@@ -178,9 +199,12 @@ export default function BankHistoryScreen() {
         {detailStatus === 'error' ? <Text style={styles.errorText}>That day detail is unavailable.</Text> : null}
         {detailStatus === 'ready' && selectedDay ? (
           <>
-            <Text style={styles.dayTitle}>{selectedDay.logDate}</Text>
+            <Text style={styles.dayTitle}>{formatDate(selectedDay.logDate)}</Text>
             <Text style={[styles.changeText, selectedDay.dailyBankChange < 0 && styles.negativeChange]}>
               Banked {formatCalories(selectedDay.dailyBankChange)}
+            </Text>
+            <Text style={styles.statusText}>
+              {contributionStatus(selectedDay.status, selectedDay.locksAt)}
             </Text>
 
             <View style={styles.breakdownRows}>
@@ -208,6 +232,26 @@ export default function BankHistoryScreen() {
               {'\n'}- {selectedDay.importedCalorieIntake.toLocaleString()} eaten{'\n'}={' '}
               {formatCalories(selectedDay.dailyBankChange)} banked
             </Text>
+
+            <View style={styles.correctionPanel}>
+              <Text style={styles.sectionTitle}>Contribution history</Text>
+              <Text style={styles.rowText}>
+                Original contribution {formatCalories(selectedDay.originalDailyBankChange)}
+              </Text>
+              {selectedDay.versions.slice(1).map((version) => (
+                <Text key={version.version} style={styles.rowText}>
+                  Correction {version.version - 1} {formatCalories(version.correctionDelta)}
+                </Text>
+              ))}
+              <Text style={styles.finalRowText}>
+                Effective contribution {formatCalories(selectedDay.effectiveDailyBankChange)}
+              </Text>
+              <Text style={styles.mutedText}>
+                {selectedDay.status === 'locked'
+                  ? 'This contribution is permanently locked.'
+                  : `Automatic corrections remain open until ${formatDate(selectedDay.locksAt)}.`}
+              </Text>
+            </View>
           </>
         ) : null}
       </View>
@@ -289,6 +333,18 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '700',
   },
+  dayIdentity: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  dayAmount: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
+  dayStatus: {
+    color: colors.textMuted,
+    fontSize: typography.caption,
+  },
   dayChange: {
     color: colors.primaryDark,
     fontSize: typography.body,
@@ -320,6 +376,17 @@ const styles = StyleSheet.create({
   },
   breakdownRows: {
     gap: spacing.xs,
+  },
+  statusText: {
+    color: colors.text,
+    fontSize: typography.caption,
+    fontWeight: '700',
+  },
+  correctionPanel: {
+    gap: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.md,
   },
   rowText: {
     color: colors.text,

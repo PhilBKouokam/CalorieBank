@@ -17,7 +17,7 @@ The product also needs a clear distinction between read-only calculated data and
 Today summary cards are approved V1 navigation gateways when they lead to history, explanation, or configuration.
 
 - Tapping Available Bank opens Bank History.
-- Bank History is read-only and shows the all-time Available Bank, finalized-day range filters, minimal history, and selected-day calculation detail.
+- Bank History is read-only and shows the all-time Available Bank, completed-day range filters, effective contribution, provisional/locked status, correction count, and selected-day calculation/version detail under ADR 009.
 - The default view stays visually simple. Calculation detail is revealed only after selecting a specific finalized day.
 - Tapping Goal Mode opens Goal Settings.
 - Tapping Daily Deficit, Daily Surplus, or Maintenance opens Goal Settings focused on goal-adjustment configuration.

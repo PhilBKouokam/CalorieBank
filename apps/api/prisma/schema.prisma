@@ -29,16 +29,96 @@ enum LedgerSourceType {
   manual_adjustment
 }
 
+enum BankContributionStatus {
+  OPEN
+  PROVISIONAL
+  LOCKED
+}
+
+enum BankCalculationSnapshotReason {
+  INITIAL_POSTING
+  PROVIDER_CORRECTION
+}
+
+enum AggregateSyncStatus {
+  unavailable
+  not_connected
+  syncing
+  partial
+  stale
+  ready
+  error
+}
+
+enum WorkoutActivityType {
+  walking
+  running
+  cycling
+  dance
+  strength
+  hiit
+  swimming
+  yoga
+  elliptical
+  rowing
+  stair
+  other
+}
+
+enum IngestionSyncSessionStatus {
+  started
+  partially_completed
+  completed
+  failed
+}
+
+enum IngestionSyncTrigger {
+  connection
+  provider_reconnect
+  app_launch
+  screen_focus
+  app_foreground
+  manual_refresh
+  scheduled
+  integration_test
+}
+
+enum BankDayProcessingStatus {
+  waiting_for_intake
+  waiting_for_expenditure
+  waiting_for_provider
+  waiting_for_sync
+  waiting_for_required_inputs
+  provisional
+  locked
+}
+
+enum IngestionCategoryStatus {
+  not_attempted
+  ready
+  unavailable
+  error
+  skipped
+}
+
 model User {
-  id                        String                     @id @default(uuid()) @db.Uuid
-  email                     String                     @unique
-  profile                   UserProfile?
-  goalConfiguration         GoalConfiguration?
-  plannedTreat              PlannedTreat?
-  finalizedDailyBankRecords FinalizedDailyBankRecord[]
-  calorieLedgerTransactions CalorieLedgerTransaction[]
-  createdAt                 DateTime                   @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt                 DateTime                   @updatedAt @map("updated_at") @db.Timestamptz
+  id                         String                      @id @default(uuid()) @db.Uuid
+  email                      String                      @unique
+  profile                    UserProfile?
+  goalConfiguration          GoalConfiguration?
+  plannedTreat               PlannedTreat?
+  finalizedDailyBankRecords  FinalizedDailyBankRecord[]
+  calorieLedgerTransactions  CalorieLedgerTransaction[]
+  dailyExpenditureAggregates DailyExpenditureAggregate[]
+  dailyIntakeAggregates      DailyIntakeAggregate[]
+  dailyStepAggregates        DailyStepAggregate[]
+  currentDayWorkouts         CurrentDayWorkout[]
+  dashboardPreferences       DashboardPreferences?
+  ingestionSyncSessions      IngestionSyncSession[]
+  bankCalculationSnapshots   BankCalculationSnapshot[]
+  bankDayProcessingStates    BankDayProcessingState[]
+  createdAt                  DateTime                    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                  DateTime                    @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("users")
 }
@@ -81,6 +161,191 @@ model PlannedTreat {
   @@map("planned_treats")
 }
 
+model DailyExpenditureAggregate {
+  id                       String                @id @default(uuid()) @db.Uuid
+  userId                   String                @map("user_id") @db.Uuid
+  localDate                DateTime              @map("local_date") @db.Date
+  timezone                 String
+  provider                 String
+  providerRecordId         String                @map("provider_record_id")
+  activeEnergyCalories     Int?                  @map("active_energy_calories")
+  basalEnergyCalories      Int?                  @map("basal_energy_calories")
+  rawTotalDailyExpenditure Int                   @map("raw_total_daily_expenditure")
+  adjustedDailyExpenditure Int                   @map("adjusted_daily_expenditure")
+  adjustmentFactor         Decimal               @map("adjustment_factor") @db.Decimal(4, 2)
+  importedAt               DateTime              @map("imported_at") @db.Timestamptz
+  providerUpdatedAt        DateTime?             @map("provider_updated_at") @db.Timestamptz
+  syncStatus               AggregateSyncStatus   @map("sync_status")
+  isCurrentDay             Boolean               @map("is_current_day")
+  syncSessionId            String?               @map("sync_session_id") @db.Uuid
+  createdAt                DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  user                     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncSession              IngestionSyncSession? @relation(fields: [syncSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, provider, providerRecordId])
+  @@unique([userId, localDate, provider])
+  @@index([userId, localDate])
+  @@map("daily_expenditure_aggregates")
+}
+
+model DailyIntakeAggregate {
+  id                    String                @id @default(uuid()) @db.Uuid
+  userId                String                @map("user_id") @db.Uuid
+  localDate             DateTime              @map("local_date") @db.Date
+  timezone              String
+  provider              String
+  providerRecordId      String                @map("provider_record_id")
+  totalCaloriesConsumed Int                   @map("total_calories_consumed")
+  importedAt            DateTime              @map("imported_at") @db.Timestamptz
+  providerUpdatedAt     DateTime?             @map("provider_updated_at") @db.Timestamptz
+  syncStatus            AggregateSyncStatus   @map("sync_status")
+  isCurrentDay          Boolean               @map("is_current_day")
+  syncSessionId         String?               @map("sync_session_id") @db.Uuid
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncSession           IngestionSyncSession? @relation(fields: [syncSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, provider, providerRecordId])
+  @@unique([userId, localDate, provider])
+  @@index([userId, localDate])
+  @@map("daily_intake_aggregates")
+}
+
+model DailyStepAggregate {
+  id                String                @id @default(uuid()) @db.Uuid
+  userId            String                @map("user_id") @db.Uuid
+  localDate         DateTime              @map("local_date") @db.Date
+  timezone          String
+  provider          String
+  providerRecordId  String                @map("provider_record_id")
+  totalSteps        Int                   @map("total_steps")
+  importedAt        DateTime              @map("imported_at") @db.Timestamptz
+  providerUpdatedAt DateTime?             @map("provider_updated_at") @db.Timestamptz
+  syncStatus        AggregateSyncStatus   @map("sync_status")
+  isCurrentDay      Boolean               @map("is_current_day")
+  syncSessionId     String?               @map("sync_session_id") @db.Uuid
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncSession       IngestionSyncSession? @relation(fields: [syncSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, provider, providerRecordId])
+  @@unique([userId, localDate, provider])
+  @@index([userId, localDate])
+  @@map("daily_step_aggregates")
+}
+
+model CurrentDayWorkout {
+  id                String                @id @default(uuid()) @db.Uuid
+  userId            String                @map("user_id") @db.Uuid
+  localDate         DateTime              @map("local_date") @db.Date
+  timezone          String
+  provider          String
+  providerWorkoutId String                @map("provider_workout_id")
+  activityType      WorkoutActivityType   @map("activity_type")
+  displayName       String                @map("display_name")
+  startedAt         DateTime              @map("started_at") @db.Timestamptz
+  endedAt           DateTime              @map("ended_at") @db.Timestamptz
+  durationMinutes   Int                   @map("duration_minutes")
+  totalEnergyBurned Int?                  @map("total_energy_burned")
+  totalDistance     Decimal?              @map("total_distance") @db.Decimal(12, 2)
+  distanceUnit      String?               @map("distance_unit")
+  importedAt        DateTime              @map("imported_at") @db.Timestamptz
+  providerUpdatedAt DateTime?             @map("provider_updated_at") @db.Timestamptz
+  syncStatus        AggregateSyncStatus   @map("sync_status")
+  isCurrentDay      Boolean               @map("is_current_day")
+  syncSessionId     String?               @map("sync_session_id") @db.Uuid
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncSession       IngestionSyncSession? @relation(fields: [syncSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, provider, providerWorkoutId])
+  @@index([userId, localDate, provider])
+  @@map("current_day_workouts")
+}
+
+model DashboardPreferences {
+  userId                          String   @id @map("user_id") @db.Uuid
+  showLatestFinalizedContribution Boolean  @default(true) @map("show_latest_finalized_contribution")
+  showTodaySoFar                  Boolean  @default(true) @map("show_today_so_far")
+  showPlannedTreat                Boolean  @default(true) @map("show_planned_treat")
+  showSteps                       Boolean  @default(true) @map("show_steps")
+  showWorkouts                    Boolean  @default(true) @map("show_workouts")
+  showCurrentGoal                 Boolean  @default(true) @map("show_current_goal")
+  createdAt                       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  user                            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("dashboard_preferences")
+}
+
+model IngestionSyncSession {
+  id                       String                      @id @default(uuid()) @db.Uuid
+  userId                   String                      @map("user_id") @db.Uuid
+  provider                 String
+  localDate                DateTime                    @map("local_date") @db.Date
+  timezone                 String
+  trigger                  IngestionSyncTrigger
+  status                   IngestionSyncSessionStatus  @default(started)
+  startedAt                DateTime                    @map("started_at") @db.Timestamptz
+  completedAt              DateTime?                   @map("completed_at") @db.Timestamptz
+  appVersion               String?                     @map("app_version")
+  providerAdapterVersion   String?                     @map("provider_adapter_version")
+  expenditureStatus        IngestionCategoryStatus     @default(not_attempted) @map("expenditure_status")
+  intakeStatus             IngestionCategoryStatus     @default(not_attempted) @map("intake_status")
+  stepsStatus              IngestionCategoryStatus     @default(not_attempted) @map("steps_status")
+  workoutsStatus           IngestionCategoryStatus     @default(not_attempted) @map("workouts_status")
+  recordsImported          Int                         @default(0) @map("records_imported")
+  recordsUpdated           Int                         @default(0) @map("records_updated")
+  recordsSkipped           Int                         @default(0) @map("records_skipped")
+  warningCount             Int                         @default(0) @map("warning_count")
+  errorCode                String?                     @map("error_code")
+  datesQueried             String[]                    @default([]) @map("dates_queried")
+  datesUploaded            String[]                    @default([]) @map("dates_uploaded")
+  datesSkipped             String[]                    @default([]) @map("dates_skipped")
+  datesReconciled          String[]                    @default([]) @map("dates_reconciled")
+  datesLocked              String[]                    @default([]) @map("dates_locked")
+  waitingDates             Json                        @default("[]") @map("waiting_dates")
+  errors                   String[]                    @default([])
+  durationMs               Int?                        @map("duration_ms")
+  createdAt                DateTime                    @default(now()) @map("created_at") @db.Timestamptz
+  user                     User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenditureAggregates    DailyExpenditureAggregate[]
+  intakeAggregates         DailyIntakeAggregate[]
+  stepAggregates           DailyStepAggregate[]
+  workouts                 CurrentDayWorkout[]
+  bankCalculationSnapshots BankCalculationSnapshot[]   @relation("SnapshotTriggerSyncSession")
+  lockedBankRecords        FinalizedDailyBankRecord[]  @relation("LockedBySyncSession")
+  bankDayProcessingStates  BankDayProcessingState[]
+
+  @@index([userId, localDate, provider])
+  @@map("ingestion_sync_sessions")
+}
+
+model BankDayProcessingState {
+  id                String                  @id @default(uuid()) @db.Uuid
+  userId            String                  @map("user_id") @db.Uuid
+  logDate           DateTime                @map("log_date") @db.Date
+  timezone          String
+  status            BankDayProcessingStatus
+  attemptCount      Int                     @default(0) @map("attempt_count")
+  lastAttemptAt     DateTime                @map("last_attempt_at") @db.Timestamptz
+  nextRetryAt       DateTime?               @map("next_retry_at") @db.Timestamptz
+  lastSyncSessionId String?                 @map("last_sync_session_id") @db.Uuid
+  lastErrorCode     String?                 @map("last_error_code")
+  createdAt         DateTime                @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime                @updatedAt @map("updated_at") @db.Timestamptz
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSyncSession   IngestionSyncSession?   @relation(fields: [lastSyncSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, logDate])
+  @@index([status, nextRetryAt])
+  @@map("bank_day_processing_states")
+}
+
 model FinalizedDailyBankRecord {
   id                            String                     @id @default(uuid()) @db.Uuid
   userId                        String                     @map("user_id") @db.Uuid
@@ -94,14 +359,58 @@ model FinalizedDailyBankRecord {
   importedCalorieIntake         Int                        @map("imported_calorie_intake")
   dailyAllowance                Int                        @map("daily_allowance")
   dailyBankChange               Int                        @map("daily_bank_change")
+  originalDailyBankChange       Int                        @map("original_daily_bank_change")
+  effectiveDailyBankChange      Int                        @map("effective_daily_bank_change")
+  status                        BankContributionStatus     @default(LOCKED)
+  correctionCount               Int                        @default(0) @map("correction_count")
+  currentVersion                Int                        @default(1) @map("current_version")
+  lockAt                        DateTime                   @map("lock_at") @db.Timestamptz
+  lockedAt                      DateTime?                  @map("locked_at") @db.Timestamptz
+  lockedBySyncSessionId         String?                    @map("locked_by_sync_session_id") @db.Uuid
   finalizedAt                   DateTime                   @map("finalized_at") @db.Timestamptz
   createdAt                     DateTime                   @default(now()) @map("created_at") @db.Timestamptz
   user                          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   calorieLedgerTransactions     CalorieLedgerTransaction[]
+  calculationSnapshots          BankCalculationSnapshot[]
+  lockedBySyncSession           IngestionSyncSession?      @relation("LockedBySyncSession", fields: [lockedBySyncSessionId], references: [id], onDelete: SetNull, map: "finalized_daily_bank_records_locked_sync_session_fkey")
 
   @@unique([userId, logDate])
   @@index([userId, logDate])
+  @@index([lockedBySyncSessionId], map: "finalized_daily_bank_records_locked_sync_session_idx")
   @@map("finalized_daily_bank_records")
+}
+
+model BankCalculationSnapshot {
+  id                            String                        @id @default(uuid()) @db.Uuid
+  finalizedDailyBankRecordId    String                        @map("finalized_daily_bank_record_id") @db.Uuid
+  userId                        String                        @map("user_id") @db.Uuid
+  version                       Int
+  reason                        BankCalculationSnapshotReason
+  importedTotalDailyExpenditure Int                           @map("imported_total_daily_expenditure")
+  expenditureAdjustmentRate     Decimal                       @map("expenditure_adjustment_rate") @db.Decimal(4, 2)
+  adjustedExpenditure           Int                           @map("adjusted_expenditure")
+  goalMode                      GoalMode                      @map("goal_mode")
+  goalAdjustmentCalories        Int                           @map("goal_adjustment_calories")
+  importedCalorieIntake         Int                           @map("imported_calorie_intake")
+  dailyAllowance                Int                           @map("daily_allowance")
+  dailyBankChange               Int                           @map("daily_bank_change")
+  correctionDelta               Int                           @map("correction_delta")
+  expenditureProvider           String                        @map("expenditure_provider")
+  expenditureProviderRecordId   String                        @map("expenditure_provider_record_id")
+  intakeProvider                String                        @map("intake_provider")
+  intakeProviderRecordId        String                        @map("intake_provider_record_id")
+  triggerSyncSessionId          String?                       @map("trigger_sync_session_id") @db.Uuid
+  inputFingerprint              String                        @map("input_fingerprint")
+  createdAt                     DateTime                      @default(now()) @map("created_at") @db.Timestamptz
+  finalizedDailyBankRecord      FinalizedDailyBankRecord      @relation(fields: [finalizedDailyBankRecordId], references: [id], onDelete: Cascade, map: "bank_calculation_snapshots_record_fkey")
+  user                          User                          @relation(fields: [userId], references: [id], onDelete: Cascade, map: "bank_calculation_snapshots_user_fkey")
+  triggerSyncSession            IngestionSyncSession?         @relation("SnapshotTriggerSyncSession", fields: [triggerSyncSessionId], references: [id], onDelete: SetNull, map: "bank_calculation_snapshots_sync_session_fkey")
+  ledgerTransaction             CalorieLedgerTransaction?
+
+  @@unique([finalizedDailyBankRecordId, version], map: "bank_calculation_snapshots_record_version_key")
+  @@unique([finalizedDailyBankRecordId, inputFingerprint], map: "bank_calculation_snapshots_record_fingerprint_key")
+  @@index([userId, finalizedDailyBankRecordId], map: "bank_calculation_snapshots_user_record_idx")
+  @@map("bank_calculation_snapshots")
 }
 
 model CalorieLedgerTransaction {
@@ -115,8 +424,10 @@ model CalorieLedgerTransaction {
   idempotencyKey           String                   @map("idempotency_key")
   description              String
   createdAt                DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  calculationSnapshotId    String?                  @unique @map("calculation_snapshot_id") @db.Uuid
   user                     User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   finalizedDailyBankRecord FinalizedDailyBankRecord @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  calculationSnapshot      BankCalculationSnapshot? @relation(fields: [calculationSnapshotId], references: [id], onDelete: SetNull, map: "calorie_ledger_transactions_snapshot_fkey")
 
   @@unique([userId, idempotencyKey])
   @@index([userId, logDate])

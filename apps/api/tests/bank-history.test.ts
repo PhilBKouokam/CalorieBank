@@ -10,18 +10,30 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import type {
   BankHistoryRepository,
-  FinalizeDailyBankRecordInput,
+  PostProvisionalDailyBankRecordInput,
 } from '../src/modules/bank-history/bank-history.repository';
 import type { DevelopmentUser } from '../src/modules/goal-configuration/goal-configuration.repository';
 
 class MemoryBankHistoryRepository implements BankHistoryRepository {
   constructor(private readonly details: BankHistoryDayDetailResponse[] = []) {}
 
-  async finalizeDailyRecord(
+  async postProvisionalDailyRecord(
     _user: DevelopmentUser,
-    _input: FinalizeDailyBankRecordInput,
+    _input: PostProvisionalDailyBankRecordInput,
   ): Promise<BankHistoryDayDetailResponse> {
     throw new Error('Not implemented in route tests.');
+  }
+
+  async reconcileStoredDay() {
+    return { outcome: 'not_ready' as const, detail: null };
+  }
+
+  async lockExpired() {
+    return 0;
+  }
+
+  async lockExpiredDates() {
+    return [];
   }
 
   async getSummary(): Promise<BankSummaryResponse> {
@@ -30,6 +42,10 @@ class MemoryBankHistoryRepository implements BankHistoryRepository {
       availableBankCalories: this.details.reduce((sum, day) => sum + day.dailyBankChange, 0),
       latestFinalizedDate: ordered[0]?.logDate ?? null,
       latestDailyBankChange: ordered[0]?.dailyBankChange ?? null,
+      latestOriginalDailyBankChange: ordered[0]?.originalDailyBankChange ?? null,
+      latestContributionStatus: ordered[0]?.status ?? null,
+      latestLocksAt: ordered[0]?.locksAt ?? null,
+      latestCorrectionCount: ordered[0]?.correctionCount ?? 0,
       finalizedDayCount: this.details.length,
     };
   }
@@ -47,6 +63,10 @@ class MemoryBankHistoryRepository implements BankHistoryRepository {
       finalizedDays: ordered.map((day) => ({
         logDate: day.logDate,
         dailyBankChange: day.dailyBankChange,
+        originalDailyBankChange: day.originalDailyBankChange,
+        status: day.status,
+        locksAt: day.locksAt,
+        correctionCount: day.correctionCount,
         goalMode: day.goalMode,
         finalizedAt: day.finalizedAt,
       })),
@@ -69,7 +89,26 @@ const detail: BankHistoryDayDetailResponse = {
   importedCalorieIntake: 2500,
   dailyAllowance: 2700,
   dailyBankChange: 200,
+  originalDailyBankChange: 200,
+  effectiveDailyBankChange: 200,
+  status: 'provisional',
+  locksAt: '2026-07-23T05:00:00.000Z',
+  lockedAt: null,
+  correctionCount: 0,
   finalizedAt: '2026-07-20T05:30:00.000Z',
+  versions: [
+    {
+      version: 1,
+      reason: 'initial_posting',
+      dailyBankChange: 200,
+      correctionDelta: 200,
+      importedTotalDailyExpenditure: 3000,
+      importedCalorieIntake: 2500,
+      expenditureProvider: 'apple_health',
+      intakeProvider: 'apple_health',
+      createdAt: '2026-07-20T05:30:00.000Z',
+    },
+  ],
 };
 
 describe('bank history API', () => {
@@ -84,6 +123,10 @@ describe('bank history API', () => {
       availableBankCalories: 0,
       latestFinalizedDate: null,
       latestDailyBankChange: null,
+      latestOriginalDailyBankChange: null,
+      latestContributionStatus: null,
+      latestLocksAt: null,
+      latestCorrectionCount: 0,
       finalizedDayCount: 0,
     });
   });
@@ -99,6 +142,9 @@ describe('bank history API', () => {
       availableBankCalories: 200,
       latestFinalizedDate: '2026-07-19',
       latestDailyBankChange: 200,
+      latestOriginalDailyBankChange: 200,
+      latestContributionStatus: 'provisional',
+      latestCorrectionCount: 0,
       finalizedDayCount: 1,
     });
   });
@@ -135,6 +181,7 @@ describe('bank history API', () => {
       .expect(200);
 
     expect(response.body).toEqual(detail);
+    expect(response.body.versions).toHaveLength(1);
   });
 
   it('returns 404 for unknown date', async () => {

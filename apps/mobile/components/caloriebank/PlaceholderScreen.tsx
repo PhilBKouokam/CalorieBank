@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, type Href } from 'expo-router';
 import { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,7 +15,9 @@ type RouteLink = {
     | '/settings'
     | '/bank-history'
     | '/goal-settings'
-    | '/planned-treat';
+    | '/planned-treat'
+    | '/integrations'
+    | '/customize-today';
   label: string;
   variant?: 'primary' | 'secondary';
 };
@@ -74,7 +76,7 @@ export function PlaceholderScreen({
         {links.length > 0 ? (
           <View style={styles.actions}>
             {links.map((link) => (
-              <Link key={link.href} href={link.href} asChild>
+              <Link key={link.href} href={link.href as Href} asChild>
                 <Pressable style={[styles.button, link.variant === 'secondary' && styles.secondaryButton]}>
                   <Text style={[styles.buttonText, link.variant === 'secondary' && styles.secondaryButtonText]}>
                     {link.label}

@@ -6,6 +6,8 @@ import {
   calculateRemainingTreatGapFromAvailableBank,
   estimateActivityCalorieRange,
   evaluateActivityOpportunityEligibility,
+  getBankContributionStatus,
+  getProvisionalLockAt,
   roundCalories,
 } from '@caloriebank/domain';
 import { describe, expect, it } from 'vitest';
@@ -122,6 +124,44 @@ describe('finalized daily bank calculation', () => {
         importedCalorieIntake: 2000,
       }),
     ).toThrow(BankCalculationError);
+  });
+});
+
+describe('provisional contribution lifecycle', () => {
+  it('keeps the current local day open, then provisional for two full calendar days', () => {
+    expect(
+      getBankContributionStatus(
+        '2026-07-21',
+        'America/Chicago',
+        new Date('2026-07-22T04:59:59.999Z'),
+      ),
+    ).toBe('open');
+    expect(
+      getBankContributionStatus(
+        '2026-07-21',
+        'America/Chicago',
+        new Date('2026-07-22T05:00:00.000Z'),
+      ),
+    ).toBe('provisional');
+    expect(getProvisionalLockAt('2026-07-21', 'America/Chicago').toISOString()).toBe(
+      '2026-07-24T05:00:00.000Z',
+    );
+    expect(
+      getBankContributionStatus(
+        '2026-07-21',
+        'America/Chicago',
+        new Date('2026-07-24T05:00:00.000Z'),
+      ),
+    ).toBe('locked');
+  });
+
+  it('uses local midnight across daylight-saving transitions', () => {
+    expect(getProvisionalLockAt('2026-03-07', 'America/Chicago').toISOString()).toBe(
+      '2026-03-10T05:00:00.000Z',
+    );
+    expect(getProvisionalLockAt('2026-10-31', 'America/Chicago').toISOString()).toBe(
+      '2026-11-03T06:00:00.000Z',
+    );
   });
 });
 

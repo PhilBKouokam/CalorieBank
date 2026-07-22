@@ -20,7 +20,7 @@ Bank usage is automatic. At completed-day finalization, CalorieBank calculates:
 daily_bank_change = daily_allowance - imported_calorie_intake
 ```
 
-Positive finalized daily changes create positive immutable ledger transactions. Negative finalized daily changes create negative immutable ledger transactions and automatically reduce Available Bank. The finalized daily transaction is the withdrawal when a completed day is negative.
+Positive completed-day changes create positive immutable provisional ledger transactions. Negative changes create negative immutable provisional transactions and immediately reduce Available Bank. Provider corrections during ADR 009's two-day window append compensating delta transactions; no existing transaction is edited.
 
 CalorieBank must not include a manual bank-spending, treat-withdrawal, or `Use Bank` workflow in V1.
 
