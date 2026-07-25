@@ -4,7 +4,7 @@ Date: 2026-07-16
 
 ## Source Of Truth
 
-This PRD is the authoritative V1 product document. It supersedes prior food-logging-first assumptions in older audits, prototype docs, and implementation notes. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. Supporting architecture guidance lives in `docs/architecture/current-state-audit.md`; the connection-first direction change is recorded in `docs/product/adr-001-connection-first-v1.md`, the expenditure-relative goal model is recorded in `docs/product/adr-002-expenditure-relative-goal-adjustment.md`, the interactive summary/history model is recorded in `docs/product/adr-003-interactive-summary-and-explanation.md`, automatic bank usage plus dashboard awareness are recorded in `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`, future personalized activity opportunities are recorded in `docs/product/adr-005-personalized-activity-opportunity-notifications.md`, provider-neutral ingestion is recorded in `docs/product/adr-006-provider-neutral-ingestion-architecture.md`, Apple Health device ingestion is recorded in `docs/product/adr-007-apple-healthkit-device-ingestion.md`, and activity context plus Today customization are recorded in `docs/product/adr-008-activity-context-and-customizable-today.md`.
+This PRD is the authoritative V1 product document. It supersedes prior food-logging-first assumptions in older audits, prototype docs, and implementation notes. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. Supporting architecture guidance lives in `docs/architecture/current-state-audit.md`; focused accepted decisions are recorded in ADRs 001-011. Progressive Feature Discovery, including the distinction between V1 availability and first-use visibility, is governed by `docs/product/adr-011-progressive-feature-discovery.md`.
 
 ## V1 Mission
 
@@ -34,6 +34,7 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 - Interpretation layer: CalorieBank should create value primarily through synchronization, calculation, history, and planning, not screen time.
 - Automatic bank usage: completed-day finalization records deposits or withdrawals automatically from imported totals. V1 must not include a manual `Use Bank`, `Spend Bank`, or Planned Treat withdrawal action.
 - Bank-first hierarchy: the default interface should show the all-time Available Bank first, keep the screen visually simple, and reveal history or calculation detail only when requested. Fitbit is a reference for information hierarchy and progressive disclosure only; CalorieBank must not copy its branding or exact visual design.
+- Progressive Feature Discovery: introduce capabilities when they are likely to provide immediate value instead of presenting the entire product during onboarding or first use. **Complexity should be earned, not imposed.** This principle reduces cognitive load; it must not create artificial lockouts, hide safety or transparency, or optimize engagement for its own sake.
 - Planning, not tracking: CalorieBank helps users plan future meals and events using estimated nutrition information and their available calorie bank. Connected calorie-tracking applications remain the source of truth for food intake.
 - Personalized opportunities, not generic tips: future activity suggestions must be tied to the user's explicit preferences, active Planned Treat, remaining gap, timing, consent, and qualified calorie-burn ranges.
 - Prepare for life, not perfection: users may optionally reserve part of genuinely accumulated banked calories in an Emergency Bank for unexpected meals, celebrations, travel, or changes in plans.
@@ -44,7 +45,7 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 1. User installs CalorieBank.
 2. User connects a supported calorie-intake data source.
 3. On iPhone, the user connects Apple Health for the currently implemented foreground intake and expenditure path.
-4. User selects `cut`, `maintain`, or `bulk`; configures a daily deficit for cut or daily surplus for bulk; uses a zero adjustment for maintain; optionally configures Emergency Bank reserve behavior; and optionally names a food, meal, treat, or event they are saving toward.
+4. User selects `cut`, `maintain`, or `bulk`; configures a daily deficit for cut or daily surplus for bulk; and uses a zero adjustment for maintain. Optional Emergency Bank, planning, forecasting, and personalization capabilities may be enabled during setup or discovered later under ADR 011.
 5. CalorieBank imports available data and initializes the bank from recent history when possible.
 6. CalorieBank calculates daily changes and updates the lifetime bank without requiring daily interaction.
 7. Every morning, the user receives one bank-update notification.
@@ -53,9 +54,9 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 
 ## Required V1 Screens
 
-- Onboarding: account creation/sign-in, goal mode, daily deficit or surplus configuration when applicable, timezone, integration education, lightweight optional Emergency Bank education/configuration.
+- Onboarding: account creation/sign-in, goal mode, daily deficit or surplus configuration when applicable, timezone, and integration education. Optional capabilities may be introduced lightly when immediately relevant, but onboarding must not require users to configure every V1 feature.
 - Connections: supported intake source connection, supported expenditure/health source connection, connection state, revoke/reconnect, troubleshooting.
-- Bank Home: compact product header, all-time Available Bank as the dominant standalone card, one active Planned Treat card when visible, compact latest completed contribution with provisional/locked status, and current goal configuration. Current-day awareness rules remain part of the product model but should not be repeated as bank-forecast copy.
+- Bank Home: compact product header, all-time Available Bank as the dominant standalone card, latest completed contribution with provisional/locked status, concise calculation access, and data freshness or calculation status where needed. Optional supporting capabilities appear only when manually enabled, contextually necessary, or progressively introduced.
 - Bank History: read-only all-time Available Bank, latest completed date, range controls for day/week/month/3 months/year/all time, minimal history list, status/correction context, and selected-day calculation breakdown.
 - Goal Settings: editable goal mode and goal-adjustment configuration using the approved cut/maintain/bulk model.
 - Planning Search: estimated restaurant meals, grocery products, packaged foods, homemade meals, custom meals, favorites, and saved future plans.
@@ -67,6 +68,8 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 - Manual Correction/Fallback: add or adjust intake/activity only where necessary.
 - Notification Settings: morning update permission, timing, enable/disable.
 - Privacy/Account Settings: connected data summary, data export/delete, sign out.
+
+V1 screen and capability lists define what belongs to V1; they do not require every item to appear during onboarding or on a new user's initial Today screen. Manual discoverability, recommendation, activation, and contextual necessity are separate visibility states governed by ADR 011.
 
 ## Must-Have First-10-User Capabilities
 
@@ -90,6 +93,7 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 - Manual correction or fallback entry where technically necessary.
 - Privacy, consent, integration revocation, and data-deletion considerations.
 - Clear language explaining what is imported and how the bank is calculated.
+- Today's Forecast with Projected Daily Burn, introduced only when sufficient data and relevance support an understandable estimate. It must never present a Projected Bank.
 
 ## Secondary Capabilities
 
@@ -236,7 +240,7 @@ If Available Bank is zero or negative, progress displays as `0%` and remaining c
 
 Reaching a Planned Treat does not automatically deduct calories from the bank. Treat readiness and bank usage are separate concepts. The user still records actual consumption in their normal calorie tracker. CalorieBank later receives total intake and automatically reflects any daily overage during finalization.
 
-The Planned Treat card is a default-visible supporting card on Today. Empty, saving, ready, loading, and unavailable states should use friendly consumer language and must not show raw infrastructure errors. It follows official bank and current-day awareness cards in the fixed hierarchy defined below.
+The Planned Treat card is an available V1 supporting card that may be manually discovered or progressively introduced. It is not required on a new user's first Today screen. Empty, saving, ready, loading, and unavailable states should use friendly consumer language and must not show raw infrastructure errors.
 
 ## Banking Concepts
 
@@ -264,7 +268,7 @@ CalorieBank V1 is an all-time calorie-bank interface powered by connected expend
 - The primary number is the user's all-time Available Bank.
 - The official bank includes completed days that have posted provisionally or locked, through the previous completed day. Provisional contributions affect Available Bank immediately.
 - The current day is not part of the official bank.
-- The current day may show a clearly labeled estimate or pending state later, but it must never look official before finalization.
+- The current day may show clearly labeled live awareness or Projected Daily Burn estimates, but it must never look like an official bank result before finalization.
 - Current-day live awareness may later show adjusted calories burned so far and calories eaten so far, with source and sync freshness, but it must remain separate from official bank calculations.
 - The all-time bank is the sum of immutable initial and correction ledger transactions for provisional and locked days, after applying approved Available Bank, Emergency Bank, and Recovery Forecast behavior.
 - The bank updates when the completed day is first processed after local midnight. Product language may say the bank updates at midnight, but implementation must remain reliable when posting occurs during the next sync or app session.
@@ -275,17 +279,14 @@ CalorieBank V1 is an all-time calorie-bank interface powered by connected expend
 - Selecting a specific finalized day reveals a short human-readable breakdown.
 - Consumer UI must use plain language and must not expose raw internal identifiers, database fields, API field names, or variable names.
 
-For a user who hides Emergency Bank, the intended Today hierarchy is:
+The initial Today experience should remain focused on:
 
 1. Available Bank.
 2. Latest Finalized Contribution.
-3. Today So Far.
-4. Planned Treat.
-5. Steps Today.
-6. Logged Workouts.
-7. Current Goal.
+3. Concise access to the calculation explanation.
+4. Current data freshness or calculation status when needed.
 
-Available Bank is mandatory, always visible, and always first.
+Available Bank is mandatory, always visible, and always first. Today So Far, Planned Treat, Steps Today, Logged Workouts, Current Goal, Emergency Bank, Today's Forecast, and other optional supporting cards may be available in V1 without being initially visible. Their discovery and activation follow ADR 011.
 
 Selected-day breakdowns should use consumer labels such as:
 
@@ -322,6 +323,7 @@ For maintenance, omit the goal-adjustment row when space is tight or label it `M
 - After initialization, confirmed later data or corrections may exhaust Available Bank and optional Emergency Bank and create a recovery amount.
 - The Available Bank must display zero instead of a negative value.
 - Recovery Forecast replaces a large negative bank number as the primary home-screen focus only after Available Bank and Emergency Bank are exhausted.
+- Recovery Forecast is contextually activated when needed. It must not depend on prior discovery, recommendation acceptance, or an enablement step.
 - A recovery state must not block synchronization, corrections, or continued use.
 - UI language should emphasize recovery, rebuilding, restoring flexibility, being back on track, estimated recovery, and progress.
 - UI language should avoid debt, punishment, failure, or owing calories.
@@ -498,6 +500,22 @@ Completed days without required inputs must enter an explicit `waiting_for_intak
 
 Each Today section owns its freshness state so a missing category does not hide usable data from another category. Current implementation marks a previously ready value stale after 30 minutes without a successful sync. This is a named, adjustable technical policy rather than a physiological or bank-calculation rule.
 
+### Today's Forecast And Projected Daily Burn
+
+Today's Forecast, including Projected Daily Burn, is an approved V1 capability but is not required in onboarding or the initial Today experience. It should be progressively introduced only when sufficient complete expenditure history supports a grounded estimate and the feature is relevant to the user's behavior, explicit interest, or active planning context.
+
+Projected Daily Burn may help answer:
+
+- What is my likely total expenditure by the end of today?
+- How might expected steps or a familiar activity affect that estimate?
+- How does today compare with my normal pattern?
+
+It is an estimate of expenditure, not a bank result. It must not display or imply a Projected Bank, estimated deposit, estimated withdrawal, calories remaining, or guaranteed physiological burn. The official bank continues to change only through completed-day provisional posting and reconciliation.
+
+Users should edit forecast assumptions rather than type an arbitrary projected-burn value. Conceptual assumptions may include expected final step count, duration of a familiar activity, whether a recurring activity is expected today, or planned walking, running, cycling, or another supported activity. Exact controls, supported activities, eligibility thresholds, and estimation methods remain open.
+
+When sufficient reliable history exists, the forecast may use approximate personal activity averages. Product copy must distinguish raw provider-reported expenditure from CalorieBank-adjusted expenditure. Whether an average displays raw values, adjusted values, or both is unresolved and must be decided before implementation.
+
 ## Today And Bank History Interaction
 
 Today uses a bank-first hierarchy.
@@ -511,7 +529,7 @@ Today uses a bank-first hierarchy.
 - Planned Treat progress must use the same real all-time Available Bank source as Bank Summary. It must not cache a separate bank balance or create fake ledger transactions.
 - Today so far should appear only after real current-day expenditure and intake data exist or an honest setup/unavailable state exists. It must not use mock values and must not imply an official current-day bank change.
 - Today shows the previous-day or latest completed contribution, its `Provisional` or `Locked` status, lock date when provisional, and `Adjusted from` context after a correction. It does not expose raw reconciliation identifiers.
-- Today should not persistently show current-day forecast, projected daily bank change, or midnight-pending copy. If current-day estimates are introduced later, they must be clearly labeled and should not compete with the official Available Bank.
+- Today's Forecast must not appear in the initial experience by default or compete with Available Bank. Once progressively introduced, Projected Daily Burn must be clearly labeled as an estimate and remain distinct from any projected bank change, which is prohibited.
 - Infrastructure diagnostics such as API health, service names, or backend connectivity details are not consumer home-screen content.
 - Today must not contain long explanatory paragraphs, raw formula blocks, or internal variable names.
 - Goal Mode, Daily Deficit, Daily Surplus, or Maintenance opens Goal Settings.
@@ -525,7 +543,7 @@ Today uses a bank-first hierarchy.
 
 ### Customizable Today Dashboard
 
-Today supports account-level card-visibility toggles with a fixed order. Drag-and-drop and custom ordering remain deferred.
+Today supports account-level card-visibility toggles with a fixed order. Drag-and-drop and custom ordering remain deferred. V1 availability does not imply that every optional card is visible during first use.
 
 Mandatory:
 
@@ -540,7 +558,7 @@ Optional cards:
 - Logged Workouts.
 - Current Goal.
 
-Initial customization should prefer visibility toggles such as:
+Customization may expose available optional cards through visibility toggles such as:
 
 ```text
 Show Latest contribution On
@@ -551,7 +569,7 @@ Show Workouts             On
 Show Current Goal         On
 ```
 
-All optional cards above are visible by default. Preferences persist through the account-level API and hiding a card does not disable ingestion. Available Bank is not part of the mutable preference contract. Drag-and-drop reordering, Emergency Bank presentation, and complex dashboard engines are deferred.
+The initial defaults should preserve the Foundation-stage experience defined by ADR 011. Optional cards may become visible through manual discovery, explicit enablement, a relevant recommendation, or contextual necessity. Preferences persist through the account-level API and hiding a card does not disable ingestion. Available Bank is not part of the mutable preference contract. Drag-and-drop reordering, Emergency Bank presentation, and complex dashboard engines are deferred.
 
 ## Manual Fallback And Activity Entry
 
@@ -610,6 +628,8 @@ The primary V1 notification is the morning bank update. It should include, when 
 - A clear incomplete/pending status when data is not ready.
 
 Request notification permission only after explaining this value.
+
+Notifications may support Progressive Feature Discovery only when a capability is highly relevant, the user has granted appropriate permission, the message provides immediate planning value, and an in-app introduction would not be more appropriate. Generic feature advertising must not compete with the morning update. Recommendation frequency, dismissal suppression, and category eligibility remain open.
 
 ### Future Activity Opportunity Engine
 
@@ -674,6 +694,8 @@ The notification taxonomy remains restrained:
 - Treat calorie, activity, and health data as sensitive.
 - Support integration revocation, data export, and data deletion before broader beta.
 - Never expose secrets to the client.
+- Do not hide calculation policy, source status, missing or incomplete data, corrections, errors, safety disclaimers, estimate labels, active recovery guidance, or integration failures behind feature-discovery eligibility.
+- Behavioral feature recommendations may use only data available under approved permissions and must explain relevance using limited, visible evidence rather than claiming broad surveillance or unsupported intent.
 
 ## Internal Alpha Success Criteria
 
@@ -688,6 +710,8 @@ The notification taxonomy remains restrained:
 - Manual fallback/correction can reconcile a bad or missing record.
 - Ledger balance can be recomputed from immutable transactions.
 - Timezone-specific calculation and notification behavior is tested.
+- The initial experience presents the core bank without requiring configuration or comprehension of every optional V1 capability.
+- Optional feature introductions can be dismissed, and required transparency remains available without discovery milestones.
 
 ## 10-User Private Beta Success Criteria
 
@@ -707,6 +731,11 @@ The notification taxonomy remains restrained:
 - Whether users understand that Planning Database estimates do not log food or change the bank.
 - Whether the experience reduces mental friction or guilt.
 - Reasons users disconnect, distrust, or abandon the product.
+- Whether users understand the core bank before optional capabilities appear.
+- Whether feature introductions feel relevant and explain why they appeared.
+- Whether users can manually find desired V1 capabilities.
+- Whether users distinguish Projected Daily Burn from a guaranteed outcome and understand that there is no Projected Bank.
+- Whether progressive discovery improves trust and usefulness rather than merely increasing engagement.
 
 ## Analytics Events To Measure Later
 
@@ -760,11 +789,34 @@ The notification taxonomy remains restrained:
 - `activity_opportunity_opened`
 - `activity_opportunity_dismissed`
 - `recovery_forecast_viewed`
+- `feature_discovery_eligible`
+- `feature_discovery_recommended`
+- `feature_discovery_learn_more_opened`
+- `feature_discovery_dismissed`
+- `feature_discovery_enabled`
+- `feature_manually_discovered`
+- `today_forecast_opened`
+- `projected_daily_burn_assumption_changed`
 - `data_delete_requested`
 
 Analytics must not include raw food names, free-text notes, passwords, precise health payloads, or unnecessary personally identifying information.
+Feature-discovery analytics must not treat opens or activation alone as proof of value. Validation must include trust, understanding, relevance, annoyance, manual discoverability, and whether users feel important capabilities are hidden.
 
 ## Open Product Decisions
+
+Progressive Feature Discovery decisions are governed comprehensively by ADR 011. Before automated recommendation or production forecast discovery is implemented, resolve:
+
+- What defines sufficient familiarity with the core bank?
+- What minimum data is required for Today's Forecast and personalized activity averages?
+- Which approved signals make each feature eligible?
+- Which V1 features are manually accessible before recommendation, and where?
+- How long is a dismissed recommendation suppressed, and can recommendations be disabled permanently?
+- How many recommendations may be active or introduced within the same week?
+- Which introductions may use push notifications?
+- How are recommendation relevance, false inferences, discovery-state persistence, resets, returning users, and imported historical data handled?
+- What happens when a forecast loses sufficient data?
+- Do personal activity averages display raw provider expenditure, CalorieBank-adjusted expenditure, or both?
+- Which measures distinguish user value from engagement manipulation?
 
 - Is Apple Health dietary energy sufficiently available among the first 10 users' existing calorie trackers, or is a second supported intake path required?
 - The rolling HealthKit operational sync window is approved as current day plus the prior two local dates. A separate seven-day onboarding initialization import remains unresolved.

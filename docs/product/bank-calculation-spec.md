@@ -37,6 +37,11 @@ This specification preserves the current V1 direction from:
 - `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`
 - `docs/product/adr-005-personalized-activity-opportunity-notifications.md`
 - `docs/product/adr-006-provider-neutral-ingestion-architecture.md`
+- `docs/product/adr-007-apple-healthkit-device-ingestion.md`
+- `docs/product/adr-008-activity-context-and-customizable-today.md`
+- `docs/product/adr-009-provisional-finalization-and-rolling-reconciliation.md`
+- `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md`
+- `docs/product/adr-011-progressive-feature-discovery.md`
 - `docs/architecture/current-state-audit.md`
 - `README.md`
 - `AGENTS.md`
@@ -66,6 +71,10 @@ CalorieBank should avoid giving users more expenditure credit than its approved 
 ### Trust Over Engagement
 
 The product should prioritize understandable and trustworthy balances rather than maximizing app opens, screen time, streaks, or notifications.
+
+### Progressive Feature Discovery
+
+V1 capability availability does not require immediate first-use visibility. Optional complexity should be introduced when it is understandable and relevant under ADR 011: **Complexity should be earned, not imposed.** Calculation transparency, source status, missing or corrected data, safety information, and active recovery guidance must never be withheld behind discovery state.
 
 ### Augment Existing Tools
 
@@ -728,7 +737,7 @@ adjusted_current_day_expenditure =
 - Use source-attributed current-day total calorie intake for the eaten value.
 - Do not double-count active calories. If the source exposes total daily expenditure, use that total once.
 - Do not add current-day expenditure or intake to Available Bank before finalization.
-- Do not show an estimated current-day deposit, withdrawal, calories remaining, or forecasted midnight balance on Today.
+- Do not show an estimated current-day deposit, withdrawal, calories remaining, forecasted midnight balance, or any other Projected Bank result on Today.
 - Do not imply current-day expenditure is already banked.
 - Do not display mock or hard-coded Today so far values as real data.
 - Source and sync freshness should be visible where useful.
@@ -741,7 +750,9 @@ adjusted_current_day_expenditure =
 - Steps do not estimate calories and never modify expenditure. Logged workout energy is already represented within Apple Health active energy and must never be added again.
 - Steps, workouts, and sync-session outcomes are awareness and observability records only. They never create ledger transactions, modify Available Bank, alter Planned Treat progress, or change finalized history.
 
-Today dashboard preferences must not allow Available Bank to be hidden. Available Bank is mandatory and always first. The fixed default order is Available Bank, Latest Finalized Contribution, Today So Far, Planned Treat, Steps Today, Logged Workouts, and Current Goal. All supporting cards are visible by default and have account-level visibility toggles. Hiding a card does not disable ingestion. Drag-and-drop ordering is deferred.
+Today's Forecast and Projected Daily Burn may estimate current-day expenditure under ADR 011, but they remain outside this specification's official bank calculation. They must not create ledger entries, alter Available Bank, or imply a projected deposit, withdrawal, or balance. Exact forecast inputs, estimation policy, and eligibility thresholds are unresolved.
+
+Today dashboard preferences must not allow Available Bank to be hidden. Available Bank is mandatory and always first. Supporting cards may be implemented and manually available without being initially visible. Their first-use defaults, recommendation, and activation follow ADR 011. Hiding a card does not disable ingestion or change calculation behavior. Drag-and-drop ordering is deferred.
 
 ## Calculation Status
 
@@ -980,6 +991,8 @@ Rules:
 - Any guidance requiring users to configure an absolute daily calorie target is superseded. V1 uses imported total daily expenditure, the `0.80` expenditure adjustment, and the user's signed daily energy adjustment.
 - Any guidance requiring a manual `Use Bank`, `Spend Bank`, treat withdrawal, or confirm-consumption action is superseded. V1 bank usage is automatic through completed-day finalization.
 - Any guidance treating the first completed-day calculation as immediately and permanently locked is superseded by ADR 009. Completed days post immediately as provisional, reconcile for two local calendar days through compensating transactions, and then lock.
+- Any guidance requiring all optional Today cards or all V1 capabilities to be visible during onboarding or first use is superseded by ADR 011.
+- Earlier broad rejection of every current-day forecast is narrowed: projected bank results remain prohibited, while a qualified Projected Daily Burn is an approved V1 estimate outside the ledger.
 
 ## Open Product Decisions
 
@@ -1044,6 +1057,9 @@ Rules:
 - What quiet-hours, frequency-cap, cooldown, and duplicate-suppression policies govern activity opportunities?
 - How long should opportunity candidates and notification-delivery history be retained?
 - Which user controls are required for muting an activity or disabling goal-linked activity nudges?
+- What minimum data and approved estimation method are required for Projected Daily Burn?
+- Do personalized activity averages display raw provider expenditure, CalorieBank-adjusted expenditure, or both?
+- How does feature-discovery state affect visibility without affecting calculation status, source truth, or ledger behavior?
 
 ## Implementation Requirements
 

@@ -10,6 +10,8 @@ Apple Health uses a native Expo development build and cannot run in Expo Go. Kee
 
 Apple Health foreground sync follows ADR 010: query current day and the prior two local dates, upload each normalized category/date independently, skip accepted unchanged values, and retain failed uploads in the ordered local outbox. Do not expand this to full-history or background HealthKit delivery without approval.
 
-Today follows the fixed order in ADR 008. Available Bank is always first and cannot be hidden. Steps and workouts are optional visible-by-default context cards; hiding them must not disable ingestion. Workout calories are already included in active energy and must not be added again.
+Today follows the fixed ordering and visibility controls in ADR 008 as amended by ADR 011. Available Bank is always first and cannot be hidden. Supporting cards may be available without being visible during first use; hiding them must not disable ingestion. Workout calories are already included in active energy and must not be added again.
+
+Do not add feature recommendations, discovery-state persistence, or default-visible optional cards without following ADR 011. Today's Forecast and Projected Daily Burn are V1 expenditure estimates for later progressive introduction, never projected bank values or ledger inputs.
 
 Latest contribution and Bank History must follow ADR 009: show effective contribution, provisional or locked status, lock timing, and consumer-readable correction history. Do not imply a provisional contribution is delayed or edit ledger data from the client.

@@ -1,18 +1,13 @@
 # CalorieBank
 
-CalorieBank is moving from a web prototype into an iPhone-first mobile V1. The current source of truth is:
+CalorieBank is moving from a web prototype into an iPhone-first mobile V1. The current source-of-truth hierarchy is:
 
-- `docs/architecture/current-state-audit.md`
-- `docs/product/v1-prd.md`
-- `docs/product/bank-calculation-spec.md`
-- `docs/product/adr-001-connection-first-v1.md`
-- `docs/product/adr-002-expenditure-relative-goal-adjustment.md`
-- `docs/product/adr-003-interactive-summary-and-explanation.md`
-- `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`
-- `docs/product/adr-005-personalized-activity-opportunity-notifications.md`
-- `docs/product/adr-006-provider-neutral-ingestion-architecture.md`
-- `docs/product/adr-007-apple-healthkit-device-ingestion.md`
-- `docs/product/adr-008-activity-context-and-customizable-today.md`
+1. `AGENTS.md` defines repository implementation guardrails.
+2. `docs/product/v1-prd.md` defines authoritative V1 product scope and experience.
+3. `docs/product/bank-calculation-spec.md` governs all bank-calculation behavior.
+4. `docs/product/adr-011-progressive-feature-discovery.md` governs V1 availability, first-use visibility, recommendation, and contextual activation.
+5. `docs/product/adr-001-connection-first-v1.md` through `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md` govern their focused accepted decisions.
+6. `docs/architecture/current-state-audit.md` records implementation state and planning but cannot override the product documents above.
 
 ## V1 Mission
 
@@ -21,6 +16,8 @@ CalorieBank V1 validates whether users can connect their existing health and cal
 CalorieBank is not being built first as a replacement food logger. The first-user product is an automatic interpretation and planning layer over supported calorie-intake and calorie-expenditure data sources.
 
 V1 includes a Planning Database for future meal and event estimates. It is not the food log. Connected calorie-tracking applications remain the source of truth for consumed intake and bank calculations.
+
+V1 scope does not require every capability to appear during onboarding or first use. ADR 011 keeps the initial experience focused on the bank and introduces optional planning, forecasting, reserve, and personalization capabilities only when relevant or manually requested. Today's Forecast and Projected Daily Burn remain V1 estimates; no Projected Bank is approved.
 
 ## Repository Structure
 
@@ -47,6 +44,8 @@ The first implementation milestones should prioritize connection-first onboardin
 Future personalized Activity Opportunity Engine work is documented in `docs/product/adr-005-personalized-activity-opportunity-notifications.md`. It is intentionally deferred until real intake/expenditure ingestion, Today-so-far awareness, notification consent, stable Planned Treat timing, and explicit activity preferences exist. Estimated activity calories must never be deposited into the bank or treated as actual expenditure.
 
 Provider-neutral ingestion is documented in `docs/product/adr-006-provider-neutral-ingestion-architecture.md`. Apple Health is the first real device adapter and is documented in `docs/product/adr-007-apple-healthkit-device-ingestion.md`. Current-day steps, workouts, sync-session observability, and dashboard visibility rules are documented in `docs/product/adr-008-activity-context-and-customizable-today.md`. Provisional posting and reconciliation are authoritative in `docs/product/adr-009-provisional-finalization-and-rolling-reconciliation.md`; reliable three-day historical sync and orchestration are governed by `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md`. Development adapters remain test-only or explicitly enabled local fallback; device and production modes must not silently return synthetic calories.
+
+Progressive Feature Discovery is governed by `docs/product/adr-011-progressive-feature-discovery.md`. Available Bank remains mandatory and first, while implemented optional cards may be manually discoverable or introduced after sufficient data and relevance exist. Transparency, errors, safety information, and active recovery guidance are never discovery-gated.
 
 The user-facing Available Bank never displays below zero. Users may optionally reserve genuinely accumulated calories in an Emergency Bank for unexpected overages. The V1 protection sequence is Available Bank -> optional Emergency Bank -> Recovery Forecast, rather than making a large negative balance the primary focus.
 

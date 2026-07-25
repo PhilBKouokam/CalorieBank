@@ -37,15 +37,15 @@ adjusted_current_day_expenditure =
   imported_total_daily_expenditure_so_far * 0.80
 ```
 
-For example, if the connected expenditure source reports `2,000 kcal` so far, CalorieBank displays `1,600 kcal burned` with supporting copy such as `2,000 from Fitbit x 80%`.
+For example, if the connected expenditure source reports `2,000 kcal` so far, CalorieBank displays `1,600 kcal burned` with supporting copy such as `2,000 from your connected source x 80%`.
 
-Current-day intake should show the source-attributed total calorie intake so far, such as `Calories eaten · 1,500 kcal · Imported from MyFitnessPal`.
+Current-day intake should show the source-attributed total calorie intake so far, such as `Calories eaten · 1,500 kcal · Imported from your connected intake source`.
 
-The user may interpret these live values themselves. CalorieBank must not show current-day calories remaining, an official or projected bank change, a forecasted midnight balance, or recommendations to eat less or exercise more.
+The user may interpret these live values themselves. CalorieBank must not show current-day calories remaining, an official or projected bank change, a forecasted midnight balance, or recommendations to eat less or exercise more. ADR 011 separately approves a qualified Projected Daily Burn estimate for progressive V1 discovery; it is an expenditure estimate, not a bank forecast.
 
 Emergency Bank is optional and protected. It is separate from Available Bank, excluded from normal planned spending, excluded from Planned Treat progress, and not automatically shown on Today. Users may later choose whether its card is visible. Hiding the card must not change the balance or reserve rules.
 
-Today dashboard customization should start with simple visibility toggles. Available Bank is mandatory, always visible, and always first. Optional cards may include Planned Treat, Today so far, Yesterday/latest finalized result, Current Goal, Emergency Bank, and future connection status cards. Drag-and-drop ordering is deferred.
+Today dashboard customization should start with simple visibility toggles. Available Bank is mandatory, always visible, and always first. Optional cards may include Planned Treat, Today so far, Yesterday/latest finalized result, Current Goal, Emergency Bank, Projected Daily Burn when eligible, and future connection status cards. V1 availability does not require first-use visibility; ADR 011 governs progressive introduction. Drag-and-drop ordering is deferred.
 
 ## Rejected Alternative
 
@@ -68,6 +68,7 @@ Reasons rejected:
 - Source-attributed intake and expenditure aggregates are the next required architecture milestone.
 - The future `Today so far` read model must include adjusted current-day expenditure, raw source expenditure for explanation, current-day intake, source labels, sync freshness, and partial/current-day labels.
 - The `Today so far` read model must not include projected bank result fields.
+- Today's Forecast may later use a separate or extended read model for Projected Daily Burn, but it must remain estimated, progressively introduced, and ledger-neutral.
 - Dashboard preferences must enforce Available Bank as non-hideable.
 - Emergency Bank detail and visibility controls can be built later, but the hidden state must not alter reserve behavior.
 

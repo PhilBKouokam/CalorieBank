@@ -10,7 +10,7 @@ Available Bank and the latest finalized contribution answer what has already rea
 
 ## Decision
 
-Today uses this fixed default order:
+Today supports this fixed ordering when the corresponding cards are visible:
 
 1. Available Bank.
 2. Latest Finalized Contribution.
@@ -20,7 +20,7 @@ Today uses this fixed default order:
 6. Logged Workouts.
 7. Current Goal.
 
-Available Bank is mandatory, always first, and cannot be hidden. The six supporting cards are visible by default and may be hidden through account-level preferences exposed by `GET` and `PATCH /v1/me/dashboard-preferences`. The first customization version changes visibility only; drag-and-drop ordering is deferred.
+Available Bank is mandatory, always first, and cannot be hidden. Supporting cards may be hidden through account-level preferences exposed by `GET` and `PATCH /v1/me/dashboard-preferences`. ADR 011 supersedes the earlier requirement that all six supporting cards be visible to every new user by default. The initial experience should remain in the Foundation stage; supporting cards can be manually enabled, progressively introduced, or contextually activated. The first customization version changes visibility only; drag-and-drop ordering is deferred.
 
 Steps and workouts are activity context, not calorie-bank inputs. `StepProvider` and `WorkoutProvider` extend the provider-neutral adapter boundary. Apple Health is the first concrete implementation. Step snapshots are cumulative and replace older snapshots for the same user, provider, and local date. Workouts are normalized and idempotent by user, provider, and provider workout identifier.
 
@@ -63,10 +63,11 @@ HealthKit does not reveal whether read access to an individual type was denied. 
 
 ## Consequences
 
-- `GET /v1/me/today` exposes independent burn, intake, step, and workout states without forecast fields.
+- `GET /v1/me/today` exposes independent burn, intake, step, and workout states without projected bank fields. A future Projected Daily Burn may use these source-attributed inputs through a distinct estimated read model governed by ADR 011.
 - Hiding a card does not disable ingestion or delete health data.
 - Current-day awareness never creates ledger transactions, changes Available Bank, changes Planned Treat progress, or alters the latest completed contribution. The latest contribution card may display ADR 009 provisional/locked status and correction context.
 - Background HealthKit delivery, historical activity charts, workout analytics, and dashboard reordering remain deferred. Rolling-window workout snapshots replace removed provider workouts for that provider/date but remain banking-neutral.
+- Current visibility defaults in the implemented shell may require a later migration to ADR 011 discovery state. This ADR does not approve that schema or recommendation engine.
 
 ## Rejected Alternatives
 

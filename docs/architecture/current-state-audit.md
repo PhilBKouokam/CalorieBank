@@ -10,9 +10,11 @@ The authoritative V1 direction is now connection-first automatic calorie banking
 
 V1 also includes a Planning Database for future meal and event estimates. That database is planning-only: connected calorie-tracking applications remain the source of truth for Food Tracking, daily intake, historical intake, synchronization, and bank calculations. Planning Database estimates must not directly update the bank.
 
-The approved mobile information architecture is bank-first. The default experience shows the all-time Available Bank first, includes provisional and locked completed days through the previous day, keeps the current day awareness-only, and reveals history by day/week/month/3 months/year/all time only when requested. Foreground Apple Health sync now refreshes current day plus the prior two local dates, then scheduler-neutral orchestration delegates posting, reconciliation, and locking to the banking engine. Completed days affect Available Bank immediately as provisional, reconcile through append-only correction transactions for two local calendar days, and then lock.
+The approved mobile information architecture is bank-first. The initial experience shows the all-time Available Bank first, the latest finalized contribution, concise calculation access, and required data status. It does not require every implemented V1 capability to be visible immediately. Foreground Apple Health sync now refreshes current day plus the prior two local dates, then scheduler-neutral orchestration delegates posting, reconciliation, and locking to the banking engine. Completed days affect Available Bank immediately as provisional, reconcile through append-only correction transactions for two local calendar days, and then lock.
 
-The current architecture inventory below remains valid as a description of the existing prototype. Forward-looking reuse, migration, database, and vertical-slice guidance has been updated to match `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`; the rejection of absolute user-entered daily calorie targets is recorded in ADR 002. Provider-neutral ingestion is governed by ADR 006, Apple Health and the development-build boundary by ADR 007, activity context by ADR 008, provisional reconciliation by ADR 009, and reliable rolling synchronization/orchestration by ADR 010.
+The current architecture inventory below remains valid as a description of the existing prototype. Forward-looking reuse, migration, database, and vertical-slice guidance has been updated to match `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`; the rejection of absolute user-entered daily calorie targets is recorded in ADR 002. Provider-neutral ingestion is governed by ADR 006, Apple Health and the development-build boundary by ADR 007, activity context by ADR 008, provisional reconciliation by ADR 009, reliable rolling synchronization/orchestration by ADR 010, and Progressive Feature Discovery by ADR 011.
+
+ADR 011 separates V1 availability from first-use visibility. It supersedes architecture guidance that assumes all supporting Today cards must be shown by default. Feature discovery state, recommendation thresholds, and persistence remain conceptual; no speculative recommendation or machine-learning schema is approved.
 
 ## 1. Current Architecture
 
@@ -572,6 +574,8 @@ Future tables:
 - Implement Planning Database storage/search for future meal and event estimates without connecting planning estimates to bank ledger inputs.
 - Implement one active Planned Treat that compares required calories against the all-time Available Bank without creating ledger transactions. Negative completed days handle bank reduction through finalized daily ledger transactions.
 - Build Expo screens for onboarding, connections, bank-first home with all-time Available Bank, one active Planned Treat, Today so far only after real current-day expenditure and intake ingestion exists or honest setup/unavailable states exist, optional Emergency Bank visibility, Recovery Forecast when applicable, planning search/detail, Bank History with finalized-day ranges, selected-day detail, notification settings, and manual correction/fallback.
+- Preserve these capabilities as V1 scope without placing all of them in onboarding or the initial Today surface. Foundation-stage visibility should prioritize Available Bank, latest finalized contribution, explanation, and required data status.
+- Keep Today's Forecast and Projected Daily Burn in V1 planning, but do not implement or introduce them until sufficient-history, estimation, labeling, and discovery decisions are approved. They must never project the bank.
 
 ### Phase 4: Migration and Compatibility
 
@@ -586,6 +590,7 @@ Future tables:
 
 - Add observability, error tracking, backups, rate limits, privacy policy support, account deletion, and support tooling.
 - Add seed/sandbox data and end-to-end tests for connection-first onboarding, sync, ledger calculation, notification generation, and explanation history.
+- Validate initial-experience simplicity, manual feature discoverability, dismissal behavior, and the difference between Projected Daily Burn and a prohibited Projected Bank.
 - Add TestFlight build pipeline and beta environment separation.
 
 ### Phase 6: Integrations
@@ -614,7 +619,7 @@ The smallest V1 vertical slice should be:
 5. Sync recent data with source labels, sync batches, and duplicate-prevention keys.
 6. Initialize lifetime bank from up to 7 days of available supported history, starting at zero if the calculated value is zero/negative or data is incomplete.
 7. Calculate a daily bank update using `v1-total-expenditure-80` into immutable ledger transactions with confirmed/pending/incomplete/corrected states.
-8. Show all-time Available Bank, one active Planned Treat based on Available Bank only, optional Emergency Bank status when enabled and visible, Recovery Forecast when applicable, Bank History ranges, and selected-day calculation detail.
+8. Show the Foundation-stage experience: all-time Available Bank, latest finalized contribution, concise calculation access, and required data status. Keep other implemented V1 capabilities manually accessible or eligible for later discovery; activate Recovery Forecast immediately when context requires it.
 9. Search or create a Planning Database entry and compare its estimated calories against Available Bank without changing the ledger.
 10. Generate the morning bank-update notification payload.
 
@@ -651,3 +656,5 @@ These questions genuinely affect implementation choices:
 12. How should Emergency Bank historical initialization, allocation-rate range, rounding, target behavior, and disable behavior work?
 13. Which Planning Database provider path is feasible for restaurant meals, grocery products, packaged foods, homemade meals, and user-created planning entries?
 14. Can planning entries later be exported into supported calorie-tracking applications, or do users always log consumed meals directly in their tracker?
+15. What discovery-state persistence and recommendation policy can support ADR 011 without introducing manipulative prompting or hiding available V1 capabilities?
+16. What data threshold and deterministic estimation policy are required before Projected Daily Burn can be introduced?

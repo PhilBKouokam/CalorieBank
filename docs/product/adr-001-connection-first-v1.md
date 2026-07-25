@@ -58,6 +58,7 @@ If CalorieBank requires daily manual logging, it competes directly with establis
 - Use Available Bank as the normal planned-spending balance, optional Emergency Bank as a protected reserve for unexpected overages, and Recovery Forecast as the primary experience only after Available Bank and Emergency Bank are exhausted.
 - Preserve immutable ledger transactions and traceable corrections.
 - Mark unsupported third-party integrations as investigation or aspiration until API access, permissions, and terms are confirmed.
+- Follow ADR 011 for onboarding and first-use visibility. Connection and required goal setup remain primary; optional V1 planning, forecasting, reserve, and personalization capabilities do not all belong in initial onboarding.
 
 ## Open Decisions
 

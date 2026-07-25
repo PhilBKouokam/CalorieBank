@@ -93,7 +93,7 @@ It may include:
 - Cumulative steps and independent freshness.
 - Normalized logged workouts and independent freshness.
 
-It must never include projected bank change, projected deficit, projected withdrawal, calories remaining, or any value that appears official before day finalization.
+It must never include projected bank change, projected deficit, projected withdrawal, calories remaining, or any value that appears like an official bank result before day finalization. A future Projected Daily Burn may consume normalized awareness data under ADR 011, but it is a separate estimated expenditure output and not a projected bank field.
 
 Today values are not ledger inputs. After the local day completes, the provisional pipeline may consume source-attributed expenditure and intake aggregates under the approved bank-calculation rules; steps and workouts remain excluded.
 
@@ -131,9 +131,9 @@ Rejected because it violates dependency inversion and forces business logic chan
 
 Rejected because `GET /v1/me/today` must remain read-only. Development bootstrap or future sync jobs may write normalized aggregates; the read endpoint must not.
 
-### Current-Day Forecast
+### Current-Day Bank Forecast
 
-Rejected because Today so far is awareness only. Current-day data is incomplete and must not look like an official bank result.
+Rejected because Today so far is awareness only. Current-day data is incomplete and must not look like an official bank result. This rejection does not prohibit the qualified Projected Daily Burn capability approved by ADR 011.
 
 ## Consequences
 

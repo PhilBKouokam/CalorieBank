@@ -12,11 +12,12 @@ The mobile app should follow the repository-level V1 source of truth:
 - `../../docs/product/adr-006-provider-neutral-ingestion-architecture.md`
 - `../../docs/product/adr-007-apple-healthkit-device-ingestion.md`
 - `../../docs/product/adr-008-activity-context-and-customizable-today.md`
+- `../../docs/product/adr-011-progressive-feature-discovery.md`
 - `../../docs/architecture/current-state-audit.md`
 
 V1 is connection-first and low-friction. The primary experience is not daily manual food logging. The app should help users connect supported intake and expenditure/health data sources, calculate a transparent lifetime calorie bank, and receive one meaningful morning bank update.
 
-The mobile home experience should show Available Bank as the normal planned-spending balance, optional Emergency Bank status when enabled, and Recovery Forecast only after Available Bank and Emergency Bank are exhausted. Do not make a large negative balance the primary home-screen experience.
+The mobile home experience should show Available Bank first and keep the initial surface focused on the latest finalized contribution, explanation, and required status. Optional V1 cards may be manually enabled or progressively introduced under ADR 011. Recovery Forecast appears automatically after Available Bank and Emergency Bank are exhausted; do not make a large negative balance the primary home-screen experience.
 
 The mobile Planning Database experience is for future meal and event estimates only. Planning entries do not log consumed food and must not directly update the bank; the connected calorie-tracking app remains the source of truth for actual intake.
 
@@ -24,7 +25,7 @@ Manual food entry belongs only as fallback, correction, supplementary input, or 
 
 ## Current Scope
 
-The app includes coordinated foreground Apple Health ingestion for expenditure, intake, steps, and normalized workouts; a provider-neutral Today read model; and persistent fixed-order card visibility preferences. Available Bank remains mandatory and first. Production authentication, historical ingestion, background sync, notifications, and automatic day finalization remain deferred.
+The app includes coordinated foreground Apple Health rolling-window ingestion for expenditure, intake, steps, and normalized workouts; a provider-neutral Today read model; and persistent fixed-order card visibility preferences. Available Bank remains mandatory and first. Existing implementation visibility may require a later ADR 011 migration; this documentation change does not add discovery logic. Today's Forecast and Projected Daily Burn remain V1 estimates but must not be represented as Projected Bank data. Production authentication, broad historical ingestion, background HealthKit delivery, exact-time scheduling, and notifications remain deferred.
 
 ## Development
 

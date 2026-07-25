@@ -29,6 +29,8 @@ The engine should eventually:
 - Apply fatigue controls and duplicate suppression.
 - Produce a structured recommendation candidate with reason codes and delivery eligibility.
 
+Activity Opportunity introductions and delivery must also follow ADR 011. A feature being available does not make its notification category enabled or visible by default. The user must retain explicit controls, relevant explanations, manual access where appropriate, and protection from repeated introductions after dismissal.
+
 Estimated activity calories must never directly change the bank, create ledger transactions, mark a Planned Treat consumed, or become actual expenditure. The official bank continues to use imported intake, imported total expenditure, the approved `0.80` policy, and completed-day finalization.
 
 ## Activity Preferences
@@ -270,3 +272,5 @@ Activity preferences, profile fields, notification history, wearable history, an
 7. Build the Activity Opportunity Engine as a candidate generator.
 8. Add delivery history, fatigue controls, and push delivery.
 9. Consider wearable-personalized estimates when sufficient consented history exists.
+
+This sequence describes technical readiness, not a fixed user journey. Progressive Feature Discovery may introduce an eligible capability only when it is relevant and understandable; it must not use opportunity notifications as generic feature advertising.
