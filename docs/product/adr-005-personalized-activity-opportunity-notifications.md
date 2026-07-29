@@ -29,9 +29,13 @@ The engine should eventually:
 - Apply fatigue controls and duplicate suppression.
 - Produce a structured recommendation candidate with reason codes and delivery eligibility.
 
-Activity Opportunity introductions and delivery must also follow ADR 011. A feature being available does not make its notification category enabled or visible by default. The user must retain explicit controls, relevant explanations, manual access where appropriate, and protection from repeated introductions after dismissal.
+Activity Opportunity introductions and delivery must also follow ADRs 011 and 014. A feature being available or technically ready does not make its notification category enabled or visible by default. Proactive introduction requires Relevance, Familiarity, and Complementarity; delivery also remains subject to consent, timing, fatigue, and safety policy. The user must retain explicit controls, relevant explanations, manual access where appropriate, and protection from repeated introductions after dismissal.
 
 Estimated activity calories must never directly change the bank, create ledger transactions, mark a Planned Treat consumed, or become actual expenditure. The official bank continues to use imported intake, imported total expenditure, the approved `0.80` policy, and completed-day finalization.
+
+ADR 013 introduces Banking Goals as a broader planning-allocation capability. This ADR continues to scope Activity Opportunity candidates to the active Planned Treat; it does not authorize goal allocations as opportunity inputs. If Banking Goals later become candidate context, estimates must remain ledger-neutral and must never appear as finalized goal funding.
+
+Estimated activity ranges and personal activity averages must not be added to confirmed provider total expenditure when calculating Today's Eating Budget. They remain explanatory or forecast inputs unless a documented methodology proves that the values do not overlap, as required by ADR 012.
 
 ## Activity Preferences
 
@@ -273,4 +277,4 @@ Activity preferences, profile fields, notification history, wearable history, an
 8. Add delivery history, fatigue controls, and push delivery.
 9. Consider wearable-personalized estimates when sufficient consented history exists.
 
-This sequence describes technical readiness, not a fixed user journey. Progressive Feature Discovery may introduce an eligible capability only when it is relevant and understandable; it must not use opportunity notifications as generic feature advertising.
+This sequence describes technical readiness, not a fixed user journey or evidence of user familiarity. Progressive discovery may proactively introduce the capability only after Relevance, Familiarity, and Complementarity are all satisfied. It must not use opportunity notifications as generic feature advertising, stack multiple new concepts in rapid succession, or treat notification engagement alone as product understanding.

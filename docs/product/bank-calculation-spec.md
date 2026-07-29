@@ -23,6 +23,8 @@ It governs:
 - Missing or delayed data.
 - Calculation status.
 - Calculation-related notification content.
+- Boundaries between finalized bank calculations and current-day eating guidance.
+- Conservation boundaries between Available Bank, Banking Goal allocations, and Unassigned calories.
 
 Other product documents may describe the broader V1 experience, but they must not define conflicting bank-calculation behavior. If another document conflicts with this specification, this specification governs bank-calculation behavior.
 
@@ -42,6 +44,9 @@ This specification preserves the current V1 direction from:
 - `docs/product/adr-009-provisional-finalization-and-rolling-reconciliation.md`
 - `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md`
 - `docs/product/adr-011-progressive-feature-discovery.md`
+- `docs/product/adr-012-todays-eating-budget.md`
+- `docs/product/adr-013-banking-goals.md`
+- `docs/product/adr-014-progressive-familiarity.md`
 - `docs/architecture/current-state-audit.md`
 - `README.md`
 - `AGENTS.md`
@@ -74,7 +79,13 @@ The product should prioritize understandable and trustworthy balances rather tha
 
 ### Progressive Feature Discovery
 
-V1 capability availability does not require immediate first-use visibility. Optional complexity should be introduced when it is understandable and relevant under ADR 011: **Complexity should be earned, not imposed.** Calculation transparency, source status, missing or corrected data, safety information, and active recovery guidance must never be withheld behind discovery state.
+V1 capability availability does not require immediate first-use visibility. ADR 011 governs contextual relevance: **Complexity should be earned, not imposed.** ADR 014 separately governs readiness, complementarity, and pacing for proactive introduction. Calculation transparency, source status, missing or corrected data, safety information, and active recovery guidance must never be withheld behind discovery state.
+
+### Progressive Familiarity
+
+ADR 014 extends discovery with three independent gates for proactive recommendations: Relevance, Familiarity, and Complementarity. A calculation-related capability should be recommended only when it solves a current problem, the user has demonstrated meaningful understanding of existing concepts, and it naturally extends the user's current workflow. Account age, elapsed days, session count, and arbitrary timers do not establish familiarity.
+
+This policy governs proactive introduction, not permission. Users may manually inspect available calculation explanations and capabilities where practical. Calculation transparency, missing-data states, corrections, safety information, and context-required Recovery Forecast behavior must never wait for a familiarity signal.
 
 ### Augment Existing Tools
 
@@ -112,6 +123,7 @@ CalorieBank answers:
 - Have I accumulated enough flexibility for a desired food, meal, or event?
 - Can a planned future meal or event fit inside my current Available Bank?
 - How close am I to one active Planned Treat I intentionally chose?
+- What finalized savings have I assigned to Banking Goals, and what remains Unassigned?
 
 CalorieBank must not claim to measure a person's exact metabolism or exact physiological energy expenditure.
 
@@ -119,7 +131,11 @@ The Planning Database described in `docs/product/v1-prd.md` supports future meal
 
 The Planned Treat described in `docs/product/v1-prd.md` is a purpose layer over the bank. Planned Treat progress is derived from the all-time Available Bank and the treat's required calories. Creating, editing, reaching, or removing a Planned Treat must not create deposits, withdrawals, confirmed intake, or automatic bank-spending transactions. Actual consumption remains in the user's calorie tracker; CalorieBank reflects it later through imported daily intake and completed-day finalization.
 
+Banking Goals described in ADR 013 are allocation labels within Available Bank. They may organize finalized savings among user-created purposes and Unassigned calories, but they do not create independent banks, duplicate calories, or alter the authoritative daily bank formula. Goal allocation records may support traceability but must not become a second authoritative ledger.
+
 Future Activity Opportunity Engine estimates are also planning information only. Estimated activity calories may help a user understand one possible way to make progress toward a Planned Treat, but they must not create ledger transactions, change Available Bank, mark a Planned Treat consumed, or replace imported expenditure. If a user performs an activity, the connected expenditure source remains the source of truth for the actual expenditure used in completed-day finalization.
+
+Today's Eating Budget is current-day guidance, not a bank balance. It may use confirmed current-day expenditure, confirmed intake, and the configured goal under a separately approved live calculation, but it must not create ledger transactions, alter Available Bank, or replace completed-day calculation. Remaining Today is an eating-budget remainder, not a remaining bank balance.
 
 ## Required Terminology
 
@@ -132,6 +148,9 @@ Future Activity Opportunity Engine estimates are also planning information only.
 - Imported calorie intake: calories consumed for an effective date from a supported intake source or approved manual fallback.
 - Planning Database entry: estimated meal, food, drink, grocery product, restaurant item, homemade meal, or event calorie information used for future planning only. It is not confirmed intake and does not directly affect bank calculations.
 - Planned Treat: one active food, meal, treat, or event the user is saving toward. It has a name, required calories, optional target date, and progress derived from Available Bank.
+- Banking Goal: a user-created Planning allocation applied to a portion of finalized Available Bank. It is not an independent balance or ledger account.
+- Banking Goal allocation: finalized Available Bank calories labeled for one active Banking Goal. The same calorie may not be allocated to another active goal.
+- Unassigned calories: finalized Available Bank calories not allocated to an active Banking Goal.
 - Raw imported active calories: activity-only calories reported by a source before CalorieBank adjustment. These are distinct from total expenditure and are not separately added in the approved V1 primary formula.
 - Raw imported total expenditure: total daily calorie expenditure reported by a supported expenditure or health-data source for an effective date.
 - Eligible active calories: active calories allowed to influence a calculation under an approved policy. In V1's primary formula, this value is recorded for provenance when available but is not separately added after applying the total-expenditure formula.
@@ -149,6 +168,9 @@ Future Activity Opportunity Engine estimates are also planning information only.
 - Emergency Bank: optional non-negative protected reserve allocation intended for unexpected overages and unplanned life events. It is not normally used for planned spending.
 - Recovery Forecast: the primary user-facing experience when both Available Bank and Emergency Bank are exhausted and a negative cumulative amount remains. It explains the path back to a positive Available Bank without making a large negative number the main interface focus.
 - Recovery amount: non-negative uncovered amount that remains after Available Bank and Emergency Bank have been applied to negative daily changes.
+- Today's Eating Budget: current-day, non-ledger guidance for total intake that would satisfy the configured daily goal under an approved live calculation.
+- Remaining Today: Today's Eating Budget minus confirmed intake so far. It is not Available Bank and may change or become negative during the day.
+- Projected Daily Burn: an estimated end-of-day expenditure value from Today's Forecast. It is not Today's Eating Budget and never creates a Projected Bank.
 - Running balance: internal lifetime bank after a specific ledger event.
 - Daily change: net bank contribution for one effective date.
 - Weekly change: sum of daily changes in a week; not an expiring bank.
@@ -163,6 +185,7 @@ Future Activity Opportunity Engine estimates are also planning information only.
 - Data-source record: source-level record with provenance, identifier, type, timestamp, and sync status.
 - Calculation-policy version: immutable identifier for the calculation rules and parameters used for a ledger event.
 - Reserve-policy version: immutable identifier for Emergency Bank allocation, withdrawal, target, and coverage rules used for an event.
+- Goal-allocation-policy version: future immutable identifier for Banking Goal eligibility, routing, overflow, withdrawal reduction, correction, and release rules. Exact policy is not yet approved.
 
 Active calories and total daily energy expenditure are distinct. V1's primary formula uses imported total daily expenditure. Do not add active calories on top of that formula.
 
@@ -191,6 +214,8 @@ Emergency Bank allocation must also be represented as named, versioned configura
 - `reserve_policy_version`
 
 These names are conceptual product requirements, not a final database schema.
+
+Banking Goal routing must eventually be represented as named, versioned policy rather than UI-only state. No policy fields are approved until ADR 013's protection, withdrawal, Emergency Bank order, and correction decisions are resolved.
 
 User-facing language should refer to:
 
@@ -385,8 +410,55 @@ Emergency Bank allocation for historical initialization is not approved. Do not 
 - Recovery Forecast activates only after Available Bank and Emergency Bank are exhausted and an uncovered recovery amount remains.
 - Daily, weekly, and monthly values are timeline views or period changes, not separate expiring banks.
 - The history must explain how the lifetime balance reached its current value.
+- Banking Goals may organize portions of Available Bank but do not change `total_banked_calories`, Available Bank, Emergency Bank, or recovery by themselves.
+- When Banking Goals exist, `active_goal_allocations + unassigned_available_calories = available_bank`.
+- Goal allocations must never exceed Available Bank and one finalized calorie must never fund more than one active goal.
 
 Any conflicting reset or expiration concept in older prototype materials is superseded.
+
+### Banking Goal Allocation Boundary
+
+Banking Goals receive only real finalized Available Bank calories. Conceptually, an eligible positive contribution flows through the approved Emergency Bank policy before any remaining Available Bank contribution is routed to Banking Goals or Unassigned:
+
+```text
+positive completed-day contribution
+-> Emergency Bank policy
+-> Banking Goal allocation policy
+-> Unassigned remainder
+```
+
+The exact ordering and correction behavior are not approved for implementation. Goal allocation must never change `daily_bank_change` or create a duplicate ledger deposit.
+
+Allocation conserves calories:
+
+```text
+allocate 500 kcal:
+  Available Bank unchanged
+  Unassigned -500
+  Goal allocation +500
+
+release 500 kcal:
+  Available Bank unchanged
+  Goal allocation -500
+  Unassigned +500
+```
+
+Priority, percentage, and manual allocation are approved conceptual methods. Priority routing is the preferred default candidate and supports fully funding a temporary event before returning overflow to a longer-term goal. Its exact default, tie behavior, and fallback destination remain open.
+
+Creating, editing, pausing, reordering, cancelling, deleting, completing, or archiving a goal must not independently change Available Bank. `Ready` means the selected allocation reached its target; it is not intake, consumption, or a withdrawal.
+
+A finalized negative contribution automatically reduces the authoritative bank under the Available Bank, Emergency Bank, and Recovery Forecast order. Because goal allocations are portions of Available Bank, they must be reduced or released under an approved withdrawal-allocation policy so:
+
+```text
+active_goal_allocations + unassigned_available_calories
+  = current_available_bank
+```
+
+The exact withdrawal policy is unresolved and blocks implementation. The system must not preserve phantom goal funding after Available Bank falls.
+
+Post-finalization attribution may record that all or part of an existing withdrawal related to a goal, but it must not create, modify, or duplicate the ledger transaction. Planned consumption continues to be confirmed through the connected intake source.
+
+Emergency Bank is excluded from Banking Goal funding by default. A goal named `Emergency` has no Emergency Bank behavior.
 
 ### Emergency Bank Deposit Allocation
 
@@ -665,12 +737,16 @@ Posting and correction rules:
 - Emergency allocation rate active at the time.
 - Reserve-policy version when applicable.
 - Recovery Forecast state when applicable.
+- Banking Goal allocation and Unassigned totals after an allocation event when Banking Goals are implemented.
+- Goal-allocation-policy version and allocation-event provenance when applicable.
 - Data source.
 - Calculation-policy version.
 - Calculation status.
 - Correction or supersession relationship.
 
 For V1 total-expenditure calculations, active-calorie fields may be `not_applicable` or explanatory-only when the source provides them. They must not be treated as extra additive credit.
+
+Banking Goal allocation history is subordinate to the authoritative bank ledger. It may explain routing, releases, overflow, usage attribution, and correction effects, but it must never represent the same calorie as an additional bank balance or ledger deposit.
 
 The displayed balance should be reproducible from authoritative ledger entries or an equivalently auditable model.
 
@@ -696,8 +772,9 @@ Conceptual lifecycle:
 16. Allocate positive changes between Available Bank and optional Emergency Bank under the active reserve policy.
 17. Apply negative changes in order: Available Bank, Emergency Bank, Recovery Forecast.
 18. Derive current Total Banked Calories, Available Bank, Emergency Bank, and recovery amount.
-19. Generate an understandable history explanation including status and correction history.
-20. Determine whether the morning notification can truthfully be generated.
+19. When Banking Goals are implemented, route eligible finalized Available Bank calories under the approved goal-allocation policy while preserving Unassigned and one-bank conservation.
+20. Generate an understandable history explanation including status and correction history.
+21. Determine whether the morning notification can truthfully be generated.
 
 Exact synchronization execution times are not approved. The local-day completion and two-day lock boundaries are approved; processing may occur at the next ingestion or app/API opportunity.
 
@@ -737,7 +814,7 @@ adjusted_current_day_expenditure =
 - Use source-attributed current-day total calorie intake for the eaten value.
 - Do not double-count active calories. If the source exposes total daily expenditure, use that total once.
 - Do not add current-day expenditure or intake to Available Bank before finalization.
-- Do not show an estimated current-day deposit, withdrawal, calories remaining, forecasted midnight balance, or any other Projected Bank result on Today.
+- Do not show an estimated current-day deposit, withdrawal, generic or unlabeled calories remaining, forecasted midnight balance, or any other Projected Bank result on Today. The explicitly labeled `Remaining Today` guidance defined by ADR 012 is not a bank result.
 - Do not imply current-day expenditure is already banked.
 - Do not display mock or hard-coded Today so far values as real data.
 - Source and sync freshness should be visible where useful.
@@ -750,9 +827,42 @@ adjusted_current_day_expenditure =
 - Steps do not estimate calories and never modify expenditure. Logged workout energy is already represented within Apple Health active energy and must never be added again.
 - Steps, workouts, and sync-session outcomes are awareness and observability records only. They never create ledger transactions, modify Available Bank, alter Planned Treat progress, or change finalized history.
 
-Today's Forecast and Projected Daily Burn may estimate current-day expenditure under ADR 011, but they remain outside this specification's official bank calculation. They must not create ledger entries, alter Available Bank, or imply a projected deposit, withdrawal, or balance. Exact forecast inputs, estimation policy, and eligibility thresholds are unresolved.
+### Today's Eating Budget Boundary
 
-Today dashboard preferences must not allow Available Bank to be hidden. Available Bank is mandatory and always first. Supporting cards may be implemented and manually available without being initially visible. Their first-use defaults, recommendation, and activation follow ADR 011. Hiding a card does not disable ingestion or change calculation behavior. Drag-and-drop ordering is deferred.
+Today's Eating Budget is an approved V1 guidance capability governed by ADR 012. It is not part of the official bank formula.
+
+This confirmed component uses the existing policy:
+
+```text
+adjusted_expenditure_so_far =
+  confirmed_provider_expenditure_so_far * 0.80
+```
+
+When a reliable total budget exists:
+
+```text
+remaining_today =
+  today_eating_budget - confirmed_intake_so_far
+```
+
+The production formula for `today_eating_budget` is not approved. The current Apple Health path reports cumulative active plus basal energy over the local-day query window; it does not provide an approved estimate of expenditure for the unelapsed part of the day. The current goal model also stores a signed `daily_energy_adjustment`, not a separate `desired_daily_bank_contribution`.
+
+Do not implement a numeric budget until product approves:
+
+- Provider intra-day semantics.
+- A non-overlapping method for any remaining resting or expected expenditure.
+- The exact mapping from cut, maintain, and bulk goal adjustment to daily eating guidance.
+- Rounding, freshness, correction, timezone, and missing-input behavior.
+
+The proposed subtraction of remaining expected resting expenditure from expenditure so far is not authoritative. It conflicts with full-day budget intent and may undercount or double-count resting expenditure.
+
+Today's Eating Budget must label total budget, confirmed intake, and Remaining Today separately. A negative Remaining Today is allowed as neutral current-day guidance, but it must not create a negative Available Bank or imply a finalized outcome.
+
+Workout calories, step calories, active calories, basal/resting calories, provider total expenditure, personalized activity averages, and forecast assumptions must not be stacked when they overlap. This guardrail also applies to Today's Forecast, Projected Daily Burn, Activity Opportunities, and future eating-flexibility calculations.
+
+Today's Forecast and Projected Daily Burn may estimate current-day expenditure under ADRs 011 and 014, but they remain outside this specification's official bank calculation. They must not create ledger entries, alter Available Bank, or imply a projected deposit, withdrawal, or balance. Exact forecast inputs, estimation policy, familiarity evidence, complementarity policy, and eligibility thresholds are unresolved.
+
+Today dashboard preferences must not allow Available Bank to be hidden. Available Bank is mandatory and always first. Supporting cards may be implemented and manually available without being initially visible. Their first-use defaults, contextual relevance, recommendation readiness, and pacing follow ADRs 011 and 014. Hiding a card does not disable ingestion or change calculation behavior. Drag-and-drop ordering is deferred.
 
 ## Calculation Status
 
@@ -780,6 +890,7 @@ It should communicate, when available:
 - Recovery Forecast state when both Available Bank and Emergency Bank are exhausted.
 - Progress toward a selected food, meal, or event.
 - Whether the selected target is now covered by the available bank.
+- Banking Goal progress or Ready state only when a separate notification policy approves it.
 
 The notification must not imply that the imported wearable number was exact. Generic engagement notifications are not part of the primary V1 loop.
 
@@ -788,6 +899,7 @@ Future notification categories are allowed only when they preserve trust and do 
 - Planned Treat progress milestone.
 - Personalized activity opportunity.
 - Positive momentum message.
+- Banking Goal progress or Ready milestone, subject to ADR 013 notification decisions.
 
 Personalized activity opportunities are governed by `docs/product/adr-005-personalized-activity-opportunity-notifications.md`. They must use qualified estimated ranges, such as `may burn around 220-320 kcal`, and must not imply that estimated activity calories are banked, guaranteed, or actual expenditure.
 
@@ -797,6 +909,7 @@ Principles:
 
 - Missing intake: do not treat as zero, do not substitute Planning Database estimates for confirmed intake, and mark the day incomplete or pending.
 - Missing expenditure: do not treat as zero; mark the day incomplete or pending.
+- Missing or stale current-day inputs: Today's Eating Budget must become unavailable, stale, or limited rather than guessing intake, expenditure, or remaining resting expenditure.
 - Delayed synchronization: during the provisional window, recalculate and append only the difference between the new and current effective contribution.
 - Duplicate source records: prevent double counting with provider, source record ID, timestamps, effective dates, sync batch IDs, and record type.
 - Corrected source records: preserve the original calculation and append a versioned correction transaction while provisional.
@@ -842,6 +955,8 @@ The user experience must distinguish:
 - Available Bank.
 - Emergency Bank.
 - Emergency Bank allocations and withdrawals.
+- Banking Goal allocations and Unassigned calories when the capability is implemented.
+- Goal-allocation-policy version and allocation-event explanation when applicable.
 - Reserve-policy version when applicable.
 - Recovery Forecast state when applicable.
 
@@ -884,6 +999,11 @@ The first-10-user validation plan should evaluate:
 - Whether users understand why Available Bank is zero when both Available Bank and Emergency Bank have been exhausted.
 - Whether users understand the optional Emergency Bank as protected previously accumulated calories, not free calories or forgiveness.
 - Whether users perceive Emergency Bank coverage as useful without encouraging unsafe restriction or compensatory behavior.
+- Whether users distinguish Today's Eating Budget and Remaining Today from Available Bank, Today's Forecast, and Projected Daily Burn.
+- Whether users understand confirmed versus estimated eating-budget inputs and that finalization may produce a different result.
+- Whether the guidance reduces manual arithmetic without encouraging exercise-for-food compensation.
+- Whether Banking Goals are understood as allocations within one Available Bank rather than separate banks.
+- Whether priority, overflow, Ready state, partial use, and withdrawal effects are understandable without creating exercise-for-food pressure.
 
 The first-10-user test does not scientifically validate universal metabolic accuracy. It validates product behavior and identifies whether further calibration is necessary.
 
@@ -978,6 +1098,7 @@ Rules:
 - When both Available Bank and Emergency Bank are exhausted, use Recovery Forecast as planning guidance rather than punishment.
 - Future activity opportunities must not frame movement as repayment for food. Avoid language such as `burn off what you ate`, `undo your meal`, `earn your food`, `compensate for overeating`, `you failed`, or `work this off`.
 - Future activity opportunity estimates must be qualified ranges, not exact promises.
+- Today's Eating Budget must be framed as uncertain planning guidance, not permission to eat, a medical prescription, or calories earned through exercise.
 
 ## Superseded Or Contradictory Rules
 
@@ -992,10 +1113,17 @@ Rules:
 - Any guidance requiring a manual `Use Bank`, `Spend Bank`, treat withdrawal, or confirm-consumption action is superseded. V1 bank usage is automatic through completed-day finalization.
 - Any guidance treating the first completed-day calculation as immediately and permanently locked is superseded by ADR 009. Completed days post immediately as provisional, reconcile for two local calendar days through compensating transactions, and then lock.
 - Any guidance requiring all optional Today cards or all V1 capabilities to be visible during onboarding or first use is superseded by ADR 011.
+- Any guidance treating contextual relevance alone as sufficient for a proactive feature recommendation is superseded by ADR 014. Relevance, Familiarity, and Complementarity must all be satisfied, subject to unresolved measurement and pacing policy.
 - Earlier broad rejection of every current-day forecast is narrowed: projected bank results remain prohibited, while a qualified Projected Daily Burn is an approved V1 estimate outside the ledger.
+- Earlier blanket rejection of every current-day `calories remaining` value is narrowed by ADR 012. Generic or bank-like remaining-calorie displays remain prohibited; the explicitly labeled `Remaining Today` eating-guidance value is allowed and remains outside the ledger.
+- Any guidance describing Banking Goals as multiple independent banks, additional calorie accounts, parallel ledgers, or extra calories is superseded by ADR 013. Banking Goals organize one Available Bank and must conserve calories.
+- Any guidance that would let goal readiness create a withdrawal, mark intake, or fund goals with current-day or projected activity is superseded. Goal progress uses finalized Available Bank calories only.
 
 ## Open Product Decisions
 
+- How should meaningful familiarity with Available Bank and other calculation concepts be measured without relying on account age, elapsed time, or session count alone?
+- Which calculation interactions indicate genuine understanding rather than accidental use?
+- How should calculation-related recommendations be paced, reprioritized, suppressed after dismissal, and revisited after inactivity?
 - Is Apple Health dietary energy sufficiently available for the first 10 users, or is another supported intake path required?
 - The operational HealthKit query window for finalization is resolved as three local days. The separate completeness policy and up-to-seven-day onboarding initialization query remain open.
 - What minimum and maximum daily deficits and surpluses should be allowed?
@@ -1060,6 +1188,23 @@ Rules:
 - What minimum data and approved estimation method are required for Projected Daily Burn?
 - Do personalized activity averages display raw provider expenditure, CalorieBank-adjusted expenditure, or both?
 - How does feature-discovery state affect visibility without affecting calculation status, source truth, or ledger behavior?
+- What provider semantics and fields are sufficient for Today's Eating Budget?
+- How is remaining resting or expected expenditure estimated without overlap?
+- Does signed `daily_energy_adjustment` fully represent the eating-budget goal for cut, maintain, and bulk?
+- What rounding, refresh, freshness, correction, timezone, day-boundary, missing-input, forecast, and notification policies govern Today's Eating Budget?
+- Is Banking Goals implemented during first-10-user V1 or later in the post-foundation V1 rollout?
+- Is priority allocation the default, and are percentage and manual allocation included initially?
+- What is the exact allocation order between Emergency Bank and Banking Goals?
+- Are Banking Goal allocations soft reservations or protected allocations?
+- Must any Available Bank amount remain Unassigned?
+- How do finalized withdrawals reduce Unassigned and Banking Goal allocations?
+- Can the user attribute a finalized withdrawal to a goal, and can attribution be partial or deferred?
+- What happens to leftover allocation after partial use?
+- What is the default overflow destination, and can overflow resume a paused long-term goal?
+- How do provisional correction deltas reroute Banking Goal allocations?
+- What rounding, target, priority-tie, recurring-goal, active-goal-count, archive, retention, notification, and discovery policies govern Banking Goals?
+- Where is Banking Goals manually discoverable?
+- Does Planned Treat become a Banking Goal, reference one, or retain whole-Available-Bank progress after Banking Goals launches?
 
 ## Implementation Requirements
 
@@ -1069,5 +1214,7 @@ Rules:
 - The V1 policy must be represented as named, versioned configuration.
 - Goal mode, daily energy adjustment, adjustment source, desired weekly weight-change preference when applicable, expenditure-credit rate, and calculation-policy version must be snapshotted for each effective date.
 - Emergency Bank allocation and coverage rules must be represented as named, versioned reserve-policy configuration.
+- Future Banking Goal allocation operations must preserve `active_goal_allocations + unassigned_available_calories = available_bank`, use named versioned policy, and remain auditable without becoming a second authoritative ledger.
+- Banking Goals must not be implemented until the protection, finalized-withdrawal allocation, Emergency Bank order, and provisional-correction policies in ADR 013 are approved.
 - Tests are required for calculation changes, historical initialization, missing data states, duplicate prevention, corrections, and rounding once approved.
 - No production implementation is defined by this document; this is a product and architecture specification.

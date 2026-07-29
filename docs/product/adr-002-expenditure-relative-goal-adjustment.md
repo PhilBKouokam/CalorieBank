@@ -112,6 +112,8 @@ Future API contracts should expose goal mode and signed goal-adjustment fields r
 
 Bank calculations must use imported total daily expenditure, the `0.80` V1 adjustment, the signed daily energy adjustment, and imported daily calorie intake. Active calories must not be added separately after using total expenditure.
 
+ADR 012 introduces Today's Eating Budget as current-day guidance but does not change this goal model. The repository does not currently store a separate desired daily bank contribution. Product must resolve whether signed `daily_energy_adjustment` fully represents eating-budget intent for cut, maintain, and bulk before numeric implementation.
+
 ### Historical Snapshots
 
 Historical initialization and later recalculation must preserve the calculation-policy version and goal-adjustment fields used for each effective date. Future policy changes must not silently rewrite historical ledger meaning.

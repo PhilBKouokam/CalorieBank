@@ -50,6 +50,8 @@ adjusted_daily_expenditure = raw_total_daily_expenditure * 0.80
 
 The API verifies active-plus-basal consistency when component metadata is supplied and applies `0.80` exactly once. Workout or Move calories are not added separately.
 
+For the open current day, these are cumulative values found within the local-day query window. This adapter does not provide an approved estimate of resting or total expenditure for the unelapsed part of the day and does not establish a full-day expenditure forecast. ADR 012 therefore treats Apple Health's current values as confirmed expenditure so far, not a complete Today's Eating Budget.
+
 Step count is a cumulative context metric and is not converted into calories. Logged workout energy is descriptive and already represented within active energy. It is never added to raw expenditure, adjusted expenditure, or the ledger.
 
 ## Intake
@@ -84,6 +86,7 @@ Synthetic providers are controlled by `TODAY_INGESTION_MODE`. Device and product
 - Expo Go cannot run this integration; normal JavaScript iteration uses the installed development client.
 - App-launch, foreground, screen-focus, connection, and manual refresh use a rolling three-day query with a cooldown. Background delivery is deferred.
 - Current-day HealthKit aggregates never create ledger transactions, modify Available Bank, alter Planned Treat progress, finalize a day, or produce a bank forecast.
+- Current-day HealthKit aggregates cannot by themselves produce a numeric Today's Eating Budget until the remaining-expenditure and goal-mapping decisions in ADR 012 are approved.
 - Provisional-day reconciliation after provider corrections is implemented by ADR 009. ADR 010 supplies the prior two local dates and invokes orchestration after upload. History beyond that window and background delivery remain deferred.
 
 ## References

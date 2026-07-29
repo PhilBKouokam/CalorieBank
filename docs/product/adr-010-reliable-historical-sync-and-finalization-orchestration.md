@@ -35,6 +35,8 @@ The rolling window is calculated from the device's current local calendar and se
 
 - HealthKit remains device-only. The backend never queries Apple Health.
 - Current-day data remains awareness-only and never touches the ledger.
+- Today's Eating Budget may later read current-day aggregates under ADR 012, but it must not invoke posting, reconciliation, or locking and must not become an orchestration input.
+- Banking Goals may later react to eligible finalized contributions under ADR 013, but provider synchronization and this orchestrator do not own allocation policy. They must not duplicate accounting logic or treat projected/current-day data as goal funding.
 - Only completed-day intake and total-expenditure aggregates enter reconciliation.
 - Steps and workouts are synchronized as context but never affect banking.
 - Existing immutable snapshots, delta corrections, advisory locking, and ledger idempotency remain authoritative.

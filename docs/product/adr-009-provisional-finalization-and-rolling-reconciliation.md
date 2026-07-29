@@ -17,7 +17,7 @@ Completed days use an `OPEN -> PROVISIONAL -> LOCKED` lifecycle.
 - Each provider intake or total-expenditure change in that window creates a new immutable calculation snapshot. If the recalculated contribution differs from the current effective contribution, CalorieBank appends exactly one correction transaction for `new contribution - current effective contribution`.
 - At or after `lockAt`, the day becomes `LOCKED`. Automatic provider reconciliation can no longer alter its effective contribution.
 
-Existing ledger transactions are never edited. Available Bank remains the sum of initial and compensating ledger transactions. Steps, workouts, current-day awareness, Planning Database records, and activity estimates remain outside this pipeline.
+Existing ledger transactions are never edited. Available Bank remains the sum of initial and compensating ledger transactions. Steps, workouts, current-day awareness, Today's Eating Budget, Planning Database records, Banking Goal allocation records, and activity estimates remain outside this pipeline. ADR 013 may organize an eligible positive Available Bank allocation after posting, but it cannot change the contribution or create a parallel ledger.
 
 ## Rationale
 
@@ -37,6 +37,7 @@ Day completion and `lockAt` use the IANA timezone stored with the imported day, 
 - Goal mode, goal adjustment, adjustment rate, and calculation inputs are snapshotted at initial posting. Later goal-setting changes do not rewrite that day.
 - Provider updates for locked days may remain auditable ingestion records but cannot automatically create ledger corrections.
 - Existing finalized records are migrated as locked version-1 reports without changing their ledger amounts.
+- Banking Goal allocation and correction-routing policy is downstream of this accounting lifecycle and remains unresolved in ADR 013. Reconciliation must not silently leave goal allocations greater than Available Bank.
 
 ## Rejected Alternatives
 

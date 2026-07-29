@@ -93,9 +93,11 @@ It may include:
 - Cumulative steps and independent freshness.
 - Normalized logged workouts and independent freshness.
 
-It must never include projected bank change, projected deficit, projected withdrawal, calories remaining, or any value that appears like an official bank result before day finalization. A future Projected Daily Burn may consume normalized awareness data under ADR 011, but it is a separate estimated expenditure output and not a projected bank field.
+It must never include projected bank change, projected deficit, projected withdrawal, generic or bank-like calories remaining, or any value that appears like an official bank result before day finalization. A future Projected Daily Burn may consume normalized awareness data under ADR 011, with proactive introduction governed by ADR 014, but it is a separate estimated expenditure output and not a projected bank field. ADR 012 permits a separately labeled `Remaining Today` eating-guidance value only after its calculation contract is approved.
 
 Today values are not ledger inputs. After the local day completes, the provisional pipeline may consume source-attributed expenditure and intake aggregates under the approved bank-calculation rules; steps and workouts remain excluded.
+
+The existing normalized aggregate does not establish whether a provider reports expenditure accumulated so far, an estimated full-day value, or another intra-day semantic. A provider must declare that semantic before its data can support Today's Eating Budget. The current `GET /v1/me/today` contract remains unchanged until a separate implementation milestone approves an eating-budget read model.
 
 ## Concrete Adapters
 
@@ -143,3 +145,4 @@ Rejected because Today so far is awareness only. Current-day data is incomplete 
 - The ledger, finalized bank history, Planned Treat, and Activity Opportunity Engine remain provider-neutral.
 - Reconciliation remains separate from ingestion and is not implemented by this ADR.
 - Apple Health is the first device adapter; development providers remain test and explicit-local-fallback tools.
+- Provider-neutral ingestion must carry or resolve sufficient semantic metadata before downstream guidance treats partial-day expenditure as a full-day eating allowance.

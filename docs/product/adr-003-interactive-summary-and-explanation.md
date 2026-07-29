@@ -25,6 +25,7 @@ Today summary cards are approved V1 navigation gateways when they lead to histor
 - Unavailable bank data must be presented as `Not calculated`, `Waiting for data`, `Pending`, `Incomplete`, or equivalent honest states rather than fabricated zero values.
 - Consumer UI must use plain language and must not expose raw internal identifiers, API field names, database field names, variable names, or raw formula blocks.
 - Consumer Today should not show infrastructure diagnostics, persistent current-day pending copy, or projected bank outcomes. ADR 011 permits a progressively introduced, clearly estimated Projected Daily Burn, but it must not crowd the initial home experience or look like an official bank result.
+- Today's Eating Budget may later open a read-only explanation that distinguishes confirmed expenditure, estimated remaining expenditure, goal effect, confirmed intake, total budget, and Remaining Today. It must not reuse Bank History or imply that the guidance is ledger-backed.
 
 ## Rationale
 
@@ -41,4 +42,4 @@ Goal mode and goal adjustment are user preferences, so they belong in editable s
 - Placeholder history screens may show unavailable states or clearly labeled examples before integrations exist, but they must not invent expenditure, intake, ledger transactions, timestamps, or bank values as real user data.
 - Future ledger work must provide enough provenance for Bank History to show imported total expenditure as calories burned, the `0.80` policy as 80% credited, adjusted expenditure, goal mode, signed goal adjustment, daily allowance, imported intake as calories eaten, daily bank change, prior balance, reconciliation records, current Available Bank, freshness, and calculation status.
 - Future analytics may measure `bank_history_opened`, `bank_history_range_changed`, `bank_history_day_selected`, `goal_settings_opened`, `goal_configuration_update_started`, `goal_configuration_update_completed`, and `goal_configuration_update_failed`.
-- Summary-card availability does not make every supporting card initially visible. Progressive Feature Discovery and first-use visibility are governed by ADR 011.
+- Summary-card availability does not make every supporting card initially visible. Progressive Feature Discovery and first-use visibility are governed by ADR 011; ADR 014 governs readiness, workflow complementarity, and pacing for proactive card introductions. Manual navigation to available details remains unaffected.

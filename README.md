@@ -6,8 +6,11 @@ CalorieBank is moving from a web prototype into an iPhone-first mobile V1. The c
 2. `docs/product/v1-prd.md` defines authoritative V1 product scope and experience.
 3. `docs/product/bank-calculation-spec.md` governs all bank-calculation behavior.
 4. `docs/product/adr-011-progressive-feature-discovery.md` governs V1 availability, first-use visibility, recommendation, and contextual activation.
-5. `docs/product/adr-001-connection-first-v1.md` through `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md` govern their focused accepted decisions.
-6. `docs/architecture/current-state-audit.md` records implementation state and planning but cannot override the product documents above.
+5. `docs/product/adr-012-todays-eating-budget.md` governs Today's Eating Budget product boundaries and unresolved calculation requirements.
+6. `docs/product/adr-013-banking-goals.md` governs Banking Goals, one-bank conservation, allocation concepts, and unresolved withdrawal policy.
+7. `docs/product/adr-014-progressive-familiarity.md` governs recommendation readiness, complementarity, and pacing.
+8. `docs/product/adr-001-connection-first-v1.md` through `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md` govern their focused accepted decisions.
+9. `docs/architecture/current-state-audit.md` records implementation state and planning but cannot override the product documents above.
 
 ## V1 Mission
 
@@ -17,7 +20,13 @@ CalorieBank is not being built first as a replacement food logger. The first-use
 
 V1 includes a Planning Database for future meal and event estimates. It is not the food log. Connected calorie-tracking applications remain the source of truth for consumed intake and bank calculations.
 
-V1 scope does not require every capability to appear during onboarding or first use. ADR 011 keeps the initial experience focused on the bank and introduces optional planning, forecasting, reserve, and personalization capabilities only when relevant or manually requested. Today's Forecast and Projected Daily Burn remain V1 estimates; no Projected Bank is approved.
+V1 scope does not require every capability to appear during onboarding or first use. ADR 011 keeps the initial experience focused on the bank and governs contextual relevance; ADR 014 requires familiarity and workflow complementarity before optional planning, forecasting, reserve, or personalization capabilities are proactively introduced. Manual access remains available where practical. Today's Forecast and Projected Daily Burn remain V1 estimates; no Projected Bank is approved.
+
+ADR 014 adds Progressive Familiarity. A proactive recommendation requires Relevance, Familiarity, and Complementarity; account age, days since signup, and session count alone do not establish readiness. This policy controls recommendations, not manual feature access.
+
+Today's Eating Budget is a separate progressively discovered V1 guidance capability. It is neither Available Bank nor Today's Forecast, never changes the ledger, and must not be implemented numerically until ADR 012's provider-semantic, remaining-expenditure, and goal-mapping decisions are resolved.
+
+Banking Goals is a progressively discovered V1 Planning capability. It organizes real finalized Available Bank calories among user-created purposes and Unassigned calories; it does not create independent banks or a second ledger. Production implementation is blocked until ADR 013's protection, withdrawal-allocation, Emergency Bank ordering, and correction policies are resolved.
 
 ## Repository Structure
 
@@ -45,7 +54,11 @@ Future personalized Activity Opportunity Engine work is documented in `docs/prod
 
 Provider-neutral ingestion is documented in `docs/product/adr-006-provider-neutral-ingestion-architecture.md`. Apple Health is the first real device adapter and is documented in `docs/product/adr-007-apple-healthkit-device-ingestion.md`. Current-day steps, workouts, sync-session observability, and dashboard visibility rules are documented in `docs/product/adr-008-activity-context-and-customizable-today.md`. Provisional posting and reconciliation are authoritative in `docs/product/adr-009-provisional-finalization-and-rolling-reconciliation.md`; reliable three-day historical sync and orchestration are governed by `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md`. Development adapters remain test-only or explicitly enabled local fallback; device and production modes must not silently return synthetic calories.
 
-Progressive Feature Discovery is governed by `docs/product/adr-011-progressive-feature-discovery.md`. Available Bank remains mandatory and first, while implemented optional cards may be manually discoverable or introduced after sufficient data and relevance exist. Transparency, errors, safety information, and active recovery guidance are never discovery-gated.
+Progressive Feature Discovery is governed by `docs/product/adr-011-progressive-feature-discovery.md`. Available Bank remains mandatory and first, while implemented optional cards may be manually discoverable or proactively introduced only after sufficient data and all ADR 014 gates are satisfied. Transparency, errors, safety information, and active recovery guidance are never discovery-gated.
+
+Progressive Familiarity is governed by `docs/product/adr-014-progressive-familiarity.md`. When several capabilities are ready, recommend the one with the highest immediate value and delay the others until familiarity or context changes. Do not use unlocks, levels, or stacked introductions.
+
+Banking Goals is governed by `docs/product/adr-013-banking-goals.md`. Conceptually, active goal allocations plus Unassigned calories must always equal Available Bank. Emergency Bank remains separate, projected activity cannot fund goals, and goal attribution must never duplicate the automatic finalized withdrawal.
 
 The user-facing Available Bank never displays below zero. Users may optionally reserve genuinely accumulated calories in an Emergency Bank for unexpected overages. The V1 protection sequence is Available Bank -> optional Emergency Bank -> Recovery Forecast, rather than making a large negative balance the primary focus.
 

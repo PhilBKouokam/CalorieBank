@@ -4,7 +4,7 @@ Date: 2026-07-24
 
 ## Status
 
-Accepted as V1 product and UX policy. Recommendation thresholds, persistence, and delivery mechanics remain open.
+Accepted as V1 product and UX policy. ADR 014 extends this policy with familiarity, complementarity, and pacing requirements. Recommendation thresholds, persistence, and delivery mechanics remain open.
 
 ## Context
 
@@ -20,11 +20,24 @@ CalorieBank adopts **Progressive Feature Discovery** as a core product principle
 
 Capabilities should be introduced when they are likely to provide immediate, understandable value. Progressive discovery exists to reduce cognitive load, not to create artificial lockouts, maximize engagement, or manipulate users into returning.
 
+Progressive Feature Discovery determines when a capability is relevant. Progressive Familiarity under ADR 014 determines whether the user is ready to learn it and whether it complements the current workflow.
+
+Every proactive introduction requires three independent gates:
+
+1. **Relevance:** the feature solves a current problem.
+2. **Familiarity:** meaningful interaction indicates the user can comfortably adopt another concept.
+3. **Complementarity:** the feature extends the current workflow rather than redirecting it.
+
+If any gate is not satisfied, the recommendation waits. Manual discovery and contextually mandatory information remain available.
+
 The product must distinguish:
 
 - **Available in V1:** implemented and supported within the approved V1 scope.
 - **Initially visible:** shown during onboarding or on the first Today experience.
-- **Eligible for recommendation:** enough relevant data or context exists to make an introduction useful.
+- **Relevant:** enough data or context exists for the feature to solve a current problem.
+- **Familiar enough:** the user has meaningfully interacted with prerequisite concepts; account age, elapsed days, and session count alone are insufficient.
+- **Complementary:** the capability is a natural next step in the current workflow.
+- **Eligible for proactive recommendation:** relevance, familiarity, and complementarity are all satisfied.
 - **Recommended:** an optional, explainable introduction has been presented.
 - **Manually discoverable:** reachable through navigation or settings without waiting for a recommendation.
 - **Enabled:** activated by an explicit user choice when activation is required.
@@ -54,7 +67,7 @@ Before recommending advanced features, CalorieBank should generally help the use
 5. Why the current day is incomplete until sufficient data is finalized.
 6. Why planning estimates do not directly change the bank.
 
-No universal familiarity period is approved. Elapsed time may be relevant, but sufficient data, user understanding, explicit interest, and contextual need are more important than an arbitrary day count.
+No universal familiarity period is approved. Familiarity is not account age, days since signup, session count alone, or an arbitrary timer. Meaningful use, successful use of prior capabilities, natural revisits, appropriate explanation-view use, and explicit exploration may be conceptual evidence, but no score or threshold is approved.
 
 ## Contextual Discovery
 
@@ -62,6 +75,7 @@ Potential discovery signals include:
 
 - Sufficient reliable history exists for a useful estimate.
 - The user repeatedly opens current-day expenditure or relevant detail views.
+- The user repeatedly reviews confirmed current-day intake or manually enables eating guidance.
 - The user regularly increases activity during the day.
 - A recognizable recurring activity appears in data the user authorized CalorieBank to use.
 - The user creates, follows, searches for, or approaches a planned meal, treat, or event target.
@@ -70,7 +84,9 @@ Potential discovery signals include:
 - Recovery becomes necessary.
 - The user explicitly expresses interest in a capability.
 
-Signals are conceptual product inputs, not proof of intent and not approval for a machine-learning system. CalorieBank must not infer sensitive motives from weak or unrelated behavior.
+Signals are conceptual product inputs, not proof of intent, familiarity, or understanding and not approval for a machine-learning system. CalorieBank must not infer sensitive motives from weak or unrelated behavior.
+
+Relevance alone is insufficient. Before recommending a relevant capability, product policy must also identify the prerequisite concept the user appears familiar with and explain how the recommendation complements the current workflow.
 
 An optional introduction should explain why the feature is relevant now and offer appropriate controls such as `Enable`, `Learn more`, `Not now`, or `Dismiss`. Declining a recommendation must not impair the core banking experience. Available V1 features should be manually discoverable where practical rather than permanently hidden behind recommendation logic.
 
@@ -84,13 +100,25 @@ Prefer contextual explanations such as:
 
 Avoid generic or manipulative copy such as `Unlock another feature`, `Try this new tool`, or `You have been selected`.
 
+## Pacing And Prioritization
+
+CalorieBank should prefer depth of understanding over feature exposure. A newly introduced capability should generally have an opportunity to become familiar before another proactive recommendation appears.
+
+If several features satisfy all three gates:
+
+1. Recommend the one with the highest immediate value.
+2. Delay the others.
+3. Reevaluate after familiarity increases or context changes.
+
+This is not approval for a fixed waiting period. Exact pacing, priority policy, and familiarity evidence remain open under ADR 014.
+
 ## Feature Treatment
 
 ### Today's Forecast And Projected Daily Burn
 
 Today's Forecast, including Projected Daily Burn, is a V1 capability but is not required in onboarding or the initial Today experience.
 
-It may become eligible after sufficient complete expenditure history exists and one or more relevant conditions apply, such as demonstrated interest in current-day expenditure, recurring activity patterns, or relevance to an active meal, treat, or event plan.
+It may become relevant after sufficient complete expenditure history exists and conditions apply, such as demonstrated interest in current-day expenditure, recurring activity patterns, or relevance to an active meal, treat, or event plan. Proactive introduction must also wait until the user can distinguish confirmed current-day values from an estimated Projected Daily Burn and the forecast complements the workflow already in use.
 
 It may answer:
 
@@ -98,21 +126,35 @@ It may answer:
 - How might an editable assumption about steps or a familiar activity affect that projection?
 - How does today compare with my normal pattern?
 
-It must remain an estimate. It must not be described as guaranteed expenditure, exact physiology, or a projected bank balance. No projected deposit, withdrawal, calories remaining, or midnight bank balance is approved.
+It must remain an estimate. It must not be described as guaranteed expenditure, exact physiology, or a projected bank balance. No projected deposit, withdrawal, generic calories remaining, or midnight bank balance is approved. ADR 012's explicitly labeled `Remaining Today` is separate confirmed eating guidance, not a forecast result.
 
 Users should adjust grounded assumptions rather than enter an arbitrary projected-burn number. Potential assumptions include expected final step count, duration of a familiar activity, whether a recurring activity is expected, or planned walking, running, cycling, or another supported activity. Exact controls and supported activities remain open.
 
 Personalized activity averages may be displayed only when sufficient reliable history exists. They must be labeled as approximate historical averages, not constants. Whether these averages use raw provider expenditure, CalorieBank-adjusted expenditure, or both with clear labels remains an Open Product Decision.
 
+### Today's Eating Budget
+
+Today's Eating Budget is a V1 capability governed by ADR 012. It is not required during onboarding or on the Foundation-stage Today screen.
+
+It may become relevant when reliable intra-day expenditure and intake exist and conditions apply, such as repeated current-day data checks, recurring increases in activity, engagement with Today's Forecast, relevance to an active plan, or manual enablement through Customize Today. Proactive introduction also requires familiarity with Available Bank and confirmed-versus-estimated data, plus a complementary current-day or planning workflow.
+
+It must remain manually discoverable where practical. Eligibility signals are not proof that a user exercises to change food intake and do not approve a recommendation algorithm.
+
+Discovery copy should explain that confirmed expenditure can change current-day eating flexibility while the finalized bank remains separate. It must not use `unlock calories`, `earn food`, `burn this to eat that`, or exercise-punishment language.
+
 ### Planning
 
 The Planning Database and planned meal or Planned Treat capabilities remain in V1. They need not all appear during first use.
 
-Planning may be introduced after the user builds an Available Bank, expresses interest in a future food or event, creates or searches for a planning item, or approaches a defined target. Planning remains separate from Food Tracking: planning estimates are not confirmed intake and do not directly change the bank.
+Planning may become relevant after the user builds an Available Bank, expresses interest in a future food or event, creates or searches for a planning item, or approaches a defined target. Proactive introduction must also fit a workflow the user already understands. Planning remains separate from Food Tracking: planning estimates are not confirmed intake and do not directly change the bank.
+
+Banking Goals is a post-foundation V1 Planning capability governed by ADR 013. It may become relevant when the user has finalized Available Bank calories to organize, creates more than one plan, wants to prioritize an upcoming event without abandoning a longer-term plan, or manually opens Planning, Available Bank details, or Customize Today. A proactive introduction additionally requires familiarity with Available Bank and Planning and must complement an existing multi-plan workflow.
+
+Banking Goals must not be mandatory onboarding. A recommendation may explain that the capability reserves portions of one Available Bank for user-created purposes, but it must not imply separate banks, extra calories, or inferred private intentions. Goals should remain manually discoverable where practical; exact placement is open.
 
 ### Emergency Bank
 
-Emergency Bank remains optional. It may be introduced as a lightweight onboarding choice, later after the user understands Available Bank, after repeated near-zero balances or an unexpected overage, or when the user asks for more protection.
+Emergency Bank remains optional. It may be offered as a lightweight onboarding choice only when that does not overload required setup, or later after the user understands Available Bank, after repeated near-zero balances or an unexpected overage, or when the user asks for more protection. Proactive introduction requires all three ADR 014 gates.
 
 Discovery must frame Emergency Bank as optional preparation for unpredictable life events, not as a requirement or fear-based warning. Manual access through an intentional settings or navigation surface must remain possible under the final UX decision.
 
@@ -127,18 +169,20 @@ Recovery continues to use a non-negative Available Bank display, a realistic pat
 The home experience may evolve conceptually:
 
 - **Foundation:** Available Bank, latest finalized contribution, calculation explanation, and current data status.
-- **Familiarity:** Today-so-far intake and expenditure, simplified history, and Planned Treat or meal progress when useful.
-- **Planning:** Planning Database, progress toward a desired food or event, and relevant planning guidance.
+- **Familiarity:** Today-so-far intake and expenditure, Today's Eating Budget when reliable and useful, simplified history, and Planned Treat or meal progress.
+- **Planning:** Planning Database, progress toward a desired food or event, and Banking Goals for organizing finalized Available Bank calories when relevant.
 - **Forecasting:** Today's Forecast, Projected Daily Burn, editable activity assumptions, and personal activity averages.
 - **Protection or recovery:** Emergency Bank when enabled or relevant, and Recovery Forecast whenever required.
 
 These are not fixed chronological levels. Users may skip stages, enable features manually, or enter a contextually necessary state at any time. Available Bank remains mandatory, visible, and first.
 
+The stages do not establish familiarity automatically. Moving between them is not an unlock system, and users do not complete levels.
+
 ## Notifications
 
 The meaningful morning bank update remains the primary V1 notification.
 
-Feature-discovery notifications are permitted only when the feature is highly relevant, notification permission covers the message, immediate planning value exists, and an in-app introduction would not be more appropriate. Generic feature advertising and frequent engagement prompts are not approved.
+Feature-discovery notifications are permitted only when all three ADR 014 gates are satisfied, notification permission covers the message, immediate planning value exists, pacing permits another introduction, and an in-app introduction would not be more appropriate. Generic feature advertising and frequent engagement prompts are not approved.
 
 Exact category eligibility, notification limits, cooldowns, and re-prompt behavior remain open. ADR 005 continues to govern Activity Opportunity recommendations and their stronger consent, safety, estimation, and fatigue requirements.
 
@@ -154,7 +198,7 @@ Progressive discovery must not:
 - Repeatedly prompt after dismissal.
 - Optimize app opens or screen time as the primary measure of success.
 
-Users should be able to dismiss optional introductions, retain the core experience, and manually find appropriate available features. The exact suppression and permanent-disable policies are open.
+Users should be able to dismiss optional introductions, retain the core experience, and manually find appropriate available features. Progressive Familiarity governs proactive recommendations, not permission to use a feature. Intentional exploration must not be blocked by a familiarity gate. The exact suppression and permanent-disable policies are open.
 
 ## Transparency And Safety
 
@@ -183,12 +227,16 @@ First-user validation should evaluate:
 - Whether the initial experience feels simple.
 - Whether users understand the bank before optional features appear.
 - Whether recommendations feel relevant and explain why they appeared.
+- Whether recommendations arrive after prerequisite concepts are understood and extend the user's current workflow.
+- Whether multiple eligible recommendations are paced rather than stacked.
 - Recommendation acceptance, dismissal, manual discovery, and later activation.
 - Whether important capabilities feel hidden.
 - Whether introductions become repetitive or annoying.
 - Whether Today's Forecast appears only with sufficient data.
 - Whether users understand personalized averages as approximate.
 - Whether users distinguish Projected Daily Burn from a guaranteed result and understand that no Projected Bank exists.
+- Whether users distinguish Today's Eating Budget and Remaining Today from Available Bank and forecasted expenditure.
+- Whether users understand Banking Goals as allocations within one Available Bank rather than independent balances.
 - Whether progressive discovery improves trust and usefulness rather than engagement volume.
 
 Engagement metrics alone do not prove product value.
@@ -199,13 +247,21 @@ Engagement metrics alone do not prove product value.
 - Existing visible-by-default supporting-card guidance is superseded. Available Bank remains mandatory and first; initial optional-card visibility is governed by this ADR and more specific UX decisions.
 - Existing broad rejections of all current-day forecasts are narrowed to projected bank results. A qualified Projected Daily Burn is approved for V1 progressive discovery, while the official bank remains finalized-only.
 - Implementations may require later discovery-state persistence, recommendation policy, manual-discovery navigation, and dashboard-default migrations. This ADR does not approve a schema.
+- Implementations may also require capability-specific familiarity and complementarity evidence, but ADR 014 does not approve a scoring system or machine-learning model.
 - Existing implemented features may remain manually accessible even when removed from the default first-use surface.
 
 ## Open Product Decisions
 
 - What defines sufficient familiarity with the core bank?
+- How should familiarity be measured without relying on account age, elapsed days, or session count alone?
+- Which interactions represent genuine understanding rather than accidental use?
+- Should familiarity decay after long inactivity?
+- How long should the system wait between recommendations?
+- How should multiple eligible discoveries be prioritized?
+- How should accessibility needs influence pacing?
 - What minimum data is required for Today's Forecast?
 - What minimum data is required for personalized activity averages?
+- What minimum confirmed data and provider semantics are required for Today's Eating Budget?
 - Which signals are approved for each feature?
 - Which available features are manually accessible before recommendation?
 - Where are undiscovered features visible, if anywhere?
@@ -222,6 +278,9 @@ Engagement metrics alone do not prove product value.
 - How are users with imported historical data treated?
 - Does imported history make a new user immediately eligible for advanced features?
 - What happens when a forecast loses sufficient data?
+- What happens when Today's Eating Budget loses sufficient intake or expenditure data?
+- Which approved signals make Banking Goals eligible, and where is it manually discoverable?
+- Does dismissing a Banking Goals introduction use the general suppression policy or a capability-specific policy?
 - Which features, beyond Recovery Forecast and required transparency, are contextually mandatory?
 - Do personalized activity averages show raw provider values, CalorieBank-adjusted values, or both with clear labels?
 - What success metrics distinguish user value from engagement manipulation?
