@@ -1,5 +1,145 @@
 # CalorieBank
 
+Smart calorie planning through calorie banking.
+
+Helping people enjoy the foods they love while continuing to make progress toward their fitness goals.
+
+[![React Native](https://img.shields.io/badge/React%20Native-20232A?style=flat&logo=react&logoColor=61DAFB)](#technology-stack)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](#technology-stack)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat&logo=nodedotjs&logoColor=white)](#technology-stack)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white)](#technology-stack)
+[![Expo](https://img.shields.io/badge/Expo-000020?style=flat&logo=expo&logoColor=white)](#technology-stack)
+
+- **Live Demo:** https://caloriebank-pi.vercel.app
+- **Website:** https://philbk.dev
+- **Architecture Walkthrough:** [docs/architecture/current-state-audit.md](docs/architecture/current-state-audit.md)
+
+## The Problem
+
+Most nutrition tools are built around restriction: log everything, stay under a number, and treat higher-calorie days as failures. That model can make planning enjoyable meals feel harder than it needs to be, especially for people who want flexibility without losing sight of their fitness goals.
+
+## Why I Built It
+
+Most nutrition apps focus on tracking food after it has already been eaten. CalorieBank focuses on helping people plan ahead by translating connected intake and expenditure data into a clear bank balance they can use to make better decisions before meals, events, and treats happen.
+
+## Product Philosophy
+
+Building software is the easy part. Building software people trust, understand, and want to keep using is the harder problem.
+
+CalorieBank is designed around that constraint. The product does not try to punish users for imperfect days or overwhelm them with raw nutrition data. It turns complex calorie inputs into a simple planning model: what is available, why it changed, and how it affects the choices ahead.
+
+## Product Overview
+
+CalorieBank is a calorie-planning product built around calorie banking. Instead of making each day feel isolated, it helps users understand how completed days contribute to a running bank that can support future plans.
+
+The V1 direction is connection-first: supported data sources provide intake and total-expenditure data, CalorieBank calculates bank changes, records traceable ledger entries, and explains the balance through clear morning updates and bank history. Planning Database entries help users compare future meals or events against the bank without logging confirmed intake or changing the ledger.
+
+The result is a more flexible nutrition experience: users can keep making progress while planning for foods and events they care about.
+
+## Key Features
+
+**Planning**
+
+- Compare future meal and event estimates against the available bank.
+- Use Planning Database entries as planning estimates without turning them into confirmed intake.
+- Keep planned treats separate from actual food tracking and ledger changes.
+
+**Automatic Banking**
+
+- Sync supported intake and expenditure data sources.
+- Calculate completed-day bank contributions from imported totals.
+- Maintain immutable ledger-style balance records with traceable changes.
+
+**Progress**
+
+- Show Available Bank as the primary balance.
+- Provide Bank History for completed-day changes and explanations.
+- Send one meaningful morning bank update instead of noisy calorie alerts.
+
+**Secure Accounts**
+
+- Keep user-owned nutrition data scoped to the authenticated user.
+- Keep secrets and provider credentials out of the client.
+- Treat connected data sources as the source of truth for consumed intake.
+
+**Personalized Experience**
+
+- Configure goal mode and deficit/surplus adjustments when applicable.
+- Keep current-day activity context visible without turning estimates into bank deposits.
+- Introduce optional capabilities progressively when they are relevant and understandable.
+
+## Architecture
+
+CalorieBank is structured as a mobile-first client-server system. The frontend presents the planning experience, the API validates requests and coordinates application services, domain packages own banking rules, the database stores traceable records, and provider/cloud boundaries handle ingestion and infrastructure concerns.
+
+```text
+Frontend
+  ↓
+API
+  ↓
+Business Logic
+  ↓
+Database
+  ↓
+Cloud / Provider Integrations
+```
+
+The architecture is intentionally split so product UI decisions do not leak into bank calculations. Banking logic belongs in `packages/domain`, shared API schemas belong in `packages/schemas`, and mobile/provider ingestion uses normalized boundaries before data can affect completed-day accounting.
+
+For the current implementation state and architecture notes, see [docs/architecture/current-state-audit.md](docs/architecture/current-state-audit.md).
+
+## Engineering Decisions
+
+**Why React Native and Expo**
+
+CalorieBank is moving toward an iPhone-first V1 because the most useful nutrition and expenditure data lives closest to the device. Expo keeps the mobile workflow productive while still allowing a native development build for HealthKit, which is required for real device ingestion.
+
+**Why a Node API**
+
+The API keeps validation, orchestration, and persistence behind a server boundary. That matters because the bank should be calculated from trusted inputs and traceable rules, not from client-side assumptions.
+
+**Why domain packages**
+
+Banking logic is isolated in shared domain code so calculations can be tested, versioned, and reused without being tied to a screen or route handler. This also makes product decisions easier to audit against the PRD and ADRs.
+
+**Why PostgreSQL for V1**
+
+The mobile V1 uses PostgreSQL for structured records, migrations, and ledger-style accounting. Immutable balance transactions and reconciliation behavior benefit from relational constraints and explicit migration history.
+
+**Why provider-neutral ingestion**
+
+HealthKit is the first native provider boundary, but domain logic should not depend on provider-specific payloads. Normalized ingestion keeps future providers possible without adding provider switches to bank calculations.
+
+**Why mobile-first V1**
+
+The original web prototype proved the concept. The mobile V1 focuses on the daily context where the product is most useful: morning updates, connected health data, bank visibility, and planning decisions made before real meals and events.
+
+## Technology Stack
+
+**Frontend:** Expo, React Native, Expo Router, TypeScript
+
+**Backend:** Node.js, API routes and service orchestration
+
+**Database:** PostgreSQL, Prisma
+
+**Cloud:** Apple HealthKit device ingestion, provider-neutral sync boundaries
+
+**Authentication:** Production authentication deferred; stable development user configuration is used for current local API work
+
+**Tooling:** npm workspaces, TypeScript, shared config packages, linting, tests
+
+## Development Workflow
+
+Modern AI-assisted development accelerated investigation, implementation, debugging, and documentation work on CalorieBank. I used it as a development aid for reading unfamiliar code paths, comparing options, drafting changes, and checking edge cases faster.
+
+Architectural decisions, product scope, validation, testing, and final verification remained under human review. The important engineering work was deciding what should be built, what should not be built yet, and whether each change respected the product documents, ADRs, and bank-calculation rules.
+
+## Repository Documentation
+
+The sections below preserve the repository implementation guidance, product source-of-truth hierarchy, local setup commands, API notes, mobile development workflow, and validation instructions.
+
+## Source-of-Truth Hierarchy
+
 CalorieBank is moving from a web prototype into an iPhone-first mobile V1. The current source-of-truth hierarchy is:
 
 1. `AGENTS.md` defines repository implementation guardrails.
