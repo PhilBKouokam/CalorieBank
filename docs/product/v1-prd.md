@@ -4,7 +4,7 @@ Date: 2026-07-16
 
 ## Source Of Truth
 
-This PRD is the authoritative V1 product document. It supersedes prior food-logging-first assumptions in older audits, prototype docs, and implementation notes. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. Supporting architecture guidance lives in `docs/architecture/current-state-audit.md`; focused accepted decisions are recorded in ADRs 001-014. Progressive Feature Discovery, including the distinction between V1 availability and first-use visibility, is governed by `docs/product/adr-011-progressive-feature-discovery.md`. Progressive Familiarity, including recommendation readiness, complementarity, and pacing, is governed by `docs/product/adr-014-progressive-familiarity.md`. Today's Eating Budget product boundaries and unresolved calculation requirements are governed by `docs/product/adr-012-todays-eating-budget.md`. Banking Goals, one-bank conservation, conceptual allocation methods, and implementation-blocking withdrawal policy decisions are governed by `docs/product/adr-013-banking-goals.md`.
+This PRD is the authoritative V1 product document. It supersedes prior food-logging-first assumptions in older audits, prototype docs, and implementation notes. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. Supporting architecture guidance lives in `docs/architecture/current-state-audit.md`; focused accepted decisions are recorded in ADRs 001-015. Progressive Feature Discovery, including the distinction between V1 availability and first-use visibility, is governed by `docs/product/adr-011-progressive-feature-discovery.md`. Progressive Familiarity, including recommendation readiness, complementarity, and pacing, is governed by `docs/product/adr-014-progressive-familiarity.md`. Today's Eating Budget product boundaries and unresolved calculation requirements are governed by `docs/product/adr-012-todays-eating-budget.md`. Banking Goals, one-bank conservation, conceptual allocation methods, and implementation-blocking withdrawal policy decisions are governed by `docs/product/adr-013-banking-goals.md`. Time-Aware Activity Forecasting, including system confidence, user readiness, time opportunity, and burn-target feasibility, is governed by `docs/product/adr-015-time-aware-activity-forecasting.md`.
 
 ## V1 Mission
 
@@ -36,6 +36,7 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 - Bank-first hierarchy: the default interface should show the all-time Available Bank first, keep the screen visually simple, and reveal history or calculation detail only when requested. Fitbit is a reference for information hierarchy and progressive disclosure only; CalorieBank must not copy its branding or exact visual design.
 - Progressive Feature Discovery: introduce capabilities when they are likely to provide immediate value instead of presenting the entire product during onboarding or first use. **Complexity should be earned, not imposed.** This principle reduces cognitive load; it must not create artificial lockouts, hide safety or transparency, or optimize engagement for its own sake.
 - Progressive Familiarity: **Features should be introduced only when they are relevant, complementary to the user's existing workflow, and the user has demonstrated enough familiarity to comfortably adopt them.** Relevance, Familiarity, and Complementarity are separate gates for proactive recommendations. Familiarity is not account age, days since signup, session count alone, or an arbitrary timer.
+- Two kinds of forecast readiness: advanced personalized forecasts require both sufficient reliable user-specific data and a user who is familiar enough to benefit. System readiness does not imply user readiness, and user readiness cannot compensate for inadequate forecast confidence.
 - Eating guidance is not the bank: Today's Eating Budget may translate current-day expenditure, confirmed intake, and goal configuration into actionable guidance, but it must remain visually and mathematically separate from finalized Available Bank and from forecasted expenditure.
 - Planning, not tracking: CalorieBank helps users plan future meals and events using estimated nutrition information and their available calorie bank. Connected calorie-tracking applications remain the source of truth for food intake.
 - One authoritative bank: Banking Goals may organize finalized Available Bank calories around user-created purposes, but they must not create independent balances, duplicate calories, or a second ledger.
@@ -97,7 +98,8 @@ V1 screen and capability lists define what belongs to V1; they do not require ev
 - Manual correction or fallback entry where technically necessary.
 - Privacy, consent, integration revocation, and data-deletion considerations.
 - Clear language explaining what is imported and how the bank is calculated.
-- Today's Forecast with Projected Daily Burn, introduced only when sufficient data and relevance support an understandable estimate. It must never present a Projected Bank.
+- Today's Forecast with Projected Daily Burn, introduced only when sufficient data and ADR 014's Relevance, Familiarity, and Complementarity gates support an understandable estimate. It must never present a Projected Bank.
+- Time-Aware Activity Forecasting as a progressively revealed advanced layer within Today's Forecast. It remains implementation-blocked until ADR 015's confidence, baseline, overlap, target, freshness, and day-boundary decisions are approved.
 - Today's Eating Budget, progressively introduced only after its provider semantics, goal relationship, and non-overlapping expenditure method are approved. It must not change Available Bank or create ledger transactions.
 
 ## Secondary Capabilities
@@ -347,6 +349,7 @@ The current Planned Treat contract continues to compare one active treat with to
 - Remaining Today: Today's Eating Budget minus confirmed intake so far. It is explicitly labeled current-day guidance, may be negative, and is not a bank balance.
 - Today's Forecast: estimated future guidance based on projected end-of-day conditions and editable assumptions.
 - Projected Daily Burn: estimated end-of-day expenditure from Today's Forecast. It is neither Today's Eating Budget nor a Projected Bank.
+- Time-Aware Activity Forecasting: advanced Today forecast guidance that uses remaining time, current pace, and qualified personal history to evaluate burn-target feasibility, approximate checkpoints, and optional activity scenarios. It is not a separate bank or ledger input.
 - Ledger transaction: immutable record explaining a balance-affecting change.
 
 ## Bank-First Information Architecture
@@ -676,6 +679,46 @@ Users should edit forecast assumptions rather than type an arbitrary projected-b
 
 When sufficient reliable history exists, the forecast may use approximate personal activity averages. Product copy must distinguish raw provider-reported expenditure from CalorieBank-adjusted expenditure. Whether an average displays raw values, adjusted values, or both is unresolved and must be decided before implementation.
 
+#### Time-Aware Activity Forecasting
+
+Time-Aware Activity Forecasting is an advanced layer inside Today's Forecast. Projected Daily Burn answers how much expenditure the user may reach by day end; the time-aware layer asks what the user's current pace and remaining time imply for a selected forecast or optional burn target.
+
+Remaining time is a first-class planning consideration. Earlier activity can leave more opportunity for baseline expenditure, incidental movement, additional steps, or optional activities during the rest of the day. CalorieBank must not claim that identical activity or the same step count intrinsically burns substantially more merely because it occurred earlier.
+
+Conceptual inputs may include current local time, the approved day boundary, confirmed and adjusted expenditure so far, current steps, historical step and expenditure accumulation by time of day, expected remaining baseline expenditure, familiar activity ranges and duration, current forecast assumptions, an optional approved burn target, remaining hours, and provider freshness. Not every provider is expected to supply every input.
+
+The conceptual model is:
+
+```text
+remaining_day_window = approved_user_day_end - current_time
+
+projected_end_of_day_expenditure =
+  confirmed_adjusted_expenditure_so_far
+  + expected_remaining_baseline_expenditure
+  + expected_remaining_activity_expenditure
+```
+
+This formula is not approved for production. Remaining-baseline methodology, hourly provider semantics, hypothetical-increment overlap, target ownership, confidence, rounding, freshness, and active-day boundaries remain unresolved under ADR 015.
+
+The advanced layer may provide qualified states such as `on track`, `ahead of current pace`, `slightly behind current pace`, `walking alone is unlikely to reach this target within your remaining day at your usual pace`, `low confidence`, or `insufficient data`. It may provide an approximate personalized checkpoint such as `Reach approximately 21,000 steps by 4:30 PM`, but that checkpoint represents remaining planning opportunity, not a physiological cutoff or a claim that activity completed later stops burning calories.
+
+Walking-only scenarios should use a reliable personal step pace and step-to-expenditure relationship where available. Familiar-activity alternatives may use qualified historical ranges, typical duration, and whether an activity fits the remaining window. They remain hypothetical assumptions, not actual expenditure or required actions.
+
+Today's Forecast may progressively deepen through a basic projection, editable assumptions, familiar activities, time-aware pace guidance, and feasibility alternatives. These are conceptual depths, not visible levels or a required sequence. Users may remain on the simpler forecast, dismiss the advanced introduction, manually explore it where practical, remove assumptions, and return to defaults.
+
+Advanced guidance has two independent readiness gates:
+
+1. **Forecast Confidence Gate:** CalorieBank has sufficient personal history, fresh current data, required inputs, and acceptable uncertainty.
+2. **User-readiness gate:** Relevance, Familiarity, and Complementarity all pass under ADR 014.
+
+One gate becoming ready does not imply the other is ready. If confidence is insufficient, retain the simpler forecast or show an honest limited state. If data is sufficient but the user is not ready, do not proactively introduce the advanced layer.
+
+Confirmed total expenditure receives the approved `0.80` adjustment once. Provider total expenditure, active energy, resting energy, workout calories, step-derived estimates, and familiar-activity averages must not be stacked when they overlap. Hypothetical increments must remain separately labeled and cannot affect Available Bank, Today's Eating Budget confirmed guidance, Banking Goals, provisional posting, or the ledger.
+
+Specific pace guidance requires sufficiently fresh provider data. Provider corrections may increase or decrease the projection and change the checkpoint; meaningful changes should be explained without implying that the prior forecast was a promise. Forecasting must respect an approved user-day boundary and timezone, with overnight work, travel, timezone changes, and daylight-saving behavior resolved before implementation.
+
+ADR 015 governs the detailed product boundaries, safety language, Activity Opportunity Engine relationship, validation plan, and implementation-blocking Open Product Decisions.
+
 ## Today And Bank History Interaction
 
 Today uses a bank-first hierarchy.
@@ -691,6 +734,7 @@ Today uses a bank-first hierarchy.
 - Today's Eating Budget must appear only after its calculation policy and required data are reliable. It must clearly label total budget, confirmed intake, and Remaining Today; it must not look like Available Bank or a forecast.
 - Today shows the previous-day or latest completed contribution, its `Provisional` or `Locked` status, lock date when provisional, and `Adjusted from` context after a correction. It does not expose raw reconciliation identifiers.
 - Today's Forecast must not appear in the initial experience by default or compete with Available Bank. Once progressively introduced, Projected Daily Burn must be clearly labeled as an estimate and remain distinct from any projected bank change, which is prohibited.
+- Advanced time-aware pace and feasibility guidance must remain inside Today's Forecast, appear only after both forecast confidence and user-readiness gates pass, and allow the user to continue using the simpler forecast.
 - Infrastructure diagnostics such as API health, service names, or backend connectivity details are not consumer home-screen content.
 - Today must not contain long explanatory paragraphs, raw formula blocks, or internal variable names.
 - Goal Mode, Daily Deficit, Daily Surplus, or Maintenance opens Goal Settings.
@@ -856,6 +900,7 @@ The notification taxonomy remains restrained:
 - Avoid encouraging extreme restriction, compensatory behavior, or shame.
 - Treat Today's Eating Budget as uncertain planning guidance, not permission to eat or a medical prescription. Do not imply that food must be earned through exercise.
 - Future activity opportunities must support autonomy, not guilt. They must not be triggered as direct punishment after a high-intake event.
+- Time-aware forecasts must not prescribe maximal activity, imply that food must be earned, or continuously raise expenditure targets. If the selected forecast is on track, the product may state that no additional activity is needed.
 - Guard against unsafe deficit or surplus selections.
 - Weight-rate conversions are planning estimates, not promises. The common `3,500 kcal per pound` conversion is an approximation affected by metabolism, body composition, adherence, water changes, measurement error, and physiological adaptation.
 - CalorieBank must not promise that a selected deficit or surplus will produce an exact weekly weight change.
@@ -884,6 +929,7 @@ The notification taxonomy remains restrained:
 - The initial experience presents the core bank without requiring configuration or comprehension of every optional V1 capability.
 - Optional feature introductions can be dismissed, and required transparency remains available without discovery milestones.
 - Proactive recommendations require documented relevance, familiarity, and complementarity rather than elapsed time or session count alone.
+- Before Time-Aware Activity Forecasting is implemented, both independent readiness requirements are testable: CalorieBank has sufficient reliable personal data, and the user-readiness gates can be evaluated without treating data history as familiarity.
 - Before numeric implementation, Today's Eating Budget provider semantics, goal mapping, remaining-expenditure method, and double-counting protections are approved and testable.
 - Before Banking Goals implementation, protection semantics, finalized-withdrawal allocation, Emergency Bank ordering, correction behavior, and one-bank conservation are approved and testable.
 
@@ -983,6 +1029,10 @@ The notification taxonomy remains restrained:
 - `feature_recommendation_deferred`
 - `today_forecast_opened`
 - `projected_daily_burn_assumption_changed`
+- `time_aware_forecast_opened`
+- `time_aware_forecast_confidence_limited`
+- `time_aware_forecast_scenario_changed`
+- `time_aware_forecast_discovery_dismissed`
 - `today_eating_budget_opened`
 - `today_eating_budget_explanation_viewed`
 - `today_eating_budget_discovery_dismissed`
@@ -999,7 +1049,22 @@ The notification taxonomy remains restrained:
 Analytics must not include raw food names, Banking Goal names, free-text notes, passwords, precise health payloads, or unnecessary personally identifying information.
 Feature-discovery analytics must not treat opens, sessions, elapsed time, or activation alone as proof of familiarity or value. Validation must include trust, understanding, relevance, complementarity, pacing, annoyance, manual discoverability, and whether users feel important capabilities are hidden.
 
+Time-aware forecast validation must additionally test whether users distinguish confirmed burn, projected burn, and selected targets; interpret checkpoints as approximate; understand that earlier identical activity does not intrinsically burn more; distinguish walking-only from familiar-activity scenarios; recognize stale and insufficient-data states; keep hypothetical activity separate from confirmed expenditure; and feel supported rather than pressured. App opens or target increases alone do not demonstrate value.
+
 ## Open Product Decisions
+
+Time-Aware Activity Forecasting decisions are governed comprehensively by ADR 015. Numeric implementation and automated proactive introduction are blocked until product resolves at least:
+
+- The minimum personal history, confidence method and threshold, and provider-freshness requirement.
+- The remaining-baseline method, hourly provider semantics, step/time model, familiar-activity recognition, and non-overlapping increment policy.
+- Burn-target ownership and persistence, on-track tolerance, checkpoint method, update cadence, and correction messaging.
+- Point-versus-range presentation, uncertainty labels, stale and incomplete states, and walking-versus-alternative ranking.
+- Forecast active-day boundary, overnight work, travel, timezone changes, and daylight-saving behavior.
+- Approved relevance and familiarity evidence, manual access, progressive pacing, and whether related forecast depths may be introduced together.
+- Safety policy for unusually intense days and overexercise risk without unsupported health inference.
+- The shared boundary, if any, with Activity Opportunity estimation and the retention/privacy policy for hourly personal patterns.
+
+These blockers do not change finalized banking, current-day confirmed awareness, or the user's ability to use a simpler qualified Projected Daily Burn once its own base policy is approved.
 
 Progressive Feature Discovery decisions are governed comprehensively by ADR 011. Before automated recommendation or production forecast discovery is implemented, resolve:
 

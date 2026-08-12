@@ -4,7 +4,7 @@ Date: 2026-07-24
 
 ## Status
 
-Accepted as V1 product and UX policy. ADR 014 extends this policy with familiarity, complementarity, and pacing requirements. Recommendation thresholds, persistence, and delivery mechanics remain open.
+Accepted as V1 product and UX policy. ADR 014 extends this policy with familiarity, complementarity, and pacing requirements. ADR 015 applies those gates alongside a separate Forecast Confidence Gate for advanced time-aware forecasting. Recommendation thresholds, persistence, and delivery mechanics remain open.
 
 ## Context
 
@@ -131,6 +131,10 @@ It must remain an estimate. It must not be described as guaranteed expenditure, 
 Users should adjust grounded assumptions rather than enter an arbitrary projected-burn number. Potential assumptions include expected final step count, duration of a familiar activity, whether a recurring activity is expected, or planned walking, running, cycling, or another supported activity. Exact controls and supported activities remain open.
 
 Personalized activity averages may be displayed only when sufficient reliable history exists. They must be labeled as approximate historical averages, not constants. Whether these averages use raw provider expenditure, CalorieBank-adjusted expenditure, or both with clear labels remains an Open Product Decision.
+
+ADR 015 adds Time-Aware Activity Forecasting as a deeper layer within Today's Forecast. It may become relevant when the user repeatedly uses the basic forecast, edits activity assumptions, pursues an explicit burn target, or manually explores advanced controls. Relevance is not enough: proactive introduction also requires ADR 015's Forecast Confidence Gate and ADR 014's Familiarity and Complementarity gates.
+
+The forecast may deepen conceptually from a basic Projected Daily Burn to editable assumptions, familiar activities, time-aware pace guidance, and feasibility alternatives. These are not levels, and users may stay with the simpler forecast. Advanced time-aware guidance is not required on the initial dashboard and must not be recommended merely because enough historical data exists.
 
 ### Today's Eating Budget
 
@@ -260,6 +264,7 @@ Engagement metrics alone do not prove product value.
 - How should multiple eligible discoveries be prioritized?
 - How should accessibility needs influence pacing?
 - What minimum data is required for Today's Forecast?
+- What independent data-confidence policy is required for Time-Aware Activity Forecasting, and how is it kept separate from user familiarity?
 - What minimum data is required for personalized activity averages?
 - What minimum confirmed data and provider semantics are required for Today's Eating Budget?
 - Which signals are approved for each feature?
@@ -278,6 +283,7 @@ Engagement metrics alone do not prove product value.
 - How are users with imported historical data treated?
 - Does imported history make a new user immediately eligible for advanced features?
 - What happens when a forecast loses sufficient data?
+- Can advanced time-aware forecasting be manually explored before proactive eligibility, and what limited state appears when confidence is insufficient?
 - What happens when Today's Eating Budget loses sufficient intake or expenditure data?
 - Which approved signals make Banking Goals eligible, and where is it manually discoverable?
 - Does dismissing a Banking Goals introduction use the general suppression policy or a capability-specific policy?

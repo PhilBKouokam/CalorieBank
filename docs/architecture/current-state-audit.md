@@ -12,7 +12,7 @@ V1 also includes a Planning Database for future meal and event estimates. That d
 
 The approved mobile information architecture is bank-first. The initial experience shows the all-time Available Bank first, the latest finalized contribution, concise calculation access, and required data status. It does not require every implemented V1 capability to be visible immediately. Foreground Apple Health sync now refreshes current day plus the prior two local dates, then scheduler-neutral orchestration delegates posting, reconciliation, and locking to the banking engine. Completed days affect Available Bank immediately as provisional, reconcile through append-only correction transactions for two local calendar days, and then lock.
 
-The current architecture inventory below remains valid as a description of the existing prototype. Forward-looking reuse, migration, database, and vertical-slice guidance has been updated to match `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`; the rejection of absolute user-entered daily calorie targets is recorded in ADR 002. Provider-neutral ingestion is governed by ADR 006, Apple Health and the development-build boundary by ADR 007, activity context by ADR 008, provisional reconciliation by ADR 009, reliable rolling synchronization/orchestration by ADR 010, Progressive Feature Discovery by ADR 011, Today's Eating Budget by ADR 012, Banking Goals by ADR 013, and Progressive Familiarity by ADR 014.
+The current architecture inventory below remains valid as a description of the existing prototype. Forward-looking reuse, migration, database, and vertical-slice guidance has been updated to match `docs/product/v1-prd.md`. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`; the rejection of absolute user-entered daily calorie targets is recorded in ADR 002. Provider-neutral ingestion is governed by ADR 006, Apple Health and the development-build boundary by ADR 007, activity context by ADR 008, provisional reconciliation by ADR 009, reliable rolling synchronization/orchestration by ADR 010, Progressive Feature Discovery by ADR 011, Today's Eating Budget by ADR 012, Banking Goals by ADR 013, Progressive Familiarity by ADR 014, and Time-Aware Activity Forecasting by ADR 015.
 
 ADR 011 separates V1 availability from first-use visibility. It supersedes architecture guidance that assumes all supporting Today cards must be shown by default. Feature discovery state, recommendation thresholds, and persistence remain conceptual; no speculative recommendation or machine-learning schema is approved.
 
@@ -21,6 +21,8 @@ ADR 014 extends that policy: proactive discovery requires independent Relevance,
 ADR 012 adds Today's Eating Budget as progressively discovered V1 guidance. The current Apple Health adapter provides cumulative active plus basal energy for the local-day window and the API provides confirmed intake so far, but the repository has no approved remaining-expenditure model or separate desired-bank-contribution field. A numeric budget is therefore architecture-planned but implementation-blocked; no speculative schema or API is approved.
 
 ADR 013 adds Banking Goals as a post-foundation V1 Planning capability. Banking Goals organize portions of one Available Bank into user-created goal allocations and Unassigned calories; they do not create independent balances or a second ledger. The current one-active-Planned-Treat implementation remains unchanged. Production Banking Goals work is blocked until protection semantics, withdrawal allocation, Emergency Bank ordering, and correction routing are approved.
+
+ADR 015 adds an advanced layer within Today's Forecast. The current ingestion architecture supplies cumulative active-plus-basal expenditure, steps, normalized workouts, source timestamps, and local-calendar dates, but it does not provide an approved hourly baseline model, familiar-activity recognition policy, burn-target contract, forecast-confidence method, or active-day boundary. Time-aware numerical guidance is therefore architecture-planned but implementation-blocked. Forecast confidence and user familiarity remain independent readiness gates.
 
 ## 1. Current Architecture
 
@@ -593,7 +595,7 @@ Future tables:
 - Implement one active Planned Treat that compares required calories against the all-time Available Bank without creating ledger transactions. Negative completed days handle bank reduction through finalized daily ledger transactions.
 - Build Expo screens for onboarding, connections, bank-first home with all-time Available Bank, one active Planned Treat, Today so far only after real current-day expenditure and intake ingestion exists or honest setup/unavailable states exist, optional Emergency Bank visibility, Recovery Forecast when applicable, planning search/detail, Bank History with finalized-day ranges, selected-day detail, notification settings, and manual correction/fallback.
 - Preserve these capabilities as V1 scope without placing all of them in onboarding or the initial Today surface. Foundation-stage visibility should prioritize Available Bank, latest finalized contribution, explanation, and required data status. Subsequent proactive introductions must pass Relevance, Familiarity, and Complementarity and should not stack multiple new concepts.
-- Keep Today's Forecast and Projected Daily Burn in V1 planning, but do not implement or introduce them until sufficient-history, estimation, labeling, and discovery decisions are approved. They must never project the bank.
+- Keep Today's Forecast and Projected Daily Burn in V1 planning, but do not implement or introduce them until sufficient-history, estimation, labeling, and discovery decisions are approved. Time-Aware Activity Forecasting remains a deeper layer inside that feature and additionally requires approved remaining-time, baseline, confidence, target, freshness, overlap, and day-boundary policies. Both system confidence and user readiness must pass before proactive introduction. Forecasts must never project the bank.
 - Keep Today's Eating Budget in V1 planning, but do not implement a numeric read model until provider intra-day semantics, remaining-resting-expenditure methodology, signed-goal mapping, rounding, correction, and stale-data rules are approved. It must remain outside the ledger.
 - Keep Banking Goals in the post-foundation V1 Planning roadmap, but do not implement schema or APIs until soft-versus-protected allocation, negative-change reduction, Emergency Bank ordering, correction routing, and policy versioning are approved. Preserve the existing one-active-Planned-Treat behavior meanwhile.
 
@@ -611,6 +613,7 @@ Future tables:
 - Add observability, error tracking, backups, rate limits, privacy policy support, account deletion, and support tooling.
 - Add seed/sandbox data and end-to-end tests for connection-first onboarding, sync, ledger calculation, notification generation, and explanation history.
 - Validate initial-experience simplicity, manual feature discoverability, dismissal behavior, and the difference between Projected Daily Burn and a prohibited Projected Bank.
+- Validate the two independent Time-Aware Activity Forecasting readiness gates, approximate checkpoint comprehension, confirmed-versus-hypothetical separation, stale-data fallback, and the ability to remain on the simpler forecast.
 - Validate that Today's Eating Budget is distinguishable from Available Bank, Remaining Today is clearly labeled, and confirmed versus estimated inputs remain understandable.
 - Validate that Banking Goals are understood as allocations within one Available Bank, Unassigned remains clear, overflow is predictable, and Ready is not mistaken for consumed or withdrawn.
 - Add TestFlight build pipeline and beta environment separation.
@@ -623,6 +626,7 @@ Future tables:
 
 ### Phase 7: Activity Opportunity Engine
 
+- Before production opportunity recommendations, establish a provider-neutral historical-pattern read model and approve the deterministic basic Projected Daily Burn and Forecast Confidence contracts. Time-aware pace guidance follows only after ADR 015's remaining-time and safety blockers are resolved.
 - Implement only after real source-attributed intake and expenditure ingestion, Today-so-far awareness, notification permission, stable Planned Treat timing, and explicit activity preference collection exist.
 - Start with a curated, versioned population-based activity-energy catalogue and deterministic estimate service.
 - Add wearable-personalized estimates only after enough consented activity history exists.
@@ -683,3 +687,6 @@ These questions genuinely affect implementation choices:
 17. Which provider semantics, remaining-expenditure model, and goal mapping can support Today's Eating Budget without double counting or implying a Projected Bank?
 18. Are Banking Goal allocations soft or protected, and how must finalized withdrawals and provisional corrections reduce or reroute them while preserving `allocations + Unassigned = Available Bank`?
 19. What is the exact allocation order between Emergency Bank and Banking Goals, and which named versioned policy governs it?
+20. What deterministic baseline, step/time, familiar-activity, target, confidence, freshness, and uncertainty policy supports Time-Aware Activity Forecasting without double counting?
+21. What active-day boundary and timezone/DST behavior supports remaining-time guidance for overnight workers and travel while leaving finalized accounting dates unchanged?
+22. What distinct state and evidence model can enforce both Forecast Confidence and Progressive Familiarity without treating personal data volume as user understanding?

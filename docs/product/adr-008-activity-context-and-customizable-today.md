@@ -66,7 +66,9 @@ HealthKit does not reveal whether read access to an individual type was denied. 
 
 ## Consequences
 
-- `GET /v1/me/today` exposes independent burn, intake, step, and workout states without projected bank fields. A future Projected Daily Burn may use these source-attributed inputs through a distinct estimated read model governed by ADRs 011 and 014.
+- `GET /v1/me/today` exposes independent burn, intake, step, and workout states without projected bank fields. A future Projected Daily Burn may use these source-attributed inputs through a distinct estimated read model governed by ADRs 011, 014, and 015.
+- Time-Aware Activity Forecasting may use steps and normalized workouts as explanatory history or hypothetical assumptions only after a non-overlapping estimation method is approved. Existing step and workout records remain context; they are not added to confirmed active-plus-basal expenditure or the ledger.
+- Advanced pace guidance requires a separate Forecast Confidence Gate. The current 30-minute awareness freshness threshold does not automatically become the approved time-aware forecast threshold.
 - Today's Eating Budget is an optional progressively discovered card governed by ADR 012. It must remain unavailable until its calculation policy is approved and must not be derived by stacking steps or workout calories on provider total expenditure.
 - Hiding a card does not disable ingestion or delete health data.
 - Current-day awareness never creates ledger transactions, changes Available Bank, changes Planned Treat progress, or alters the latest completed contribution. The latest contribution card may display ADR 009 provisional/locked status and correction context.

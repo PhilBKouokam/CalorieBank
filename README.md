@@ -67,6 +67,7 @@ The result is a more flexible nutrition experience: users can keep making progre
 - Configure goal mode and deficit/surplus adjustments when applicable.
 - Keep current-day activity context visible without turning estimates into bank deposits.
 - Introduce optional capabilities progressively when they are relevant and understandable.
+- Deepen Today's Forecast with time-aware pace and feasibility guidance only after both forecast confidence and user-readiness requirements are satisfied.
 
 ## Architecture
 
@@ -149,8 +150,9 @@ CalorieBank is moving from a web prototype into an iPhone-first mobile V1. The c
 5. `docs/product/adr-012-todays-eating-budget.md` governs Today's Eating Budget product boundaries and unresolved calculation requirements.
 6. `docs/product/adr-013-banking-goals.md` governs Banking Goals, one-bank conservation, allocation concepts, and unresolved withdrawal policy.
 7. `docs/product/adr-014-progressive-familiarity.md` governs recommendation readiness, complementarity, and pacing.
-8. `docs/product/adr-001-connection-first-v1.md` through `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md` govern their focused accepted decisions.
-9. `docs/architecture/current-state-audit.md` records implementation state and planning but cannot override the product documents above.
+8. `docs/product/adr-015-time-aware-activity-forecasting.md` governs advanced time-aware forecasting, forecast confidence, and burn-target feasibility.
+9. `docs/product/adr-001-connection-first-v1.md` through `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md` govern their focused accepted decisions.
+10. `docs/architecture/current-state-audit.md` records implementation state and planning but cannot override the product documents above.
 
 ## V1 Mission
 
@@ -163,6 +165,8 @@ V1 includes a Planning Database for future meal and event estimates. It is not t
 V1 scope does not require every capability to appear during onboarding or first use. ADR 011 keeps the initial experience focused on the bank and governs contextual relevance; ADR 014 requires familiarity and workflow complementarity before optional planning, forecasting, reserve, or personalization capabilities are proactively introduced. Manual access remains available where practical. Today's Forecast and Projected Daily Burn remain V1 estimates; no Projected Bank is approved.
 
 ADR 014 adds Progressive Familiarity. A proactive recommendation requires Relevance, Familiarity, and Complementarity; account age, days since signup, and session count alone do not establish readiness. This policy controls recommendations, not manual feature access.
+
+ADR 015 extends Today's Forecast with future Time-Aware Activity Forecasting. It may evaluate current pace, remaining time, a selected burn target, walking-only feasibility, and familiar-activity scenarios, but numeric production behavior is blocked until the forecast method and confidence policy are approved. Reliable data and user familiarity are independent readiness requirements.
 
 Today's Eating Budget is a separate progressively discovered V1 guidance capability. It is neither Available Bank nor Today's Forecast, never changes the ledger, and must not be implemented numerically until ADR 012's provider-semantic, remaining-expenditure, and goal-mapping decisions are resolved.
 

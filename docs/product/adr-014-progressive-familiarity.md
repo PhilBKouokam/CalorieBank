@@ -138,6 +138,12 @@ If a user understands Planning and has more than one user-confirmed purpose for 
 
 Today's Forecast may be relevant when projected expenditure would help the user, but it should wait until the user can distinguish confirmed Today's Eating Budget guidance from estimated Projected Daily Burn.
 
+### Basic Forecast To Time-Aware Activity Forecasting
+
+ADR 015's advanced forecast may complement repeated, successful use of the basic Today's Forecast. Proactive introduction requires two independent kinds of readiness: CalorieBank must have sufficient reliable personal data under the Forecast Confidence Gate, and the user must satisfy Relevance, Familiarity, and Complementarity. A long data history does not prove understanding, and a familiar user does not make low-confidence guidance acceptable.
+
+The user may remain on the simpler forecast. The advanced layer must not be framed as an unlock, level, or reward for app usage.
+
 ### Contextual Recovery
 
 Recovery Forecast remains contextually mandatory when required by the bank state. Familiarity does not delay recovery guidance.
@@ -189,6 +195,8 @@ Research should evaluate:
 - How should imported historical data affect familiarity without implying product understanding?
 - Can familiarity be capability-specific rather than global?
 - How are prerequisite concepts defined for each recommendation?
+- What familiarity with the basic Today's Forecast is required before Time-Aware Activity Forecasting may be proactively introduced?
+- Can closely related forecast depths be introduced together when doing so reduces cognitive load, and how is that exception evaluated?
 - How should recommendation state be stored and reset?
 - How many proactive recommendations may be active at once, and can more than one be introduced during the same week?
 - Can users permanently disable proactive feature recommendations while retaining manual access?

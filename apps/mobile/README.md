@@ -16,6 +16,7 @@ The mobile app should follow the repository-level V1 source of truth:
 - `../../docs/product/adr-012-todays-eating-budget.md`
 - `../../docs/product/adr-013-banking-goals.md`
 - `../../docs/product/adr-014-progressive-familiarity.md`
+- `../../docs/product/adr-015-time-aware-activity-forecasting.md`
 - `../../docs/architecture/current-state-audit.md`
 
 V1 is connection-first and low-friction. The primary experience is not daily manual food logging. The app should help users connect supported intake and expenditure/health data sources, calculate a transparent lifetime calorie bank, and receive one meaningful morning bank update.
@@ -23,6 +24,8 @@ V1 is connection-first and low-friction. The primary experience is not daily man
 The mobile home experience should show Available Bank first and keep the initial surface focused on the latest finalized contribution, explanation, and required status. Optional V1 cards may be manually enabled under ADR 011 or proactively introduced after all ADR 014 gates pass. Recovery Forecast appears automatically after Available Bank and Emergency Bank are exhausted; do not make a large negative balance the primary home-screen experience.
 
 ADR 014 requires Relevance, Familiarity, and Complementarity before proactive mobile recommendations. This does not block intentional navigation or manual card enablement.
+
+ADR 015 defines Time-Aware Activity Forecasting as an advanced layer within Today's Forecast. It requires two independent readiness checks: CalorieBank must have sufficient reliable personal data, and the user must be familiar enough for the guidance to help. The current mobile shell must not fabricate pace checkpoints, burn-target feasibility, or familiar-activity scenarios.
 
 Today's Eating Budget is an optional V1 guidance capability, distinct from Available Bank and Today's Forecast. Its numeric implementation is blocked by ADR 012's open provider-semantic, remaining-expenditure, and goal-mapping decisions; the current mobile shell must not fabricate it from Today So Far.
 
@@ -34,7 +37,7 @@ Manual food entry belongs only as fallback, correction, supplementary input, or 
 
 ## Current Scope
 
-The app includes coordinated foreground Apple Health rolling-window ingestion for expenditure, intake, steps, and normalized workouts; a provider-neutral Today read model; and persistent fixed-order card visibility preferences. Available Bank remains mandatory and first. Existing implementation visibility may require a later ADR 011 migration; this documentation change does not add discovery logic. Today's Forecast and Projected Daily Burn remain V1 estimates but must not be represented as Projected Bank data. Production authentication, broad historical ingestion, background HealthKit delivery, exact-time scheduling, and notifications remain deferred.
+The app includes coordinated foreground Apple Health rolling-window ingestion for expenditure, intake, steps, and normalized workouts; a provider-neutral Today read model; and persistent fixed-order card visibility preferences. Available Bank remains mandatory and first. Existing implementation visibility may require a later ADR 011 migration; this documentation change does not add discovery logic. Today's Forecast and Projected Daily Burn remain V1 estimates but must not be represented as Projected Bank data. Time-aware forecasting is documentation-planned and implementation-blocked under ADR 015. Production authentication, broad historical ingestion, background HealthKit delivery, exact-time scheduling, and notifications remain deferred.
 
 ## Development
 

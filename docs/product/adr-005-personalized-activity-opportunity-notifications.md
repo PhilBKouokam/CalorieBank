@@ -37,6 +37,10 @@ ADR 013 introduces Banking Goals as a broader planning-allocation capability. Th
 
 Estimated activity ranges and personal activity averages must not be added to confirmed provider total expenditure when calculating Today's Eating Budget. They remain explanatory or forecast inputs unless a documented methodology proves that the values do not overlap, as required by ADR 012.
 
+ADR 015 introduces Time-Aware Activity Forecasting inside Today's Forecast. It evaluates a user-selected forecast, current pace, remaining time, and optional familiar-activity scenarios. This differs from the Activity Opportunity Engine, which may later generate structured candidates tied to Planned Treat context, explicit preferences, timing, consent, and delivery policy.
+
+The two systems may eventually share a deterministic, versioned activity-estimation service, but they must not duplicate responsibilities. Today's Forecast does not own push delivery, fatigue controls, or notification candidate generation. The Opportunity Engine must not treat a forecast scenario as completed activity, actual expenditure, or a bank deposit. Any shared model boundary remains an Open Product Decision.
+
 ## Activity Preferences
 
 Activity interests must be explicit. CalorieBank must not infer activities from sex, age, ethnicity, or stereotypes.
@@ -278,3 +282,5 @@ Activity preferences, profile fields, notification history, wearable history, an
 9. Consider wearable-personalized estimates when sufficient consented history exists.
 
 This sequence describes technical readiness, not a fixed user journey or evidence of user familiarity. Progressive discovery may proactively introduce the capability only after Relevance, Familiarity, and Complementarity are all satisfied. It must not use opportunity notifications as generic feature advertising, stack multiple new concepts in rapid succession, or treat notification engagement alone as product understanding.
+
+Likewise, sufficient data for ADR 015's Forecast Confidence Gate does not authorize an Activity Opportunity notification. Notification delivery still requires the separate preference, consent, safety, fatigue, timing, and candidate-validity rules in this ADR.

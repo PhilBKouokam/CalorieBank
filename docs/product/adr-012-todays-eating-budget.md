@@ -216,11 +216,14 @@ This guardrail applies to:
 - Today's Eating Budget.
 - Today's Forecast.
 - Projected Daily Burn.
+- Time-Aware Activity Forecasting.
 - Personalized activity averages.
 - Activity Opportunity calculations.
 - Future eating-flexibility calculations.
 
 Personal activity averages remain explanatory or forecast inputs unless the system can establish that they are not already represented in confirmed provider totals.
+
+ADR 015's Time-Aware Activity Forecasting remains hypothetical even when it uses personalized pace, familiar activities, or a selected burn target. Its projected baseline and activity increments must not silently increase Today's Eating Budget or Remaining Today. Any future forecasted eating-flexibility output requires a separate approved label and calculation under this ADR.
 
 ## Progressive Feature Discovery
 
@@ -422,6 +425,7 @@ Increased app opens alone do not prove value.
 - Can manual activity affect the confirmed budget?
 - Are step-based changes explanatory only or calculation inputs?
 - Can Today's Forecast show a separately labeled forecasted eating budget?
+- Can Time-Aware Activity Forecasting show a separately labeled forecasted eating-flexibility scenario, and how is it prevented from resembling confirmed Today's Eating Budget?
 - How are forecasted and confirmed eating budgets visually distinguished?
 - Which behavioral signals make the feature eligible?
 - Where is it manually discoverable?

@@ -240,6 +240,8 @@ A planning comparison must label whether it uses Remaining Today, Unassigned cal
 
 Projected Daily Burn, activity estimates, and current-day awareness must never appear as saved goal progress. Goal progress uses finalized calories only. No Projected Bank is permitted.
 
+Time-Aware Activity Forecasting under ADR 015 may eventually provide qualified context about possible progress after finalization if the day follows a selected scenario. It must not allocate forecast calories, mark a goal ready, or display hypothetical expenditure as funded. Banking Goal state continues to use finalized Available Bank only.
+
 ## Progressive Feature Discovery
 
 Banking Goals is an approved post-foundation V1 Planning capability. It is not mandatory onboarding and need not appear on the Foundation-stage dashboard. Planning -> Banking Goals is the intended complementary progression when organizing saved calories naturally extends the user's active planning workflow.

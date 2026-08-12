@@ -43,11 +43,13 @@ For example, if the connected expenditure source reports `2,000 kcal` so far, Ca
 
 Current-day intake should show the source-attributed total calorie intake so far, such as `Calories eaten · 1,500 kcal · Imported from your connected intake source`.
 
-The user may interpret these live values themselves. CalorieBank must not show generic or bank-like current-day calories remaining, an official or projected bank change, a forecasted midnight balance, or recommendations to eat less or exercise more. ADR 012 permits an explicitly labeled `Remaining Today` value within Today's Eating Budget; it is current-day guidance, not a bank remainder. ADR 011 separately approves a qualified Projected Daily Burn estimate for progressive V1 discovery, and ADR 014 governs readiness and pacing for its proactive introduction; it is an expenditure estimate, not a bank forecast.
+The user may interpret these live values themselves. CalorieBank must not show generic or bank-like current-day calories remaining, an official or projected bank change, a forecasted midnight balance, or recommendations to eat less or exercise more. ADR 012 permits an explicitly labeled `Remaining Today` value within Today's Eating Budget; it is current-day guidance, not a bank remainder. ADR 011 separately approves a qualified Projected Daily Burn estimate for progressive V1 discovery, ADR 014 governs user readiness and pacing, and ADR 015 governs the advanced time-aware layer; all remain expenditure planning, not bank forecasts.
 
 Emergency Bank is optional and protected. It is separate from Available Bank, excluded from normal planned spending, excluded from Planned Treat progress, and not automatically shown on Today. Users may later choose whether its card is visible. Hiding the card must not change the balance or reserve rules.
 
 Today dashboard customization should start with simple visibility toggles. Available Bank is mandatory, always visible, and always first. Optional cards may include Planned Treat, Today so far, Today's Eating Budget, Yesterday/latest finalized result, Current Goal, Emergency Bank, Projected Daily Burn when eligible, and future connection status cards. V1 availability does not require first-use visibility; ADR 011 governs contextual discovery and ADR 014 requires Relevance, Familiarity, and Complementarity before proactive introduction. Users may still enable available cards intentionally. Drag-and-drop ordering is deferred.
+
+Time-Aware Activity Forecasting does not add a separate required Today card. It progressively deepens Today's Forecast after both ADR 015 forecast confidence and ADR 014 user-readiness conditions are met. Available Bank remains first, and advanced forecast assumptions never become dashboard bank values.
 
 ## Rejected Alternative
 

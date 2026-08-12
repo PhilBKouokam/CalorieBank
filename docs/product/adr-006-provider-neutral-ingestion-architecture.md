@@ -93,7 +93,9 @@ It may include:
 - Cumulative steps and independent freshness.
 - Normalized logged workouts and independent freshness.
 
-It must never include projected bank change, projected deficit, projected withdrawal, generic or bank-like calories remaining, or any value that appears like an official bank result before day finalization. A future Projected Daily Burn may consume normalized awareness data under ADR 011, with proactive introduction governed by ADR 014, but it is a separate estimated expenditure output and not a projected bank field. ADR 012 permits a separately labeled `Remaining Today` eating-guidance value only after its calculation contract is approved.
+It must never include projected bank change, projected deficit, projected withdrawal, generic or bank-like calories remaining, or any value that appears like an official bank result before day finalization. A future Projected Daily Burn may consume normalized awareness data under ADR 011, with proactive introduction governed by ADR 014 and advanced time-aware behavior governed by ADR 015, but it is a separate estimated expenditure output and not a projected bank field. ADR 012 permits a separately labeled `Remaining Today` eating-guidance value only after its calculation contract is approved.
+
+Provider-neutral ingestion supplies confirmed, source-attributed inputs; it does not own forecast assumptions. Future Time-Aware Activity Forecasting may consume current expenditure, steps, freshness, and authorized historical patterns through a separate read/domain boundary. Provider-specific field names must remain inside adapters, and absent hourly or baseline semantics must not be invented by the forecast layer.
 
 Today values are not ledger inputs. After the local day completes, the provisional pipeline may consume source-attributed expenditure and intake aggregates under the approved bank-calculation rules; steps and workouts remain excluded.
 

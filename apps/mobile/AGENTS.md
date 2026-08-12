@@ -18,6 +18,8 @@ Do not add feature recommendations, discovery-state persistence, or default-visi
 
 Do not add proactive recommendation behavior without ADR 014's Relevance, Familiarity, and Complementarity gates and pacing policy. Manual feature discovery must not be blocked by familiarity.
 
+Time-Aware Activity Forecasting is governed by ADR 015 and remains inside Today's Forecast. Do not add precise pace checkpoints, latest-time guidance, burn-target feasibility, or familiar-activity alternatives until both the Forecast Confidence Gate and user-readiness gate can be satisfied under approved calculation policy. Never present it as a Projected Bank or feed hypothetical activity into confirmed current-day guidance.
+
 Today's Eating Budget is governed by ADR 012. Do not add a numeric card or compute Remaining Today from the existing Today response until the unresolved full-day expenditure and goal-mapping policy is approved. Never present it as Available Bank or a Projected Bank.
 
 Latest contribution and Bank History must follow ADR 009: show effective contribution, provisional or locked status, lock timing, and consumer-readable correction history. Do not imply a provisional contribution is delayed or edit ledger data from the client.
