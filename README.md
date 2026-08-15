@@ -190,13 +190,15 @@ screenshots/       Existing prototype screenshots
 
 ## Current Foundation Scope
 
-This branch includes the mobile/API foundation, foreground Apple Health rolling three-day ingestion, and the provisional bank pipeline. Current day remains awareness-only; yesterday and the day before are refreshed automatically so completed days can post immediately, remain correctable for two local calendar days, and then lock. Product direction no longer uses a user-entered absolute daily calorie target; V1 derives allowance from imported total daily expenditure, CalorieBank's `0.80` adjustment, and the user's goal-mode adjustment. Production authentication, background HealthKit delivery, notifications, and exact-midnight jobs remain deferred.
+This branch includes the mobile/API foundation, foreground Apple Health rolling three-day ingestion, server-side Fitbit expenditure ingestion, explicit authoritative-provider selection, and the provisional bank pipeline. Current day remains awareness-only; yesterday and the day before are refreshed automatically so completed days can post immediately, remain correctable for two local calendar days, and then lock. Product direction no longer uses a user-entered absolute daily calorie target; V1 derives allowance from imported total daily expenditure, CalorieBank's `0.80` adjustment, and the user's goal-mode adjustment. Production authentication, background HealthKit delivery, notifications, and exact-midnight jobs remain deferred.
 
 The first implementation milestones should prioritize connection-first onboarding, technically credible supported data-source sync, automatic bank calculation, transparent history, Planning Database estimates for future meals/events, and the morning bank update. Manual food logging is a fallback/correction path, not the dominant V1 loop. Bank-calculation behavior, including Available Bank, optional Emergency Bank, Recovery Forecast, and reserve-policy history, is governed by `docs/product/bank-calculation-spec.md`. Automatic bank usage and dashboard awareness are recorded in `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`.
 
 Future personalized Activity Opportunity Engine work is documented in `docs/product/adr-005-personalized-activity-opportunity-notifications.md`. It is intentionally deferred until real intake/expenditure ingestion, Today-so-far awareness, notification consent, stable Planned Treat timing, and explicit activity preferences exist. Estimated activity calories must never be deposited into the bank or treated as actual expenditure.
 
 Provider-neutral ingestion is documented in `docs/product/adr-006-provider-neutral-ingestion-architecture.md`. Apple Health is the first real device adapter and is documented in `docs/product/adr-007-apple-healthkit-device-ingestion.md`. Current-day steps, workouts, sync-session observability, and dashboard visibility rules are documented in `docs/product/adr-008-activity-context-and-customizable-today.md`. Provisional posting and reconciliation are authoritative in `docs/product/adr-009-provisional-finalization-and-rolling-reconciliation.md`; reliable three-day historical sync and orchestration are governed by `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md`. Development adapters remain test-only or explicitly enabled local fallback; device and production modes must not silently return synthetic calories.
+
+Authoritative provider selection and Fitbit are governed by `docs/product/adr-016-authoritative-provider-selection-and-multi-provider-resolution.md`. Exactly one expenditure provider and one intake provider feed a calculation. Fitbit and Apple Health expenditure are never summed. Apple Health remains the implemented intake and activity-context path; Fitbit is the first dedicated expenditure path.
 
 Progressive Feature Discovery is governed by `docs/product/adr-011-progressive-feature-discovery.md`. Available Bank remains mandatory and first, while implemented optional cards may be manually discoverable or proactively introduced only after sufficient data and all ADR 014 gates are satisfied. Transparency, errors, safety information, and active recovery guidance are never discovery-gated.
 
@@ -346,6 +348,12 @@ POST /v1/me/ingestion/steps
 POST /v1/me/ingestion/workouts
 POST /v1/me/ingestion/sync-sessions
 PATCH /v1/me/ingestion/sync-sessions/:sessionId
+GET /v1/me/provider-selection
+PUT /v1/me/provider-selection
+GET /v1/me/integrations/fitbit/authorize
+GET /v1/me/integrations/fitbit/callback
+POST /v1/me/integrations/fitbit/sync
+DELETE /v1/me/integrations/fitbit
 GET /v1/me/dashboard-preferences
 PATCH /v1/me/dashboard-preferences
 ```
@@ -353,6 +361,35 @@ PATCH /v1/me/dashboard-preferences
 `GET /v1/me/today` returns current-day adjusted burned calories, calories eaten, cumulative steps, and normalized logged workouts with independent freshness states. It is read-only and must not project a bank change, mutate ledger rows, or change Available Bank. Step and workout calories are never added to active-plus-basal expenditure.
 
 The ingestion commands are the device-to-server boundary for normalized daily summaries. They do not accept a user ID, adjusted expenditure, or bank effects. Each foreground sync independently queries and uploads current day, yesterday, and the day before. Current-day data remains awareness-only. Completed-date expenditure and intake updates invoke idempotent provisional posting or reconciliation; steps and workouts never do. The API applies the centralized `0.80` policy, replaces newer cumulative totals, and ignores stale updates. The device skips accepted unchanged values and retains failed uploads in an ordered local outbox. Coordinated sync sessions retain queried/uploaded/skipped/reconciled/locked/waiting dates, category outcomes, duration, and redacted errors without raw health payloads. Set `TODAY_INGESTION_MODE=device` for Apple Health testing. Use `development` only when deterministic local fallback is explicitly intended.
+
+Fitbit OAuth and API requests run on the server because Fitbit is internet-accessible and its client secret must never enter mobile JavaScript. `POST /v1/me/integrations/fitbit/sync` retrieves current day, yesterday, and the day before independently from Fitbit's daily activity endpoint. `summary.caloriesOut` is normalized as the one raw expenditure total; CalorieBank applies `0.80` once. Selecting Fitbit affects provisional calculations through immutable correction deltas and never rewrites locked days.
+
+Inspect existing development history without changing it:
+
+```bash
+npm run bank:inspect-providers
+```
+
+### Fitbit Development Setup
+
+Fitbit's current documentation states that the legacy Fitbit Web API is scheduled for deprecation in September 2026 and directs developers to the Google Health API migration guidance. This adapter proves the provider-selection boundary against the currently documented endpoint, but production launch is blocked on validating and completing that migration. The provider-neutral aggregate and selection contracts are intended to remain stable across that transport change.
+
+1. Register an application at [Fitbit Web API application registration](https://dev.fitbit.com/apps/new). For testing only your own Fitbit account, use the Personal application type; access for other users is subject to Fitbit's application rules.
+2. Configure the exact externally reachable API callback ending in `/v1/me/integrations/fitbit/callback`. A physical iPhone cannot reach Mac `localhost`, and Fitbit OAuth should use HTTPS. For local device testing, use an HTTPS development tunnel or deployed development API that forwards to the Mac. Do not register the `caloriebank://` mobile URL as Fitbit's callback.
+3. Request only the `activity` scope. This milestone does not request Fitbit nutrition, profile, sleep, heart-rate, location, or social scopes.
+4. Put the issued Client ID and Client Secret only in untracked `apps/api/.env`. Generate a local token-encryption key with `openssl rand -base64 32`.
+5. Configure the following and restart the API:
+
+```env
+FITBIT_CLIENT_ID=your_client_id
+FITBIT_CLIENT_SECRET=your_client_secret
+FITBIT_REDIRECT_URI=https://your-development-api.example/v1/me/integrations/fitbit/callback
+FITBIT_TOKEN_ENCRYPTION_KEY=your_base64_32_byte_key
+```
+
+6. Open Settings -> Health Connections -> Connect Fitbit, complete authorization, then select `Use Fitbit for calorie burn`.
+
+OAuth state is hashed, the PKCE verifier and tokens are encrypted at rest, refresh tokens are rotated, and tokens are excluded from request logs. Production must use managed secret storage and a stable HTTPS callback.
 
 Finalization orchestration can also be invoked by scheduler infrastructure without duplicating accounting logic:
 

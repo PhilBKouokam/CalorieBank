@@ -20,6 +20,10 @@ import {
   plannedTreatGetResponseSchema,
   plannedTreatInputSchema,
   todayResponseSchema,
+  fitbitAuthorizationResponseSchema,
+  fitbitSyncResponseSchema,
+  providerSelectionInputSchema,
+  providerSelectionResponseSchema,
   type BankHistoryDayDetailResponse,
   type BankHistoryRange,
   type BankHistoryResponse,
@@ -41,6 +45,9 @@ import {
   type PlannedTreatInput,
   type ActivePlannedTreatResponse,
   type TodayResponse,
+  type FitbitSyncResponse,
+  type ProviderSelectionInput,
+  type ProviderSelectionResponse,
 } from '@caloriebank/schemas';
 
 export type HealthResponse = {
@@ -186,6 +193,41 @@ export async function fetchToday(timezone?: string): Promise<TodayResponse> {
   }
 
   return todayResponseSchema.parse(await response.json());
+}
+
+export async function fetchProviderSelection(): Promise<ProviderSelectionResponse> {
+  const response = await apiRequest('/v1/me/provider-selection');
+  if (!response.ok) throw new Error('Unable to load health connection choices.');
+  return providerSelectionResponseSchema.parse(await response.json());
+}
+
+export async function saveProviderSelection(input: ProviderSelectionInput) {
+  const response = await apiRequest('/v1/me/provider-selection', {
+    method: 'PUT', body: JSON.stringify(providerSelectionInputSchema.parse(input)),
+  });
+  if (!response.ok) throw new Error('Unable to update the calorie-burn source.');
+  return providerSelectionResponseSchema.parse(await response.json());
+}
+
+export async function startFitbitAuthorization() {
+  const response = await apiRequest(
+    `/v1/me/integrations/fitbit/authorize?mobileRedirectUri=${encodeURIComponent('caloriebank://integrations')}`,
+  );
+  if (!response.ok) throw new Error('Fitbit connection is not available.');
+  return fitbitAuthorizationResponseSchema.parse(await response.json());
+}
+
+export async function syncFitbit(timezone: string, force = false): Promise<FitbitSyncResponse> {
+  const response = await apiRequest('/v1/me/integrations/fitbit/sync', {
+    method: 'POST', body: JSON.stringify({ timezone, force }),
+  });
+  if (!response.ok) throw new Error('Fitbit could not refresh.');
+  return fitbitSyncResponseSchema.parse(await response.json());
+}
+
+export async function disconnectFitbit() {
+  const response = await apiRequest('/v1/me/integrations/fitbit', { method: 'DELETE' });
+  if (!response.ok) throw new Error('Fitbit could not be disconnected.');
 }
 
 export async function syncCurrentDayExpenditure(

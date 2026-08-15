@@ -117,10 +117,61 @@ model User {
   ingestionSyncSessions      IngestionSyncSession[]
   bankCalculationSnapshots   BankCalculationSnapshot[]
   bankDayProcessingStates    BankDayProcessingState[]
+  providerSelection          ProviderSelection?
+  fitbitConnection           FitbitConnection?
+  fitbitOAuthAttempts        FitbitOAuthAttempt[]
   createdAt                  DateTime                    @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                  DateTime                    @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("users")
+}
+
+model ProviderSelection {
+  userId                           String   @id @map("user_id") @db.Uuid
+  authoritativeExpenditureProvider String   @default("apple_health") @map("authoritative_expenditure_provider")
+  authoritativeIntakeProvider      String   @default("apple_health") @map("authoritative_intake_provider")
+  allowExpenditureFallback         Boolean  @default(false) @map("allow_expenditure_fallback")
+  selectedAt                       DateTime @default(now()) @map("selected_at") @db.Timestamptz
+  createdAt                        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                        DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  user                             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("provider_selections")
+}
+
+model FitbitConnection {
+  userId                String    @id @map("user_id") @db.Uuid
+  fitbitUserId          String    @map("fitbit_user_id")
+  encryptedAccessToken  String    @map("encrypted_access_token") @db.Text
+  encryptedRefreshToken String    @map("encrypted_refresh_token") @db.Text
+  accessTokenExpiresAt  DateTime  @map("access_token_expires_at") @db.Timestamptz
+  scopes                String[]  @default([])
+  status                String    @default("connected")
+  connectedAt           DateTime  @default(now()) @map("connected_at") @db.Timestamptz
+  lastRefreshedAt       DateTime? @map("last_refreshed_at") @db.Timestamptz
+  lastSyncedAt          DateTime? @map("last_synced_at") @db.Timestamptz
+  lastErrorCode         String?   @map("last_error_code")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("fitbit_connections")
+}
+
+model FitbitOAuthAttempt {
+  id                    String    @id @default(uuid()) @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+  stateHash             String    @unique @map("state_hash")
+  encryptedCodeVerifier String    @map("encrypted_code_verifier") @db.Text
+  mobileRedirectUri     String    @map("mobile_redirect_uri")
+  expiresAt             DateTime  @map("expires_at") @db.Timestamptz
+  consumedAt            DateTime? @map("consumed_at") @db.Timestamptz
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("fitbit_oauth_attempts")
 }
 
 model UserProfile {
@@ -186,6 +237,7 @@ model DailyExpenditureAggregate {
   @@unique([userId, provider, providerRecordId])
   @@unique([userId, localDate, provider])
   @@index([userId, localDate])
+  @@index([userId, provider, localDate])
   @@map("daily_expenditure_aggregates")
 }
 
@@ -210,6 +262,7 @@ model DailyIntakeAggregate {
   @@unique([userId, provider, providerRecordId])
   @@unique([userId, localDate, provider])
   @@index([userId, localDate])
+  @@index([userId, provider, localDate])
   @@map("daily_intake_aggregates")
 }
 

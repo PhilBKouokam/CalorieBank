@@ -29,6 +29,13 @@ import {
   type HealthKitNativeClient,
 } from './apple-health-provider';
 import {
+  createHealthKitDiagnosticsSnapshot,
+  deriveHealthKitSyncStatus,
+  safeHealthKitError,
+  type HealthKitDiagnosticsSnapshot,
+  type HealthKitQueryDiagnostic,
+} from './healthkit-diagnostics';
+import {
   mergeRollingSyncOutbox,
   type RollingSyncQueuedUpload,
   type RollingSyncUpload,
@@ -39,6 +46,7 @@ const EVER_CONNECTED_KEY = 'caloriebank.apple-health.ever-connected';
 const LAST_SYNC_KEY = 'caloriebank.apple-health.last-sync';
 const OUTBOX_KEY = 'caloriebank.apple-health.sync-outbox.v1';
 const FINGERPRINTS_KEY = 'caloriebank.apple-health.upload-fingerprints.v1';
+const DIAGNOSTICS_KEY = 'caloriebank.apple-health.diagnostics.v1';
 const SYNC_COOLDOWN_MS = 5 * 60 * 1000;
 const DEVICE_USER_ID = 'current-device-user';
 const ADAPTER_VERSION = 'apple-health-v2-rolling-window';
@@ -55,8 +63,7 @@ type QueuedUpload = RollingSyncQueuedUpload<UploadPayload>;
 export type AppleHealthConnectionStatus =
   | 'not_connected'
   | 'connected'
-  | 'unavailable'
-  | 'needs_attention';
+  | 'unavailable';
 
 export type AppleHealthSyncOutcome = {
   connectionStatus: AppleHealthConnectionStatus;
@@ -65,6 +72,7 @@ export type AppleHealthSyncOutcome = {
   stepsFound: boolean;
   workoutCount: number;
   skippedForCooldown: boolean;
+  syncStatus: 'success' | 'partial' | 'failure';
 };
 
 type CategoryResult<T> = { value: T | null; status: IngestionCategoryStatus };
@@ -92,6 +100,35 @@ async function readJson<T>(key: string, fallback: T): Promise<T> {
   }
 }
 
+function logHealthKitDiagnostic(event: string, metadata: Record<string, unknown>) {
+  if (!__DEV__) return;
+  console.info(`[CalorieBank HealthKit] ${event}`, metadata);
+}
+
+async function saveHealthKitDiagnostics(snapshot: HealthKitDiagnosticsSnapshot) {
+  if (!__DEV__) return;
+  await AsyncStorage.setItem(DIAGNOSTICS_KEY, JSON.stringify(snapshot));
+}
+
+export async function getAppleHealthDiagnostics(): Promise<HealthKitDiagnosticsSnapshot | null> {
+  if (!__DEV__) return null;
+  return readJson<HealthKitDiagnosticsSnapshot | null>(DIAGNOSTICS_KEY, null);
+}
+
+async function recordGlobalSyncFailure(error: unknown) {
+  if (!__DEV__) return;
+  const previous = await getAppleHealthDiagnostics();
+  const safeError = safeHealthKitError(error);
+  const snapshot = createHealthKitDiagnosticsSnapshot({
+    ...previous,
+    lastSyncAt: new Date().toISOString(),
+    overallSyncResult: 'failure',
+    error: safeError,
+  });
+  await saveHealthKitDiagnostics(snapshot);
+  logHealthKitDiagnostic('sync_failure', safeError);
+}
+
 async function enqueueChangedUploads(uploads: UploadPayload[]) {
   const [outbox, fingerprints] = await Promise.all([
     readJson<QueuedUpload[]>(OUTBOX_KEY, []),
@@ -114,6 +151,7 @@ async function uploadQueuedItem(item: QueuedUpload, syncSessionId: string) {
 
 async function flushOutbox(syncSessionId: string) {
   const queue = await readJson<QueuedUpload[]>(OUTBOX_KEY, []);
+  const attemptedCount = queue.length;
   const fingerprints = await readJson<Record<string, string>>(FINGERPRINTS_KEY, {});
   const remaining = [...queue];
   const uploadedDates = new Set<string>();
@@ -147,7 +185,14 @@ async function flushOutbox(syncSessionId: string) {
     }
   }
 
-  return { uploadedDates: [...uploadedDates], counters, errors, pendingCount: remaining.length };
+  return {
+    uploadedDates: [...uploadedDates],
+    counters,
+    errors,
+    pendingCount: remaining.length,
+    attemptedCount,
+    completedCount: attemptedCount - remaining.length,
+  };
 }
 
 export async function getAppleHealthConnectionStatus(): Promise<AppleHealthConnectionStatus> {
@@ -166,21 +211,36 @@ export async function connectAppleHealth() {
   const healthKit = await loadHealthKit();
   if (!healthKit.isHealthDataAvailable()) return 'unavailable' as const;
   const completed = await healthKit.requestAuthorization({ toRead: APPLE_HEALTH_READ_TYPES });
-  if (!completed) return 'needs_attention' as const;
+  await saveHealthKitDiagnostics(createHealthKitDiagnosticsSnapshot({
+    healthKitAvailable: true,
+    authorizationRequest: completed ? 'completed' : 'failed',
+  }));
+  logHealthKitDiagnostic('authorization_request', { completed });
+  if (!completed) throw new Error('Apple Health authorization request did not complete.');
   const wasPreviouslyConnected = (await AsyncStorage.getItem(EVER_CONNECTED_KEY)) === 'true';
   await AsyncStorage.multiSet([
     [CONNECTION_KEY, 'true'],
     [EVER_CONNECTED_KEY, 'true'],
   ]);
-  await syncAppleHealthRollingWindow({
-    force: true,
-    trigger: wasPreviouslyConnected ? 'provider_reconnect' : 'connection',
-  });
+  try {
+    await syncAppleHealthRollingWindow({
+      force: true,
+      trigger: wasPreviouslyConnected ? 'provider_reconnect' : 'connection',
+    });
+  } catch {
+    // The authorization flow completed. A later query or API failure does not disconnect HealthKit.
+  }
   return 'connected' as const;
 }
 
 export async function disconnectAppleHealthLocally() {
-  await AsyncStorage.multiRemove([CONNECTION_KEY, LAST_SYNC_KEY, OUTBOX_KEY, FINGERPRINTS_KEY]);
+  await AsyncStorage.multiRemove([
+    CONNECTION_KEY,
+    LAST_SYNC_KEY,
+    OUTBOX_KEY,
+    FINGERPRINTS_KEY,
+    DIAGNOSTICS_KEY,
+  ]);
 }
 
 function combinedStatus(statuses: IngestionCategoryStatus[]): IngestionCategoryStatus {
@@ -190,7 +250,7 @@ function combinedStatus(statuses: IngestionCategoryStatus[]): IngestionCategoryS
   return 'skipped';
 }
 
-export async function syncAppleHealthRollingWindow({
+async function performAppleHealthRollingWindowSync({
   force = false,
   trigger = 'screen_focus',
 }: {
@@ -199,7 +259,7 @@ export async function syncAppleHealthRollingWindow({
 } = {}): Promise<AppleHealthSyncOutcome> {
   const connectionStatus = await getAppleHealthConnectionStatus();
   if (connectionStatus !== 'connected') {
-    return { connectionStatus, expenditureFound: false, intakeFound: false, stepsFound: false, workoutCount: 0, skippedForCooldown: false };
+    return { connectionStatus, expenditureFound: false, intakeFound: false, stepsFound: false, workoutCount: 0, skippedForCooldown: false, syncStatus: 'failure' as const };
   }
 
   const previousSync = Number(await AsyncStorage.getItem(LAST_SYNC_KEY));
@@ -212,6 +272,7 @@ export async function syncAppleHealthRollingWindow({
       stepsFound: today.steps.count !== null,
       workoutCount: today.workouts.totalCount,
       skippedForCooldown: true,
+      syncStatus: 'success',
     };
   }
 
@@ -221,6 +282,19 @@ export async function syncAppleHealthRollingWindow({
     queryWorkoutSamples: healthKit.queryWorkoutSamples,
   };
   const windows = getRollingLocalDayWindows();
+  const previousDiagnostics = await getAppleHealthDiagnostics();
+  const diagnostics = createHealthKitDiagnosticsSnapshot({
+    healthKitAvailable: true,
+    authorizationRequest: previousDiagnostics?.authorizationRequest === 'completed'
+      ? 'completed'
+      : 'not_completed',
+    lastSyncAt: new Date().toISOString(),
+    rollingDates: windows.map((window) => ({
+      localDate: window.localDate,
+      queryStart: window.dayStart.toISOString(),
+      queryEnd: window.dayEnd.toISOString(),
+    })),
+  });
   const uploads: UploadPayload[] = [];
   const statuses = { expenditure: [] as IngestionCategoryStatus[], intake: [] as IngestionCategoryStatus[], steps: [] as IngestionCategoryStatus[], workouts: [] as IngestionCategoryStatus[] };
   let expenditureFound = false;
@@ -230,7 +304,31 @@ export async function syncAppleHealthRollingWindow({
 
   for (const [index, window] of windows.entries()) {
     const input = { userId: DEVICE_USER_ID, localDate: window.localDate, timezone: window.timezone, isCurrentDay: index === 0 };
-    const dependencies = { healthKit: nativeClient, dayStart: window.dayStart, dayEnd: window.dayEnd };
+    const dependencies = {
+      healthKit: nativeClient,
+      dayStart: window.dayStart,
+      dayEnd: window.dayEnd,
+      onDiagnostic: (nativeDiagnostic: Omit<HealthKitQueryDiagnostic, 'localDate' | 'queryStart' | 'queryEnd' | 'error'> & { queryStart: Date; queryEnd: Date; error: unknown | null }) => {
+        const queryDiagnostic: HealthKitQueryDiagnostic = {
+          ...nativeDiagnostic,
+          localDate: window.localDate,
+          queryStart: nativeDiagnostic.queryStart.toISOString(),
+          queryEnd: nativeDiagnostic.queryEnd.toISOString(),
+          error: nativeDiagnostic.error === null ? null : safeHealthKitError(nativeDiagnostic.error),
+        };
+        diagnostics.queries.push(queryDiagnostic);
+        logHealthKitDiagnostic('query', {
+          category: queryDiagnostic.category,
+          localDate: queryDiagnostic.localDate,
+          queryStart: queryDiagnostic.queryStart,
+          queryEnd: queryDiagnostic.queryEnd,
+          status: queryDiagnostic.status,
+          sampleCount: queryDiagnostic.sampleCount,
+          normalizedAggregate: queryDiagnostic.normalizedAggregate,
+          error: queryDiagnostic.error,
+        });
+      },
+    };
     const [expenditure, intake, steps, workouts] = await Promise.all([
       categoryResult(new AppleHealthExpenditureProvider(dependencies).fetchDailyExpenditureAggregate(input)),
       categoryResult(new AppleHealthIntakeProvider(dependencies).fetchDailyCalorieIntakeAggregate(input)),
@@ -250,7 +348,7 @@ export async function syncAppleHealthRollingWindow({
     if (expenditure.value) uploads.push({ kind: 'expenditure', localDate: window.localDate, body: {
       localDate: window.localDate, timezone: window.timezone, provider: 'apple_health',
       rawTotalDailyExpenditure: expenditure.value.rawTotalDailyExpenditure,
-      syncStatus: expenditure.value.syncStatus === 'partial' ? 'partial' : 'ready',
+      syncStatus: 'ready',
       providerUpdatedAt: expenditure.value.providerUpdatedAt?.toISOString() ?? new Date().toISOString(),
       sourceMetadata: { activeEnergyCalories: expenditure.value.activeEnergyCalories ?? 0, basalEnergyCalories: expenditure.value.basalEnergyCalories ?? 0 },
     } });
@@ -276,6 +374,9 @@ export async function syncAppleHealthRollingWindow({
     } });
   }
 
+  diagnostics.overallSyncResult = deriveHealthKitSyncStatus(diagnostics.queries, diagnostics.upload);
+  await saveHealthKitDiagnostics(diagnostics);
+
   const queued = await enqueueChangedUploads(uploads);
   const anchor = windows[0];
   if (!anchor) throw new Error('A current local day is required.');
@@ -289,6 +390,23 @@ export async function syncAppleHealthRollingWindow({
     datesQueried: windows.map((window) => window.localDate),
   });
   const flushed = await flushOutbox(session.id);
+  diagnostics.upload = {
+    status: flushed.errors.length === 0
+      ? 'success'
+      : flushed.completedCount > 0
+        ? 'partial'
+        : 'failure',
+    attemptedCount: flushed.attemptedCount,
+    completedCount: flushed.completedCount,
+    pendingCount: flushed.pendingCount,
+    failedCategories: flushed.errors,
+  };
+  diagnostics.overallSyncResult = deriveHealthKitSyncStatus(diagnostics.queries, diagnostics.upload);
+  diagnostics.error = flushed.errors.length > 0
+    ? { code: 'upload_incomplete', message: 'One or more normalized aggregate uploads failed.' }
+    : null;
+  await saveHealthKitDiagnostics(diagnostics);
+  logHealthKitDiagnostic('upload', diagnostics.upload);
   const uploaded = new Set([...queued.changedDates, ...flushed.uploadedDates]);
   const skippedDates = windows.map((window) => window.localDate).filter((date) => !uploaded.has(date));
   const allStatuses = [...statuses.expenditure, ...statuses.intake, ...statuses.steps, ...statuses.workouts];
@@ -310,7 +428,30 @@ export async function syncAppleHealthRollingWindow({
 
   if (flushed.pendingCount === 0) await AsyncStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
   await fetchToday(anchor.timezone);
-  return { connectionStatus, expenditureFound, intakeFound, stepsFound, workoutCount, skippedForCooldown: false };
+  return {
+    connectionStatus,
+    expenditureFound,
+    intakeFound,
+    stepsFound,
+    workoutCount,
+    skippedForCooldown: false,
+    syncStatus: diagnostics.overallSyncResult === 'failure'
+      ? 'failure'
+      : diagnostics.overallSyncResult === 'partial'
+        ? 'partial'
+        : 'success',
+  };
+}
+
+export async function syncAppleHealthRollingWindow(
+  options: { force?: boolean; trigger?: IngestionSyncTrigger } = {},
+): Promise<AppleHealthSyncOutcome> {
+  try {
+    return await performAppleHealthRollingWindowSync(options);
+  } catch (error) {
+    await recordGlobalSyncFailure(error);
+    throw error;
+  }
 }
 
 // Kept as a compatibility name for existing screens; it now synchronizes the rolling window.

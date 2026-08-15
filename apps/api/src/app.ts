@@ -41,6 +41,13 @@ import {
   FinalizationOrchestrationService,
   type FinalizationScheduler,
 } from './modules/finalization-orchestration/finalization-orchestration.service';
+import {
+  PrismaProviderSelectionRepository,
+  type ProviderSelectionRepository,
+} from './modules/provider-selection/provider-selection.repository';
+import { createProviderSelectionRouter } from './modules/provider-selection/provider-selection.routes';
+import { FitbitService } from './modules/fitbit/fitbit.service';
+import { createFitbitRouter } from './modules/fitbit/fitbit.routes';
 
 type AppDependencies = {
   goalConfigurationRepository?: GoalConfigurationRepository;
@@ -50,6 +57,7 @@ type AppDependencies = {
   dashboardPreferencesRepository?: DashboardPreferencesRepository;
   syncSessionRepository?: SyncSessionRepository;
   finalizationScheduler?: FinalizationScheduler | null;
+  providerSelectionRepository?: ProviderSelectionRepository;
 };
 
 export function createApp(config: ApiEnv = env, dependencies: AppDependencies = {}) {
@@ -88,6 +96,14 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
     id: config.DEV_USER_ID,
     email: config.DEV_USER_EMAIL,
   };
+  const providerSelectionRepository = dependencies.providerSelectionRepository ??
+    new PrismaProviderSelectionRepository(prisma, bankHistoryRepository);
+  const fitbitService = new FitbitService(
+    prisma,
+    todayRepository,
+    config,
+    finalizationScheduler,
+  );
 
   app.use(
     cors({
@@ -110,6 +126,11 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
   app.use('/v1/me', createBankHistoryRouter(bankHistoryRepository, developmentUser));
   app.use('/v1/me/planned-treat', createPlannedTreatRouter(plannedTreatRepository, developmentUser));
   app.use('/v1/me', createTodayRouter(todayRepository, developmentUser));
+  app.use(
+    '/v1/me/provider-selection',
+    createProviderSelectionRouter(providerSelectionRepository, developmentUser),
+  );
+  app.use('/v1/me/integrations/fitbit', createFitbitRouter(fitbitService, developmentUser));
   app.use(
     '/v1/me/dashboard-preferences',
     createDashboardPreferencesRouter(dashboardPreferencesRepository, developmentUser),

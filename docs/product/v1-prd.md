@@ -48,7 +48,7 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 
 1. User installs CalorieBank.
 2. User connects a supported calorie-intake data source.
-3. On iPhone, the user connects Apple Health for the currently implemented foreground intake and expenditure path.
+3. On iPhone, the user connects Apple Health for Dietary Energy and activity context and may connect Fitbit as the dedicated calorie-expenditure source.
 4. User selects `cut`, `maintain`, or `bulk`; configures a daily deficit for cut or daily surplus for bulk; and uses a zero adjustment for maintain. Optional Emergency Bank, planning, Banking Goals, forecasting, and personalization capabilities may be enabled during setup or discovered later under ADRs 011 and 014. Banking Goals are not mandatory onboarding.
 5. CalorieBank imports available data and initializes the bank from recent history when possible.
 6. CalorieBank calculates daily changes and updates the lifetime bank without requiring daily interaction.
@@ -135,6 +135,8 @@ Do not assume MyFitnessPal or any named third-party service has an open, approve
 - All imported records must carry source labels and sync metadata.
 - Unsupported integrations must be described as aspirations or investigation items, not capabilities.
 - Apple HealthKit is the first implemented iPhone adapter. Foreground synchronization reads active energy, basal energy, dietary energy, steps, and workouts on-device for the rolling window of current day, yesterday, and the day before, then sends normalized daily aggregates independently to the API.
+- Fitbit is the first dedicated expenditure adapter. Its server-side OAuth connection and rolling three-day retrieval normalize Fitbit's documented daily calories-burned total into the same provider-neutral expenditure aggregate.
+- Exactly one provider is authoritative for expenditure and exactly one for intake for each user and calculation. Fitbit and Apple Health expenditure are never summed. Apple Health remains the V1 intake source and the steps/workouts context source when Fitbit controls expenditure.
 - HealthKit requires an Expo development build; it is not supported in Expo Go.
 - HealthKit dietary energy is usable only when an authorized nutrition source or manual Health entry has written it. CalorieBank must not imply that every food tracker writes dietary energy to Apple Health.
 
@@ -546,7 +548,7 @@ How historical initialization interacts with the optional Emergency Bank is not 
 
 ## Current-Day Live Awareness
 
-CalorieBank shows current-day expenditure and intake together in one `Today so far` card when Apple Health returns matching data. This supports CalorieBank's role as the banking center that connects expenditure and intake in one place while still leaving decisions to the user.
+CalorieBank shows current-day authoritative expenditure and intake together in one `Today so far` card when the selected sources return matching data. This supports CalorieBank's role as the banking center that connects expenditure and intake in one place while still leaving decisions to the user.
 
 The implemented flow exposes this through a provider-neutral read model at `GET /v1/me/today`. The iOS device queries HealthKit, maps results through focused expenditure, intake, step, and workout adapters, and sends validated normalized aggregates to provider-neutral ingestion commands. The API calculates adjusted expenditure and persists cumulative current-day aggregates and normalized workout summaries. Development adapters are limited to tests or explicit local fallback.
 
@@ -557,7 +559,7 @@ Today so far
 
 Burned
 1,600 kcal
-2,000 from Apple Health x 80%
+2,000 from Fitbit x 80%
 
 Eaten
 1,500 kcal
@@ -577,7 +579,8 @@ adjusted_current_day_expenditure =
   imported_total_daily_expenditure_so_far * 0.80
 ```
 
-- For Apple Health, raw total expenditure is active energy plus basal energy. The sum is adjusted once; workout or Move energy is not added separately.
+- For Apple Health fallback, raw total expenditure requires active energy plus basal energy. Active Energy alone is unavailable, not a valid total. The sum is adjusted once; workout or Move energy is not added separately.
+- For Fitbit authority, use Fitbit's daily calories-burned total once and apply `0.80` once. Do not add Fitbit steps, activity calories, workout calories, or BMR separately.
 - Raw imported device expenditure remains visible only as brief supporting context, such as `2,000 from Apple Health x 80%`.
 - Use the connected expenditure source name dynamically when available.
 - Do not double-count active calories. If the source exposes total daily expenditure, use that total once.
@@ -617,6 +620,8 @@ Future read model concept:
 The read model should be derived from source-attributed ingestion records and must not store a projected bank result.
 
 Provider-specific translation belongs inside adapters. Domain and bank logic must not depend on Apple Health fields, Fitbit JSON, MyFitnessPal response structures, or switches on provider names. Future providers should be added by implementing the relevant provider interface and registering the adapter.
+
+ADR 016 governs authoritative provider resolution. Multiple normalized aggregates may coexist for audit, but selection is explicit and deterministic. Automatic fallback is disabled initially: unavailable Fitbit data remains unavailable rather than silently changing the bank input to Apple Health. A provider change may reconcile a provisional day through an append-only correction and source-attributed calculation snapshot. It never rewrites a locked day.
 
 Apple Health synchronization runs as one coordinated rolling-window session after explicit connection, on app launch/Today focus, when the app returns to the foreground, and on manual refresh, subject to a five-minute cooldown. Manual refresh bypasses the cooldown. Current day, yesterday, and the day before are queried independently for expenditure, intake, steps, and workouts. Accepted unchanged values are skipped; changed values are uploaded per category/date through an ordered local outbox that survives offline failures. A lightweight server record stores queried, uploaded, skipped, reconciled, locked, waiting, and errored dates plus category outcomes, counts, versions, trigger, and duration without raw health samples. Completing the session invokes the existing posting/reconciliation/locking services. `GET /v1/me/today` remains read-only, and current-day aggregates never write the ledger.
 

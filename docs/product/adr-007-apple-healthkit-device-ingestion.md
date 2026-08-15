@@ -1,5 +1,7 @@
 # ADR 007: Apple HealthKit as the First Device Ingestion Adapter
 
+> **ADR 016 refinement:** Apple Health remains the intake and activity-context hub and an explicit expenditure fallback. Fitbit is the first dedicated expenditure provider. Apple Health expenditure is valid only when both Active and Resting/Basal Energy are present; Active Energy alone must not be uploaded as total expenditure.
+
 Date: 2026-07-21
 
 ## Status
@@ -38,6 +40,8 @@ The app requests read access only to:
 The HealthKit capability and read-purpose string are generated from source-controlled Expo configuration. Background delivery is disabled. No HealthKit write purpose or write permission is requested.
 
 HealthKit does not disclose whether read access to a type was denied. An empty query can mean denial, limited access, or no matching samples. Consumer states therefore use `No data found today`, `Waiting for data`, or `Health data unavailable`; they do not infer permission denial.
+
+The local connection state records that HealthKit was available and the authorization request completed. It is intentionally separate from per-category data availability and synchronization health. Empty dietary energy, steps, or workouts do not disconnect Apple Health, and one category failure does not suppress successful categories. A real query or upload failure may produce `Connected · Sync issue`; an otherwise successful sync with empty or independently unavailable categories may produce `Connected · Some data unavailable`. Development builds expose only safe category, date-boundary, aggregate, and upload diagnostics, never individual HealthKit samples.
 
 ## Expenditure Composition
 

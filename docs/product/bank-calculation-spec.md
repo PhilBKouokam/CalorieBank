@@ -234,6 +234,8 @@ Do not claim:
 
 For CalorieBank V1, the connected calorie-expenditure source's total daily calorie-expenditure value is the calculation input.
 
+ADR 016 refines `source` to mean one explicit authoritative provider per banking input and date. Fitbit is the first dedicated expenditure provider. When selected, Fitbit's daily activity `caloriesOut` total enters once as `imported_total_daily_expenditure`; CalorieBank applies `0.80` once. Apple Health expenditure may be used only as an explicit fallback and only when both Active Energy and Resting/Basal Energy are available and summed once. Fitbit and Apple Health expenditure are never added together. Intake follows the same single-authority rule; Apple Health Dietary Energy remains the implemented V1 intake source.
+
 CalorieBank does not separately calculate resting expenditure and active expenditure for the primary V1 bank formula.
 
 Users do not enter an absolute daily calorie target in V1. The connected total-expenditure source remains the operational source of truth for determining the user's daily allowance, after CalorieBank applies the approved conservative expenditure adjustment and the user's signed goal adjustment.
@@ -811,6 +813,8 @@ adjusted_current_day_expenditure =
 ```
 
 - For the Apple Health adapter, raw total expenditure is the deterministic integer sum of cumulative active energy and basal energy for the current local day. The `0.80` rate is applied once to that total. Workout or Move calories are not added separately.
+- Active Energy alone is not a valid Apple Health total-expenditure aggregate. Missing Active or Resting/Basal Energy makes Apple Health expenditure unavailable while intake, steps, and workouts continue independently.
+- When Fitbit is authoritative, Fitbit's daily `caloriesOut` total replaces Apple Health as the expenditure input. Apple Health may still independently supply Dietary Energy, steps, and workouts.
 - Raw imported device expenditure remains available as supporting context only, such as `2,000 from Apple Health x 80%`.
 - Use source-attributed current-day total calorie intake for the eaten value.
 - Do not double-count active calories. If the source exposes total daily expenditure, use that total once.
@@ -932,7 +936,7 @@ Principles:
 - Notification already delivered before a correction: open decision; requires user-visible correction messaging.
 - Integration reconnects: resume sync with duplicate prevention and gap detection.
 - Device changes: preserve data-source provenance and avoid double counting.
-- Multiple expenditure sources reporting the same activity: open decision; do not sum overlapping sources unless approved.
+- Multiple provider aggregates may coexist for audit, but ADR 016 resolves exactly one authoritative expenditure record and one authoritative intake record. Provider totals are never summed. Automatic fallback is disabled initially; a missing selected source remains an explicit waiting state.
 
 Operational HealthKit sync is limited to current day, yesterday, and the day before in the device's local timezone. The device uploads each normalized category/date independently, skips accepted unchanged values, and retains failed uploads for ordered retry. Sync-session completion invokes the existing posting, reconciliation, and locking services. The orchestrator must not calculate a parallel contribution or mutate ledger rows directly.
 

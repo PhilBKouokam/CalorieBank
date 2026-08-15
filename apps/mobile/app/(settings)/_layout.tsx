@@ -14,6 +14,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="goal-settings" options={{ title: 'Goal Settings' }} />
       <Stack.Screen name="planned-treat" options={{ title: 'Planned Treat' }} />
       <Stack.Screen name="integrations" options={{ title: 'Health Connections' }} />
+      <Stack.Screen name="health-diagnostics" options={{ title: 'HealthKit Diagnostics' }} />
       <Stack.Screen name="customize-today" options={{ title: 'Customize Today' }} />
     </Stack>
   );

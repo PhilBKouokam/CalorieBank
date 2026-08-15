@@ -1,5 +1,7 @@
 # ADR 009: Provisional Finalization and Rolling Reconciliation
 
+> **ADR 016 refinement:** reconciliation resolves one authoritative expenditure provider and one authoritative intake provider. A provider selection change may create a source-attributed correction delta while a day is provisional; it never changes a locked day.
+
 Status: Accepted  
 Date: 2026-07-22
 

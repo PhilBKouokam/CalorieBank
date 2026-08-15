@@ -1,5 +1,7 @@
 # ADR 006: Provider-Neutral Ingestion Architecture
 
+> **ADR 016 refinement:** provider-neutral persistence may contain multiple providers for a date, but banking resolves exactly one authoritative expenditure source and one authoritative intake source. Coexisting provider totals are never summed.
+
 Date: 2026-07-21
 
 ## Status

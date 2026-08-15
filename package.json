@@ -16,6 +16,7 @@
     "db:deploy": "npm --workspace @caloriebank/api run db:deploy",
     "bank:seed": "npm --workspace @caloriebank/api run seed:bank-history",
     "bank:orchestrate": "npm --workspace @caloriebank/api run orchestrate:finalization --",
+    "bank:inspect-providers": "npm --workspace @caloriebank/api run inspect:provider-provenance",
     "mobile:start": "npm --workspace @caloriebank/mobile run start --",
     "mobile:ios": "npm --workspace @caloriebank/mobile run ios --",
     "mobile:ios:device": "npm --workspace @caloriebank/mobile run ios:device --",

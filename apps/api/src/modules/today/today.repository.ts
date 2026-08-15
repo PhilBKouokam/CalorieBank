@@ -1,5 +1,6 @@
 import {
   V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE,
+  resolveAuthoritativeProviderRecord,
   type NormalizedDailyExpenditureAggregate,
   type NormalizedDailyIntakeAggregate,
   type NormalizedDailyStepAggregate,
@@ -7,12 +8,10 @@ import {
 } from '@caloriebank/domain';
 import type { TodayResponse, TodaySoFarDataFreshnessStatus } from '@caloriebank/schemas';
 import type {
-  CurrentDayWorkout,
   DailyExpenditureAggregate,
   DailyIntakeAggregate,
   DailyStepAggregate,
   IngestionCategoryStatus,
-  IngestionSyncSession,
   PrismaClient,
 } from '@prisma/client';
 
@@ -20,6 +19,7 @@ import type { DevelopmentUser } from '../goal-configuration/goal-configuration.r
 import { AppError } from '../../errors';
 import { getProviderDisplayName, isSyntheticProvider } from './provider-catalog';
 import { combineTodayFreshness, currentDayFreshness } from './today.freshness';
+import { readProviderSelection } from '../provider-selection/provider-selection.repository';
 
 export type AggregateUpsertResult = 'created' | 'updated' | 'unchanged' | 'ignored_stale';
 
@@ -83,26 +83,6 @@ function isUniqueConstraintError(error: unknown) {
     error !== null &&
     'code' in error &&
     (error as { code?: unknown }).code === 'P2002'
-  );
-}
-
-function selectedProvider(
-  expenditureRecords: DailyExpenditureAggregate[],
-  intakeRecords: DailyIntakeAggregate[],
-  stepRecords: DailyStepAggregate[],
-  workouts: CurrentDayWorkout[],
-  session: IngestionSyncSession | null,
-) {
-  return (
-    [...expenditureRecords, ...intakeRecords, ...stepRecords, ...workouts].find(
-      (record) => !isSyntheticProvider(record.provider),
-    )
-      ?.provider ??
-    session?.provider ??
-    expenditureRecords[0]?.provider ??
-    intakeRecords[0]?.provider ??
-    stepRecords[0]?.provider ??
-    workouts[0]?.provider
   );
 }
 
@@ -455,7 +435,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       ? {}
       : { provider: { not: 'development' } };
     const date = parseLocalDate(localDate);
-    const [expenditureRecords, intakeRecords, stepRecords, workoutRecords, latestSession] =
+    const [expenditureRecords, intakeRecords, stepRecords, workoutRecords, sessions, selection] =
       await Promise.all([
       this.db.dailyExpenditureAggregate.findMany({
         where: {
@@ -483,45 +463,54 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         where: { userId, localDate: date, isCurrentDay: true, ...providerFilter },
         orderBy: { startedAt: 'desc' },
       }),
-      this.db.ingestionSyncSession.findFirst({
+      this.db.ingestionSyncSession.findMany({
         where: { userId, localDate: date, ...providerFilter },
         orderBy: { startedAt: 'desc' },
       }),
+      readProviderSelection(this.db, userId),
     ]);
-    const provider = selectedProvider(
-      expenditureRecords,
-      intakeRecords,
-      stepRecords,
-      workoutRecords,
-      latestSession,
-    );
-    const expenditure = expenditureRecords.find((record) => record.provider === provider) ?? null;
-    const intake = intakeRecords.find((record) => record.provider === provider) ?? null;
-    const steps = stepRecords.find((record) => record.provider === provider) ?? null;
-    const workouts = workoutRecords.filter((record) => record.provider === provider);
-    const session = latestSession?.provider === provider ? latestSession : null;
-    const sessionSyncedAt = session?.completedAt ?? session?.startedAt ?? null;
+    const syntheticExpenditure = this.options.allowSyntheticProviders && expenditureRecords.every((record) => isSyntheticProvider(record.provider));
+    const syntheticIntake = this.options.allowSyntheticProviders && intakeRecords.every((record) => isSyntheticProvider(record.provider));
+    const expenditure = resolveAuthoritativeProviderRecord(expenditureRecords, {
+      authoritativeProvider: syntheticExpenditure ? 'development' : selection.authoritativeExpenditureProvider,
+      fallbackProvider: 'apple_health',
+      allowFallback: selection.allowExpenditureFallback,
+    });
+    const intake = resolveAuthoritativeProviderRecord(intakeRecords, {
+      authoritativeProvider: syntheticIntake ? 'development' : selection.authoritativeIntakeProvider,
+      allowFallback: false,
+    });
+    const contextProvider = this.options.allowSyntheticProviders && stepRecords.every((record) => isSyntheticProvider(record.provider))
+      ? 'development' : 'apple_health';
+    const steps = stepRecords.find((record) => record.provider === contextProvider) ?? null;
+    const workouts = workoutRecords.filter((record) => record.provider === contextProvider);
+    const expenditureSession = sessions.find((session) => session.provider === (expenditure?.provider ?? selection.authoritativeExpenditureProvider)) ?? null;
+    const intakeSession = sessions.find((session) => session.provider === (intake?.provider ?? selection.authoritativeIntakeProvider)) ?? null;
+    const contextSession = sessions.find((session) => session.provider === contextProvider) ?? null;
+    const expenditureSyncedAt = expenditureSession?.completedAt ?? expenditureSession?.startedAt ?? null;
+    const intakeSyncedAt = intakeSession?.completedAt ?? intakeSession?.startedAt ?? null;
+    const contextSyncedAt = contextSession?.completedAt ?? contextSession?.startedAt ?? null;
     const burnedStatus = currentDayFreshness(
-      expenditure ? syncStatus(expenditure.syncStatus) : categoryStatus(session?.expenditureStatus),
-      expenditure?.updatedAt ?? sessionSyncedAt,
+      expenditure ? syncStatus(expenditure.syncStatus) : categoryStatus(expenditureSession?.expenditureStatus),
+      expenditure?.updatedAt ?? expenditureSyncedAt,
     );
     const eatenStatus = currentDayFreshness(
-      intake ? syncStatus(intake.syncStatus) : categoryStatus(session?.intakeStatus),
-      intake?.updatedAt ?? sessionSyncedAt,
+      intake ? syncStatus(intake.syncStatus) : categoryStatus(intakeSession?.intakeStatus),
+      intake?.updatedAt ?? intakeSyncedAt,
     );
     const stepsStatus = currentDayFreshness(
-      steps ? syncStatus(steps.syncStatus) : categoryStatus(session?.stepsStatus),
-      steps?.updatedAt ?? sessionSyncedAt,
+      steps ? syncStatus(steps.syncStatus) : categoryStatus(contextSession?.stepsStatus),
+      steps?.updatedAt ?? contextSyncedAt,
     );
     const firstWorkout = workouts[0];
     const workoutsStatus = currentDayFreshness(
-      firstWorkout ? syncStatus(firstWorkout.syncStatus) : categoryStatus(session?.workoutsStatus),
-      firstWorkout?.updatedAt ?? sessionSyncedAt,
+      firstWorkout ? syncStatus(firstWorkout.syncStatus) : categoryStatus(contextSession?.workoutsStatus),
+      firstWorkout?.updatedAt ?? contextSyncedAt,
     );
 
     return {
       date: localDate,
-      timezone: expenditure?.timezone ?? intake?.timezone ?? steps?.timezone ?? session?.timezone ?? timezone,
+      timezone: expenditure?.timezone ?? intake?.timezone ?? steps?.timezone ?? contextSession?.timezone ?? timezone,
       isCurrentDay: true,
       dataFreshness: combineTodayFreshness([
         burnedStatus,
@@ -546,8 +535,8 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       },
       steps: {
         count: steps?.totalSteps ?? null,
-        source: steps || session ? getProviderDisplayName(provider ?? session?.provider ?? '') : null,
-        lastSyncedAt: steps ? latestSyncedAt(steps) : sessionSyncedAt?.toISOString() ?? null,
+        source: steps || contextSession ? getProviderDisplayName(contextProvider) : null,
+        lastSyncedAt: steps ? latestSyncedAt(steps) : contextSyncedAt?.toISOString() ?? null,
         status: stepsStatus,
       },
       workouts: {
@@ -562,10 +551,10 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
           source: getProviderDisplayName(workout.provider),
         })),
         totalCount: workouts.length,
-        source: workouts.length > 0 || session
-          ? getProviderDisplayName(provider ?? session?.provider ?? '')
+        source: workouts.length > 0 || contextSession
+          ? getProviderDisplayName(contextProvider)
           : null,
-        lastSyncedAt: workouts[0]?.updatedAt.toISOString() ?? sessionSyncedAt?.toISOString() ?? null,
+        lastSyncedAt: workouts[0]?.updatedAt.toISOString() ?? contextSyncedAt?.toISOString() ?? null,
         status: workoutsStatus,
       },
     };

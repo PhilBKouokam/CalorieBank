@@ -73,8 +73,15 @@ function createOrchestrationHarness(options: {
   const reconciled: string[] = [];
   const db = {
     finalizedDailyBankRecord: { findUnique: async () => null },
-    dailyExpenditureAggregate: { findFirst: async () => options.expenditure ?? { id: 'exp' } },
-    dailyIntakeAggregate: { findFirst: async () => options.intake === undefined ? { id: 'intake' } : options.intake },
+    dailyExpenditureAggregate: {
+      findFirst: async () => options.expenditure ?? { id: 'exp', timezone: 'America/Chicago' },
+      findMany: async () => [options.expenditure ?? { id: 'exp', provider: 'apple_health' }],
+    },
+    dailyIntakeAggregate: {
+      findFirst: async () => options.intake === undefined ? { id: 'intake', timezone: 'America/Chicago' } : options.intake,
+      findMany: async () => options.intake === null ? [] : [options.intake ?? { id: 'intake', provider: 'apple_health' }],
+    },
+    providerSelection: { findUnique: async () => null },
     goalConfiguration: { findUnique: async () => ({ goalMode: 'maintain' }) },
     ingestionSyncSession: { findFirst: async () => ({ expenditureStatus: 'ready', intakeStatus: 'ready' }) },
     bankDayProcessingState: {

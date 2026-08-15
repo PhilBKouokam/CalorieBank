@@ -1,5 +1,6 @@
 const providerDisplayNames: Readonly<Record<string, string>> = {
   apple_health: 'Apple Health',
+  fitbit: 'Fitbit',
   development: 'Development Provider',
 };
 

@@ -14,6 +14,7 @@
     "db:deploy": "prisma migrate deploy",
     "seed:bank-history": "tsx src/scripts/seed-bank-history.ts",
     "orchestrate:finalization": "tsx src/scripts/run-finalization-orchestration.ts",
+    "inspect:provider-provenance": "tsx src/scripts/inspect-bank-provider-provenance.ts",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "pretypecheck": "npm --workspace @caloriebank/domain run build && npm --workspace @caloriebank/schemas run build",
     "typecheck": "tsc --noEmit -p tsconfig.json",

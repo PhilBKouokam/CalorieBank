@@ -1,5 +1,7 @@
 # ADR 010: Reliable Historical Synchronization and Finalization Orchestration
 
+> **ADR 016 refinement:** Apple Health device sync and Fitbit server sync may both populate the three-day window. Orchestration consumes only explicitly resolved authoritative intake and expenditure records and never sums provider totals.
+
 Status: Accepted and implemented  
 Date: 2026-07-22
 

@@ -320,6 +320,50 @@ describe('provider-neutral Today ingestion', () => {
     expect(today.eaten.calories).toBe(1500);
   });
 
+  it('reads Fitbit expenditure and Apple Health intake independently without summing providers', async () => {
+    const persistenceUser = {
+      id: '00000000-0000-4000-8000-000000000776',
+      email: 'multi-provider-today@caloriebank.local',
+    };
+    await prisma.user.deleteMany({ where: { id: persistenceUser.id } });
+    await prisma.user.create({
+      data: {
+        id: persistenceUser.id,
+        email: persistenceUser.email,
+        providerSelection: {
+          create: {
+            authoritativeExpenditureProvider: 'fitbit',
+            authoritativeIntakeProvider: 'apple_health',
+          },
+        },
+      },
+    });
+    const repository = new PrismaTodayAggregateRepository(prisma, { allowSyntheticProviders: false });
+    await repository.upsertExpenditureAggregate(persistenceUser, normalizeDailyExpenditureAggregate({
+      ...aggregateInput, userId: persistenceUser.id, provider: 'apple_health',
+      providerRecordId: 'apple_health:expenditure:2026-07-21', rawTotalDailyExpenditure: 2000,
+      importedAt: fixedNow, providerUpdatedAt: fixedNow, syncStatus: 'ready',
+    }));
+    await repository.upsertExpenditureAggregate(persistenceUser, normalizeDailyExpenditureAggregate({
+      ...aggregateInput, userId: persistenceUser.id, provider: 'fitbit',
+      providerRecordId: 'fitbit:expenditure:2026-07-21', rawTotalDailyExpenditure: 3000,
+      importedAt: fixedNow, providerUpdatedAt: fixedNow, syncStatus: 'ready',
+    }));
+    await repository.upsertIntakeAggregate(persistenceUser, normalizeDailyIntakeAggregate({
+      ...aggregateInput, userId: persistenceUser.id, provider: 'apple_health',
+      providerRecordId: 'apple_health:intake:2026-07-21', totalCaloriesConsumed: 1500,
+      importedAt: fixedNow, providerUpdatedAt: fixedNow, syncStatus: 'ready',
+    }));
+    const today = await repository.getTodayForUser(
+      persistenceUser.id, aggregateInput.localDate, aggregateInput.timezone,
+    );
+    expect(today.burned).toMatchObject({ raw: 3000, adjusted: 2400, source: 'Fitbit' });
+    expect(today.eaten).toMatchObject({ calories: 1500, source: 'Apple Health' });
+    expect(await prisma.dailyExpenditureAggregate.count({ where: { userId: persistenceUser.id } })).toBe(2);
+    expect(await prisma.calorieLedgerTransaction.count({ where: { userId: persistenceUser.id } })).toBe(0);
+    await prisma.user.delete({ where: { id: persistenceUser.id } });
+  });
+
   it('validates Apple Health sync commands and calculates adjusted expenditure on the server', async () => {
     const repository = new MemoryTodayRepository();
     const timezone = 'America/Chicago';

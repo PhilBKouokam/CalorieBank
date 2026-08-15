@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   negativeChange: {
-    color: colors.danger,
+    color: colors.text,
   },
   breakdownPanel: {
     gap: spacing.sm,

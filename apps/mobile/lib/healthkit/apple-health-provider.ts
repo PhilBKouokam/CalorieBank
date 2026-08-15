@@ -46,27 +46,70 @@ type AppleHealthProviderDependencies = {
   dayStart: Date;
   dayEnd: Date;
   now?: () => Date;
+  onDiagnostic?: (diagnostic: AppleHealthNativeQueryDiagnostic) => void;
 };
 
-async function cumulativeKilocalories(
-  healthKit: HealthKitNativeClient,
-  identifier: (typeof APPLE_HEALTH_QUANTITY_READ_TYPES)[number],
-  dayStart: Date,
-  dayEnd: Date,
-) {
-  const statistics = await healthKit.queryStatisticsForQuantity(identifier, ['cumulativeSum'], {
-    filter: {
-      date: {
-        startDate: dayStart,
-        endDate: dayEnd,
-        strictStartDate: true,
-        strictEndDate: true,
-      },
-    },
-    unit: 'kcal',
-  });
+export type AppleHealthNativeQueryDiagnostic = {
+  category: 'active_energy' | 'resting_energy' | 'dietary_energy' | 'steps' | 'workouts';
+  queryStart: Date;
+  queryEnd: Date;
+  status: 'success' | 'empty' | 'error';
+  sampleCount: number | null;
+  normalizedAggregate: number | null;
+  error: unknown | null;
+};
 
-  return statistics.sumQuantity?.quantity;
+function reportQuery(
+  dependencies: AppleHealthProviderDependencies,
+  diagnostic: Omit<AppleHealthNativeQueryDiagnostic, 'queryStart' | 'queryEnd'>,
+) {
+  dependencies.onDiagnostic?.({
+    ...diagnostic,
+    queryStart: dependencies.dayStart,
+    queryEnd: dependencies.dayEnd,
+  });
+}
+
+async function cumulativeKilocalories(
+  dependencies: AppleHealthProviderDependencies,
+  identifier: (typeof APPLE_HEALTH_QUANTITY_READ_TYPES)[number],
+  category: AppleHealthNativeQueryDiagnostic['category'],
+) {
+  try {
+    const statistics = await dependencies.healthKit.queryStatisticsForQuantity(
+      identifier,
+      ['cumulativeSum'],
+      {
+        filter: {
+          date: {
+            startDate: dependencies.dayStart,
+            endDate: dependencies.dayEnd,
+            strictStartDate: true,
+            strictEndDate: true,
+          },
+        },
+        unit: 'kcal',
+      },
+    );
+    const value = statistics.sumQuantity?.quantity;
+    reportQuery(dependencies, {
+      category,
+      status: value === undefined ? 'empty' : 'success',
+      sampleCount: null,
+      normalizedAggregate: value === undefined ? null : roundCalories(value),
+      error: null,
+    });
+    return value;
+  } catch (error) {
+    reportQuery(dependencies, {
+      category,
+      status: 'error',
+      sampleCount: null,
+      normalizedAggregate: null,
+      error,
+    });
+    throw error;
+  }
 }
 
 const workoutTypeMap: Readonly<
@@ -105,24 +148,30 @@ export class AppleHealthExpenditureProvider implements ExpenditureProvider {
   async fetchDailyExpenditureAggregate(
     input: FetchDailyAggregateInput,
   ): Promise<NormalizedDailyExpenditureAggregate | null> {
-    const [activeEnergy, basalEnergy] = await Promise.all([
+    const [activeResult, basalResult] = await Promise.allSettled([
       cumulativeKilocalories(
-        this.dependencies.healthKit,
+        this.dependencies,
         'HKQuantityTypeIdentifierActiveEnergyBurned',
-        this.dependencies.dayStart,
-        this.dependencies.dayEnd,
+        'active_energy',
       ),
       cumulativeKilocalories(
-        this.dependencies.healthKit,
+        this.dependencies,
         'HKQuantityTypeIdentifierBasalEnergyBurned',
-        this.dependencies.dayStart,
-        this.dependencies.dayEnd,
+        'resting_energy',
       ),
     ]);
 
-    if (activeEnergy === undefined && basalEnergy === undefined) return null;
+    if (activeResult.status === 'rejected' || basalResult.status === 'rejected') {
+      throw new Error('One or more Apple Health expenditure queries failed.');
+    }
+    const activeEnergy = activeResult.value;
+    const basalEnergy = basalResult.value;
 
-    const composed = composeTotalDailyExpenditure(activeEnergy ?? 0, basalEnergy ?? 0);
+    // CalorieBank's fallback expenditure is a total, so neither component is optional.
+    // An incomplete HealthKit result remains unavailable instead of becoming active-only burn.
+    if (activeEnergy === undefined || basalEnergy === undefined) return null;
+
+    const composed = composeTotalDailyExpenditure(activeEnergy, basalEnergy);
     const importedAt = this.dependencies.now?.() ?? new Date();
 
     return normalizeDailyExpenditureAggregate({
@@ -132,7 +181,7 @@ export class AppleHealthExpenditureProvider implements ExpenditureProvider {
       ...composed,
       importedAt,
       providerUpdatedAt: importedAt,
-      syncStatus: activeEnergy !== undefined && basalEnergy !== undefined ? 'ready' : 'partial',
+      syncStatus: 'ready',
     });
   }
 }
@@ -144,10 +193,9 @@ export class AppleHealthIntakeProvider implements IntakeProvider {
     input: FetchDailyAggregateInput,
   ): Promise<NormalizedDailyIntakeAggregate | null> {
     const dietaryEnergy = await cumulativeKilocalories(
-      this.dependencies.healthKit,
+      this.dependencies,
       'HKQuantityTypeIdentifierDietaryEnergyConsumed',
-      this.dependencies.dayStart,
-      this.dependencies.dayEnd,
+      'dietary_energy',
     );
 
     if (dietaryEnergy === undefined) return null;
@@ -171,29 +219,45 @@ export class AppleHealthStepProvider implements StepProvider {
   async fetchDailyStepAggregate(
     input: FetchDailyAggregateInput,
   ): Promise<NormalizedDailyStepAggregate | null> {
-    const statistics = await this.dependencies.healthKit.queryStatisticsForQuantity(
-      'HKQuantityTypeIdentifierStepCount',
-      ['cumulativeSum'],
-      {
-        filter: {
-          date: {
-            startDate: this.dependencies.dayStart,
-            endDate: this.dependencies.dayEnd,
-            strictStartDate: true,
-            strictEndDate: true,
+    let statistics;
+    try {
+      statistics = await this.dependencies.healthKit.queryStatisticsForQuantity(
+        'HKQuantityTypeIdentifierStepCount',
+        ['cumulativeSum'],
+        {
+          filter: {
+            date: {
+              startDate: this.dependencies.dayStart,
+              endDate: this.dependencies.dayEnd,
+              strictStartDate: true,
+              strictEndDate: true,
+            },
           },
+          unit: 'count',
         },
-        unit: 'count',
-      },
-    );
-    if (statistics.sumQuantity?.quantity === undefined) return null;
+      );
+    } catch (error) {
+      reportQuery(this.dependencies, {
+        category: 'steps', status: 'error', sampleCount: null, normalizedAggregate: null, error,
+      });
+      throw error;
+    }
+    const stepCount = statistics.sumQuantity?.quantity;
+    reportQuery(this.dependencies, {
+      category: 'steps',
+      status: stepCount === undefined ? 'empty' : 'success',
+      sampleCount: null,
+      normalizedAggregate: stepCount === undefined ? null : roundCalories(stepCount),
+      error: null,
+    });
+    if (stepCount === undefined) return null;
 
     const importedAt = this.dependencies.now?.() ?? new Date();
     return normalizeDailyStepAggregate({
       ...input,
       provider: APPLE_HEALTH_PROVIDER_ID,
       providerRecordId: `${APPLE_HEALTH_PROVIDER_ID}:steps:${input.localDate}`,
-      totalSteps: roundCalories(statistics.sumQuantity.quantity),
+      totalSteps: roundCalories(stepCount),
       importedAt,
       providerUpdatedAt: importedAt,
       syncStatus: 'ready',
@@ -207,17 +271,32 @@ export class AppleHealthWorkoutProvider implements WorkoutProvider {
   async fetchDailyWorkouts(
     input: FetchDailyAggregateInput,
   ): Promise<readonly NormalizedCurrentDayWorkout[]> {
-    const workouts = await this.dependencies.healthKit.queryWorkoutSamples({
-      filter: {
-        date: {
-          startDate: this.dependencies.dayStart,
-          endDate: this.dependencies.dayEnd,
-          strictStartDate: true,
-          strictEndDate: true,
+    let workouts;
+    try {
+      workouts = await this.dependencies.healthKit.queryWorkoutSamples({
+        filter: {
+          date: {
+            startDate: this.dependencies.dayStart,
+            endDate: this.dependencies.dayEnd,
+            strictStartDate: true,
+            strictEndDate: true,
+          },
         },
-      },
-      limit: 100,
-      ascending: false,
+        limit: 100,
+        ascending: false,
+      });
+    } catch (error) {
+      reportQuery(this.dependencies, {
+        category: 'workouts', status: 'error', sampleCount: null, normalizedAggregate: null, error,
+      });
+      throw error;
+    }
+    reportQuery(this.dependencies, {
+      category: 'workouts',
+      status: workouts.length === 0 ? 'empty' : 'success',
+      sampleCount: workouts.length,
+      normalizedAggregate: null,
+      error: null,
     });
     const importedAt = this.dependencies.now?.() ?? new Date();
 

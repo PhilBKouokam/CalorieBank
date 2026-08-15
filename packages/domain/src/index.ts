@@ -5,6 +5,26 @@ export const MIN_EXPENDITURE_ADJUSTMENT_RATE = 0;
 export const MAX_EXPENDITURE_ADJUSTMENT_RATE = 1;
 export const PROVISIONAL_CORRECTION_WINDOW_CALENDAR_DAYS = 2;
 export const ROLLING_HEALTH_SYNC_CALENDAR_DAYS = 3;
+export const BANKING_PROVIDER_IDS = ['apple_health', 'fitbit'] as const;
+export type BankingProviderId = (typeof BANKING_PROVIDER_IDS)[number];
+
+export type ProviderSelectionPolicy = {
+  authoritativeProvider: string;
+  fallbackProvider?: string;
+  allowFallback: boolean;
+};
+
+export function resolveAuthoritativeProviderRecord<T extends { provider: string }>(
+  records: readonly T[],
+  policy: ProviderSelectionPolicy,
+): T | null {
+  const authoritative = records.find(
+    (record) => record.provider === policy.authoritativeProvider,
+  );
+  if (authoritative) return authoritative;
+  if (!policy.allowFallback || !policy.fallbackProvider) return null;
+  return records.find((record) => record.provider === policy.fallbackProvider) ?? null;
+}
 
 export type BankContributionStatus = 'open' | 'provisional' | 'locked';
 

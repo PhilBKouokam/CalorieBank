@@ -3,6 +3,7 @@ import {
   calculateFinalizedDailyBankChange,
   getBankContributionStatus,
   getProvisionalLockAt,
+  resolveAuthoritativeProviderRecord,
   type BankGoalMode,
 } from '@caloriebank/domain';
 import type {
@@ -17,6 +18,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { createHash } from 'node:crypto';
 
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
+import { readProviderSelection } from '../provider-selection/provider-selection.repository';
 
 export type PostProvisionalDailyBankRecordInput = {
   logDate: string;
@@ -412,17 +414,29 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       const providerFilter = this.options.allowSyntheticProviders
         ? {}
         : { provider: { not: 'development' } };
-      const [expenditure, intake, goal] = await Promise.all([
-        transaction.dailyExpenditureAggregate.findFirst({
+      const [expenditureRecords, intakeRecords, goal, selection] = await Promise.all([
+        transaction.dailyExpenditureAggregate.findMany({
           where: { userId: user.id, localDate: date, ...providerFilter },
           orderBy: { updatedAt: 'desc' },
         }),
-        transaction.dailyIntakeAggregate.findFirst({
+        transaction.dailyIntakeAggregate.findMany({
           where: { userId: user.id, localDate: date, ...providerFilter },
           orderBy: { updatedAt: 'desc' },
         }),
         transaction.goalConfiguration.findUnique({ where: { userId: user.id } }),
+        readProviderSelection(transaction, user.id),
       ]);
+      const syntheticExpenditure = this.options.allowSyntheticProviders && expenditureRecords.every((record) => record.provider === 'development');
+      const syntheticIntake = this.options.allowSyntheticProviders && intakeRecords.every((record) => record.provider === 'development');
+      const expenditure = resolveAuthoritativeProviderRecord(expenditureRecords, {
+        authoritativeProvider: syntheticExpenditure ? 'development' : selection.authoritativeExpenditureProvider,
+        fallbackProvider: 'apple_health',
+        allowFallback: selection.allowExpenditureFallback,
+      });
+      const intake = resolveAuthoritativeProviderRecord(intakeRecords, {
+        authoritativeProvider: syntheticIntake ? 'development' : selection.authoritativeIntakeProvider,
+        allowFallback: false,
+      });
       if (!expenditure || !intake || (!goal && !existing)) {
         return { outcome: 'not_ready', detail: existing ? toDetail(await this.recordWithSnapshots(transaction, existing.id)) : null };
       }

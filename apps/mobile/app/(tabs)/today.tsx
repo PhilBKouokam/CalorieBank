@@ -29,8 +29,10 @@ import {
   fetchDashboardPreferences,
   fetchGoalConfiguration,
   fetchPlannedTreat,
+  fetchProviderSelection,
   fetchToday,
   getApiBaseUrl,
+  syncFitbit,
 } from '@/lib/api/client';
 import {
   getAppleHealthConnectionStatus,
@@ -160,26 +162,24 @@ export default function TodayScreen() {
     const connectionStatus = await getAppleHealthConnectionStatus();
     setHealthConnectionStatus(connectionStatus);
 
-    if (connectionStatus !== 'connected') return;
-
     try {
       setRefreshingHealth(force);
-      const outcome = await syncAppleHealthToday({ force, trigger });
-      const anyCategoryFound =
-        outcome.expenditureFound ||
-        outcome.intakeFound ||
-        outcome.stepsFound ||
-        outcome.workoutCount > 0;
-      setHealthSyncDetail(
-        !anyCategoryFound
-          ? 'No matching Health data was found today.'
-          : !outcome.intakeFound
-            ? 'No calorie intake was found in Apple Health today.'
-            : !outcome.expenditureFound
-              ? 'No calorie burn data was found in Apple Health today.'
-            : null,
-      );
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const providerState = await fetchProviderSelection().catch(() => null);
+      const [appleResult, fitbitResult] = await Promise.allSettled([
+        connectionStatus === 'connected'
+          ? syncAppleHealthToday({ force, trigger })
+          : Promise.resolve(null),
+        providerState?.connectedProviders.some(
+          (provider) => provider.provider === 'fitbit' && provider.status === 'connected',
+        )
+          ? syncFitbit(timezone, force)
+          : Promise.resolve(null),
+      ]);
+      if (appleResult.status === 'rejected' && fitbitResult.status === 'rejected') {
+        throw new Error('Connected health sources could not refresh.');
+      }
+      setHealthSyncDetail(null);
       const refreshedToday = await fetchToday(timezone);
       setToday(refreshedToday);
       setTodayStatus(
@@ -188,9 +188,7 @@ export default function TodayScreen() {
           : 'ready',
       );
     } catch {
-      setTodayStatus('error');
-      setHealthConnectionStatus('needs_attention');
-      setHealthSyncDetail('Apple Health could not refresh. Try again.');
+      setHealthSyncDetail('Today’s health data could not refresh.');
     } finally {
       setRefreshingHealth(false);
     }
@@ -749,7 +747,7 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
   },
   negativeValue: {
-    color: colors.danger,
+    color: colors.text,
   },
   supportingText: {
     color: colors.textMuted,

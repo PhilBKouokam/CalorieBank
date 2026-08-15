@@ -200,6 +200,54 @@ function isIanaTimezone(value: string) {
 }
 
 export const ingestionProviderSchema = z.enum(['apple_health']);
+export const bankingProviderSchema = z.enum(['apple_health', 'fitbit']);
+
+export const providerSelectionInputSchema = z
+  .object({
+    authoritativeExpenditureProvider: bankingProviderSchema,
+    authoritativeIntakeProvider: z.literal('apple_health'),
+  })
+  .strict();
+
+const providerConnectionStatusSchema = z.enum([
+  'not_connected',
+  'connected',
+  'ready',
+  'unavailable',
+  'needs_attention',
+]);
+
+export const providerSelectionResponseSchema = z.object({
+  expenditure: z.object({
+    authoritativeProvider: bankingProviderSchema,
+    displayName: z.string().min(1),
+    status: providerConnectionStatusSchema,
+    fallbackActive: z.boolean(),
+  }),
+  intake: z.object({
+    authoritativeProvider: z.literal('apple_health'),
+    displayName: z.string().min(1),
+    status: providerConnectionStatusSchema,
+  }),
+  connectedProviders: z.array(
+    z.object({
+      provider: bankingProviderSchema,
+      displayName: z.string().min(1),
+      status: providerConnectionStatusSchema,
+      lastSyncedAt: z.string().datetime().nullable(),
+    }),
+  ),
+});
+
+export const fitbitAuthorizationResponseSchema = z.object({
+  authorizationUrl: z.string().url(),
+});
+
+export const fitbitSyncResponseSchema = z.object({
+  datesRequested: z.array(dateStringSchema),
+  datesUpdated: z.array(dateStringSchema),
+  datesSkipped: z.array(dateStringSchema),
+});
 
 const ingestionBaseShape = {
   localDate: dateStringSchema,
@@ -213,14 +261,13 @@ export const currentDayExpenditureSyncSchema = z
   .object({
     ...ingestionBaseShape,
     rawTotalDailyExpenditure: z.number().int().min(0).max(100_000),
-    syncStatus: z.enum(['partial', 'ready']).default('ready'),
+    syncStatus: z.literal('ready').default('ready'),
     sourceMetadata: z
       .object({
         activeEnergyCalories: z.number().int().min(0).max(100_000),
         basalEnergyCalories: z.number().int().min(0).max(100_000),
       })
-      .strict()
-      .optional(),
+      .strict(),
   })
   .strict()
   .superRefine((input, context) => {
@@ -600,6 +647,11 @@ export type IngestionSyncTrigger = z.infer<typeof ingestionSyncTriggerSchema>;
 export type TodaySoFarAwareness = z.infer<typeof todaySoFarAwarenessSchema>;
 export type TodayResponse = z.infer<typeof todayResponseSchema>;
 export type IngestionProvider = z.infer<typeof ingestionProviderSchema>;
+export type BankingProvider = z.infer<typeof bankingProviderSchema>;
+export type ProviderSelectionInput = z.infer<typeof providerSelectionInputSchema>;
+export type ProviderSelectionResponse = z.infer<typeof providerSelectionResponseSchema>;
+export type FitbitAuthorizationResponse = z.infer<typeof fitbitAuthorizationResponseSchema>;
+export type FitbitSyncResponse = z.infer<typeof fitbitSyncResponseSchema>;
 export type CurrentDayExpenditureSync = z.infer<typeof currentDayExpenditureSyncSchema>;
 export type CurrentDayIntakeSync = z.infer<typeof currentDayIntakeSyncSchema>;
 export type CurrentDayStepSync = z.infer<typeof currentDayStepSyncSchema>;

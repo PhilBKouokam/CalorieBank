@@ -1,10 +1,12 @@
 import type { BankDayProcessingStatus, PrismaClient } from '@prisma/client';
+import { resolveAuthoritativeProviderRecord } from '@caloriebank/domain';
 
 import type {
   BankHistoryRepository,
   ReconciliationResult,
 } from '../bank-history/bank-history.repository';
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
+import { readProviderSelection } from '../provider-selection/provider-selection.repository';
 
 export const WAITING_DAY_RETRY_COOLDOWN_MS = 15 * 60 * 1000;
 
@@ -63,9 +65,9 @@ export class FinalizationOrchestrationService implements FinalizationScheduler {
     syncSessionId?: string,
   ): Promise<BankDayProcessingStatus> {
     const date = parseLocalDate(logDate);
-    const [expenditure, intake, goal, session] = await Promise.all([
-      this.db.dailyExpenditureAggregate.findFirst({ where: { userId, localDate: date } }),
-      this.db.dailyIntakeAggregate.findFirst({ where: { userId, localDate: date } }),
+    const [expenditureRecords, intakeRecords, goal, session, selection] = await Promise.all([
+      this.db.dailyExpenditureAggregate.findMany({ where: { userId, localDate: date } }),
+      this.db.dailyIntakeAggregate.findMany({ where: { userId, localDate: date } }),
       this.db.goalConfiguration.findUnique({ where: { userId } }),
       syncSessionId
         ? this.db.ingestionSyncSession.findFirst({ where: { id: syncSessionId, userId } })
@@ -73,7 +75,19 @@ export class FinalizationOrchestrationService implements FinalizationScheduler {
             where: { userId, datesQueried: { has: logDate } },
             orderBy: { startedAt: 'desc' },
           }),
+      readProviderSelection(this.db, userId),
     ]);
+    const expenditure = resolveAuthoritativeProviderRecord(expenditureRecords, {
+      authoritativeProvider: expenditureRecords.length > 0 && expenditureRecords.every((record) => record.provider === 'development')
+        ? 'development' : selection.authoritativeExpenditureProvider,
+      fallbackProvider: 'apple_health',
+      allowFallback: selection.allowExpenditureFallback,
+    });
+    const intake = resolveAuthoritativeProviderRecord(intakeRecords, {
+      authoritativeProvider: intakeRecords.length > 0 && intakeRecords.every((record) => record.provider === 'development')
+        ? 'development' : selection.authoritativeIntakeProvider,
+      allowFallback: false,
+    });
 
     if (!goal) return 'waiting_for_required_inputs';
     if (!expenditure && intake) return 'waiting_for_expenditure';
