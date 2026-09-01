@@ -32,6 +32,15 @@ async function configureCut(user: ReturnType<typeof testUser>) {
           adjustmentSource: 'manual_calories',
         },
       },
+      providerSelection: {
+        create: {
+          authoritativeExpenditureProvider: 'apple_health',
+          authoritativeActivityProvider: 'apple_health',
+          authoritativeIntakeProvider: 'apple_health',
+          appleHealthIntakeWriterBundleId: 'CRONOMETER-GOLD',
+          appleHealthIntakeWriterDisplayName: 'Cronometer',
+        },
+      },
     },
   });
 }
@@ -68,10 +77,20 @@ function intake(userId: string, calories: number, updatedAt: Date, localDate = '
     provider: 'apple_health',
     providerRecordId: `apple_health:intake:${localDate}`,
     totalCaloriesConsumed: calories,
+    writerBundleIdentifier: 'CRONOMETER-GOLD',
+    writerDisplayName: 'Cronometer',
     importedAt: updatedAt,
     providerUpdatedAt: updatedAt,
     syncStatus: 'ready',
     isCurrentDay: localDate === '2026-07-22',
+  });
+}
+
+function providerIntake(userId: string, provider: string, calories: number, updatedAt: Date) {
+  return normalizeDailyIntakeAggregate({
+    ...intake(userId, calories, updatedAt),
+    provider,
+    providerRecordId: `${provider}:intake:2026-07-21`,
   });
 }
 
@@ -206,10 +225,10 @@ describe('provisional finalization and reconciliation persistence', () => {
   it('uses one selected expenditure provider and records a provisional source switch as a delta', async () => {
     const user = testUser();
     await configureCut(user);
-    await prisma.providerSelection.create({
+    await prisma.providerSelection.update({
+      where: { userId: user.id },
       data: {
-        userId: user.id,
-        authoritativeExpenditureProvider: 'fitbit',
+        authoritativeExpenditureProvider: 'google_health_fitbit',
         authoritativeIntakeProvider: 'apple_health',
       },
     });
@@ -224,10 +243,10 @@ describe('provisional finalization and reconciliation persistence', () => {
     await aggregates.upsertIntakeAggregate(user, intake(user.id, 1800, now));
     expect(await bank.getDayDetail(user.id, '2026-07-21')).toBeNull();
 
-    await aggregates.upsertExpenditureAggregate(user, providerExpenditure(user.id, 'fitbit', 3000, now));
+    await aggregates.upsertExpenditureAggregate(user, providerExpenditure(user.id, 'google_health_fitbit', 3000, now));
     expect(await bank.getDayDetail(user.id, '2026-07-21')).toMatchObject({
       effectiveDailyBankChange: 100,
-      versions: [{ expenditureProvider: 'fitbit', intakeProvider: 'apple_health' }],
+      versions: [{ expenditureProvider: 'google_health_fitbit', intakeProvider: 'apple_health' }],
     });
 
     await prisma.providerSelection.update({
@@ -237,8 +256,48 @@ describe('provisional finalization and reconciliation persistence', () => {
     await bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago');
     const detail = await bank.getDayDetail(user.id, '2026-07-21');
     expect(detail).toMatchObject({ effectiveDailyBankChange: -300, correctionCount: 1 });
-    expect(detail?.versions.map((version) => version.expenditureProvider)).toEqual(['fitbit', 'apple_health']);
+    expect(detail?.versions.map((version) => version.expenditureProvider)).toEqual(['google_health_fitbit', 'apple_health']);
     expect((await prisma.calorieLedgerTransaction.findMany({ where: { userId: user.id } }))
       .map((transaction) => transaction.amountCalories)).toEqual([100, -400]);
+    expect(await bank.getSummary(user.id)).toMatchObject({
+      effectiveBankBalanceCalories: -300,
+      availableBankCalories: 0,
+      recoveryCalories: 300,
+    });
+  });
+
+  it('uses one selected intake provider and records a FatSecret source switch exactly once', async () => {
+    const user = testUser();
+    await configureCut(user);
+    await prisma.providerSelection.update({
+      where: { userId: user.id },
+      data: {
+        authoritativeExpenditureProvider: 'apple_health',
+        authoritativeIntakeProvider: 'apple_health',
+      },
+    });
+    const now = new Date('2026-07-22T12:00:00.000Z');
+    const bank = new PrismaBankHistoryRepository(prisma, { now: () => now, allowSyntheticProviders: false });
+    const aggregates = new PrismaTodayAggregateRepository(prisma, { allowSyntheticProviders: false });
+    await aggregates.upsertExpenditureAggregate(user, expenditure(user.id, 3000, now));
+    await aggregates.upsertIntakeAggregate(user, providerIntake(user.id, 'apple_health', 1800, now));
+    await aggregates.upsertIntakeAggregate(user, providerIntake(user.id, 'fatsecret', 2000, now));
+    await bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago');
+    expect(await bank.getDayDetail(user.id, '2026-07-21')).toMatchObject({
+      effectiveDailyBankChange: 100,
+      versions: [{ intakeProvider: 'apple_health' }],
+    });
+
+    await prisma.providerSelection.update({
+      where: { userId: user.id },
+      data: { authoritativeIntakeProvider: 'fatsecret' },
+    });
+    await bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago');
+    await bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago');
+    const detail = await bank.getDayDetail(user.id, '2026-07-21');
+    expect(detail).toMatchObject({ effectiveDailyBankChange: -100, correctionCount: 1 });
+    expect(detail?.versions.map((version) => version.intakeProvider)).toEqual(['apple_health', 'fatsecret']);
+    expect((await prisma.calorieLedgerTransaction.findMany({ where: { userId: user.id } }))
+      .map((transaction) => transaction.amountCalories)).toEqual([100, -200]);
   });
 });

@@ -5,18 +5,18 @@ import {
 import { Router } from 'express';
 
 import { AppError } from '../../errors';
-import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
+import { resolveRequestUser, type RequestUserSource } from '../../auth/current-user';
 import type { DashboardPreferencesRepository } from './dashboard-preferences.repository';
 
 export function createDashboardPreferencesRouter(
   repository: DashboardPreferencesRepository,
-  developmentUser: DevelopmentUser,
+  userSource: RequestUserSource,
 ) {
   const router = Router();
 
   router.get('/', async (_req, res, next) => {
     try {
-      res.json(dashboardPreferencesResponseSchema.parse(await repository.get(developmentUser)));
+      res.json(dashboardPreferencesResponseSchema.parse(await repository.get(resolveRequestUser(userSource, res))));
     } catch (error) {
       next(error);
     }
@@ -30,7 +30,7 @@ export function createDashboardPreferencesRouter(
       }
       res.json(
         dashboardPreferencesResponseSchema.parse(
-          await repository.update(developmentUser, parsed.data),
+          await repository.update(resolveRequestUser(userSource, res), parsed.data),
         ),
       );
     } catch (error) {

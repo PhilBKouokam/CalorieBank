@@ -88,4 +88,48 @@ describe('bank history PostgreSQL persistence', () => {
 
     await prisma.user.delete({ where: { id: user.id } });
   });
+
+  it('returns every unexplained post-boundary date instead of silently skipping it', async () => {
+    const userId = randomUUID();
+    await prisma.user.create({
+      data: {
+        id: userId,
+        email: `continuity-${randomUUID()}@caloriebank.local`,
+        bankAccountInitialization: {
+          create: {
+            status: 'INITIALIZED',
+            accountingStartsOn: new Date('2026-08-21T00:00:00.000Z'),
+            timezone: 'America/Chicago',
+          },
+        },
+        providerSelection: {
+          create: {
+            authoritativeExpenditureProvider: 'google_health_fitbit',
+            authoritativeActivityProvider: 'google_health_fitbit',
+            authoritativeIntakeProvider: 'fatsecret',
+          },
+        },
+      },
+    });
+    const continuityRepository = new PrismaBankHistoryRepository(prisma, {
+      now: () => new Date('2026-08-29T17:00:00.000Z'),
+    });
+
+    const history = await continuityRepository.getHistory(userId, 'ALL');
+
+    expect(history.days).toEqual([]);
+    expect(history.missingDays.map((day) => day.logDate)).toEqual([
+      '2026-08-28',
+      '2026-08-27',
+      '2026-08-26',
+      '2026-08-25',
+      '2026-08-24',
+      '2026-08-23',
+      '2026-08-22',
+      '2026-08-21',
+    ]);
+    expect(history.missingDays.every((day) => day.status === 'unprocessed')).toBe(true);
+
+    await prisma.user.delete({ where: { id: userId } });
+  });
 });

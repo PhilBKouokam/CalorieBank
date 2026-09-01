@@ -3,12 +3,15 @@ import {
   buildActivityOpportunityBody,
   calculateAdjustedCurrentDayExpenditure,
   calculateFinalizedDailyBankChange,
+  calculateOpeningEffectiveBalance,
   calculateRemainingTreatGapFromAvailableBank,
   estimateActivityCalorieRange,
   evaluateActivityOpportunityEligibility,
   getBankContributionStatus,
+  getPreviousCompletedLocalDates,
   getProvisionalLockAt,
   roundCalories,
+  deriveConsumerBankBalances,
 } from '@caloriebank/domain';
 import { describe, expect, it } from 'vitest';
 
@@ -124,6 +127,53 @@ describe('finalized daily bank calculation', () => {
         importedCalorieIntake: 2000,
       }),
     ).toThrow(BankCalculationError);
+  });
+});
+
+describe('Opening Bank and Recovery derivation', () => {
+  it('floors only the one-time opening amount', () => {
+    expect(calculateOpeningEffectiveBalance([500, -200, 100])).toEqual({
+      historicalOpeningNetCalories: 400,
+      openingEffectiveBalanceCalories: 400,
+    });
+    expect(calculateOpeningEffectiveBalance([-500, 200])).toEqual({
+      historicalOpeningNetCalories: -300,
+      openingEffectiveBalanceCalories: 0,
+    });
+    expect(calculateOpeningEffectiveBalance([0])).toEqual({
+      historicalOpeningNetCalories: 0,
+      openingEffectiveBalanceCalories: 0,
+    });
+  });
+
+  it('keeps effective accounting truth while deriving Available Bank and Recovery', () => {
+    expect(deriveConsumerBankBalances(1000)).toEqual({
+      effectiveBankBalanceCalories: 1000,
+      availableBankCalories: 1000,
+      recoveryCalories: 0,
+    });
+    expect(deriveConsumerBankBalances(0)).toEqual({
+      effectiveBankBalanceCalories: 0,
+      availableBankCalories: 0,
+      recoveryCalories: 0,
+    });
+    expect(deriveConsumerBankBalances(-1000)).toEqual({
+      effectiveBankBalanceCalories: -1000,
+      availableBankCalories: 0,
+      recoveryCalories: 1000,
+    });
+  });
+
+  it('selects exactly the previous seven local dates across DST and excludes today', () => {
+    expect(getPreviousCompletedLocalDates('2026-03-09')).toEqual([
+      '2026-03-08',
+      '2026-03-07',
+      '2026-03-06',
+      '2026-03-05',
+      '2026-03-04',
+      '2026-03-03',
+      '2026-03-02',
+    ]);
   });
 });
 

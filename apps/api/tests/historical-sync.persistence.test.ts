@@ -31,6 +31,22 @@ describe('historical sync orchestration persistence', () => {
     await request(app).put('/v1/me/goal-configuration').send({
       goalMode: 'maintain', dailyEnergyAdjustment: 0, adjustmentSource: 'manual_calories',
     }).expect(200);
+    await prisma.providerSelection.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        authoritativeExpenditureProvider: 'apple_health',
+        authoritativeActivityProvider: 'apple_health',
+        authoritativeIntakeProvider: 'apple_health',
+        appleHealthIntakeWriterBundleId: 'CRONOMETER-GOLD',
+        appleHealthIntakeWriterDisplayName: 'Cronometer',
+      },
+      update: {
+        authoritativeIntakeProvider: 'apple_health',
+        appleHealthIntakeWriterBundleId: 'CRONOMETER-GOLD',
+        appleHealthIntakeWriterDisplayName: 'Cronometer',
+      },
+    });
     const session = await request(app).post('/v1/me/ingestion/sync-sessions').send({
       localDate: today,
       timezone,
@@ -54,6 +70,8 @@ describe('historical sync orchestration persistence', () => {
       provider: 'apple_health',
       providerUpdatedAt,
       totalCaloriesConsumed: 1700,
+      writerBundleIdentifier: 'CRONOMETER-GOLD',
+      writerDisplayName: 'Cronometer',
       syncSessionId: session.body.id,
     }).expect(200);
 

@@ -1,15 +1,30 @@
 import type {
   BankHistoryDayDetailResponse,
+  BankHistoryMissingDay,
   BankHistoryRange,
   BankHistoryResponse,
+  HistoricalSourceOptionsResponse,
 } from '@caloriebank/schemas';
+import * as Crypto from 'expo-crypto';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PlaceholderScreen } from '@/components/caloriebank/PlaceholderScreen';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
-import { fetchBankHistory, fetchBankHistoryDay } from '@/lib/api/client';
+import {
+  ApiHttpError,
+  changeHistoricalSource,
+  fetchBankHistory,
+  fetchBankHistoryDay,
+  fetchHistoricalSourceOptions,
+  fetchProviderSelection,
+  syncFatSecret,
+  syncFitbit,
+} from '@/lib/api/client';
+import { historicalSourceChangeMessage } from '@/lib/history/source-change-errors';
+import { refreshAppleHealthForCurrentAccount } from '@/lib/healthkit/healthkit-connection';
+import { getConsumerSourceName } from '@/lib/providers/presentation';
 
 const ranges: { label: string; value: BankHistoryRange }[] = [
   { label: 'D', value: 'D' },
@@ -25,6 +40,10 @@ function formatCalories(value: number) {
   return `${sign}${value.toLocaleString()} kcal`;
 }
 
+function formatBankBalance(value: number) {
+  return `${value.toLocaleString()} kcal`;
+}
+
 function formatDate(value: string) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? new Date(`${value}T12:00:00`)
@@ -32,16 +51,60 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
 }
 
-function contributionStatus(status: 'provisional' | 'locked', locksAt: string) {
-  return status === 'locked' ? 'Locked' : `Provisional · Locks ${formatDate(locksAt)}`;
+function contributionVerb(value: number) {
+  if (value > 0) return 'Deposited';
+  if (value < 0) return 'Enjoyed';
+  return 'No change';
 }
 
 function goalAdjustmentText(day: BankHistoryDayDetailResponse) {
-  if (day.goalMode === 'maintain') return 'Maintenance · no adjustment';
+  if (day.goalMode === 'maintain') return 'Maintain weight';
+  const label = day.goalMode === 'cut' ? 'Lose weight' : 'Gain weight';
+  return `${label} · ${day.goalAdjustmentCalories.toLocaleString()} kcal`;
+}
 
-  const label = day.goalMode === 'cut' ? 'Cut goal' : 'Bulk goal';
-  const sign = day.goalMode === 'cut' ? '-' : '+';
-  return `${label} ${sign}${day.goalAdjustmentCalories.toLocaleString()} kcal`;
+function contributionEquation(day: BankHistoryDayDetailResponse) {
+  const adjusted = day.adjustedExpenditure.toLocaleString();
+  const eaten = day.importedCalorieIntake.toLocaleString();
+  const result = formatCalories(day.dailyBankChange);
+
+  if (day.goalMode === 'cut') {
+    return `${adjusted} − ${day.goalAdjustmentCalories.toLocaleString()} − ${eaten} = ${result}`;
+  }
+  if (day.goalMode === 'bulk') {
+    return `${adjusted} + ${day.goalAdjustmentCalories.toLocaleString()} − ${eaten} = ${result}`;
+  }
+  return `${adjusted} − ${eaten} = ${result}`;
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text adjustsFontSizeToFit minimumFontScale={0.8} numberOfLines={1} style={styles.detailValue}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+async function refreshHistoricalSources() {
+  const selection = await fetchProviderSelection();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const tasks: Promise<unknown>[] = [];
+  if (selection.expenditure.authoritativeProvider === 'google_health_fitbit') {
+    tasks.push(syncFitbit(timezone, true, true));
+  }
+  if (selection.intake.authoritativeProvider === 'fatsecret') {
+    tasks.push(syncFatSecret(timezone, true, true));
+  }
+  if (
+    selection.expenditure.authoritativeProvider === 'apple_health'
+    || selection.intake.authoritativeProvider === 'apple_health'
+  ) {
+    tasks.push(refreshAppleHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 }));
+  }
+  await Promise.all(tasks);
 }
 
 export default function BankHistoryScreen() {
@@ -51,6 +114,12 @@ export default function BankHistoryScreen() {
   const [selectedDay, setSelectedDay] = useState<BankHistoryDayDetailResponse | null>(null);
   const [status, setStatus] = useState<'loading' | 'empty' | 'ready' | 'error'>('loading');
   const [detailStatus, setDetailStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [sourceOptions, setSourceOptions] = useState<HistoricalSourceOptionsResponse | null>(null);
+  const [sourcePickerRole, setSourcePickerRole] = useState<'expenditure' | 'intake' | null>(null);
+  const [sourceMutationStatus, setSourceMutationStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+  const [sourceMutationMessage, setSourceMutationMessage] = useState<string | null>(null);
+  const automaticGapRecoveryAttempted = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,27 +130,39 @@ export default function BankHistoryScreen() {
         setDetailStatus('idle');
 
         try {
-          const nextHistory = await fetchBankHistory(selectedRange);
+          let nextHistory = await fetchBankHistory(selectedRange);
+          if (
+            !automaticGapRecoveryAttempted.current
+            && nextHistory.missingDays.some((day) => day.canRetry)
+          ) {
+            automaticGapRecoveryAttempted.current = true;
+            await refreshHistoricalSources().catch(() => undefined);
+            nextHistory = await fetchBankHistory(selectedRange).catch(() => nextHistory);
+          }
           if (!isMounted) return;
 
           setHistory(nextHistory);
 
-          if (nextHistory.finalizedDays.length === 0) {
+          if (nextHistory.days.length === 0 && nextHistory.missingDays.length === 0) {
             setSelectedLogDate(null);
             setSelectedDay(null);
             setStatus('empty');
             return;
           }
 
-          const nextSelectedLogDate = nextHistory.finalizedDays[0]?.logDate ?? null;
+          const nextSelectedLogDate = nextHistory.days[0]?.logDate ?? null;
           setSelectedLogDate(nextSelectedLogDate);
           setStatus('ready');
 
           if (nextSelectedLogDate) {
             setDetailStatus('loading');
-            const detail = await fetchBankHistoryDay(nextSelectedLogDate);
+            const [detail, sources] = await Promise.all([
+              fetchBankHistoryDay(nextSelectedLogDate),
+              fetchHistoricalSourceOptions(nextSelectedLogDate),
+            ]);
             if (!isMounted) return;
             setSelectedDay(detail);
+            setSourceOptions(sources);
             setDetailStatus('ready');
           }
         } catch {
@@ -99,7 +180,9 @@ export default function BankHistoryScreen() {
       return () => {
         isMounted = false;
       };
-    }, [selectedRange]),
+    // retryAttempt intentionally reruns the focused request without changing the selected range.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [retryAttempt, selectedRange]),
   );
 
   async function handleSelectDay(logDate: string) {
@@ -107,8 +190,12 @@ export default function BankHistoryScreen() {
     setDetailStatus('loading');
 
     try {
-      const detail = await fetchBankHistoryDay(logDate);
+      const [detail, sources] = await Promise.all([
+        fetchBankHistoryDay(logDate),
+        fetchHistoricalSourceOptions(logDate),
+      ]);
       setSelectedDay(detail);
+      setSourceOptions(sources);
       setDetailStatus('ready');
     } catch {
       setSelectedDay(null);
@@ -116,21 +203,88 @@ export default function BankHistoryScreen() {
     }
   }
 
-  const hasFinalizedDays = history && history.finalizedDays.length > 0;
-  const bankValue = hasFinalizedDays ? formatCalories(history.availableBankCalories) : 'Not calculated';
-  const throughText = hasFinalizedDays ? `Through ${formatDate(history.endDate ?? '')}` : 'No finalized days yet';
+  async function handleSourceChange(optionId: string) {
+    if (!selectedLogDate || !sourcePickerRole || !sourceOptions) return;
+    setSourceMutationStatus('saving');
+    setSourceMutationMessage(null);
+    const selectedOption = sourceOptions[sourcePickerRole].options.find((option) => option.id === optionId);
+    try {
+      const roleState = sourceOptions[sourcePickerRole];
+      const result = await changeHistoricalSource(selectedLogDate, sourcePickerRole, {
+        optionId,
+        expectedRevision: roleState.revision,
+        idempotencyKey: Crypto.randomUUID(),
+      });
+      setSelectedDay(result.day);
+      setSourceOptions(result.sources);
+      setSourcePickerRole(null);
+      setSourceMutationStatus('idle');
+      setHistory(await fetchBankHistory(selectedRange).catch(() => history));
+    } catch (error) {
+      setSourceMutationStatus('error');
+      setSourceMutationMessage(historicalSourceChangeMessage(
+        error instanceof ApiHttpError ? error.code : null,
+        selectedOption?.label ?? 'That source',
+      ));
+    }
+  }
+
+  function openSourcePicker(role: 'expenditure' | 'intake') {
+    setSourceMutationStatus('idle');
+    setSourceMutationMessage(null);
+    setSourcePickerRole(role);
+  }
+
+  async function retryMissingDay() {
+    await refreshHistoricalSources();
+    setRetryAttempt((attempt) => attempt + 1);
+  }
+
+  function showMissingDay(day: BankHistoryMissingDay) {
+    const actions = day.canRetry
+      ? [
+          { text: 'Cancel', style: 'cancel' as const },
+          {
+            text: 'Try again',
+            onPress: () => void retryMissingDay().catch(() => {
+              Alert.alert('Couldn’t refresh this day', 'Check your health connections and try again.');
+            }),
+          },
+        ]
+      : [{ text: 'OK' }];
+    Alert.alert(formatDate(day.logDate), day.message, actions);
+  }
+
+  const hasCompletedDays = Boolean(history && history.days.length > 0);
+  const hasInitializedBank = history?.openingBankStatus === 'initialized';
+  const bankValue = hasInitializedBank && history
+    ? formatBankBalance(history.availableBankCalories)
+    : 'Not calculated';
+  const throughText = hasCompletedDays && history
+    ? `Through ${formatDate(history.endDate ?? '')}`
+    : 'Waiting for a complete day';
 
   return (
     <PlaceholderScreen
-      eyebrow="Bank History"
+      eyebrow="History"
       title="Available Bank"
-      description="Your bank includes posted completed days through the previous day."
+      description="See how completed days changed your bank."
     >
       <View style={styles.hero}>
         <Text style={styles.heroLabel}>Available Bank</Text>
         <Text style={styles.heroValue}>{bankValue}</Text>
         <Text style={styles.heroDetail}>{throughText}</Text>
       </View>
+
+      {history && history.recoveryCalories > 0 ? (
+        <View accessibilityRole="summary" style={styles.recoverySummary}>
+          <Text style={styles.sectionTitle}>Recovery</Text>
+          <Text style={styles.recoveryValue}>
+            {history.recoveryCalories.toLocaleString()} kcal to recover
+          </Text>
+          <Text style={styles.mutedText}>New deposits will restore your bank first.</Text>
+        </View>
+      ) : null}
 
       <View style={styles.rangeRow} accessibilityLabel="History range">
         {ranges.map((range) => {
@@ -152,19 +306,49 @@ export default function BankHistoryScreen() {
       <View style={styles.timelinePanel}>
         <Text style={styles.sectionTitle}>Completed days</Text>
         {status === 'loading' ? <ActivityIndicator color={colors.primary} /> : null}
-        {status === 'error' ? <Text style={styles.errorText}>Bank history is unavailable.</Text> : null}
+        {status === 'error' ? (
+          <View style={styles.errorState}>
+            <Text style={styles.errorText}>Bank history is unavailable.</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setRetryAttempt((attempt) => attempt + 1)}
+              style={({ pressed }) => [styles.retryButton, pressed && styles.retryButtonPressed]}
+            >
+              <Text style={styles.retryButtonText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : null}
         {status === 'empty' ? (
           <>
-            <Text style={styles.bodyText}>No completed bank days yet.</Text>
-            <Text style={styles.mutedText}>Completed days appear after their first provisional posting.</Text>
+            <Text style={styles.bodyText}>No completed days yet.</Text>
+            <Text style={styles.mutedText}>Your history will appear after CalorieBank receives a complete day of burn and food data.</Text>
           </>
         ) : null}
         {status === 'ready'
-          ? history?.finalizedDays.map((day) => {
+          ? [
+              ...(history?.days.map((day) => ({ kind: 'calculated' as const, day })) ?? []),
+              ...(history?.missingDays.map((day) => ({ kind: 'missing' as const, day })) ?? []),
+            ].sort((a, b) => b.day.logDate.localeCompare(a.day.logDate)).map((item) => {
+              if (item.kind === 'missing') {
+                return (
+                  <Pressable
+                    accessibilityHint={item.day.canRetry ? 'Shows why this day is missing and offers retry.' : 'Shows why this day is missing.'}
+                    accessibilityLabel={`${item.day.logDate}, ${item.day.message}`}
+                    accessibilityRole="button"
+                    key={item.day.logDate}
+                    onPress={() => showMissingDay(item.day)}
+                    style={styles.dayRow}
+                  >
+                    <Text style={styles.dayDate}>{formatDate(item.day.logDate)}</Text>
+                    <Text style={styles.missingDayText}>{item.day.message}</Text>
+                  </Pressable>
+                );
+              }
+              const day = item.day;
               const selected = selectedLogDate === day.logDate;
               return (
                 <Pressable
-                  accessibilityHint="Loads bank detail for this finalized day."
+                  accessibilityHint="Loads bank details for this completed day."
                   accessibilityLabel={`${day.logDate}, ${formatCalories(day.dailyBankChange)}`}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
@@ -172,19 +356,11 @@ export default function BankHistoryScreen() {
                   onPress={() => void handleSelectDay(day.logDate)}
                   style={[styles.dayRow, selected && styles.selectedDayRow]}
                 >
-                  <View style={styles.dayIdentity}>
-                    <Text style={styles.dayDate}>{formatDate(day.logDate)}</Text>
-                    <Text style={styles.dayStatus}>{contributionStatus(day.status, day.locksAt)}</Text>
-                  </View>
+                  <Text style={styles.dayDate}>{formatDate(day.logDate)}</Text>
                   <View style={styles.dayAmount}>
-                    <Text style={[styles.dayChange, day.dailyBankChange < 0 && styles.negativeChange]}>
+                    <Text style={styles.dayChange}>
                       {formatCalories(day.dailyBankChange)}
                     </Text>
-                    {day.correctionCount > 0 ? (
-                      <Text style={styles.dayStatus}>
-                        Adjusted from {formatCalories(day.originalDailyBankChange)}
-                      </Text>
-                    ) : null}
                   </View>
                 </Pressable>
               );
@@ -193,68 +369,109 @@ export default function BankHistoryScreen() {
       </View>
 
       <View style={styles.breakdownPanel}>
-        <Text style={styles.sectionTitle}>Selected day</Text>
-        {detailStatus === 'idle' ? <Text style={styles.mutedText}>Select a finalized day.</Text> : null}
+        <Text style={styles.sectionTitle}>Day details</Text>
+        {detailStatus === 'idle' ? <Text style={styles.mutedText}>Select a completed day.</Text> : null}
         {detailStatus === 'loading' ? <ActivityIndicator color={colors.primary} /> : null}
         {detailStatus === 'error' ? <Text style={styles.errorText}>That day detail is unavailable.</Text> : null}
         {detailStatus === 'ready' && selectedDay ? (
           <>
             <Text style={styles.dayTitle}>{formatDate(selectedDay.logDate)}</Text>
-            <Text style={[styles.changeText, selectedDay.dailyBankChange < 0 && styles.negativeChange]}>
-              Banked {formatCalories(selectedDay.dailyBankChange)}
-            </Text>
-            <Text style={styles.statusText}>
-              {contributionStatus(selectedDay.status, selectedDay.locksAt)}
+            <Text style={styles.changeText}>
+              {contributionVerb(selectedDay.dailyBankChange)} {Math.abs(selectedDay.dailyBankChange).toLocaleString()} kcal
             </Text>
 
             <View style={styles.breakdownRows}>
-              <Text style={styles.rowText}>
-                Calories burned {selectedDay.importedTotalDailyExpenditure.toLocaleString()} kcal
-              </Text>
-              <Text style={styles.rowText}>
-                {Math.round(selectedDay.expenditureAdjustmentRate * 100)}% credited{' '}
-                {selectedDay.adjustedExpenditure.toLocaleString()} kcal
-              </Text>
-              <Text style={styles.rowText}>{goalAdjustmentText(selectedDay)}</Text>
-              <Text style={styles.rowText}>
-                Calories eaten {selectedDay.importedCalorieIntake.toLocaleString()} kcal
-              </Text>
-              <Text style={styles.finalRowText}>Banked {formatCalories(selectedDay.dailyBankChange)}</Text>
+              <DetailRow
+                label={`${sourceOptions?.expenditure.selected.label
+                  ?? getConsumerSourceName(selectedDay.versions.at(-1)?.expenditureProvider)} burn`}
+                value={`${selectedDay.importedTotalDailyExpenditure.toLocaleString()} kcal`}
+              />
+              <DetailRow
+                label="Estimated actual burn"
+                value={`× ${Number(selectedDay.expenditureAdjustmentRate.toFixed(2))} = ${selectedDay.adjustedExpenditure.toLocaleString()} kcal`}
+              />
+              <DetailRow label="Goal" value={goalAdjustmentText(selectedDay)} />
+              <DetailRow label="Eaten" value={`${selectedDay.importedCalorieIntake.toLocaleString()} kcal`} />
             </View>
 
-            <Text style={styles.compactMath}>
-              {selectedDay.adjustedExpenditure.toLocaleString()} credited{'\n'}
-              {selectedDay.goalMode === 'cut'
-                ? `- ${selectedDay.goalAdjustmentCalories.toLocaleString()} cut goal`
-                : selectedDay.goalMode === 'bulk'
-                  ? `+ ${selectedDay.goalAdjustmentCalories.toLocaleString()} bulk goal`
-                  : 'maintenance'}
-              {'\n'}- {selectedDay.importedCalorieIntake.toLocaleString()} eaten{'\n'}={' '}
-              {formatCalories(selectedDay.dailyBankChange)} banked
-            </Text>
+            <Text style={styles.compactMath}>{contributionEquation(selectedDay)}</Text>
 
-            <View style={styles.correctionPanel}>
-              <Text style={styles.sectionTitle}>Contribution history</Text>
-              <Text style={styles.rowText}>
-                Original contribution {formatCalories(selectedDay.originalDailyBankChange)}
-              </Text>
-              {selectedDay.versions.slice(1).map((version) => (
-                <Text key={version.version} style={styles.rowText}>
-                  Correction {version.version - 1} {formatCalories(version.correctionDelta)}
-                </Text>
-              ))}
-              <Text style={styles.finalRowText}>
-                Effective contribution {formatCalories(selectedDay.effectiveDailyBankChange)}
-              </Text>
-              <Text style={styles.mutedText}>
-                {selectedDay.status === 'locked'
-                  ? 'This contribution is permanently locked.'
-                  : `Automatic corrections remain open until ${formatDate(selectedDay.locksAt)}.`}
-              </Text>
+            <View style={styles.detailNotes}>
+              {selectedDay.provenance === 'opening' ? (
+                <Text style={styles.mutedText}>Included in your starting bank.</Text>
+              ) : null}
+              {selectedDay.provenance === 'opening' && selectedDay.startingBalanceFloorApplied ? (
+                <Text style={styles.mutedText}>Your starting balance cannot begin below zero.</Text>
+              ) : null}
+              {selectedDay.versions.at(-1) ? (
+                <>
+                  <View style={styles.sourceRow}>
+                    <Text style={styles.mutedText}>
+                      Calories burned · {sourceOptions?.expenditure.selected.label
+                        ?? getConsumerSourceName(selectedDay.versions.at(-1)!.expenditureProvider)}
+                    </Text>
+                    {sourceOptions?.expenditure.canChange ? (
+                      <Pressable accessibilityRole="button" onPress={() => openSourcePicker('expenditure')}>
+                        <Text style={styles.changeSourceText}>Change</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  <View style={styles.sourceRow}>
+                    <Text style={styles.mutedText}>
+                      Calories eaten · {sourceOptions?.intake.selected.label
+                        ?? selectedDay.versions.at(-1)!.intakeSourceDisplayName
+                        ?? getConsumerSourceName(selectedDay.versions.at(-1)!.intakeProvider)}
+                    </Text>
+                    {sourceOptions?.intake.canChange ? (
+                      <Pressable accessibilityRole="button" onPress={() => openSourcePicker('intake')}>
+                        <Text style={styles.changeSourceText}>Change</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </>
+              ) : null}
             </View>
           </>
         ) : null}
       </View>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setSourcePickerRole(null)}
+        transparent
+        visible={sourcePickerRole !== null}
+      >
+        <Pressable accessibilityRole="button" onPress={() => setSourcePickerRole(null)} style={styles.modalBackdrop}>
+          <Pressable accessibilityRole="none" onPress={(event) => event.stopPropagation()} style={styles.sourceSheet}>
+            <Text style={styles.sourceSheetTitle}>
+              {sourcePickerRole === 'expenditure' ? 'Calories burned' : 'Calories eaten'}
+            </Text>
+            {sourcePickerRole ? sourceOptions?.[sourcePickerRole].options.map((option) => {
+              const selected = option.id === sourceOptions[sourcePickerRole].selected.id;
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected, disabled: selected || sourceMutationStatus === 'saving' }}
+                  disabled={selected || sourceMutationStatus === 'saving'}
+                  key={option.id}
+                  onPress={() => void handleSourceChange(option.id)}
+                  style={styles.sourceOption}
+                >
+                  <Text style={styles.sourceOptionMark}>{selected ? '✓' : ''}</Text>
+                  <Text style={styles.sourceOptionText}>{option.label}</Text>
+                  {sourceMutationStatus === 'saving' && !selected ? <ActivityIndicator color={colors.primary} /> : null}
+                </Pressable>
+              );
+            }) : null}
+            {sourceMutationStatus === 'error' && sourceMutationMessage
+              ? <Text style={styles.errorText}>{sourceMutationMessage}</Text>
+              : null}
+            <Pressable accessibilityRole="button" onPress={() => setSourcePickerRole(null)} style={styles.cancelButton}>
+              <Text style={styles.changeSourceText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </PlaceholderScreen>
   );
 }
@@ -286,6 +503,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  recoverySummary: {
+    gap: spacing.xs,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  recoveryValue: {
+    color: colors.text,
+    fontSize: typography.heading,
+    fontWeight: '800',
   },
   rangeButton: {
     minHeight: 44,
@@ -333,25 +562,21 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '700',
   },
-  dayIdentity: {
-    flex: 1,
-    gap: spacing.xs,
-  },
   dayAmount: {
     alignItems: 'flex-end',
     gap: spacing.xs,
-  },
-  dayStatus: {
-    color: colors.textMuted,
-    fontSize: typography.caption,
   },
   dayChange: {
     color: colors.primaryDark,
     fontSize: typography.body,
     fontWeight: '800',
   },
-  negativeChange: {
-    color: colors.text,
+  missingDayText: {
+    color: colors.textMuted,
+    flex: 1,
+    fontSize: typography.caption,
+    marginLeft: spacing.md,
+    textAlign: 'right',
   },
   breakdownPanel: {
     gap: spacing.sm,
@@ -377,27 +602,85 @@ const styles = StyleSheet.create({
   breakdownRows: {
     gap: spacing.xs,
   },
-  statusText: {
-    color: colors.text,
-    fontSize: typography.caption,
-    fontWeight: '700',
-  },
-  correctionPanel: {
+  detailNotes: {
     gap: spacing.xs,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingTop: spacing.md,
   },
-  rowText: {
+  sourceRow: {
+    minHeight: 44,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  changeSourceText: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    padding: spacing.md,
+  },
+  sourceSheet: {
+    gap: spacing.sm,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+  },
+  sourceSheetTitle: {
     color: colors.text,
+    fontSize: typography.heading,
+    fontWeight: '800',
+  },
+  sourceOption: {
+    minHeight: 52,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sourceOptionMark: {
+    width: 24,
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  sourceOptionText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: '700',
+  },
+  cancelButton: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  detailLabel: {
+    flexBasis: '48%',
+    flexShrink: 0,
+    color: colors.textMuted,
     fontSize: typography.body,
     lineHeight: 23,
   },
-  finalRowText: {
+  detailValue: {
     color: colors.text,
+    flex: 1,
     fontSize: typography.body,
     fontWeight: '800',
     lineHeight: 23,
+    textAlign: 'left',
   },
   compactMath: {
     color: colors.textMuted,
@@ -418,5 +701,25 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: typography.caption,
     lineHeight: 18,
+  },
+  errorState: {
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  retryButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+  },
+  retryButtonPressed: {
+    opacity: 0.72,
+  },
+  retryButtonText: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: '800',
   },
 });

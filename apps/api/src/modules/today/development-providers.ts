@@ -40,6 +40,12 @@ export class DevelopmentExpenditureProvider implements ExpenditureProvider {
 }
 
 export class DevelopmentIntakeProvider implements IntakeProvider {
+  readonly providerId = 'development';
+  readonly capabilities = {
+    dailyAggregate: true,
+    rollingWindow: false,
+    directConnection: false,
+  } as const;
   constructor(private readonly now: () => Date = () => new Date(Date.now() - DEVELOPMENT_SYNC_OFFSET_MS)) {}
 
   async fetchDailyCalorieIntakeAggregate(

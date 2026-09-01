@@ -6,9 +6,29 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "CALORIEBANK_IOS_ALLOW_LOCAL_HTTP": "1"
+      },
       "ios": {
         "resourceClass": "m-medium"
       }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "beta",
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "beta",
+        "EXPO_PUBLIC_AUTH_MODE": "clerk"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "environment": "production",
+      "autoIncrement": true
     }
   }
 }

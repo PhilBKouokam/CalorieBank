@@ -6,14 +6,14 @@ import {
 import { Router } from 'express';
 
 import { AppError } from '../../errors';
-import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
+import { resolveRequestUser, type RequestUserSource } from '../../auth/current-user';
 import type { FinalizationScheduler } from '../finalization-orchestration/finalization-orchestration.service';
 import type { SyncSessionRepository } from './sync-session.repository';
 import { getLocalDateForTimezone } from './today.time';
 
 function rollingDates(localDate: string) {
   const anchor = new Date(`${localDate}T12:00:00.000Z`);
-  return Array.from({ length: 3 }, (_, offset) => {
+  return Array.from({ length: 8 }, (_, offset) => {
     const date = new Date(anchor);
     date.setUTCDate(date.getUTCDate() - offset);
     return date.toISOString().slice(0, 10);
@@ -22,7 +22,7 @@ function rollingDates(localDate: string) {
 
 export function createSyncSessionRouter(
   repository: SyncSessionRepository,
-  developmentUser: DevelopmentUser,
+  userSource: RequestUserSource,
   scheduler?: FinalizationScheduler,
   now: () => Date = () => new Date(),
 ) {
@@ -30,6 +30,7 @@ export function createSyncSessionRouter(
 
   router.post('/', async (req, res, next) => {
     try {
+      const user = resolveRequestUser(userSource, res);
       const parsed = ingestionSyncSessionStartSchema.safeParse(req.body);
       if (!parsed.success) throw new AppError('Sync session is invalid.', 400, parsed.error.flatten());
       const startedAt = now();
@@ -38,9 +39,9 @@ export function createSyncSessionRouter(
       }
       const allowedDates = new Set(rollingDates(parsed.data.localDate));
       if (parsed.data.datesQueried.some((date) => !allowedDates.has(date))) {
-        throw new AppError('Sync dates must stay within the rolling three-day window.', 400);
+        throw new AppError('Sync dates must stay within the supported setup window.', 400);
       }
-      const session = await repository.start(developmentUser, parsed.data, startedAt);
+      const session = await repository.start(user, parsed.data, startedAt);
       res.status(201).json(ingestionSyncSessionResponseSchema.parse(session));
     } catch (error) {
       next(error);
@@ -49,14 +50,15 @@ export function createSyncSessionRouter(
 
   router.patch('/:sessionId', async (req, res, next) => {
     try {
+      const user = resolveRequestUser(userSource, res);
       const sessionId = req.params.sessionId;
       if (!sessionId) throw new AppError('Sync session is required.', 400);
       const parsed = ingestionSyncSessionCompleteSchema.safeParse(req.body);
       if (!parsed.success) throw new AppError('Sync result is invalid.', 400, parsed.error.flatten());
-      let session = await repository.complete(developmentUser.id, sessionId, parsed.data, now());
+      let session = await repository.complete(user.id, sessionId, parsed.data, now());
       if (scheduler) {
         const outcome = await scheduler.execute({
-          user: developmentUser,
+          user,
           currentLocalDate: getLocalDateForTimezone(session.timezone ?? '', now()),
           timezone: session.timezone ?? 'UTC',
           dates: session.datesQueried,
@@ -64,7 +66,7 @@ export function createSyncSessionRouter(
           syncSessionId: session.id,
         });
         session = await repository.recordOrchestrationOutcome(
-          developmentUser.id,
+          user.id,
           session.id,
           outcome,
         );

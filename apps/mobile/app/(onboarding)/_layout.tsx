@@ -11,7 +11,7 @@ export default function OnboardingLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
-      <Stack.Screen name="onboarding" options={{ title: 'Onboarding' }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
     </Stack>
   );
 }

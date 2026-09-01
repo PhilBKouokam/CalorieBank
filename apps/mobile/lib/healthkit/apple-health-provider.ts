@@ -1,5 +1,6 @@
 import {
   composeTotalDailyExpenditure,
+  estimateRestingBurnFromDailyBasal,
   getCurrentLocalDayWindow,
   normalizeDailyExpenditureAggregate,
   normalizeDailyIntakeAggregate,
@@ -13,13 +14,16 @@ import {
   type NormalizedDailyIntakeAggregate,
   type NormalizedDailyStepAggregate,
   type NormalizedCurrentDayWorkout,
+  type RestEnergyHistoryDay,
   type StepProvider,
   type WorkoutProvider,
 } from '@caloriebank/domain';
 import type {
   queryStatisticsForQuantity,
+  queryStatisticsCollectionForQuantity,
   queryWorkoutSamples,
 } from '@kingstinct/react-native-healthkit';
+import type { AppleHealthSource } from './apple-health-intake-writers';
 
 export const APPLE_HEALTH_PROVIDER_ID = 'apple_health';
 export const APPLE_HEALTH_PROVIDER_LABEL = 'Apple Health';
@@ -38,8 +42,63 @@ export const APPLE_HEALTH_READ_TYPES = [
 
 export type HealthKitNativeClient = {
   queryStatisticsForQuantity: typeof queryStatisticsForQuantity;
+  queryStatisticsCollectionForQuantity: typeof queryStatisticsCollectionForQuantity;
   queryWorkoutSamples: typeof queryWorkoutSamples;
 };
+
+function localDateString(value: Date) {
+  return [
+    value.getFullYear(),
+    String(value.getMonth() + 1).padStart(2, '0'),
+    String(value.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+export async function estimateAppleHealthRestingBurn(
+  healthKit: HealthKitNativeClient,
+  timezone: string,
+  now = new Date(),
+) {
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  for (const dayCount of [14, 30, 90]) {
+    const rangeStart = new Date(todayStart);
+    rangeStart.setDate(rangeStart.getDate() - dayCount);
+    const statistics = await healthKit.queryStatisticsCollectionForQuantity(
+      'HKQuantityTypeIdentifierBasalEnergyBurned',
+      ['cumulativeSum'],
+      rangeStart,
+      { day: 1 },
+      {
+        filter: { date: {
+          startDate: rangeStart,
+          endDate: todayStart,
+          strictStartDate: true,
+          strictEndDate: true,
+        } },
+        unit: 'kcal',
+      },
+    );
+    const days: RestEnergyHistoryDay[] = statistics.flatMap((item) =>
+      item.startDate && item.sumQuantity?.quantity && item.sumQuantity.quantity > 0
+        ? [{
+          localDate: localDateString(item.startDate),
+          timezone,
+          basalEnergyCalories: Math.round(item.sumQuantity.quantity),
+        }]
+        : [],
+    );
+    const estimate = estimateRestingBurnFromDailyBasal(days);
+    if (estimate) {
+      return {
+        ...estimate,
+        evidenceType: 'provider_resting_energy' as const,
+        lookbackStartDate: days[0]!.localDate,
+        lookbackEndDate: days.at(-1)!.localDate,
+      };
+    }
+  }
+  return null;
+}
 
 type AppleHealthProviderDependencies = {
   healthKit: HealthKitNativeClient;
@@ -47,6 +106,11 @@ type AppleHealthProviderDependencies = {
   dayEnd: Date;
   now?: () => Date;
   onDiagnostic?: (diagnostic: AppleHealthNativeQueryDiagnostic) => void;
+  intakeWriter?: {
+    source: AppleHealthSource;
+    bundleIdentifier: string;
+    displayName: string;
+  };
 };
 
 export type AppleHealthNativeQueryDiagnostic = {
@@ -187,16 +251,52 @@ export class AppleHealthExpenditureProvider implements ExpenditureProvider {
 }
 
 export class AppleHealthIntakeProvider implements IntakeProvider {
+  readonly providerId = 'apple_health';
+  readonly capabilities = {
+    dailyAggregate: true,
+    rollingWindow: true,
+    directConnection: false,
+  } as const;
   constructor(private readonly dependencies: AppleHealthProviderDependencies) {}
 
   async fetchDailyCalorieIntakeAggregate(
     input: FetchDailyAggregateInput,
   ): Promise<NormalizedDailyIntakeAggregate | null> {
-    const dietaryEnergy = await cumulativeKilocalories(
-      this.dependencies,
-      'HKQuantityTypeIdentifierDietaryEnergyConsumed',
-      'dietary_energy',
-    );
+    const writer = this.dependencies.intakeWriter;
+    if (!writer) return null;
+    let dietaryEnergy: number | undefined;
+    try {
+      const statistics = await this.dependencies.healthKit.queryStatisticsForQuantity(
+        'HKQuantityTypeIdentifierDietaryEnergyConsumed',
+        ['cumulativeSum'],
+        {
+          filter: {
+            date: {
+              startDate: this.dependencies.dayStart,
+              endDate: this.dependencies.dayEnd,
+              strictStartDate: true,
+              strictEndDate: true,
+            },
+            sources: [writer.source],
+          },
+          unit: 'kcal',
+        },
+      );
+      dietaryEnergy = statistics.sumQuantity?.quantity;
+      reportQuery(this.dependencies, {
+        category: 'dietary_energy',
+        status: dietaryEnergy === undefined ? 'empty' : 'success',
+        sampleCount: null,
+        normalizedAggregate: dietaryEnergy === undefined ? null : roundCalories(dietaryEnergy),
+        error: null,
+      });
+    } catch (error) {
+      reportQuery(this.dependencies, {
+        category: 'dietary_energy', status: 'error', sampleCount: null,
+        normalizedAggregate: null, error,
+      });
+      throw error;
+    }
 
     if (dietaryEnergy === undefined) return null;
 
@@ -206,6 +306,8 @@ export class AppleHealthIntakeProvider implements IntakeProvider {
       provider: APPLE_HEALTH_PROVIDER_ID,
       providerRecordId: `${APPLE_HEALTH_PROVIDER_ID}:intake:${input.localDate}`,
       totalCaloriesConsumed: roundCalories(dietaryEnergy),
+      writerBundleIdentifier: writer.bundleIdentifier,
+      writerDisplayName: writer.displayName,
       importedAt,
       providerUpdatedAt: importedAt,
       syncStatus: 'ready',
@@ -323,6 +425,7 @@ export class AppleHealthWorkoutProvider implements WorkoutProvider {
           workout.totalEnergyBurned?.quantity === undefined
             ? null
             : roundCalories(workout.totalEnergyBurned.quantity),
+        totalSteps: null,
         totalDistance: workout.totalDistance?.quantity ?? null,
         distanceUnit: workout.totalDistance?.unit ?? null,
         importedAt,

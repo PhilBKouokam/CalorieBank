@@ -5,8 +5,10 @@ import { describe, expect, it } from 'vitest';
 import type { BankHistoryRepository } from '../src/modules/bank-history/bank-history.repository';
 import { FinalizationOrchestrationService } from '../src/modules/finalization-orchestration/finalization-orchestration.service';
 import {
+  createRollingSyncSingleFlight,
   mergeRollingSyncOutbox,
   rollingUploadFingerprint,
+  sanitizeRollingSyncOutbox,
   type RollingSyncUpload,
 } from '../../mobile/lib/healthkit/rolling-sync-policy';
 
@@ -60,6 +62,74 @@ describe('rolling historical synchronization policy', () => {
     expect(replacement.queue).toHaveLength(1);
     expect(replacement.queue[0]?.body.rawTotalDailyExpenditure).toBe(1700);
   });
+
+  it('discards legacy all-writer intake uploads that lack source authority', () => {
+    const queue = sanitizeRollingSyncOutbox<RollingSyncUpload>([{
+      kind: 'intake',
+      localDate: '2026-08-15',
+      body: { totalCaloriesConsumed: 1500 },
+      url: 'http://192.168.0.154:3000/v1/me/ingestion/intake',
+      queuedAt: '2026-08-15T12:00:00.000Z',
+    }]);
+
+    expect(queue).toEqual([]);
+  });
+
+  it('preserves source-specific intake uploads while removing legacy URLs', () => {
+    const queue = sanitizeRollingSyncOutbox<RollingSyncUpload>([{
+      kind: 'intake',
+      localDate: '2026-08-15',
+      body: {
+        totalCaloriesConsumed: 1500,
+        writerBundleIdentifier: 'CRONOMETER-GOLD',
+        writerDisplayName: 'Cronometer',
+      },
+      url: 'http://192.168.0.154:3000/v1/me/ingestion/intake',
+      queuedAt: '2026-08-15T12:00:00.000Z',
+    }]);
+
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).not.toHaveProperty('url');
+  });
+
+  it('collapses concurrent automatic triggers into one rolling sync', async () => {
+    let release: (() => void) | undefined;
+    let executions = 0;
+    const coordinator = createRollingSyncSingleFlight(async () => {
+      executions += 1;
+      await new Promise<void>((resolve) => { release = resolve; });
+      return executions;
+    });
+
+    const launch = coordinator.run({ force: false });
+    const focus = coordinator.run({ force: false });
+    const foreground = coordinator.run({ force: false });
+    expect(executions).toBe(1);
+    release?.();
+    await expect(Promise.all([launch, focus, foreground])).resolves.toEqual([1, 1, 1]);
+  });
+
+  it('queues at most one fresh run for manual refresh during an active sync', async () => {
+    const releases: Array<() => void> = [];
+    let executions = 0;
+    const coordinator = createRollingSyncSingleFlight(async () => {
+      executions += 1;
+      await new Promise<void>((resolve) => releases.push(resolve));
+      return executions;
+    });
+
+    const active = coordinator.run({ force: false });
+    const manualOne = coordinator.run({ force: true });
+    const manualTwo = coordinator.run({ force: true });
+    expect(executions).toBe(1);
+    releases.shift()?.();
+    await active;
+    await Promise.resolve();
+    expect(executions).toBe(2);
+    releases.shift()?.();
+    await expect(Promise.all([manualOne, manualTwo])).resolves.toEqual([2, 2]);
+    expect(executions).toBe(2);
+  });
 });
 
 function createOrchestrationHarness(options: {
@@ -93,6 +163,12 @@ function createOrchestrationHarness(options: {
     },
   } as unknown as PrismaClient;
   const bankHistory = {
+    initializeOpeningBank: async () => ({
+      outcome: 'not_applicable' as const,
+      accountingStartsOn: null,
+      openingEffectiveBalanceCalories: 0,
+    }),
+    getAccountingStartDate: async () => null,
     reconcileStoredDay: async (_user: unknown, date: string) => {
       reconciled.push(date);
       const outcome = options.reconcileOutcome ?? 'posted';

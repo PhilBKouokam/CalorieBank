@@ -2,6 +2,12 @@
 
 > **ADR 016 refinement:** provider-neutral persistence may contain multiple providers for a date, but banking resolves exactly one authoritative expenditure source and one authoritative intake source. Coexisting provider totals are never summed.
 
+> **Transport update:** Fitbit-derived expenditure is fetched server-side through Google Health API v4 under the `google_health_fitbit` identifier. The provider-neutral interfaces and normalized aggregate contract are unchanged.
+
+> **Wearable expansion:** ADR 017 classifies provider expenditure semantics and registers Garmin and WHOOP without relaxing these contracts. WHOOP implements workout context only; Garmin remains runtime-disabled pending approved API semantics.
+
+> **Nutrition expansion:** ADR 018 adds FatSecret as the first direct `IntakeProvider`. Apple Health remains the bridge path. Both normalize into the same daily aggregate and are never summed.
+
 Date: 2026-07-21
 
 ## Status
@@ -98,6 +104,8 @@ It may include:
 It must never include projected bank change, projected deficit, projected withdrawal, generic or bank-like calories remaining, or any value that appears like an official bank result before day finalization. A future Projected Daily Burn may consume normalized awareness data under ADR 011, with proactive introduction governed by ADR 014 and advanced time-aware behavior governed by ADR 015, but it is a separate estimated expenditure output and not a projected bank field. ADR 012 permits a separately labeled `Remaining Today` eating-guidance value only after its calculation contract is approved.
 
 Provider-neutral ingestion supplies confirmed, source-attributed inputs; it does not own forecast assumptions. Future Time-Aware Activity Forecasting may consume current expenditure, steps, freshness, and authorized historical patterns through a separate read/domain boundary. Provider-specific field names must remain inside adapters, and absent hourly or baseline semantics must not be invented by the forecast layer.
+
+ADR 016 adds capability-aware role selection. Expenditure, intake, steps, and workouts resolve independently to one authoritative provider; selecting a dedicated expenditure ecosystem also selects its supported activity context. Normalized records from other providers may coexist for audit, but read models never sum steps or merge workouts across providers. Fallback is explicit and source-attributed.
 
 Today values are not ledger inputs. After the local day completes, the provisional pipeline may consume source-attributed expenditure and intake aggregates under the approved bank-calculation rules; steps and workouts remain excluded.
 

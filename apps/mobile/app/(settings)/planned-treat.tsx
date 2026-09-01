@@ -1,11 +1,10 @@
 import { plannedTreatInputSchema, type PlannedTreatGetResponse } from '@caloriebank/schemas';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -34,9 +33,11 @@ export default function PlannedTreatScreen() {
   const [existingTreat, setExistingTreat] = useState<PlannedTreatGetResponse | null>(null);
   const [name, setName] = useState('');
   const [requiredCalories, setRequiredCalories] = useState('');
-  const [targetDate, setTargetDate] = useState('');
   const [status, setStatus] = useState<FormStatus>('loading');
   const [message, setMessage] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+  const nameInputRef = useRef<TextInput>(null);
+  const caloriesInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -54,7 +55,6 @@ export default function PlannedTreatScreen() {
         if (isActivePlannedTreat(plannedTreat)) {
           setName(plannedTreat.name);
           setRequiredCalories(String(plannedTreat.requiredCalories));
-          setTargetDate(plannedTreat.targetDate ?? '');
         }
 
         setStatus('idle');
@@ -78,7 +78,7 @@ export default function PlannedTreatScreen() {
     const parsedInput = plannedTreatInputSchema.safeParse({
       name,
       requiredCalories: Number(requiredCalories),
-      targetDate: targetDate.trim().length > 0 ? targetDate.trim() : null,
+      targetDate: isActivePlannedTreat(existingTreat) ? existingTreat.targetDate : null,
     });
 
     if (!parsedInput.success) {
@@ -122,14 +122,21 @@ export default function PlannedTreatScreen() {
 
   const activeTreat = isActivePlannedTreat(existingTreat) ? existingTreat : null;
   const isBusy = status === 'saving' || status === 'deleting';
+  const revealInput = (input: TextInput | null) => {
+    if (!input) return;
+    setTimeout(() => {
+      scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(input, spacing.lg, true);
+    }, 250);
+  };
 
   return (
-    <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <PlaceholderScreen
-        eyebrow="Planned Treat"
-        title={activeTreat ? 'Edit your plan' : 'Choose something to save for'}
-        description="Name one food, meal, or event. CalorieBank compares it with your real Available Bank without spending it automatically."
-      >
+    <PlaceholderScreen
+      eyebrow="Planned Treat"
+      title={activeTreat ? 'Edit your plan' : 'Choose something to save for'}
+      description="Name one food, meal, or event. CalorieBank compares it with your real Available Bank without spending it automatically."
+      keyboardAware
+      scrollViewRef={scrollRef}
+    >
         {status === 'loading' ? (
           <View style={styles.loadingPanel}>
             <ActivityIndicator color={colors.primary} size="large" />
@@ -155,8 +162,10 @@ export default function PlannedTreatScreen() {
               accessibilityLabel="Planned Treat name"
               autoCapitalize="sentences"
               onChangeText={setName}
+              onFocus={() => revealInput(nameInputRef.current)}
               placeholder="Cookies and milk"
               placeholderTextColor={colors.textMuted}
+              ref={nameInputRef}
               style={styles.input}
               value={name}
             />
@@ -166,22 +175,14 @@ export default function PlannedTreatScreen() {
               accessibilityLabel="Required calories"
               keyboardType="number-pad"
               onChangeText={setRequiredCalories}
+              onFocus={() => revealInput(caloriesInputRef.current)}
               placeholder="1500"
               placeholderTextColor={colors.textMuted}
+              ref={caloriesInputRef}
               style={styles.input}
               value={requiredCalories}
             />
 
-            <Text style={styles.label}>Target date optional</Text>
-            <TextInput
-              accessibilityLabel="Optional target date"
-              autoCapitalize="none"
-              onChangeText={setTargetDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.textMuted}
-              style={styles.input}
-              value={targetDate}
-            />
             <Text style={styles.help}>
               Reaching a Planned Treat means it is ready. Your connected calorie tracker still records what you eat.
             </Text>
@@ -219,15 +220,11 @@ export default function PlannedTreatScreen() {
             ) : null}
           </View>
         )}
-      </PlaceholderScreen>
-    </KeyboardAvoidingView>
+    </PlaceholderScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  fill: {
-    flex: 1,
-  },
   form: {
     gap: spacing.sm,
   },

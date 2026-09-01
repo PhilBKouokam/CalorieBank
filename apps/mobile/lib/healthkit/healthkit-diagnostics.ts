@@ -34,12 +34,31 @@ export type HealthKitUploadDiagnostic = {
   completedCount: number;
   pendingCount: number;
   failedCategories: string[];
+  items: HealthKitUploadItemDiagnostic[];
+};
+
+export type HealthKitUploadItemDiagnostic = {
+  category: 'expenditure' | 'intake' | 'steps' | 'workouts';
+  localDate: string;
+  endpoint: string;
+  status: 'queued' | 'skipped' | 'success' | 'failure';
+  errorType: string | null;
+};
+
+export type HealthKitOutboxDiagnostic = {
+  queuedCount: number;
+  oldestQueuedDate: string | null;
+  lastRetryStatus: 'not_run' | 'success' | 'partial' | 'failure';
 };
 
 export type HealthKitDiagnosticsSnapshot = {
   healthKitAvailable: boolean | null;
   authorizationRequest: 'not_completed' | 'completed' | 'failed';
   lastSyncAt: string | null;
+  syncRunning: boolean;
+  lastSyncTrigger: string | null;
+  lastSyncStartedAt: string | null;
+  lastSyncCompletedAt: string | null;
   overallSyncResult: HealthKitDiagnosticSyncStatus;
   rollingDates: Array<{
     localDate: string;
@@ -48,6 +67,7 @@ export type HealthKitDiagnosticsSnapshot = {
   }>;
   queries: HealthKitQueryDiagnostic[];
   upload: HealthKitUploadDiagnostic;
+  outbox: HealthKitOutboxDiagnostic;
   error: HealthKitDiagnosticError | null;
 };
 
@@ -58,12 +78,27 @@ export type AppleHealthPresentationState =
   | 'sync_error'
   | 'unavailable';
 
+export type AppleHealthBurnState =
+  | 'needs_refresh'
+  | 'refreshing'
+  | 'ready'
+  | 'no_burn_data'
+  | 'refresh_failed'
+  | 'needs_attention';
+
 const EMPTY_UPLOAD: HealthKitUploadDiagnostic = {
   status: 'not_attempted',
   attemptedCount: 0,
   completedCount: 0,
   pendingCount: 0,
   failedCategories: [],
+  items: [],
+};
+
+const EMPTY_OUTBOX: HealthKitOutboxDiagnostic = {
+  queuedCount: 0,
+  oldestQueuedDate: null,
+  lastRetryStatus: 'not_run',
 };
 
 export function createHealthKitDiagnosticsSnapshot(
@@ -73,10 +108,19 @@ export function createHealthKitDiagnosticsSnapshot(
     healthKitAvailable: input.healthKitAvailable ?? null,
     authorizationRequest: input.authorizationRequest ?? 'not_completed',
     lastSyncAt: input.lastSyncAt ?? null,
+    syncRunning: input.syncRunning ?? false,
+    lastSyncTrigger: input.lastSyncTrigger ?? null,
+    lastSyncStartedAt: input.lastSyncStartedAt ?? null,
+    lastSyncCompletedAt: input.lastSyncCompletedAt ?? null,
     overallSyncResult: input.overallSyncResult ?? 'not_run',
     rollingDates: input.rollingDates ?? [],
     queries: input.queries ?? [],
-    upload: input.upload ?? EMPTY_UPLOAD,
+    upload: {
+      ...EMPTY_UPLOAD,
+      ...input.upload,
+      items: input.upload?.items ?? [],
+    },
+    outbox: { ...EMPTY_OUTBOX, ...input.outbox },
     error: input.error ?? null,
   };
 }
@@ -119,3 +163,29 @@ export function deriveAppleHealthPresentationState(
   return 'connected';
 }
 
+export function deriveAppleHealthBurnState(
+  connectionStatus: 'not_connected' | 'connected' | 'unavailable',
+  diagnostics: HealthKitDiagnosticsSnapshot | null,
+): AppleHealthBurnState {
+  if (connectionStatus === 'unavailable') return 'needs_attention';
+  if (diagnostics?.syncRunning) return 'refreshing';
+  if (connectionStatus !== 'connected' || !diagnostics?.lastSyncCompletedAt) return 'needs_refresh';
+  if (diagnostics.overallSyncResult === 'failure') return 'refresh_failed';
+
+  const dates = new Set(diagnostics.queries.map((query) => query.localDate));
+  for (const localDate of dates) {
+    const active = diagnostics.queries.find(
+      (query) => query.localDate === localDate && query.category === 'active_energy',
+    );
+    const basal = diagnostics.queries.find(
+      (query) => query.localDate === localDate && query.category === 'resting_energy',
+    );
+    if (active?.status === 'success' && basal?.status === 'success') return 'ready';
+  }
+
+  const burnQueries = diagnostics.queries.filter(
+    (query) => query.category === 'active_energy' || query.category === 'resting_energy',
+  );
+  if (burnQueries.some((query) => query.status === 'error')) return 'refresh_failed';
+  return 'no_burn_data';
+}

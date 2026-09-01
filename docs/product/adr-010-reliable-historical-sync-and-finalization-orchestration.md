@@ -1,8 +1,10 @@
 # ADR 010: Reliable Historical Synchronization and Finalization Orchestration
 
-> **ADR 016 refinement:** Apple Health device sync and Fitbit server sync may both populate the three-day window. Orchestration consumes only explicitly resolved authoritative intake and expenditure records and never sums provider totals.
+> **ADR 016 refinement:** Apple Health device sync and Google Health/Fitbit server sync may both populate the three-day window. Orchestration consumes only explicitly resolved authoritative intake and expenditure records and never sums provider totals.
 
-Status: Accepted and implemented  
+Google Health/Fitbit synchronization also retrieves verified `steps` daily rollups and `exercise` sessions for each day independently. Those categories use the same rolling window and category-level observability, but never trigger posting or reconciliation. Today resolves them only when Fitbit is the selected activity-context provider.
+
+Status: Accepted and implemented; PB.1B adds hosted lifecycle execution
 Date: 2026-07-22
 
 ## Context
@@ -10,6 +12,12 @@ Date: 2026-07-22
 ADR 009 made completed days provisional and correctable, but reconciliation is only useful when fresh provider aggregates reach it. Current-day-only HealthKit queries leave yesterday dependent on a user remembering a special refresh and cannot reliably capture late nutrition or wearable updates.
 
 ## Decision
+
+PB.1B adds one host-agnostic `AccountLifecycleCoordinator`. Render invokes it hourly for onboarding-complete accounts. It refreshes only authoritative server-readable Fitbit/FatSecret sources, plus a server-readable source required by an active provisional per-day override. One user's failure does not block another. Apple Health and Apple Health food writers remain device-only and run through an authenticated app-scope foreground coordinator with a three-day normal window and continuity-guided expansion to eight dates.
+
+Initial posting additionally requires evidence that each authoritative role was queried for that exact date after the captured local day ended. A cumulative row imported while the date was current is not completed-day proof. A completed unchanged query is proof even when no aggregate row changes.
+
+Before a goal update, bounded unresolved completed dates are processed under the old goal. The update is rejected when safe recovery cannot complete; today's new goal is never retroactively applied to an unresolved completed date.
 
 Foreground Apple Health synchronization uses a rolling three-local-calendar-day window:
 
@@ -66,7 +74,7 @@ Rejected because it can create false deposits or withdrawals.
 ## Deferred
 
 - Background HealthKit delivery
-- Hosted scheduler deployment and exact execution cadence
+- Morning push/local notification delivery
 - Administrative reconciliation of locked days
 - Unlimited historical import and analytics
 - Cross-device outbox synchronization

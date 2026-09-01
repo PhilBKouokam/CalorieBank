@@ -3,6 +3,7 @@ import type {
   PlannedTreatGetResponse,
   PlannedTreatInput,
 } from '@caloriebank/schemas';
+import { deriveConsumerBankBalances } from '@caloriebank/domain';
 import type { PlannedTreat, PrismaClient } from '@prisma/client';
 
 import { AppError } from '../../errors';
@@ -28,12 +29,21 @@ function parseOptionalDate(value: string | null | undefined) {
 }
 
 async function getAvailableBankCalories(db: PrismaClient, userId: string) {
-  const ledgerSum = await db.calorieLedgerTransaction.aggregate({
-    where: { userId },
-    _sum: { amountCalories: true },
-  });
+  const [ledgerSum, initialization] = await Promise.all([
+    db.calorieLedgerTransaction.aggregate({
+      where: { userId },
+      _sum: { amountCalories: true },
+    }),
+    db.bankAccountInitialization.findUnique({
+      where: { userId },
+      select: { openingEffectiveBalanceCalories: true },
+    }),
+  ]);
 
-  return ledgerSum._sum.amountCalories ?? 0;
+  return deriveConsumerBankBalances(
+    (initialization?.openingEffectiveBalanceCalories ?? 0) +
+      (ledgerSum._sum.amountCalories ?? 0),
+  ).availableBankCalories;
 }
 
 function toResponse(

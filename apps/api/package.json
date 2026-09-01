@@ -14,7 +14,9 @@
     "db:deploy": "prisma migrate deploy",
     "seed:bank-history": "tsx src/scripts/seed-bank-history.ts",
     "orchestrate:finalization": "tsx src/scripts/run-finalization-orchestration.ts",
+    "lifecycle:run": "node dist/scripts/run-account-lifecycle.js",
     "inspect:provider-provenance": "tsx src/scripts/inspect-bank-provider-provenance.ts",
+    "auth:link-existing": "tsx src/scripts/link-existing-auth-identity.ts",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "pretypecheck": "npm --workspace @caloriebank/domain run build && npm --workspace @caloriebank/schemas run build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -24,6 +26,7 @@
   "dependencies": {
     "@caloriebank/domain": "*",
     "@caloriebank/schemas": "*",
+    "@clerk/express": "^2.1.60",
     "@prisma/client": "6.19.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

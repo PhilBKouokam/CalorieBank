@@ -4,6 +4,7 @@ import {
   currentDayStepSyncSchema,
   currentDayWorkoutSyncSchema,
   ingestionSyncResultSchema,
+  restingBurnEstimateInputSchema,
   workoutSyncResultSchema,
 } from '@caloriebank/schemas';
 import {
@@ -16,7 +17,7 @@ import {
 import { Router } from 'express';
 
 import { AppError } from '../../errors';
-import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
+import { resolveRequestUser, type RequestUserSource } from '../../auth/current-user';
 import { getLocalDateForTimezone } from './today.time';
 import type { TodayAggregateRepository } from './today.repository';
 
@@ -38,13 +39,34 @@ function assertNotFutureLocalDate(localDate: string, timezone: string, now: Date
 
 export function createTodayIngestionRouter(
   repository: TodayAggregateRepository,
-  developmentUser: DevelopmentUser,
+  userSource: RequestUserSource,
   now: () => Date = () => new Date(),
 ) {
   const router = Router();
 
+  router.post('/resting-burn-estimate', async (req, res, next) => {
+    try {
+      const user = resolveRequestUser(userSource, res);
+      const parsed = restingBurnEstimateInputSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new AppError('Resting-burn estimate is invalid.', 400, parsed.error.flatten());
+      }
+      if (!repository.upsertRestingBurnEstimate) {
+        throw new AppError('Resting-burn estimates are unavailable.', 503);
+      }
+      await repository.upsertRestingBurnEstimate(user, {
+        ...parsed.data,
+        calculatedAt: new Date(parsed.data.calculatedAt),
+      });
+      res.json({ result: 'updated' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post('/expenditure', async (req, res, next) => {
     try {
+      const user = resolveRequestUser(userSource, res);
       const parsed = currentDayExpenditureSyncSchema.safeParse(req.body);
       if (!parsed.success) {
         throw new AppError('Current-day expenditure is invalid.', 400, parsed.error.flatten());
@@ -54,11 +76,11 @@ export function createTodayIngestionRouter(
       assertNotFutureLocalDate(parsed.data.localDate, parsed.data.timezone, receivedAt);
       const isCurrentDay =
         getLocalDateForTimezone(parsed.data.timezone, receivedAt) === parsed.data.localDate;
-      await assertSessionOwnership(repository, parsed.data.syncSessionId, developmentUser.id);
+      await assertSessionOwnership(repository, parsed.data.syncSessionId, user.id);
       const result = await repository.upsertExpenditureAggregate(
-        developmentUser,
+        user,
         normalizeDailyExpenditureAggregate({
-          userId: developmentUser.id,
+          userId: user.id,
           localDate: parsed.data.localDate,
           timezone: parsed.data.timezone,
           provider: APPLE_HEALTH_PROVIDER,
@@ -87,6 +109,7 @@ export function createTodayIngestionRouter(
 
   router.post('/intake', async (req, res, next) => {
     try {
+      const user = resolveRequestUser(userSource, res);
       const parsed = currentDayIntakeSyncSchema.safeParse(req.body);
       if (!parsed.success) {
         throw new AppError('Current-day intake is invalid.', 400, parsed.error.flatten());
@@ -96,16 +119,18 @@ export function createTodayIngestionRouter(
       assertNotFutureLocalDate(parsed.data.localDate, parsed.data.timezone, receivedAt);
       const isCurrentDay =
         getLocalDateForTimezone(parsed.data.timezone, receivedAt) === parsed.data.localDate;
-      await assertSessionOwnership(repository, parsed.data.syncSessionId, developmentUser.id);
+      await assertSessionOwnership(repository, parsed.data.syncSessionId, user.id);
       const result = await repository.upsertIntakeAggregate(
-        developmentUser,
+        user,
         normalizeDailyIntakeAggregate({
-          userId: developmentUser.id,
+          userId: user.id,
           localDate: parsed.data.localDate,
           timezone: parsed.data.timezone,
           provider: APPLE_HEALTH_PROVIDER,
           providerRecordId: `${APPLE_HEALTH_PROVIDER}:intake:${parsed.data.localDate}`,
           totalCaloriesConsumed: parsed.data.totalCaloriesConsumed,
+          writerBundleIdentifier: parsed.data.writerBundleIdentifier,
+          writerDisplayName: parsed.data.writerDisplayName,
           importedAt: receivedAt,
           providerUpdatedAt: new Date(parsed.data.providerUpdatedAt),
           syncStatus: 'ready',
@@ -122,6 +147,7 @@ export function createTodayIngestionRouter(
 
   router.post('/steps', async (req, res, next) => {
     try {
+      const user = resolveRequestUser(userSource, res);
       const parsed = currentDayStepSyncSchema.safeParse(req.body);
       if (!parsed.success) {
         throw new AppError('Current-day steps are invalid.', 400, parsed.error.flatten());
@@ -130,11 +156,11 @@ export function createTodayIngestionRouter(
       assertNotFutureLocalDate(parsed.data.localDate, parsed.data.timezone, receivedAt);
       const isCurrentDay =
         getLocalDateForTimezone(parsed.data.timezone, receivedAt) === parsed.data.localDate;
-      await assertSessionOwnership(repository, parsed.data.syncSessionId, developmentUser.id);
+      await assertSessionOwnership(repository, parsed.data.syncSessionId, user.id);
       const result = await repository.upsertStepAggregate(
-        developmentUser,
+        user,
         normalizeDailyStepAggregate({
-          userId: developmentUser.id,
+          userId: user.id,
           localDate: parsed.data.localDate,
           timezone: parsed.data.timezone,
           provider: APPLE_HEALTH_PROVIDER,
@@ -155,6 +181,7 @@ export function createTodayIngestionRouter(
 
   router.post('/workouts', async (req, res, next) => {
     try {
+      const user = resolveRequestUser(userSource, res);
       const parsed = currentDayWorkoutSyncSchema.safeParse(req.body);
       if (!parsed.success) {
         throw new AppError('Current-day workouts are invalid.', 400, parsed.error.flatten());
@@ -163,7 +190,7 @@ export function createTodayIngestionRouter(
       assertNotFutureLocalDate(parsed.data.localDate, parsed.data.timezone, receivedAt);
       const isCurrentDay =
         getLocalDateForTimezone(parsed.data.timezone, receivedAt) === parsed.data.localDate;
-      await assertSessionOwnership(repository, parsed.data.syncSessionId, developmentUser.id);
+      await assertSessionOwnership(repository, parsed.data.syncSessionId, user.id);
       if (
         parsed.data.workouts.some(
           (workout) =>
@@ -176,10 +203,10 @@ export function createTodayIngestionRouter(
         throw new AppError('Workout timestamps must belong to the supplied local day.', 400);
       }
       const results = await repository.upsertWorkouts(
-        developmentUser,
+        user,
         parsed.data.workouts.map((workout) =>
           normalizeCurrentDayWorkout({
-            userId: developmentUser.id,
+            userId: user.id,
             localDate: parsed.data.localDate,
             timezone: parsed.data.timezone,
             provider: APPLE_HEALTH_PROVIDER,
@@ -190,6 +217,7 @@ export function createTodayIngestionRouter(
             endedAt: new Date(workout.endedAt),
             durationMinutes: workout.durationMinutes,
             totalEnergyBurned: workout.totalEnergyBurned,
+            totalSteps: workout.totalSteps,
             totalDistance: workout.totalDistance,
             distanceUnit: workout.distanceUnit,
             importedAt: receivedAt,
@@ -201,7 +229,7 @@ export function createTodayIngestionRouter(
         ),
       );
       const deleted = await repository.deleteMissingWorkoutsForDay?.(
-        developmentUser.id,
+        user.id,
         parsed.data.localDate,
         APPLE_HEALTH_PROVIDER,
         parsed.data.workouts.map((workout) => workout.providerWorkoutId),

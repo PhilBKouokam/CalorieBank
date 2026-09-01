@@ -16,7 +16,9 @@
     "db:deploy": "npm --workspace @caloriebank/api run db:deploy",
     "bank:seed": "npm --workspace @caloriebank/api run seed:bank-history",
     "bank:orchestrate": "npm --workspace @caloriebank/api run orchestrate:finalization --",
+    "lifecycle:run": "npm --workspace @caloriebank/api run lifecycle:run",
     "bank:inspect-providers": "npm --workspace @caloriebank/api run inspect:provider-provenance",
+    "auth:link-existing": "npm --workspace @caloriebank/api run auth:link-existing --",
     "mobile:start": "npm --workspace @caloriebank/mobile run start --",
     "mobile:ios": "npm --workspace @caloriebank/mobile run ios --",
     "mobile:ios:device": "npm --workspace @caloriebank/mobile run ios:device --",
@@ -29,5 +31,17 @@
   },
   "engines": {
     "node": ">=20.19.0 <21"
+  },
+  "overrides": {
+    "expo": "54.0.37",
+    "expo-constants": "18.0.14",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "expo": "54.0.37",
+    "expo-constants": "18.0.14",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   }
 }

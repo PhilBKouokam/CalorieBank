@@ -40,6 +40,11 @@ enum BankCalculationSnapshotReason {
   PROVIDER_CORRECTION
 }
 
+enum BankAccountInitializationStatus {
+  WAITING_FOR_OPENING_DATA
+  INITIALIZED
+}
+
 enum AggregateSyncStatus {
   unavailable
   not_connected
@@ -101,50 +106,171 @@ enum IngestionCategoryStatus {
   skipped
 }
 
+enum DashboardPreferenceDecisionSource {
+  unset
+  inferred
+  explicit
+}
+
+enum HistoricalSourceRole {
+  EXPENDITURE
+  INTAKE
+}
+
 model User {
-  id                         String                      @id @default(uuid()) @db.Uuid
-  email                      String                      @unique
-  profile                    UserProfile?
-  goalConfiguration          GoalConfiguration?
-  plannedTreat               PlannedTreat?
-  finalizedDailyBankRecords  FinalizedDailyBankRecord[]
-  calorieLedgerTransactions  CalorieLedgerTransaction[]
-  dailyExpenditureAggregates DailyExpenditureAggregate[]
-  dailyIntakeAggregates      DailyIntakeAggregate[]
-  dailyStepAggregates        DailyStepAggregate[]
-  currentDayWorkouts         CurrentDayWorkout[]
-  dashboardPreferences       DashboardPreferences?
-  ingestionSyncSessions      IngestionSyncSession[]
-  bankCalculationSnapshots   BankCalculationSnapshot[]
-  bankDayProcessingStates    BankDayProcessingState[]
-  providerSelection          ProviderSelection?
-  fitbitConnection           FitbitConnection?
-  fitbitOAuthAttempts        FitbitOAuthAttempt[]
-  createdAt                  DateTime                    @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt                  DateTime                    @updatedAt @map("updated_at") @db.Timestamptz
+  id                            String                              @id @default(uuid()) @db.Uuid
+  // Email is descriptive account metadata. Clerk subject is the ownership key:
+  // a deleted and recreated Clerk user may legitimately reuse an email.
+  email                         String
+  authProvider                  String?                             @map("auth_provider")
+  authSubject                   String?                             @unique @map("auth_subject")
+  profile                       UserProfile?
+  goalConfiguration             GoalConfiguration?
+  plannedTreat                  PlannedTreat?
+  finalizedDailyBankRecords     FinalizedDailyBankRecord[]
+  calorieLedgerTransactions     CalorieLedgerTransaction[]
+  dailyExpenditureAggregates    DailyExpenditureAggregate[]
+  dailyIntakeAggregates         DailyIntakeAggregate[]
+  dailyStepAggregates           DailyStepAggregate[]
+  currentDayWorkouts            CurrentDayWorkout[]
+  restingBurnEstimate           RestingBurnEstimate?
+  dashboardPreferences          DashboardPreferences?
+  ingestionSyncSessions         IngestionSyncSession[]
+  bankCalculationSnapshots      BankCalculationSnapshot[]
+  bankDayProcessingStates       BankDayProcessingState[]
+  providerSelection             ProviderSelection?
+  googleHealthConnection        GoogleHealthConnection?
+  googleHealthOAuthAttempts     GoogleHealthOAuthAttempt[]
+  externalProviderConnections   ExternalProviderConnection[]
+  externalProviderOAuthAttempts ExternalProviderOAuthAttempt[]
+  bankAccountInitialization     BankAccountInitialization?
+  historicalSourceOverrides     HistoricalSourceAuthorityOverride[]
+  historicalSourceRequests      HistoricalSourceOverrideRequest[]
+  createdAt                     DateTime                            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                     DateTime                            @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("users")
 }
 
+model RestingBurnEstimate {
+  userId              String   @id @map("user_id") @db.Uuid
+  provider            String
+  providerKcalPerHour Float    @map("provider_kcal_per_hour")
+  evidenceType        String   @map("evidence_type")
+  observationCount    Int      @map("observation_count")
+  lookbackStartDate   DateTime @map("lookback_start_date") @db.Date
+  lookbackEndDate     DateTime @map("lookback_end_date") @db.Date
+  calculatedAt        DateTime @map("calculated_at") @db.Timestamptz
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([provider, calculatedAt])
+  @@map("resting_burn_estimates")
+}
+
+model BankAccountInitialization {
+  userId                          String                          @id @map("user_id") @db.Uuid
+  status                          BankAccountInitializationStatus @default(WAITING_FOR_OPENING_DATA)
+  historicalOpeningNetCalories    Int?                            @map("historical_opening_net_calories")
+  openingEffectiveBalanceCalories Int?                            @map("opening_effective_balance_calories")
+  eligibleDayCount                Int                             @default(0) @map("eligible_day_count")
+  lookbackStartDate               DateTime?                       @map("lookback_start_date") @db.Date
+  lookbackEndDate                 DateTime?                       @map("lookback_end_date") @db.Date
+  accountingStartsOn              DateTime?                       @map("accounting_starts_on") @db.Date
+  timezone                        String?
+  initializedAt                   DateTime?                       @map("initialized_at") @db.Timestamptz
+  createdAt                       DateTime                        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                       DateTime                        @updatedAt @map("updated_at") @db.Timestamptz
+  user                            User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calculationDays                 OpeningBankCalculationDay[]
+
+  @@map("bank_account_initializations")
+}
+
+model OpeningBankCalculationDay {
+  id                            String                    @id @default(uuid()) @db.Uuid
+  userId                        String                    @map("user_id") @db.Uuid
+  logDate                       DateTime                  @map("log_date") @db.Date
+  timezone                      String
+  importedTotalDailyExpenditure Int                       @map("imported_total_daily_expenditure")
+  expenditureAdjustmentRate     Decimal                   @map("expenditure_adjustment_rate") @db.Decimal(4, 2)
+  adjustedExpenditure           Int                       @map("adjusted_expenditure")
+  goalMode                      GoalMode                  @map("goal_mode")
+  goalAdjustmentCalories        Int                       @map("goal_adjustment_calories")
+  importedCalorieIntake         Int                       @map("imported_calorie_intake")
+  dailyAllowance                Int                       @map("daily_allowance")
+  dailyBankChange               Int                       @map("daily_bank_change")
+  expenditureProvider           String                    @map("expenditure_provider")
+  expenditureProviderRecordId   String                    @map("expenditure_provider_record_id")
+  intakeProvider                String                    @map("intake_provider")
+  intakeProviderRecordId        String                    @map("intake_provider_record_id")
+  intakeSourceDisplayName       String?                   @map("intake_source_display_name")
+  createdAt                     DateTime                  @default(now()) @map("created_at") @db.Timestamptz
+  initialization                BankAccountInitialization @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, logDate])
+  @@index([userId, logDate])
+  @@map("opening_bank_calculation_days")
+}
+
 model ProviderSelection {
-  userId                           String   @id @map("user_id") @db.Uuid
-  authoritativeExpenditureProvider String   @default("apple_health") @map("authoritative_expenditure_provider")
-  authoritativeIntakeProvider      String   @default("apple_health") @map("authoritative_intake_provider")
-  allowExpenditureFallback         Boolean  @default(false) @map("allow_expenditure_fallback")
-  selectedAt                       DateTime @default(now()) @map("selected_at") @db.Timestamptz
-  createdAt                        DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt                        DateTime @updatedAt @map("updated_at") @db.Timestamptz
-  user                             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                             String   @id @map("user_id") @db.Uuid
+  authoritativeExpenditureProvider   String   @default("apple_health") @map("authoritative_expenditure_provider")
+  authoritativeActivityProvider      String   @default("apple_health") @map("authoritative_activity_provider")
+  authoritativeIntakeProvider        String   @default("apple_health") @map("authoritative_intake_provider")
+  appleHealthIntakeWriterBundleId    String?  @map("apple_health_intake_writer_bundle_id")
+  appleHealthIntakeWriterDisplayName String?  @map("apple_health_intake_writer_display_name")
+  allowExpenditureFallback           Boolean  @default(false) @map("allow_expenditure_fallback")
+  allowActivityFallback              Boolean  @default(false) @map("allow_activity_fallback")
+  selectedAt                         DateTime @default(now()) @map("selected_at") @db.Timestamptz
+  createdAt                          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                          DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  user                               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("provider_selections")
 }
 
-model FitbitConnection {
+model HistoricalSourceAuthorityOverride {
+  id                           String               @id @default(uuid()) @db.Uuid
+  userId                       String               @map("user_id") @db.Uuid
+  localDate                    DateTime             @map("local_date") @db.Date
+  role                         HistoricalSourceRole
+  provider                     String
+  intakeWriterBundleIdentifier String?              @map("intake_writer_bundle_identifier")
+  revision                     Int                  @default(1)
+  createdAt                    DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                    DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+  user                         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, localDate, role])
+  @@index([userId, localDate])
+  @@map("historical_source_authority_overrides")
+}
+
+model HistoricalSourceOverrideRequest {
+  id             String               @id @default(uuid()) @db.Uuid
+  userId         String               @map("user_id") @db.Uuid
+  idempotencyKey String               @map("idempotency_key")
+  localDate      DateTime             @map("local_date") @db.Date
+  role           HistoricalSourceRole
+  optionId       String               @map("option_id")
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, localDate, role])
+  @@map("historical_source_override_requests")
+}
+
+model GoogleHealthConnection {
   userId                String    @id @map("user_id") @db.Uuid
-  fitbitUserId          String    @map("fitbit_user_id")
   encryptedAccessToken  String    @map("encrypted_access_token") @db.Text
   encryptedRefreshToken String    @map("encrypted_refresh_token") @db.Text
   accessTokenExpiresAt  DateTime  @map("access_token_expires_at") @db.Timestamptz
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.Timestamptz
+  healthUserId          String?   @map("health_user_id")
+  legacyUserId          String?   @map("legacy_user_id")
   scopes                String[]  @default([])
   status                String    @default("connected")
   connectedAt           DateTime  @default(now()) @map("connected_at") @db.Timestamptz
@@ -156,10 +282,11 @@ model FitbitConnection {
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status])
-  @@map("fitbit_connections")
+  @@index([healthUserId])
+  @@map("google_health_connections")
 }
 
-model FitbitOAuthAttempt {
+model GoogleHealthOAuthAttempt {
   id                    String    @id @default(uuid()) @db.Uuid
   userId                String    @map("user_id") @db.Uuid
   stateHash             String    @unique @map("state_hash")
@@ -171,15 +298,60 @@ model FitbitOAuthAttempt {
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
-  @@map("fitbit_oauth_attempts")
+  @@map("google_health_oauth_attempts")
+}
+
+model ExternalProviderConnection {
+  id                    String    @id @default(uuid()) @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+  provider              String
+  providerUserId        String?   @map("provider_user_id")
+  encryptedAccessToken  String    @map("encrypted_access_token") @db.Text
+  authProtocol          String    @default("oauth2") @map("auth_protocol")
+  encryptedRefreshToken String?   @map("encrypted_refresh_token") @db.Text
+  encryptedTokenSecret  String?   @map("encrypted_token_secret") @db.Text
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.Timestamptz
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.Timestamptz
+  scopes                String[]  @default([])
+  status                String    @default("connected")
+  connectedAt           DateTime  @default(now()) @map("connected_at") @db.Timestamptz
+  lastRefreshedAt       DateTime? @map("last_refreshed_at") @db.Timestamptz
+  lastSyncedAt          DateTime? @map("last_synced_at") @db.Timestamptz
+  lastErrorCode         String?   @map("last_error_code")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([provider, status])
+  @@map("external_provider_connections")
+}
+
+model ExternalProviderOAuthAttempt {
+  id                          String    @id @default(uuid()) @db.Uuid
+  userId                      String    @map("user_id") @db.Uuid
+  provider                    String
+  stateHash                   String    @unique @map("state_hash")
+  encryptedRequestToken       String?   @map("encrypted_request_token") @db.Text
+  encryptedRequestTokenSecret String?   @map("encrypted_request_token_secret") @db.Text
+  mobileRedirectUri           String    @map("mobile_redirect_uri")
+  expiresAt                   DateTime  @map("expires_at") @db.Timestamptz
+  consumedAt                  DateTime? @map("consumed_at") @db.Timestamptz
+  createdAt                   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  user                        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider, expiresAt])
+  @@map("external_provider_oauth_attempts")
 }
 
 model UserProfile {
-  userId    String   @id @map("user_id") @db.Uuid
-  timezone  String   @default("UTC")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  userId                     String    @id @map("user_id") @db.Uuid
+  timezone                   String    @default("UTC")
+  onboardingWelcomeCompleted Boolean   @default(false) @map("onboarding_welcome_completed")
+  onboardingCompletedAt      DateTime? @map("onboarding_completed_at") @db.Timestamptz
+  user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("user_profiles")
 }
@@ -242,22 +414,24 @@ model DailyExpenditureAggregate {
 }
 
 model DailyIntakeAggregate {
-  id                    String                @id @default(uuid()) @db.Uuid
-  userId                String                @map("user_id") @db.Uuid
-  localDate             DateTime              @map("local_date") @db.Date
-  timezone              String
-  provider              String
-  providerRecordId      String                @map("provider_record_id")
-  totalCaloriesConsumed Int                   @map("total_calories_consumed")
-  importedAt            DateTime              @map("imported_at") @db.Timestamptz
-  providerUpdatedAt     DateTime?             @map("provider_updated_at") @db.Timestamptz
-  syncStatus            AggregateSyncStatus   @map("sync_status")
-  isCurrentDay          Boolean               @map("is_current_day")
-  syncSessionId         String?               @map("sync_session_id") @db.Uuid
-  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz
-  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  syncSession           IngestionSyncSession? @relation(fields: [syncSessionId], references: [id], onDelete: SetNull)
+  id                     String                @id @default(uuid()) @db.Uuid
+  userId                 String                @map("user_id") @db.Uuid
+  localDate              DateTime              @map("local_date") @db.Date
+  timezone               String
+  provider               String
+  providerRecordId       String                @map("provider_record_id")
+  totalCaloriesConsumed  Int                   @map("total_calories_consumed")
+  writerBundleIdentifier String?               @map("writer_bundle_identifier")
+  writerDisplayName      String?               @map("writer_display_name")
+  importedAt             DateTime              @map("imported_at") @db.Timestamptz
+  providerUpdatedAt      DateTime?             @map("provider_updated_at") @db.Timestamptz
+  syncStatus             AggregateSyncStatus   @map("sync_status")
+  isCurrentDay           Boolean               @map("is_current_day")
+  syncSessionId          String?               @map("sync_session_id") @db.Uuid
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncSession            IngestionSyncSession? @relation(fields: [syncSessionId], references: [id], onDelete: SetNull)
 
   @@unique([userId, provider, providerRecordId])
   @@unique([userId, localDate, provider])
@@ -303,6 +477,7 @@ model CurrentDayWorkout {
   endedAt           DateTime              @map("ended_at") @db.Timestamptz
   durationMinutes   Int                   @map("duration_minutes")
   totalEnergyBurned Int?                  @map("total_energy_burned")
+  totalSteps        Int?                  @map("total_steps")
   totalDistance     Decimal?              @map("total_distance") @db.Decimal(12, 2)
   distanceUnit      String?               @map("distance_unit")
   importedAt        DateTime              @map("imported_at") @db.Timestamptz
@@ -321,16 +496,17 @@ model CurrentDayWorkout {
 }
 
 model DashboardPreferences {
-  userId                          String   @id @map("user_id") @db.Uuid
-  showLatestFinalizedContribution Boolean  @default(true) @map("show_latest_finalized_contribution")
-  showTodaySoFar                  Boolean  @default(true) @map("show_today_so_far")
-  showPlannedTreat                Boolean  @default(true) @map("show_planned_treat")
-  showSteps                       Boolean  @default(true) @map("show_steps")
-  showWorkouts                    Boolean  @default(true) @map("show_workouts")
-  showCurrentGoal                 Boolean  @default(true) @map("show_current_goal")
-  createdAt                       DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt                       DateTime @updatedAt @map("updated_at") @db.Timestamptz
-  user                            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                          String                            @id @map("user_id") @db.Uuid
+  showLatestFinalizedContribution Boolean                           @default(true) @map("show_latest_finalized_contribution")
+  showTodaySoFar                  Boolean                           @default(true) @map("show_today_so_far")
+  showPlannedTreat                Boolean                           @default(false) @map("show_planned_treat")
+  showSteps                       Boolean                           @default(false) @map("show_steps")
+  stepsVisibilitySource           DashboardPreferenceDecisionSource @default(unset) @map("steps_visibility_source")
+  showWorkouts                    Boolean                           @default(false) @map("show_workouts")
+  showCurrentGoal                 Boolean                           @default(false) @map("show_current_goal")
+  createdAt                       DateTime                          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                       DateTime                          @updatedAt @map("updated_at") @db.Timestamptz
+  user                            User                              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("dashboard_preferences")
 }
@@ -363,6 +539,7 @@ model IngestionSyncSession {
   datesLocked              String[]                    @default([]) @map("dates_locked")
   waitingDates             Json                        @default("[]") @map("waiting_dates")
   errors                   String[]                    @default([])
+  categoryResults          Json                        @default("[]") @map("category_results")
   durationMs               Int?                        @map("duration_ms")
   createdAt                DateTime                    @default(now()) @map("created_at") @db.Timestamptz
   user                     User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -452,6 +629,8 @@ model BankCalculationSnapshot {
   expenditureProviderRecordId   String                        @map("expenditure_provider_record_id")
   intakeProvider                String                        @map("intake_provider")
   intakeProviderRecordId        String                        @map("intake_provider_record_id")
+  intakeSourceDisplayName       String?                       @map("intake_source_display_name")
+  intakeWriterBundleIdentifier  String?                       @map("intake_writer_bundle_identifier")
   triggerSyncSessionId          String?                       @map("trigger_sync_session_id") @db.Uuid
   inputFingerprint              String                        @map("input_fingerprint")
   createdAt                     DateTime                      @default(now()) @map("created_at") @db.Timestamptz

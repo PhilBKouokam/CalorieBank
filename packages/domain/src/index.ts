@@ -5,8 +5,115 @@ export const MIN_EXPENDITURE_ADJUSTMENT_RATE = 0;
 export const MAX_EXPENDITURE_ADJUSTMENT_RATE = 1;
 export const PROVISIONAL_CORRECTION_WINDOW_CALENDAR_DAYS = 2;
 export const ROLLING_HEALTH_SYNC_CALENDAR_DAYS = 3;
-export const BANKING_PROVIDER_IDS = ['apple_health', 'fitbit'] as const;
+export const OPENING_BANK_LOOKBACK_CALENDAR_DAYS = 7;
+export const PROVIDER_IDS = ['apple_health', 'google_health_fitbit', 'garmin', 'whoop', 'fatsecret'] as const;
+export type ProviderId = (typeof PROVIDER_IDS)[number];
+export const BANKING_PROVIDER_IDS = ['apple_health', 'google_health_fitbit'] as const;
 export type BankingProviderId = (typeof BANKING_PROVIDER_IDS)[number];
+export type ExpenditureCapability = 'full_total' | 'derivable_total' | 'active_only' | 'unavailable';
+
+export type ProviderCapabilities = {
+  expenditure: boolean;
+  expenditureCapability: ExpenditureCapability;
+  intake: boolean;
+  steps: boolean;
+  workouts: boolean;
+  workoutEnergy: boolean;
+  workoutDuration: boolean;
+  distance: boolean;
+  sleep: boolean;
+  heartRate: boolean;
+  webhooks: boolean;
+  historicalBackfill: boolean;
+  oauth: boolean;
+};
+
+const PROVIDER_CAPABILITY_CATALOG: Readonly<Record<ProviderId, ProviderCapabilities>> = {
+  apple_health: {
+    expenditure: true,
+    expenditureCapability: 'derivable_total',
+    intake: true,
+    steps: true,
+    workouts: true,
+    workoutEnergy: true,
+    workoutDuration: true,
+    distance: true,
+    sleep: false,
+    heartRate: false,
+    webhooks: false,
+    historicalBackfill: true,
+    oauth: false,
+  },
+  google_health_fitbit: {
+    expenditure: true,
+    expenditureCapability: 'full_total',
+    intake: false,
+    steps: true,
+    workouts: true,
+    workoutEnergy: true,
+    workoutDuration: true,
+    distance: true,
+    sleep: false,
+    heartRate: false,
+    webhooks: true,
+    historicalBackfill: true,
+    oauth: true,
+  },
+  garmin: {
+    expenditure: false,
+    expenditureCapability: 'unavailable',
+    intake: false,
+    steps: true,
+    workouts: true,
+    workoutEnergy: true,
+    workoutDuration: true,
+    distance: true,
+    sleep: true,
+    heartRate: true,
+    webhooks: true,
+    historicalBackfill: true,
+    oauth: true,
+  },
+  whoop: {
+    expenditure: false,
+    expenditureCapability: 'unavailable',
+    intake: false,
+    steps: false,
+    workouts: true,
+    workoutEnergy: true,
+    workoutDuration: true,
+    distance: true,
+    sleep: true,
+    heartRate: true,
+    webhooks: true,
+    historicalBackfill: true,
+    oauth: true,
+  },
+  fatsecret: {
+    expenditure: false,
+    expenditureCapability: 'unavailable',
+    intake: true,
+    steps: false,
+    workouts: false,
+    workoutEnergy: false,
+    workoutDuration: false,
+    distance: false,
+    sleep: false,
+    heartRate: false,
+    webhooks: false,
+    historicalBackfill: true,
+    oauth: true,
+  },
+};
+
+export function getProviderCapabilities(provider: ProviderId): ProviderCapabilities {
+  return PROVIDER_CAPABILITY_CATALOG[provider];
+}
+
+export function canProvideAuthoritativeExpenditure(provider: ProviderId) {
+  const capability = getProviderCapabilities(provider).expenditureCapability;
+  return capability === 'full_total' || capability === 'derivable_total';
+}
 
 export type ProviderSelectionPolicy = {
   authoritativeProvider: string;
@@ -41,6 +148,54 @@ export type FinalizedDailyBankCalculationResult = {
   dailyAllowance: number;
   dailyBankChange: number;
 };
+
+export type ConsumerBankBalances = {
+  effectiveBankBalanceCalories: number;
+  availableBankCalories: number;
+  recoveryCalories: number;
+};
+
+export function deriveConsumerBankBalances(effectiveBankBalanceCalories: number): ConsumerBankBalances {
+  if (!Number.isInteger(effectiveBankBalanceCalories)) {
+    throw new BankCalculationError('effectiveBankBalanceCalories must be an integer.');
+  }
+
+  return {
+    effectiveBankBalanceCalories,
+    availableBankCalories: Math.max(0, effectiveBankBalanceCalories),
+    recoveryCalories: Math.max(0, -effectiveBankBalanceCalories),
+  };
+}
+
+export function calculateOpeningEffectiveBalance(dailyBankChanges: readonly number[]) {
+  for (const dailyBankChange of dailyBankChanges) {
+    if (!Number.isInteger(dailyBankChange)) {
+      throw new BankCalculationError('Opening Bank daily changes must be integers.');
+    }
+  }
+  const historicalOpeningNetCalories = dailyBankChanges.reduce((sum, value) => sum + value, 0);
+  return {
+    historicalOpeningNetCalories,
+    openingEffectiveBalanceCalories: Math.max(0, historicalOpeningNetCalories),
+  };
+}
+
+export function getPreviousCompletedLocalDates(
+  currentLocalDate: string,
+  count = OPENING_BANK_LOOKBACK_CALENDAR_DAYS,
+) {
+  assertDateOnly(currentLocalDate, 'currentLocalDate');
+  if (!Number.isInteger(count) || count < 0) {
+    throw new BankCalculationError('count must be a nonnegative integer.');
+  }
+  const [year, month, day] = currentLocalDate.split('-').map(Number);
+  const dates: string[] = [];
+  for (let offset = 1; offset <= count; offset += 1) {
+    const date = new Date(Date.UTC(year!, month! - 1, day! - offset));
+    dates.push(date.toISOString().slice(0, 10));
+  }
+  return dates;
+}
 
 export type CurrentDayAdjustedExpenditureInput = {
   rawImportedExpenditureCalories: number;
@@ -88,6 +243,8 @@ export type NormalizedDailyIntakeAggregate = {
   provider: string;
   providerRecordId: string;
   totalCaloriesConsumed: number;
+  writerBundleIdentifier?: string;
+  writerDisplayName?: string;
   importedAt: Date;
   providerUpdatedAt: Date | null;
   syncStatus: IngestionSyncStatus;
@@ -101,7 +258,15 @@ export interface ExpenditureProvider {
   ): Promise<NormalizedDailyExpenditureAggregate | null>;
 }
 
+export type IntakeProviderCapabilities = {
+  dailyAggregate: true;
+  rollingWindow: boolean;
+  directConnection: boolean;
+};
+
 export interface IntakeProvider {
+  readonly providerId: string;
+  readonly capabilities: IntakeProviderCapabilities;
   fetchDailyCalorieIntakeAggregate(
     input: FetchDailyAggregateInput,
   ): Promise<NormalizedDailyIntakeAggregate | null>;
@@ -150,6 +315,7 @@ export type NormalizedCurrentDayWorkout = {
   endedAt: Date;
   durationMinutes: number;
   totalEnergyBurned: number | null;
+  totalSteps?: number | null;
   totalDistance: number | null;
   distanceUnit: string | null;
   importedAt: Date;
@@ -359,6 +525,259 @@ function zonedMidnightUtc(year: number, month: number, day: number, timezone: st
   return new Date(candidate);
 }
 
+export function getLocalDateUtcBounds(localDate: string, timezone: string) {
+  assertNonEmptyString(timezone, 'timezone');
+  const { year, month, day } = localDateParts(localDate);
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  return {
+    start: zonedMidnightUtc(year, month, day, timezone),
+    end: zonedMidnightUtc(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), timezone),
+  };
+}
+
+export type StepWhatIfProjectionInput = {
+  currentSteps: number;
+  hypotheticalSteps: number;
+  providerCaloriesPerStep: number;
+  adjustedBurnSoFarCalories: number;
+  adjustmentFactor: number;
+};
+
+export type StepWhatIfProjection = {
+  providerCaloriesPer1000Steps: number;
+  adjustedCaloriesPer1000Steps: number;
+  currentAdjustedStepContributionCalories: number;
+  nonStepAdjustedBurnBaselineCalories: number;
+  hypotheticalAdjustedStepContributionCalories: number;
+  predictedAdjustedTotalBurnCalories: number;
+};
+
+function roundEstimateToTen(value: number) {
+  return Math.round(value / 10) * 10;
+}
+
+export function calculateStepWhatIfProjection(
+  input: StepWhatIfProjectionInput,
+): StepWhatIfProjection {
+  assertNonNegativeInteger(input.currentSteps, 'currentSteps');
+  assertNonNegativeInteger(input.hypotheticalSteps, 'hypotheticalSteps');
+  assertNonNegativeInteger(input.adjustedBurnSoFarCalories, 'adjustedBurnSoFarCalories');
+  if (!Number.isFinite(input.providerCaloriesPerStep) || input.providerCaloriesPerStep <= 0) {
+    throw new BankCalculationError('providerCaloriesPerStep must be a positive finite number.');
+  }
+  if (!Number.isFinite(input.adjustmentFactor) || input.adjustmentFactor < 0 || input.adjustmentFactor > 1) {
+    throw new BankCalculationError('adjustmentFactor must be between 0 and 1.');
+  }
+  const adjustedCaloriesPerStep = input.providerCaloriesPerStep * input.adjustmentFactor;
+  const currentAdjustedContribution = input.currentSteps * adjustedCaloriesPerStep;
+  const nonStepBaseline = Math.max(0, input.adjustedBurnSoFarCalories - currentAdjustedContribution);
+  const hypotheticalContribution = input.hypotheticalSteps * adjustedCaloriesPerStep;
+  return {
+    providerCaloriesPer1000Steps: Math.round(input.providerCaloriesPerStep * 1_000),
+    adjustedCaloriesPer1000Steps: Math.round(adjustedCaloriesPerStep * 1_000),
+    currentAdjustedStepContributionCalories: roundEstimateToTen(currentAdjustedContribution),
+    nonStepAdjustedBurnBaselineCalories: roundEstimateToTen(nonStepBaseline),
+    hypotheticalAdjustedStepContributionCalories: roundEstimateToTen(hypotheticalContribution),
+    predictedAdjustedTotalBurnCalories: roundEstimateToTen(nonStepBaseline + hypotheticalContribution),
+  };
+}
+
+export function suggestNextStepTarget(currentSteps: number) {
+  assertNonNegativeInteger(currentSteps, 'currentSteps');
+  const nextMultiple = (Math.floor(currentSteps / 5_000) + 1) * 5_000;
+  return nextMultiple - currentSteps > 2_500 ? nextMultiple : nextMultiple + 5_000;
+}
+
+export function calculateStepToBurnPlan(input: {
+  currentSteps: number;
+  targetSteps: number;
+  providerCaloriesPerStep: number;
+  projectedProviderBurnAtRest: number;
+  adjustmentFactor: number;
+}) {
+  assertNonNegativeInteger(input.currentSteps, 'currentSteps');
+  assertNonNegativeInteger(input.targetSteps, 'targetSteps');
+  assertNonNegativeInteger(input.projectedProviderBurnAtRest, 'projectedProviderBurnAtRest');
+  assertPositiveFiniteNumber(input.providerCaloriesPerStep, 'providerCaloriesPerStep');
+  if (!Number.isFinite(input.adjustmentFactor) || input.adjustmentFactor < 0 || input.adjustmentFactor > 1) {
+    throw new BankCalculationError('adjustmentFactor must be between 0 and 1.');
+  }
+  const additionalSteps = Math.max(0, input.targetSteps - input.currentSteps);
+  const additionalProviderCalories = additionalSteps * input.providerCaloriesPerStep;
+  const projectedProviderBurn = input.projectedProviderBurnAtRest + additionalProviderCalories;
+  return {
+    additionalSteps,
+    additionalProviderCalories: roundEstimateToTen(additionalProviderCalories),
+    projectedProviderBurnCalories: roundEstimateToTen(projectedProviderBurn),
+    projectedAdjustedBurnCalories: roundEstimateToTen(
+      projectedProviderBurn * input.adjustmentFactor,
+    ),
+  };
+}
+
+export function calculateBurnToStepPlan(input: {
+  currentSteps: number;
+  targetActualBurnCalories: number;
+  providerCaloriesPerStep: number;
+  projectedProviderBurnAtRest: number;
+  adjustmentFactor: number;
+}) {
+  assertNonNegativeInteger(input.currentSteps, 'currentSteps');
+  assertNonNegativeInteger(input.targetActualBurnCalories, 'targetActualBurnCalories');
+  assertNonNegativeInteger(input.projectedProviderBurnAtRest, 'projectedProviderBurnAtRest');
+  assertPositiveFiniteNumber(input.providerCaloriesPerStep, 'providerCaloriesPerStep');
+  if (!Number.isFinite(input.adjustmentFactor) || input.adjustmentFactor <= 0 || input.adjustmentFactor > 1) {
+    throw new BankCalculationError('adjustmentFactor must be greater than zero and at most one.');
+  }
+  const requiredProviderBurnCalories =
+    input.targetActualBurnCalories / input.adjustmentFactor;
+  const additionalProviderCaloriesNeeded =
+    requiredProviderBurnCalories - input.projectedProviderBurnAtRest;
+  if (additionalProviderCaloriesNeeded <= 0) {
+    return {
+      alreadyOnTrack: true,
+      requiredProviderBurnCalories: roundEstimateToTen(requiredProviderBurnCalories),
+      additionalProviderCaloriesNeeded: 0,
+      totalDailyStepsNeeded: input.currentSteps,
+      remainingSteps: 0,
+    };
+  }
+  const additionalSteps = additionalProviderCaloriesNeeded / input.providerCaloriesPerStep;
+  const totalDailyStepsNeeded = Math.max(
+    input.currentSteps,
+    Math.round((input.currentSteps + additionalSteps) / 100) * 100,
+  );
+  return {
+    alreadyOnTrack: false,
+    requiredProviderBurnCalories: roundEstimateToTen(requiredProviderBurnCalories),
+    additionalProviderCaloriesNeeded: roundEstimateToTen(additionalProviderCaloriesNeeded),
+    totalDailyStepsNeeded,
+    remainingSteps: Math.max(
+      0,
+      Math.round((totalDailyStepsNeeded - input.currentSteps) / 100) * 100,
+    ),
+  };
+}
+
+export type RestEnergyHistoryDay = {
+  localDate: string;
+  timezone: string;
+  basalEnergyCalories: number;
+};
+
+export function calculateAdjustedRestCaloriesPerHour(
+  days: readonly RestEnergyHistoryDay[],
+  adjustmentFactor: number,
+) {
+  if (!Number.isFinite(adjustmentFactor) || adjustmentFactor < 0 || adjustmentFactor > 1) {
+    throw new BankCalculationError('adjustmentFactor must be between 0 and 1.');
+  }
+  if (days.length === 0) return null;
+  const totals = days.reduce((sum, day) => {
+    assertNonNegativeInteger(day.basalEnergyCalories, 'basalEnergyCalories');
+    const bounds = getLocalDateUtcBounds(day.localDate, day.timezone);
+    return {
+      calories: sum.calories + day.basalEnergyCalories,
+      hours: sum.hours + (bounds.end.getTime() - bounds.start.getTime()) / 3_600_000,
+    };
+  }, { calories: 0, hours: 0 });
+  if (totals.hours <= 0) return null;
+  return Math.round((totals.calories / totals.hours) * adjustmentFactor);
+}
+
+export function getRemainingLocalDayMinutes(localDate: string, timezone: string, now: Date) {
+  const bounds = getLocalDateUtcBounds(localDate, timezone);
+  return Math.max(0, Math.round((bounds.end.getTime() - now.getTime()) / 60_000));
+}
+
+export function calculateRestOfDayBurnProjection(input: {
+  providerBurnSoFarCalories: number;
+  providerRestCaloriesPerHour: number;
+  remainingMinutes: number;
+  adjustmentFactor: number;
+}) {
+  assertNonNegativeInteger(input.providerBurnSoFarCalories, 'providerBurnSoFarCalories');
+  assertPositiveFiniteNumber(input.providerRestCaloriesPerHour, 'providerRestCaloriesPerHour');
+  assertNonNegativeInteger(input.remainingMinutes, 'remainingMinutes');
+  if (!Number.isFinite(input.adjustmentFactor) || input.adjustmentFactor < 0 || input.adjustmentFactor > 1) {
+    throw new BankCalculationError('adjustmentFactor must be between 0 and 1.');
+  }
+  const provider = input.providerBurnSoFarCalories +
+    input.providerRestCaloriesPerHour * (input.remainingMinutes / 60);
+  return {
+    projectedProviderBurnCalories: roundEstimateToTen(provider),
+    projectedAdjustedBurnCalories: roundEstimateToTen(provider * input.adjustmentFactor),
+  };
+}
+
+export type LowActivityRestObservation = {
+  calories: number;
+  steps: number;
+  overlapsWorkout: boolean;
+  observedAt: Date;
+};
+
+export function estimateRestingBurnFromLowActivityHours(
+  observations: readonly LowActivityRestObservation[],
+  maximumStepsPerHour = 100,
+) {
+  const eligible = observations
+    .filter((item) =>
+      Number.isFinite(item.calories) && item.calories > 0 &&
+      Number.isInteger(item.steps) && item.steps >= 0 && item.steps <= maximumStepsPerHour &&
+      !item.overlapsWorkout,
+    )
+    .sort((left, right) => left.observedAt.getTime() - right.observedAt.getTime());
+  if (eligible.length === 0) return null;
+  const sortedCalories = eligible.map((item) => item.calories).sort((left, right) => left - right);
+  const middle = Math.floor(sortedCalories.length / 2);
+  const median = sortedCalories.length % 2 === 0
+    ? (sortedCalories[middle - 1]! + sortedCalories[middle]!) / 2
+    : sortedCalories[middle]!;
+  return {
+    providerKcalPerHour: median,
+    observationCount: eligible.length,
+    lookbackStartDate: eligible[0]!.observedAt,
+    lookbackEndDate: eligible.at(-1)!.observedAt,
+  };
+}
+
+export function selectRestingBurnLookback(
+  windows: readonly {
+    days: number;
+    observations: readonly LowActivityRestObservation[];
+  }[],
+  minimumObservations = 3,
+) {
+  for (const window of windows) {
+    const estimate = estimateRestingBurnFromLowActivityHours(window.observations);
+    if (estimate && estimate.observationCount >= minimumObservations) {
+      return { ...estimate, lookbackDays: window.days };
+    }
+  }
+  return null;
+}
+
+export function estimateRestingBurnFromDailyBasal(
+  days: readonly RestEnergyHistoryDay[],
+) {
+  if (days.length === 0) return null;
+  const rates = days.map((day) => {
+    assertNonNegativeInteger(day.basalEnergyCalories, 'basalEnergyCalories');
+    const bounds = getLocalDateUtcBounds(day.localDate, day.timezone);
+    return day.basalEnergyCalories /
+      ((bounds.end.getTime() - bounds.start.getTime()) / 3_600_000);
+  }).filter((rate) => rate > 0).sort((left, right) => left - right);
+  if (rates.length === 0) return null;
+  const middle = Math.floor(rates.length / 2);
+  return {
+    providerKcalPerHour: rates.length % 2 === 0
+      ? (rates[middle - 1]! + rates[middle]!) / 2
+      : rates[middle]!,
+    observationCount: rates.length,
+  };
+}
+
 export function getProvisionalLockAt(logDate: string, timezone: string) {
   assertNonEmptyString(timezone, 'timezone');
   const { year, month, day } = localDateParts(logDate);
@@ -516,6 +935,8 @@ export function normalizeDailyIntakeAggregate({
   provider,
   providerRecordId,
   totalCaloriesConsumed,
+  writerBundleIdentifier,
+  writerDisplayName,
   importedAt,
   providerUpdatedAt,
   syncStatus,
@@ -528,6 +949,8 @@ export function normalizeDailyIntakeAggregate({
   assertNonEmptyString(provider, 'provider');
   assertNonEmptyString(providerRecordId, 'providerRecordId');
   assertNonNegativeInteger(totalCaloriesConsumed, 'totalCaloriesConsumed');
+  if (writerBundleIdentifier !== undefined) assertNonEmptyString(writerBundleIdentifier, 'writerBundleIdentifier');
+  if (writerDisplayName !== undefined) assertNonEmptyString(writerDisplayName, 'writerDisplayName');
 
   return {
     userId,
@@ -536,6 +959,8 @@ export function normalizeDailyIntakeAggregate({
     provider,
     providerRecordId,
     totalCaloriesConsumed,
+    ...(writerBundleIdentifier ? { writerBundleIdentifier } : {}),
+    ...(writerDisplayName ? { writerDisplayName } : {}),
     importedAt,
     providerUpdatedAt,
     syncStatus,
@@ -580,12 +1005,16 @@ export function normalizeCurrentDayWorkout(
   if (workout.totalEnergyBurned !== null) {
     assertNonNegativeInteger(workout.totalEnergyBurned, 'totalEnergyBurned');
   }
+  if (workout.totalSteps !== null && workout.totalSteps !== undefined) {
+    assertNonNegativeInteger(workout.totalSteps, 'totalSteps');
+  }
   if (workout.totalDistance !== null && (!Number.isFinite(workout.totalDistance) || workout.totalDistance < 0)) {
     throw new BankCalculationError('totalDistance must be a non-negative finite number.');
   }
 
   return {
     ...workout,
+    totalSteps: workout.totalSteps ?? null,
     activityType: normalizeWorkoutActivityType(workout.activityType),
     durationMinutes: Math.round(workout.durationMinutes),
   };

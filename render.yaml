@@ -1,0 +1,104 @@
+databases:
+  - name: caloriebank-beta-db
+    plan: 0.1c-256mb
+    region: ohio
+    postgresMajorVersion: "17"
+    databaseName: caloriebank_beta
+    user: caloriebank_beta
+    ipAllowList: []
+
+services:
+  - type: web
+    name: caloriebank-beta-api
+    branch: codex/private-beta-release
+    runtime: node
+    plan: 0.5c-512mb
+    region: ohio
+    buildCommand: npm ci --include=dev && npm run db:generate && npm run api:build
+    preDeployCommand: npm run db:deploy
+    startCommand: npm run api:start
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.4
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: beta
+      - key: AUTH_MODE
+        value: clerk
+      - key: TODAY_INGESTION_MODE
+        value: device
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caloriebank-beta-db
+          property: connectionString
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: GOOGLE_HEALTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_HEALTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_HEALTH_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: EXTERNAL_PROVIDER_TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: FATSECRET_CONSUMER_KEY
+        sync: false
+      - key: FATSECRET_CONSUMER_SECRET
+        sync: false
+      - key: FATSECRET_REDIRECT_URI
+        sync: false
+
+  - type: cron
+    name: caloriebank-beta-lifecycle
+    branch: codex/private-beta-release
+    runtime: node
+    plan: 0.5c-512mb
+    region: ohio
+    schedule: "0 * * * *"
+    buildCommand: npm ci --include=dev && npm run db:generate && npm run api:build
+    startCommand: npm run lifecycle:run
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.4
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: beta
+      - key: AUTH_MODE
+        value: clerk
+      - key: TODAY_INGESTION_MODE
+        value: device
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caloriebank-beta-db
+          property: connectionString
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: GOOGLE_HEALTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_HEALTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_HEALTH_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: EXTERNAL_PROVIDER_TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: FATSECRET_CONSUMER_KEY
+        sync: false
+      - key: FATSECRET_CONSUMER_SECRET
+        sync: false
+      - key: FATSECRET_REDIRECT_URI
+        sync: false

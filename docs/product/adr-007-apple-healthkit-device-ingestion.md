@@ -1,6 +1,6 @@
 # ADR 007: Apple HealthKit as the First Device Ingestion Adapter
 
-> **ADR 016 refinement:** Apple Health remains the intake and activity-context hub and an explicit expenditure fallback. Fitbit is the first dedicated expenditure provider. Apple Health expenditure is valid only when both Active and Resting/Basal Energy are present; Active Energy alone must not be uploaded as total expenditure.
+> **ADR 016 refinement:** Apple Health remains the intake hub and an explicit expenditure/activity fallback. When Fitbit is selected, its verified Google Health capabilities become authoritative for expenditure, steps, and workouts. Apple Health expenditure is valid only when both Active and Resting/Basal Energy are present; Active Energy alone must not be uploaded as total expenditure.
 
 Date: 2026-07-21
 
@@ -15,6 +15,8 @@ CalorieBank needs one technically credible iPhone ingestion path without couplin
 ## Decision
 
 CalorieBank uses `@kingstinct/react-native-healthkit` in an Expo development build. The mobile integration provides focused expenditure, intake, step, and workout adapters behind the provider-neutral interfaces from ADR 006. HealthKit identifiers and query structures stay in the mobile adapter.
+
+Dietary Energy additionally follows ADR 022: the device filters to one selected writer source before normalization. An all-writer cumulative statistic is diagnostic-only and must never feed authoritative intake.
 
 The device queries the current local calendar day, normalizes cumulative aggregates, and sends validated commands to:
 

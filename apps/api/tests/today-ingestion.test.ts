@@ -45,6 +45,7 @@ class MemoryTodayRepository implements TodayAggregateRepository {
   intake: NormalizedDailyIntakeAggregate | null = null;
   steps: NormalizedDailyStepAggregate | null = null;
   workouts: NormalizedCurrentDayWorkout[] = [];
+  restProjection: TodayResponse['restOfDayProjection'] | null = null;
 
   async upsertExpenditureAggregate(
     _user: DevelopmentUser,
@@ -115,6 +116,30 @@ class MemoryTodayRepository implements TodayAggregateRepository {
         source: this.steps?.provider ?? null,
         lastSyncedAt: this.steps?.importedAt.toISOString() ?? null,
         status: this.steps?.syncStatus ?? 'not_connected',
+        estimatedContributionCalories: null,
+        estimatedCaloriesPer1000Steps: null,
+        caloriesPerStep: null,
+        calibrationWorkoutCount: 0,
+        calibrationTotalSteps: 0,
+        calibrationTotalCalories: 0,
+        estimationStatus: this.steps ? 'insufficient_data' : 'unavailable',
+        providerReportedCaloriesPer1000Steps: null,
+        adjustedCaloriesPer1000Steps: null,
+        adjustedCaloriesPerStep: null,
+        currentAdjustedContributionCalories: null,
+        nonStepAdjustedBurnBaselineCalories: null,
+      },
+      restOfDayProjection: this.restProjection ?? {
+        status: 'insufficient_data',
+        providerKcalPerHour: null,
+        adjustedKcalPerHour: null,
+        remainingMinutes: 0,
+        projectedProviderBurnCalories: null,
+        projectedAdjustedBurnCalories: null,
+        source: null,
+        evidenceType: null,
+        observationCount: 0,
+        calculatedAt: null,
       },
       workouts: {
         items: this.workouts.map((workout, index) => ({
@@ -259,6 +284,44 @@ describe('provider-neutral Today ingestion', () => {
     expect(response.body).not.toHaveProperty('availableBankCalories');
   });
 
+  it('returns an on-demand resting model in the same Today request without requiring persistence', async () => {
+    const repository = new MemoryTodayRepository();
+    await new TodayIngestionService({
+      expenditureProvider: new DevelopmentExpenditureProvider(() => fixedNow),
+      intakeProvider: new DevelopmentIntakeProvider(() => fixedNow),
+      repository,
+    }).syncDailyAggregates(user, aggregateInput);
+    const before = { expenditure: repository.expenditure, intake: repository.intake };
+    const response = await request(createApp(undefined, {
+      todayRepository: repository,
+      todayPredictionResolver: {
+        resolveRestingBurnEstimate: async () => {
+          repository.restProjection = {
+            status: 'ready',
+            providerKcalPerHour: 79.246776,
+            adjustedKcalPerHour: 63.3974208,
+            remainingMinutes: 450,
+            projectedProviderBurnCalories: 2_590,
+            projectedAdjustedBurnCalories: 2_070,
+            source: 'development',
+            evidenceType: 'historical_low_activity_hours',
+            observationCount: 57,
+            calculatedAt: fixedNow.toISOString(),
+          };
+          return true;
+        },
+      },
+    })).get('/v1/me/today').expect(200);
+
+    expect(response.body.restOfDayProjection).toMatchObject({
+      status: 'ready',
+      providerKcalPerHour: 79.246776,
+      projectedProviderBurnCalories: 2590,
+      projectedAdjustedBurnCalories: 2070,
+    });
+    expect({ expenditure: repository.expenditure, intake: repository.intake }).toEqual(before);
+  });
+
   it('represents missing expenditure and stale intake without fabricating values', async () => {
     const repository = new MemoryTodayRepository();
     repository.intake = normalizeDailyIntakeAggregate({
@@ -320,7 +383,7 @@ describe('provider-neutral Today ingestion', () => {
     expect(today.eaten.calories).toBe(1500);
   });
 
-  it('reads Fitbit expenditure and Apple Health intake independently without summing providers', async () => {
+  it('reads Fitbit expenditure and selected FatSecret intake without summing providers', async () => {
     const persistenceUser = {
       id: '00000000-0000-4000-8000-000000000776',
       email: 'multi-provider-today@caloriebank.local',
@@ -332,8 +395,11 @@ describe('provider-neutral Today ingestion', () => {
         email: persistenceUser.email,
         providerSelection: {
           create: {
-            authoritativeExpenditureProvider: 'fitbit',
-            authoritativeIntakeProvider: 'apple_health',
+            authoritativeExpenditureProvider: 'google_health_fitbit',
+            authoritativeActivityProvider: 'google_health_fitbit',
+            authoritativeIntakeProvider: 'fatsecret',
+            appleHealthIntakeWriterBundleId: 'CRONOMETER-GOLD',
+            appleHealthIntakeWriterDisplayName: 'Cronometer',
           },
         },
       },
@@ -345,21 +411,48 @@ describe('provider-neutral Today ingestion', () => {
       importedAt: fixedNow, providerUpdatedAt: fixedNow, syncStatus: 'ready',
     }));
     await repository.upsertExpenditureAggregate(persistenceUser, normalizeDailyExpenditureAggregate({
-      ...aggregateInput, userId: persistenceUser.id, provider: 'fitbit',
-      providerRecordId: 'fitbit:expenditure:2026-07-21', rawTotalDailyExpenditure: 3000,
+      ...aggregateInput, userId: persistenceUser.id, provider: 'google_health_fitbit',
+      providerRecordId: 'google_health_fitbit:expenditure:2026-07-21', rawTotalDailyExpenditure: 3000,
       importedAt: fixedNow, providerUpdatedAt: fixedNow, syncStatus: 'ready',
     }));
     await repository.upsertIntakeAggregate(persistenceUser, normalizeDailyIntakeAggregate({
       ...aggregateInput, userId: persistenceUser.id, provider: 'apple_health',
       providerRecordId: 'apple_health:intake:2026-07-21', totalCaloriesConsumed: 1500,
+      writerBundleIdentifier: 'CRONOMETER-GOLD', writerDisplayName: 'Cronometer',
       importedAt: fixedNow, providerUpdatedAt: fixedNow, syncStatus: 'ready',
     }));
+    await repository.upsertIntakeAggregate(persistenceUser, normalizeDailyIntakeAggregate({
+      ...aggregateInput, userId: persistenceUser.id, provider: 'fatsecret',
+      providerRecordId: 'fatsecret:2026-07-21', totalCaloriesConsumed: 1731,
+      importedAt: fixedNow, providerUpdatedAt: null, syncStatus: 'ready',
+    }));
+    for (const [provider, totalSteps] of [['apple_health', 7000], ['google_health_fitbit', 9000]] as const) {
+      await repository.upsertStepAggregate(persistenceUser, {
+        ...aggregateInput, userId: persistenceUser.id, provider,
+        providerRecordId: `${provider}:steps:2026-07-21`, totalSteps,
+        importedAt: fixedNow, providerUpdatedAt: fixedNow, syncStatus: 'ready',
+      });
+      await repository.upsertWorkouts(persistenceUser, [{
+        ...aggregateInput, userId: persistenceUser.id, provider,
+        providerWorkoutId: `${provider}:workout:1`, activityType: 'walking',
+        displayName: provider === 'google_health_fitbit' ? 'Fitbit walk' : 'Apple walk',
+        startedAt: new Date('2026-07-21T12:00:00.000Z'),
+        endedAt: new Date('2026-07-21T12:30:00.000Z'), durationMinutes: 30,
+        totalEnergyBurned: 200, totalDistance: null, distanceUnit: null,
+        importedAt: fixedNow, providerUpdatedAt: fixedNow, syncStatus: 'ready',
+      }]);
+    }
     const today = await repository.getTodayForUser(
       persistenceUser.id, aggregateInput.localDate, aggregateInput.timezone,
     );
     expect(today.burned).toMatchObject({ raw: 3000, adjusted: 2400, source: 'Fitbit' });
-    expect(today.eaten).toMatchObject({ calories: 1500, source: 'Apple Health' });
+    expect(today.eaten).toMatchObject({ calories: 1731, source: 'FatSecret' });
+    expect(today.steps).toMatchObject({ count: 9000, source: 'Fitbit' });
+    expect(today.workouts).toMatchObject({
+      totalCount: 1, source: 'Fitbit', items: [{ displayName: 'Fitbit walk', source: 'Fitbit' }],
+    });
     expect(await prisma.dailyExpenditureAggregate.count({ where: { userId: persistenceUser.id } })).toBe(2);
+    expect(await prisma.dailyIntakeAggregate.count({ where: { userId: persistenceUser.id } })).toBe(2);
     expect(await prisma.calorieLedgerTransaction.count({ where: { userId: persistenceUser.id } })).toBe(0);
     await prisma.user.delete({ where: { id: persistenceUser.id } });
   });
@@ -496,6 +589,21 @@ describe('provider-neutral Today ingestion', () => {
       })
       .expect(200, { result: 'unchanged' });
 
+    await prisma.dailyIntakeAggregate.create({
+      data: {
+        userId: persistenceUser.id,
+        localDate: new Date(`${localDate}T00:00:00.000Z`),
+        timezone,
+        provider: 'apple_health',
+        providerRecordId: `apple_health:intake:${localDate}`,
+        totalCaloriesConsumed: 3966,
+        importedAt: firstUpdatedAt,
+        providerUpdatedAt: firstUpdatedAt,
+        syncStatus: 'ready',
+        isCurrentDay: true,
+      },
+    });
+
     const partialToday = await request(app)
       .get(`/v1/me/today?timezone=${encodeURIComponent(timezone)}`)
       .expect(200);
@@ -505,16 +613,48 @@ describe('provider-neutral Today ingestion', () => {
       eaten: { calories: null, source: null },
     });
 
+    await prisma.providerSelection.upsert({
+      where: { userId: persistenceUser.id },
+      create: {
+        userId: persistenceUser.id,
+        authoritativeExpenditureProvider: 'apple_health',
+        authoritativeActivityProvider: 'apple_health',
+        authoritativeIntakeProvider: 'apple_health',
+        appleHealthIntakeWriterBundleId: 'CRONOMETER-GOLD',
+        appleHealthIntakeWriterDisplayName: 'Cronometer',
+      },
+      update: {
+        authoritativeIntakeProvider: 'apple_health',
+        appleHealthIntakeWriterBundleId: 'CRONOMETER-GOLD',
+        appleHealthIntakeWriterDisplayName: 'Cronometer',
+      },
+    });
+
     await request(app)
       .post('/v1/me/ingestion/intake')
       .send({
         localDate,
         timezone,
         provider: 'apple_health',
-        totalCaloriesConsumed: 900,
+        totalCaloriesConsumed: 3966,
+        writerBundleIdentifier: 'com.fatsecret.caloriecounter',
+        writerDisplayName: 'FatSecret',
         providerUpdatedAt: secondUpdatedAt.toISOString(),
       })
-      .expect(200, { result: 'created' });
+      .expect(409);
+
+    await request(app)
+      .post('/v1/me/ingestion/intake')
+      .send({
+        localDate,
+        timezone,
+        provider: 'apple_health',
+        totalCaloriesConsumed: 2354,
+        writerBundleIdentifier: 'CRONOMETER-GOLD',
+        writerDisplayName: 'Cronometer',
+        providerUpdatedAt: secondUpdatedAt.toISOString(),
+      })
+      .expect(200, { result: 'updated' });
 
     const syntheticRepository = new PrismaTodayAggregateRepository(prisma);
     await new TodayIngestionService({
@@ -549,7 +689,7 @@ describe('provider-neutral Today ingestion', () => {
     expect(today.body).toMatchObject({
       dataFreshness: 'partial',
       burned: { raw: 1700, adjusted: 1360, source: 'Apple Health' },
-      eaten: { calories: 900, source: 'Apple Health' },
+      eaten: { calories: 2354, source: 'Cronometer' },
     });
     expect(bankSummary.body.availableBankCalories).toBe(0);
     expect(plannedTreat.body).toMatchObject({ status: 'no_plan', availableBankCalories: 0 });

@@ -1,6 +1,11 @@
 import cors from 'cors';
 import express from 'express';
 
+import {
+  createAuthenticationBoundary,
+  currentUser,
+  type AuthenticationBoundary,
+} from './auth/current-user';
 import type { ApiEnv } from './env';
 import { env } from './env';
 import { errorHandler, notFoundHandler } from './errors';
@@ -30,7 +35,10 @@ import {
   PrismaTodayAggregateRepository,
   type TodayAggregateRepository,
 } from './modules/today/today.repository';
-import { createTodayRouter } from './modules/today/today.routes';
+import {
+  createTodayRouter,
+  type TodayPredictionResolver,
+} from './modules/today/today.routes';
 import { createTodayIngestionRouter } from './modules/today/today-ingestion.routes';
 import {
   PrismaSyncSessionRepository,
@@ -46,8 +54,20 @@ import {
   type ProviderSelectionRepository,
 } from './modules/provider-selection/provider-selection.repository';
 import { createProviderSelectionRouter } from './modules/provider-selection/provider-selection.routes';
-import { FitbitService } from './modules/fitbit/fitbit.service';
-import { createFitbitRouter } from './modules/fitbit/fitbit.routes';
+import { createHealthConnectionsRouter } from './modules/provider-selection/health-connections.routes';
+import { GoogleHealthFitbitService } from './modules/google-health/google-health.service';
+import { createGoogleHealthFitbitRouter } from './modules/google-health/google-health.routes';
+import { WhoopService } from './modules/whoop/whoop.service';
+import { createWhoopRouter } from './modules/whoop/whoop.routes';
+import { FatSecretService } from './modules/fatsecret/fatsecret.service';
+import { createFatSecretRouter } from './modules/fatsecret/fatsecret.routes';
+import {
+  PrismaOnboardingRepository,
+  type OnboardingRepository,
+} from './modules/onboarding/onboarding.repository';
+import { createOnboardingRouter } from './modules/onboarding/onboarding.routes';
+import { AccountLifecycleCoordinator } from './modules/lifecycle/account-lifecycle.service';
+import { createAccountLifecycleRouter } from './modules/lifecycle/account-lifecycle.routes';
 
 type AppDependencies = {
   goalConfigurationRepository?: GoalConfigurationRepository;
@@ -58,6 +78,9 @@ type AppDependencies = {
   syncSessionRepository?: SyncSessionRepository;
   finalizationScheduler?: FinalizationScheduler | null;
   providerSelectionRepository?: ProviderSelectionRepository;
+  authenticationBoundary?: AuthenticationBoundary;
+  onboardingRepository?: OnboardingRepository;
+  todayPredictionResolver?: TodayPredictionResolver | null;
 };
 
 export function createApp(config: ApiEnv = env, dependencies: AppDependencies = {}) {
@@ -92,18 +115,34 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
       ? undefined
       : new FinalizationOrchestrationService(prisma, bankHistoryRepository)
     : dependencies.finalizationScheduler ?? undefined;
-  const developmentUser = {
-    id: config.DEV_USER_ID,
-    email: config.DEV_USER_EMAIL,
-  };
+  const authentication = dependencies.authenticationBoundary ??
+    createAuthenticationBoundary(config, prisma);
   const providerSelectionRepository = dependencies.providerSelectionRepository ??
     new PrismaProviderSelectionRepository(prisma, bankHistoryRepository);
-  const fitbitService = new FitbitService(
+  const onboardingRepository = dependencies.onboardingRepository ??
+    new PrismaOnboardingRepository(prisma, providerSelectionRepository, bankHistoryRepository);
+  const googleHealthFitbitService = new GoogleHealthFitbitService(
     prisma,
     todayRepository,
     config,
     finalizationScheduler,
   );
+  const todayPredictionResolver = dependencies.todayPredictionResolver === undefined
+    ? dependencies.todayRepository
+      ? undefined
+      : googleHealthFitbitService
+    : dependencies.todayPredictionResolver ?? undefined;
+  const whoopService = new WhoopService(prisma, todayRepository, config);
+  const fatSecretService = new FatSecretService(prisma, todayRepository, config, fetch, undefined, undefined, finalizationScheduler);
+  const lifecycleCoordinator = finalizationScheduler
+    ? new AccountLifecycleCoordinator(
+        prisma,
+        bankHistoryRepository,
+        finalizationScheduler,
+        googleHealthFitbitService,
+        fatSecretService,
+      )
+    : null;
 
   app.use(
     cors({
@@ -112,6 +151,7 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
   );
   app.use(express.json({ limit: '32kb' }));
   app.use(requestLogger);
+  app.use(authentication.verify);
 
   app.get('/health', (_req, res) => {
     res.json({
@@ -119,29 +159,70 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
       service: 'caloriebank-api',
     });
   });
+  app.get('/health/ready', async (_req, res) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ status: 'ok', service: 'caloriebank-api', database: 'ready' });
+    } catch {
+      console.error(JSON.stringify({ component: 'api_health', event: 'database_unavailable' }));
+      res.status(503).json({ status: 'unavailable', service: 'caloriebank-api' });
+    }
+  });
+  app.use(authentication.requireUser);
   app.use(
     '/v1/me/goal-configuration',
-    createGoalConfigurationRouter(goalConfigurationRepository, developmentUser),
+    createGoalConfigurationRouter(
+      goalConfigurationRepository,
+      currentUser,
+      bankHistoryRepository.prepareForGoalChange
+        ? (user) => bankHistoryRepository.prepareForGoalChange!(user)
+        : undefined,
+    ),
   );
-  app.use('/v1/me', createBankHistoryRouter(bankHistoryRepository, developmentUser));
-  app.use('/v1/me/planned-treat', createPlannedTreatRouter(plannedTreatRepository, developmentUser));
-  app.use('/v1/me', createTodayRouter(todayRepository, developmentUser));
+  app.use('/v1/me', createBankHistoryRouter(bankHistoryRepository, currentUser));
+  app.use('/v1/me/planned-treat', createPlannedTreatRouter(plannedTreatRepository, currentUser));
+  app.use('/v1/me/onboarding', createOnboardingRouter(onboardingRepository, currentUser));
+  if (lifecycleCoordinator) {
+    app.use('/v1/me/lifecycle', createAccountLifecycleRouter(lifecycleCoordinator, currentUser));
+  }
+  app.use('/v1/me', createTodayRouter(
+    todayRepository,
+    currentUser,
+    todayPredictionResolver,
+    config.APP_ENV === 'local'
+      ? (event, metadata) => console.info(JSON.stringify({
+          level: 'info',
+          component: 'today_detail',
+          event,
+          ...metadata,
+        }))
+      : undefined,
+  ));
   app.use(
     '/v1/me/provider-selection',
-    createProviderSelectionRouter(providerSelectionRepository, developmentUser),
+    createProviderSelectionRouter(providerSelectionRepository, currentUser),
   );
-  app.use('/v1/me/integrations/fitbit', createFitbitRouter(fitbitService, developmentUser));
+  app.use(
+    '/v1/me/health-connections',
+    createHealthConnectionsRouter(providerSelectionRepository, currentUser),
+  );
+  app.use(
+    '/v1/me/integrations/fitbit',
+    createGoogleHealthFitbitRouter(googleHealthFitbitService, currentUser),
+  );
+  app.use('/v1/me/integrations/whoop', createWhoopRouter(whoopService, currentUser));
+  app.use('/v1/me/integrations/fatsecret', createFatSecretRouter(fatSecretService, currentUser));
   app.use(
     '/v1/me/dashboard-preferences',
-    createDashboardPreferencesRouter(dashboardPreferencesRepository, developmentUser),
+    createDashboardPreferencesRouter(dashboardPreferencesRepository, currentUser),
   );
   app.use(
     '/v1/me/ingestion/sync-sessions',
-    createSyncSessionRouter(syncSessionRepository, developmentUser, finalizationScheduler),
+    createSyncSessionRouter(syncSessionRepository, currentUser, finalizationScheduler),
   );
   app.use(
     '/v1/me/ingestion',
-    createTodayIngestionRouter(todayRepository, developmentUser),
+    createTodayIngestionRouter(todayRepository, currentUser),
   );
 
   app.use(notFoundHandler);

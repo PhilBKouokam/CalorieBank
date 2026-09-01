@@ -21,9 +21,9 @@ import { colors, radii, spacing, typography } from '@/constants/caloriebank-them
 import { fetchGoalConfiguration, saveGoalConfiguration } from '@/lib/api/client';
 
 const goalOptions: { value: GoalMode; label: string; description: string }[] = [
-  { value: 'cut', label: 'Cut', description: 'Save below adjusted expenditure.' },
-  { value: 'maintain', label: 'Maintain', description: 'Use a zero adjustment.' },
-  { value: 'bulk', label: 'Bulk', description: 'Spend above adjusted expenditure.' },
+  { value: 'cut', label: 'Cut', description: 'Lose weight by setting a daily amount below your estimated actual burn.' },
+  { value: 'maintain', label: 'Maintain', description: 'Maintain weight by matching your estimated actual burn.' },
+  { value: 'bulk', label: 'Bulk', description: 'Gain weight by setting a daily amount above your estimated actual burn.' },
 ];
 
 const sourceOptions: { value: AdjustmentSource; label: string }[] = [
@@ -239,7 +239,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
               />
               <Text style={styles.help}>
                 Enter the positive number you want to {goalMode === 'cut' ? 'save below' : 'spend above'} adjusted
-                expenditure. CalorieBank stores cut values as negative adjustments.
+                expenditure each day.
               </Text>
             </>
           ) : (
@@ -273,15 +273,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
             </>
           )}
         </>
-      ) : (
-        <View style={styles.maintenancePanel}>
-          <Text style={styles.label}>Maintenance adjustment: 0</Text>
-          <Text style={styles.help}>
-            Maintain uses adjusted imported expenditure with no deficit or surplus. You do not enter a calorie target
-            for maintenance.
-          </Text>
-        </View>
-      )}
+      ) : null}
 
       {status === 'success' ? (
         <Text style={styles.success}>
@@ -300,7 +292,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
         {status === 'saving' ? (
           <ActivityIndicator color={colors.surface} />
         ) : (
-          <Text style={styles.saveButtonText}>Save {getGoalModeLabel(goalMode)} Configuration</Text>
+          <Text style={styles.saveButtonText}>{mode === 'onboarding' ? 'Continue' : `Save ${getGoalModeLabel(goalMode)} goal`}</Text>
         )}
       </Pressable>
     </View>
@@ -375,14 +367,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: typography.caption,
     lineHeight: 18,
-  },
-  maintenancePanel: {
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    backgroundColor: colors.background,
-    padding: spacing.md,
   },
   success: {
     color: colors.primaryDark,

@@ -14,16 +14,22 @@ The product also needs a clear distinction between read-only calculated data and
 
 ## Decision
 
+Today uses progressive detail: the bank-first summary remains minimal, while the existing Steps and Today-so-far cards may open focused explanatory views. These views are read-only activity context. They do not calculate a projected bank, create contributions, or alter provider authority, reconciliation, finalization, Recovery, or the ledger.
+
+Steps planning reuses ADR 021's personal walk/run rate and ADR 023's provider-level rest-of-day projection. The forward calculator adds only provider calories from steps above the current count to that resting-day baseline. The inverse calculator solves the same model for total daily steps. Neither calculator re-adds current steps or changes accounting. Today rest-of-day prediction uses a personalized provider resting rate and the remaining duration of the user's current local day. It is withheld when that evidence is genuinely unavailable.
+
+The `Why 80%?` affordance opens a short modal over Today with the accepted founder-story explanation. It remains beside the first `× 80%` presentation, retains the full provider-reported burn for transparency, and does not claim that every wearable has a precisely measured 20% error. It does not navigate away from Today or appear again in Today Detail.
+
 Today summary cards are approved V1 navigation gateways when they lead to history, explanation, or configuration.
 
 - Tapping Available Bank opens Bank History.
-- Bank History is read-only and shows the all-time Available Bank, completed-day range filters, effective contribution, provisional/locked status, correction count, and selected-day calculation/version detail under ADR 009.
+- Bank History is read-only and shows the unsigned all-time Available Bank, completed-day range filters, signed daily contributions, and a selected-day calculation under ADR 009. Lifecycle, correction-count, and version metadata remain available to internal accounting and diagnostics but are not permanent primary consumer content.
 - The default view stays visually simple. Calculation detail is revealed only after selecting a specific finalized day.
 - Tapping Goal Mode opens Goal Settings.
 - Tapping Daily Deficit, Daily Surplus, or Maintenance opens Goal Settings focused on goal-adjustment configuration.
 - Available Bank must not be manually editable.
 - Unavailable bank data must be presented as `Not calculated`, `Waiting for data`, `Pending`, `Incomplete`, or equivalent honest states rather than fabricated zero values.
-- Consumer UI must use plain language and must not expose raw internal identifiers, API field names, database field names, variable names, or raw formula blocks.
+- Consumer UI must use plain language and must not expose raw internal identifiers, API field names, database field names, variable names, or accounting lifecycle mechanics. The selected-day presentation uses `Provider burn`, then `Estimated actual burn` with the visible `raw × 0.8 = adjusted` relationship. It does not require the user to learn `Credited` as an accounting term. The goal effect, intake, and resulting signed contribution remain self-evident in one compact equation.
 - Consumer Today should not show infrastructure diagnostics, persistent current-day pending copy, or projected bank outcomes. ADR 011 permits a progressively introduced, clearly estimated Projected Daily Burn, but it must not crowd the initial home experience or look like an official bank result.
 - Today's Eating Budget may later open a read-only explanation that distinguishes confirmed expenditure, estimated remaining expenditure, goal effect, confirmed intake, total budget, and Remaining Today. It must not reuse Bank History or imply that the guidance is ledger-backed.
 
@@ -40,6 +46,6 @@ Goal mode and goal adjustment are user preferences, so they belong in editable s
 - The mobile route tree includes public routes for `/bank-history` and `/goal-settings`.
 - Today must refresh goal configuration when it regains focus after Goal Settings.
 - Placeholder history screens may show unavailable states or clearly labeled examples before integrations exist, but they must not invent expenditure, intake, ledger transactions, timestamps, or bank values as real user data.
-- Future ledger work must provide enough provenance for Bank History to show imported total expenditure as calories burned, the `0.80` policy as 80% credited, adjusted expenditure, goal mode, signed goal adjustment, daily allowance, imported intake as calories eaten, daily bank change, prior balance, reconciliation records, current Available Bank, freshness, and calculation status.
+- Ledger and calculation records must retain enough provenance for Bank History to show provider burn, `Estimated actual burn` as `raw × 0.8 = adjusted`, goal mode and adjustment, imported intake, and signed daily contribution. Prior versions, reconciliation records, correction counts, freshness, and lifecycle status remain internally auditable without appearing as permanent noise in the normal History experience.
 - Future analytics may measure `bank_history_opened`, `bank_history_range_changed`, `bank_history_day_selected`, `goal_settings_opened`, `goal_configuration_update_started`, `goal_configuration_update_completed`, and `goal_configuration_update_failed`.
 - Summary-card availability does not make every supporting card initially visible. Progressive Feature Discovery and first-use visibility are governed by ADR 011; ADR 014 governs readiness, workflow complementarity, and pacing for proactive card introductions. Manual navigation to available details remains unaffected.

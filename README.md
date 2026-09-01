@@ -125,7 +125,7 @@ The original web prototype proved the concept. The mobile V1 focuses on the dail
 
 **Cloud:** Apple HealthKit device ingestion, provider-neutral sync boundaries
 
-**Authentication:** Production authentication deferred; stable development user configuration is used for current local API work
+**Authentication:** Clerk-backed beta identity maps verified external subjects to internal CalorieBank UUIDs; the stable development user remains an explicit local-only option
 
 **Tooling:** npm workspaces, TypeScript, shared config packages, linting, tests
 
@@ -151,8 +151,13 @@ CalorieBank is moving from a web prototype into an iPhone-first mobile V1. The c
 6. `docs/product/adr-013-banking-goals.md` governs Banking Goals, one-bank conservation, allocation concepts, and unresolved withdrawal policy.
 7. `docs/product/adr-014-progressive-familiarity.md` governs recommendation readiness, complementarity, and pacing.
 8. `docs/product/adr-015-time-aware-activity-forecasting.md` governs advanced time-aware forecasting, forecast confidence, and burn-target feasibility.
-9. `docs/product/adr-001-connection-first-v1.md` through `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md` govern their focused accepted decisions.
-10. `docs/architecture/current-state-audit.md` records implementation state and planning but cannot override the product documents above.
+9. `docs/product/adr-016-authoritative-provider-selection-and-multi-provider-resolution.md` governs authoritative provider roles and the Fitbit/Google Health transport.
+10. `docs/product/adr-017-multi-provider-wearable-integration-strategy.md` governs wearable capability qualification and Garmin, WHOOP, and Apple Health expansion.
+11. `docs/product/adr-018-direct-nutrition-provider-strategy-and-fatsecret-integration.md` governs direct nutrition providers, FatSecret delegated diary access, and authoritative intake resolution.
+12. `docs/product/adr-019-beta-identity-and-environment-boundary.md` and `docs/product/adr-020-opening-bank-and-recovery-presentation.md` govern identity ownership and the opening/recovery accounting boundary.
+13. `docs/product/adr-021-personalized-step-contribution-and-initial-visibility.md` governs ledger-neutral walking estimates and the one-time Steps visibility default.
+14. `docs/product/adr-001-connection-first-v1.md` through `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md` govern their focused accepted decisions.
+15. `docs/architecture/current-state-audit.md` records implementation state and planning but cannot override the product documents above.
 
 ## V1 Mission
 
@@ -163,6 +168,12 @@ CalorieBank is not being built first as a replacement food logger. The first-use
 V1 includes a Planning Database for future meal and event estimates. It is not the food log. Connected calorie-tracking applications remain the source of truth for consumed intake and bank calculations.
 
 V1 scope does not require every capability to appear during onboarding or first use. ADR 011 keeps the initial experience focused on the bank and governs contextual relevance; ADR 014 requires familiarity and workflow complementarity before optional planning, forecasting, reserve, or personalization capabilities are proactively introduced. Manual access remains available where practical. Today's Forecast and Projected Daily Burn remain V1 estimates; no Projected Bank is approved.
+
+### Canonical First Run
+
+The V1 mobile journey is: authenticate -> connect calories burned -> connect calories eaten -> configure the goal -> prepare the Opening Bank -> Today. Setup is resumable. Provider connections and authoritative role selection, the saved goal, and Opening Bank initialization remain authoritative; the profile stores only whether welcome was completed and whether the ready state was acknowledged. Existing users migrated before this flow are not forced through it again.
+
+Consumer-facing provider choices are intentionally limited to Fitbit/Google Health or valid Apple Health expenditure for calories burned, and FatSecret or Apple Health Dietary Energy for calories eaten. The app never combines competing providers. While Opening Bank is waiting for sufficient completed-day inputs, setup shows a preparation state rather than inventing a zero balance.
 
 ADR 014 adds Progressive Familiarity. A proactive recommendation requires Relevance, Familiarity, and Complementarity; account age, days since signup, and session count alone do not establish readiness. This policy controls recommendations, not manual feature access.
 
@@ -190,7 +201,7 @@ screenshots/       Existing prototype screenshots
 
 ## Current Foundation Scope
 
-This branch includes the mobile/API foundation, foreground Apple Health rolling three-day ingestion, server-side Fitbit expenditure ingestion, explicit authoritative-provider selection, and the provisional bank pipeline. Current day remains awareness-only; yesterday and the day before are refreshed automatically so completed days can post immediately, remain correctable for two local calendar days, and then lock. Product direction no longer uses a user-entered absolute daily calorie target; V1 derives allowance from imported total daily expenditure, CalorieBank's `0.80` adjustment, and the user's goal-mode adjustment. Production authentication, background HealthKit delivery, notifications, and exact-midnight jobs remain deferred.
+This branch includes the mobile/API foundation, Clerk-backed beta identity boundary, foreground Apple Health ingestion, server-side Google Health API ingestion of Fitbit-derived expenditure, direct FatSecret daily-intake ingestion, explicit authoritative-provider selection, and the provisional bank pipeline. Current day remains awareness-only. Render private beta uses an hourly account-wide lifecycle job for authoritative server-readable sources; Apple Health remains device-only and catches up on authenticated foreground. Completed days post only after both authoritative roles have exact-date post-day-end query evidence, remain correctable for two local calendar days, and then lock. Push/local notifications and background HealthKit delivery remain deferred.
 
 The first implementation milestones should prioritize connection-first onboarding, technically credible supported data-source sync, automatic bank calculation, transparent history, Planning Database estimates for future meals/events, and the morning bank update. Manual food logging is a fallback/correction path, not the dominant V1 loop. Bank-calculation behavior, including Available Bank, optional Emergency Bank, Recovery Forecast, and reserve-policy history, is governed by `docs/product/bank-calculation-spec.md`. Automatic bank usage and dashboard awareness are recorded in `docs/product/adr-004-automatic-bank-usage-and-dashboard-awareness.md`.
 
@@ -198,7 +209,11 @@ Future personalized Activity Opportunity Engine work is documented in `docs/prod
 
 Provider-neutral ingestion is documented in `docs/product/adr-006-provider-neutral-ingestion-architecture.md`. Apple Health is the first real device adapter and is documented in `docs/product/adr-007-apple-healthkit-device-ingestion.md`. Current-day steps, workouts, sync-session observability, and dashboard visibility rules are documented in `docs/product/adr-008-activity-context-and-customizable-today.md`. Provisional posting and reconciliation are authoritative in `docs/product/adr-009-provisional-finalization-and-rolling-reconciliation.md`; reliable three-day historical sync and orchestration are governed by `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md`. Development adapters remain test-only or explicitly enabled local fallback; device and production modes must not silently return synthetic calories.
 
-Authoritative provider selection and Fitbit are governed by `docs/product/adr-016-authoritative-provider-selection-and-multi-provider-resolution.md`. Exactly one expenditure provider and one intake provider feed a calculation. Fitbit and Apple Health expenditure are never summed. Apple Health remains the implemented intake and activity-context path; Fitbit is the first dedicated expenditure path.
+Authoritative provider selection and Fitbit are governed by `docs/product/adr-016-authoritative-provider-selection-and-multi-provider-resolution.md`. Expenditure, activity context, and intake have distinct authoritative roles. Selecting Fitbit uses verified Google Health API v4 data for expenditure, steps, and workouts; Apple Health remains intake. Provider values and workout lists are never summed or merged.
+
+Multi-provider wearable expansion is governed by `docs/product/adr-017-multi-provider-wearable-integration-strategy.md`. The supported V1 connection surface is Fitbit/Google Health, Apple Health, and FatSecret. WHOOP and Garmin are deferred and do not appear in the mobile product. Their provider-neutral research and dormant infrastructure remain available for future evaluation.
+
+Direct nutrition ingestion is governed by `docs/product/adr-018-direct-nutrition-provider-strategy-and-fatsecret-integration.md`. FatSecret users connect their existing diary through delegated OAuth 1.0; CalorieBank imports only normalized daily calorie totals. Apple Health Dietary Energy remains a first-class intake source and bridge for compatible nutrition apps. ADR 022 requires one selected Apple Health writer and prohibits all-writer intake totals. The selected intake source is authoritative and provider totals are never summed.
 
 Progressive Feature Discovery is governed by `docs/product/adr-011-progressive-feature-discovery.md`. Available Bank remains mandatory and first, while implemented optional cards may be manually discoverable or proactively introduced only after sufficient data and all ADR 014 gates are satisfied. Transparency, errors, safety information, and active recovery guidance are never discovery-gated.
 
@@ -206,7 +221,7 @@ Progressive Familiarity is governed by `docs/product/adr-014-progressive-familia
 
 Banking Goals is governed by `docs/product/adr-013-banking-goals.md`. Conceptually, active goal allocations plus Unassigned calories must always equal Available Bank. Emergency Bank remains separate, projected activity cannot fund goals, and goal attribution must never duplicate the automatic finalized withdrawal.
 
-The user-facing Available Bank never displays below zero. Users may optionally reserve genuinely accumulated calories in an Emergency Bank for unexpected overages. The V1 protection sequence is Available Bank -> optional Emergency Bank -> Recovery Forecast, rather than making a large negative balance the primary focus.
+The user-facing Available Bank never displays below zero. ADR 020 preserves the truthful effective accounting balance while deriving `availableBankCalories = max(0, effectiveBankBalanceCalories)` and `recoveryCalories = max(0, -effectiveBankBalanceCalories)`. Recovery is not a second ledger: later positive contributions restore the same effective balance. A new user initializes once from at most seven eligible prior completed local days, with negative pre-CalorieBank net floored to zero. Existing users are not retroactively floored. Emergency Bank remains optional, separate, deferred, and hidden by default.
 
 ## Requirements
 
@@ -257,7 +272,19 @@ Then copy the API environment template:
 cp apps/api/.env.example apps/api/.env
 ```
 
-Update `DATABASE_URL` and `SHADOW_DATABASE_URL` if your PostgreSQL username, password, host, port, or database names differ. The `DEV_USER_ID` and `DEV_USER_EMAIL` values identify one stable temporary development user until production authentication is implemented.
+Update `DATABASE_URL` and `SHADOW_DATABASE_URL` if your PostgreSQL username, password, host, port, or database names differ. `DEV_USER_ID` and `DEV_USER_EMAIL` are accepted only with `APP_ENV=local` and `AUTH_MODE=development`. Beta and production fail closed unless Clerk keys are configured.
+
+### Identity and beta environments
+
+ADR 019 governs identity and ownership. In Clerk mode, the Expo app stores its session token in Secure Store and sends it as a bearer credential. The API verifies it, maps each Clerk subject to exactly one internal UUID (provisioning an unseen subject as a fresh user), and derives all `/v1/me/*` ownership from that mapping. OAuth callbacks identify their owner from server-side state/request-token records rather than the callback request. A local API running `AUTH_MODE=development` rejects Clerk bearer credentials rather than silently resolving them as `DEV_USER_ID`; physical Clerk testing must run the API with `AUTH_MODE=clerk` and both server-side Clerk keys.
+
+For an existing local account, first create the intended Clerk account, find its Clerk user ID, and explicitly link it without rewriting owned data:
+
+```bash
+npm run auth:link-existing -- "$DEV_USER_ID" "user_CLERK_SUBJECT"
+```
+
+Do not use a placeholder subject. The command refuses conflicting links. A beta environment additionally needs a stable HTTPS API, a separate beta database, stable Google Health and FatSecret callbacks, `APP_ENV=beta`, `AUTH_MODE=clerk`, Clerk keys, and provider secrets supplied by the host. Configure `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_AUTH_MODE=clerk`, and `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` in the EAS `preview` environment. Production uses separate values and is not claimed as deployed.
 
 Generate the ORM client and run migrations:
 
@@ -315,7 +342,7 @@ GET /v1/me/bank-history?range=D|W|M|3M|Y|ALL
 GET /v1/me/bank-history/:logDate
 ```
 
-The official bank is the all-time sum of immutable initial and correction ledger transactions. A completed day affects the bank immediately as provisional, can receive append-only correction deltas for two local calendar days, and then becomes locked. Range filters affect the history list and `rangeNetChangeCalories`; they do not replace the all-time bank.
+The effective bank is the immutable Opening Bank snapshot, when applicable, plus append-only initial and correction ledger transactions after the accounting activation date. `GET /v1/me/bank-summary` exposes `effectiveBankBalanceCalories`, non-negative `availableBankCalories`, and non-negative `recoveryCalories` explicitly. A completed active-accounting day affects the bank immediately as provisional, can receive append-only correction deltas for two local calendar days, and then becomes locked. Range filters affect the history list and `rangeNetChangeCalories`; they do not replace the all-time effective bank.
 
 The Planned Treat endpoints are:
 
@@ -354,6 +381,11 @@ GET /v1/me/integrations/fitbit/authorize
 GET /v1/me/integrations/fitbit/callback
 POST /v1/me/integrations/fitbit/sync
 DELETE /v1/me/integrations/fitbit
+GET /v1/me/integrations/fatsecret
+GET /v1/me/integrations/fatsecret/authorize
+GET /v1/me/integrations/fatsecret/callback
+POST /v1/me/integrations/fatsecret/sync
+DELETE /v1/me/integrations/fatsecret
 GET /v1/me/dashboard-preferences
 PATCH /v1/me/dashboard-preferences
 ```
@@ -362,7 +394,7 @@ PATCH /v1/me/dashboard-preferences
 
 The ingestion commands are the device-to-server boundary for normalized daily summaries. They do not accept a user ID, adjusted expenditure, or bank effects. Each foreground sync independently queries and uploads current day, yesterday, and the day before. Current-day data remains awareness-only. Completed-date expenditure and intake updates invoke idempotent provisional posting or reconciliation; steps and workouts never do. The API applies the centralized `0.80` policy, replaces newer cumulative totals, and ignores stale updates. The device skips accepted unchanged values and retains failed uploads in an ordered local outbox. Coordinated sync sessions retain queried/uploaded/skipped/reconciled/locked/waiting dates, category outcomes, duration, and redacted errors without raw health payloads. Set `TODAY_INGESTION_MODE=device` for Apple Health testing. Use `development` only when deterministic local fallback is explicitly intended.
 
-Fitbit OAuth and API requests run on the server because Fitbit is internet-accessible and its client secret must never enter mobile JavaScript. `POST /v1/me/integrations/fitbit/sync` retrieves current day, yesterday, and the day before independently from Fitbit's daily activity endpoint. `summary.caloriesOut` is normalized as the one raw expenditure total; CalorieBank applies `0.80` once. Selecting Fitbit affects provisional calculations through immutable correction deltas and never rewrites locked days.
+Google OAuth and Google Health API requests run on the server because the service is internet-accessible and its client secret must never enter mobile JavaScript. `POST /v1/me/integrations/fitbit/sync` retrieves current day, yesterday, and the day before independently. It uses `total-calories:dailyRollUp` for expenditure, `steps:dailyRollUp` for cumulative steps, and civil-day-filtered `exercise` data points for workout sessions. `totalCalories.kcalSum` is the one raw expenditure total; workout calories are context and are never added. CalorieBank applies `0.80` once. Selecting Fitbit affects provisional calculations through expenditure only and never rewrites locked days.
 
 Inspect existing development history without changing it:
 
@@ -370,26 +402,54 @@ Inspect existing development history without changing it:
 npm run bank:inspect-providers
 ```
 
-### Fitbit Development Setup
+### Fitbit through Google Health Development Setup
 
-Fitbit's current documentation states that the legacy Fitbit Web API is scheduled for deprecation in September 2026 and directs developers to the Google Health API migration guidance. This adapter proves the provider-selection boundary against the currently documented endpoint, but production launch is blocked on validating and completing that migration. The provider-neutral aggregate and selection contracts are intended to remain stable across that transport change.
+The legacy Fitbit Web API is scheduled to shut down in September 2026. New CalorieBank connections therefore use [Google Health API v4](https://developers.google.com/health/) and Google OAuth; the legacy transport is not registered in production code.
 
-1. Register an application at [Fitbit Web API application registration](https://dev.fitbit.com/apps/new). For testing only your own Fitbit account, use the Personal application type; access for other users is subject to Fitbit's application rules.
-2. Configure the exact externally reachable API callback ending in `/v1/me/integrations/fitbit/callback`. A physical iPhone cannot reach Mac `localhost`, and Fitbit OAuth should use HTTPS. For local device testing, use an HTTPS development tunnel or deployed development API that forwards to the Mac. Do not register the `caloriebank://` mobile URL as Fitbit's callback.
-3. Request only the `activity` scope. This milestone does not request Fitbit nutrition, profile, sleep, heart-rate, location, or social scopes.
-4. Put the issued Client ID and Client Secret only in untracked `apps/api/.env`. Generate a local token-encryption key with `openssl rand -base64 32`.
-5. Configure the following and restart the API:
+1. Create or select a Google Cloud project, then enable **Google Health API** from the API Library. Follow Google's [Cloud and OAuth setup](https://developers.google.com/health/setup).
+2. Configure the Google Auth Platform consent screen as **External** for development. Add the Google/Fitbit account used on the iPhone under **Audience -> Test users**.
+3. Under **Data Access**, add only `https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly`. CalorieBank does not request write, nutrition, sleep, location, profile, or health-metrics scopes for this adapter.
+4. Create an OAuth 2.0 client of type **Web application**. Register the exact externally reachable HTTPS callback ending in `/v1/me/integrations/fitbit/callback`. A physical iPhone cannot use Mac `localhost`; use a stable HTTPS development tunnel or deployed development API. The `caloriebank://` URL is the post-callback app redirect and is not the Google OAuth redirect URI.
+5. Put the issued Client ID and Client Secret only in untracked `apps/api/.env`. Generate a local token-encryption key with `openssl rand -base64 32`.
+6. Configure the following and restart the API:
 
 ```env
-FITBIT_CLIENT_ID=your_client_id
-FITBIT_CLIENT_SECRET=your_client_secret
-FITBIT_REDIRECT_URI=https://your-development-api.example/v1/me/integrations/fitbit/callback
-FITBIT_TOKEN_ENCRYPTION_KEY=your_base64_32_byte_key
+GOOGLE_HEALTH_CLIENT_ID=your_client_id
+GOOGLE_HEALTH_CLIENT_SECRET=your_client_secret
+GOOGLE_HEALTH_REDIRECT_URI=https://your-development-api.example/v1/me/integrations/fitbit/callback
+GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY=your_base64_32_byte_key
 ```
 
-6. Open Settings -> Health Connections -> Connect Fitbit, complete authorization, then select `Use Fitbit for calorie burn`.
+7. Open Settings -> Health Connections -> Connect Fitbit, sign in to the allowlisted Google account, grant activity-and-fitness read access, then select **Use Fitbit for burn and activity**.
 
-OAuth state is hashed, the PKCE verifier and tokens are encrypted at rest, refresh tokens are rotated, and tokens are excluded from request logs. Production must use managed secret storage and a stable HTTPS callback.
+OAuth state is hashed, the PKCE verifier and tokens are encrypted at rest, refresh-token rotation is preserved when Google returns a replacement, and tokens are excluded from request logs. In Google's Testing publishing mode, refresh tokens expire after seven days. Unverified apps are limited to 100 users; public launch requires OAuth verification and the Google Health restricted-scope security process. Production must use managed secret storage and a stable HTTPS callback.
+
+### FatSecret Direct Intake Development Setup
+
+FatSecret existing-user diary access uses the platform's [three-legged OAuth 1.0 flow](https://platform.fatsecret.com/docs/guides/authentication/oauth1/three-legged). OAuth 2.0 client credentials cannot delegate access to a member's private diary.
+
+1. Register for the [FatSecret Platform API](https://platform.fatsecret.com/) and create an application that provides an OAuth 1.0 Consumer Key and Consumer Secret. Use the credentials issued by FatSecret; do not substitute an OAuth 2.0 Client ID.
+2. Configure the callback used by the application as the exact public HTTPS API URL ending in `/v1/me/integrations/fatsecret/callback`. For iPhone development, this may be the same stable ngrok or other HTTPS tunnel used for Google OAuth. The `caloriebank://integrations` URI is the post-callback mobile redirect, not the FatSecret callback.
+3. Generate or reuse the external-provider encryption key with `openssl rand -base64 32`, then add only these values to untracked `apps/api/.env`:
+
+```env
+EXTERNAL_PROVIDER_TOKEN_ENCRYPTION_KEY=your_base64_32_byte_key
+FATSECRET_CONSUMER_KEY=your_oauth1_consumer_key
+FATSECRET_CONSUMER_SECRET=your_oauth1_consumer_secret
+FATSECRET_REDIRECT_URI=https://your-development-api.example/v1/me/integrations/fatsecret/callback
+```
+
+4. Restart the API and keep the HTTPS tunnel pointed at API port `3000`. Restart Metro only when JavaScript or `EXPO_PUBLIC_API_URL` changes.
+5. On the iPhone, open Settings -> Health Connections -> Connect FatSecret. Sign in to the existing FatSecret account and approve access, then select **Use FatSecret for calories eaten**.
+6. Refresh Today and compare Eaten with the FatSecret diary total. Edit yesterday's diary, refresh again, and verify one provisional correction delta. Repeating the refresh without another edit must not create another correction.
+
+CalorieBank reads FatSecret's monthly diary summary and persists only daily calorie totals. Omitted diary dates remain unavailable rather than becoming zero. It does not import individual foods or edit the diary. The delegated OAuth flow was successfully completed on a physical iPhone development build on 2026-08-18; this validates connection and return-to-app behavior, not production-scale synchronization. No EAS rebuild is required for this integration because it adds no native dependency or configuration.
+
+### Deferred Wearable Providers
+
+WHOOP and Garmin are not part of the user-facing V1 connection surface. The mobile app must not offer Connect, selection, status, or setup controls for either provider.
+
+WHOOP's dormant workout-context adapter and generic OAuth persistence remain architecture for possible later use, but workout-only context does not justify V1 connection complexity and cannot provide CalorieBank's required local-day total expenditure. Garmin remains capability research only until Developer Program access and approved documentation establish calorie semantics and commercial terms. ADR 017 retains the detailed technical investigation for both providers.
 
 Finalization orchestration can also be invoked by scheduler infrastructure without duplicating accounting logic:
 
@@ -398,6 +458,8 @@ npm run bank:orchestrate -- --trigger=scheduled
 ```
 
 Supported CLI triggers are `scheduled`, `manual_refresh`, and `integration_test`. The command retries the prior two local dates and locks expired provisional records through the same idempotent services used after device sync.
+
+The private-beta account-wide scheduler uses `npm run lifecycle:run`, not the development-only single-user command above. Render deployment and EAS beta environment requirements are documented in `docs/deployment/render-private-beta.md`.
 
 For deterministic local history, seed completed bank reports explicitly:
 
@@ -410,7 +472,7 @@ The seed script creates representative completed days through the same idempoten
 For physical iPhone testing, `localhost` on the phone points to the phone, not the Mac. Set the mobile API URL to the Mac's LAN IP address, for example:
 
 ```bash
-EXPO_PUBLIC_API_URL=http://192.168.0.154:3000
+EXPO_PUBLIC_API_URL=http://YOUR_MAC_LAN_IP:3000
 ```
 
 Copy `apps/mobile/.env.example` to an untracked local env file and replace the example IP with the Mac's current LAN IP before launching the development client. Expo SDK 54 inlines statically referenced `EXPO_PUBLIC_` values, so restart Metro after changing this file.
@@ -444,7 +506,22 @@ HealthKit requires a native development build. Expo Go cannot load the HealthKit
 5. After the first native installation, run `npm run mobile:start -- --clear` for normal JavaScript iteration and open the CalorieBank development client.
 6. Open Settings -> Health Connections -> Connect Apple Health. Grant read access to active energy, basal energy, dietary energy, steps, and workouts.
 
-Rebuild the native client after adding or changing a native dependency, entitlement, purpose string, bundle identifier, or Expo native configuration. JavaScript-only changes need only Metro reload.
+Development-profile iOS builds include `NSAllowsLocalNetworking` and a local-network usage description so the physical iPhone can reach the Mac API over private-LAN HTTP. Preview and production profiles do not include this exception and continue requiring HTTPS. The LAN IP remains an environment value and is not hard-coded into the app.
+
+For an EAS development client, build and install with:
+
+```bash
+cd apps/mobile
+eas build --platform ios --profile development
+```
+
+For local native generation, explicitly enable the same development-only configuration:
+
+```bash
+CALORIEBANK_IOS_ALLOW_LOCAL_HTTP=1 npm run mobile:prebuild:ios
+```
+
+Rebuild the native client after adding or changing a native dependency, entitlement, purpose string, bundle identifier, ATS policy, or Expo native configuration. JavaScript-only changes need only Metro reload.
 
 CalorieBank cannot determine whether a HealthKit read category was denied; an empty query can also mean no matching samples. System authorization is managed in iOS Settings or the Health app. `Disconnect in CalorieBank` disables the local connection state but does not claim to revoke system permission.
 

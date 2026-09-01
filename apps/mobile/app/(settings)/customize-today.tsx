@@ -13,12 +13,12 @@ const optionalCards: {
   key: keyof DashboardPreferencesPatch;
   label: string;
 }[] = [
-  { key: 'showLatestFinalizedContribution', label: 'Latest finalized contribution' },
+  { key: 'showLatestFinalizedContribution', label: 'Latest completed contribution' },
+  { key: 'showCurrentGoal', label: 'Current goal' },
   { key: 'showTodaySoFar', label: 'Today so far' },
   { key: 'showPlannedTreat', label: 'Planned Treat' },
   { key: 'showSteps', label: 'Steps today' },
   { key: 'showWorkouts', label: 'Logged workouts' },
-  { key: 'showCurrentGoal', label: 'Current goal' },
 ];
 
 export default function CustomizeTodayScreen() {

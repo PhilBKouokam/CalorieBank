@@ -129,7 +129,7 @@ describe('planned treat PostgreSQL persistence', () => {
     });
     expect(secondTreat).toMatchObject({
       name: 'Ice cream',
-      availableBankCalories: -100,
+      availableBankCalories: 0,
       progressCalories: 0,
       remainingCalories: 150,
       status: 'saving',

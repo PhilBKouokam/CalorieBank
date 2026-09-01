@@ -1,6 +1,9 @@
 const providerDisplayNames: Readonly<Record<string, string>> = {
   apple_health: 'Apple Health',
-  fitbit: 'Fitbit',
+  google_health_fitbit: 'Fitbit',
+  garmin: 'Garmin',
+  whoop: 'WHOOP',
+  fatsecret: 'FatSecret',
   development: 'Development Provider',
 };
 

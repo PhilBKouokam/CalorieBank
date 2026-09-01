@@ -10,9 +10,9 @@ export default function GoalSettingsScreen() {
   return (
     <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <PlaceholderScreen
-        eyebrow="Goal Settings"
+        eyebrow="Goal"
         title="Update your goal"
-        description="Change your goal mode or adjustment. Future bank calculations should use the active configuration for the effective date."
+        description="Choose how your goal changes your estimated actual burn. Changes apply to future completed days."
       >
         <GoalConfigurationForm mode="settings" onSaved={() => router.replace('/today')} />
       </PlaceholderScreen>

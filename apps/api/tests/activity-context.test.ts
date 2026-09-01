@@ -26,6 +26,12 @@ function appFor(currentUser = user) {
   });
 }
 
+function localDateOffset(localDate: string, offset: number) {
+  const date = new Date(`${localDate}T12:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+}
+
 async function startSession(app: ReturnType<typeof createApp>) {
   const response = await request(app)
     .post('/v1/me/ingestion/sync-sessions')
@@ -46,6 +52,28 @@ afterEach(async () => {
 });
 
 describe('activity context ingestion', () => {
+  it('accepts the bounded eight-date setup session and rejects a ninth date', async () => {
+    const app = appFor();
+    const localDate = getLocalDateForTimezone(timezone);
+    const datesQueried = Array.from({ length: 8 }, (_, offset) => localDateOffset(localDate, -offset));
+    await request(app)
+      .post('/v1/me/ingestion/sync-sessions')
+      .send({
+        localDate, timezone, provider: 'apple_health', trigger: 'provider_reconnect',
+        datesQueried,
+      })
+      .expect(201)
+      .expect(({ body }) => expect(body.datesQueried).toEqual(datesQueried));
+
+    await request(app)
+      .post('/v1/me/ingestion/sync-sessions')
+      .send({
+        localDate, timezone, provider: 'apple_health', trigger: 'provider_reconnect',
+        datesQueried: [...datesQueried, localDateOffset(localDate, -8)],
+      })
+      .expect(400);
+  });
+
   it('derives stale state from one centralized threshold', () => {
     const now = new Date('2026-07-22T12:00:00.000Z');
     expect(
@@ -109,6 +137,7 @@ describe('activity context ingestion', () => {
       endedAt: updatedAt.toISOString(),
       durationMinutes: 42,
       totalEnergyBurned: 238,
+      totalSteps: 2_300,
       totalDistance: 3.5,
       distanceUnit: 'km',
     };
@@ -167,7 +196,7 @@ describe('activity context ingestion', () => {
     expect(today.body).toMatchObject({
       workouts: {
         totalCount: 1,
-        items: [{ displayName: 'Outdoor Walk', totalEnergyBurned: 250 }],
+        items: [{ displayName: 'Outdoor Walk', totalEnergyBurned: 250, totalSteps: 2_300 }],
       },
       burned: { adjusted: null, raw: null },
     });
@@ -220,24 +249,219 @@ describe('activity context ingestion', () => {
     expect(defaults.body).toMatchObject({
       showLatestFinalizedContribution: true,
       showTodaySoFar: true,
-      showPlannedTreat: true,
-      showSteps: true,
-      showWorkouts: true,
-      showCurrentGoal: true,
+      showPlannedTreat: false,
+      showSteps: false,
+      showWorkouts: false,
+      showCurrentGoal: false,
     });
 
     const updated = await request(app)
       .patch('/v1/me/dashboard-preferences')
-      .send({ showSteps: false })
+      .send({ showSteps: true })
       .expect(200);
-    expect(updated.body.showSteps).toBe(false);
-    expect(updated.body.showWorkouts).toBe(true);
+    expect(updated.body.showSteps).toBe(true);
+    expect(updated.body.showWorkouts).toBe(false);
     await request(app)
       .patch('/v1/me/dashboard-preferences')
       .send({ availableBank: false })
       .expect(400);
     const persisted = await request(app).get('/v1/me/dashboard-preferences').expect(200);
-    expect(persisted.body.showSteps).toBe(false);
+    expect(persisted.body.showSteps).toBe(true);
+    expect(persisted.body.stepsVisibilitySource).toBe('explicit');
+  });
+
+  it('infers the initial Steps visibility once from the selected provider and preserves manual override', async () => {
+    const app = appFor();
+    const today = getLocalDateForTimezone(timezone);
+    await prisma.user.create({
+      data: {
+        id: user.id,
+        email: user.email,
+        profile: { create: { timezone } },
+        providerSelection: {
+          create: { authoritativeActivityProvider: 'google_health_fitbit' },
+        },
+        dailyStepAggregates: {
+          create: [12_000, 14_000, 11_000].map((totalSteps, index) => ({
+            localDate: new Date(`${localDateOffset(today, -(index + 1))}T00:00:00.000Z`),
+            timezone,
+            provider: 'google_health_fitbit',
+            providerRecordId: `fitbit-step-${index}`,
+            totalSteps,
+            importedAt: new Date(),
+            providerUpdatedAt: new Date(),
+            syncStatus: 'ready',
+            isCurrentDay: false,
+          })),
+        },
+      },
+    });
+
+    const inferred = await request(app).get('/v1/me/dashboard-preferences').expect(200);
+    expect(inferred.body).toMatchObject({ showSteps: true, stepsVisibilitySource: 'inferred' });
+    await request(app)
+      .patch('/v1/me/dashboard-preferences')
+      .send({ showSteps: false })
+      .expect(200)
+      .expect(({ body }) => expect(body.stepsVisibilitySource).toBe('explicit'));
+    await prisma.dailyStepAggregate.create({
+      data: {
+        userId: user.id,
+        localDate: new Date(`${localDateOffset(today, -4)}T00:00:00.000Z`),
+        timezone,
+        provider: 'google_health_fitbit',
+        providerRecordId: 'fitbit-step-4',
+        totalSteps: 20_000,
+        importedAt: new Date(),
+        providerUpdatedAt: new Date(),
+        syncStatus: 'ready',
+        isCurrentDay: false,
+      },
+    });
+    const preserved = await request(app).get('/v1/me/dashboard-preferences').expect(200);
+    expect(preserved.body).toMatchObject({ showSteps: false, stepsVisibilitySource: 'explicit' });
+
+    await prisma.user.create({
+      data: {
+        id: otherUser.id,
+        email: otherUser.email,
+        profile: { create: { timezone } },
+        providerSelection: {
+          create: { authoritativeActivityProvider: 'google_health_fitbit' },
+        },
+        dailyStepAggregates: {
+          create: [7_000, 8_000, 9_000].map((totalSteps, index) => ({
+            localDate: new Date(`${localDateOffset(today, -(index + 1))}T00:00:00.000Z`),
+            timezone,
+            provider: 'google_health_fitbit',
+            providerRecordId: `other-fitbit-step-${index}`,
+            totalSteps,
+            importedAt: new Date(),
+            providerUpdatedAt: new Date(),
+            syncStatus: 'ready',
+            isCurrentDay: false,
+          })),
+        },
+      },
+    });
+    const otherPreferences = await request(appFor(otherUser))
+      .get('/v1/me/dashboard-preferences')
+      .expect(200);
+    expect(otherPreferences.body).toMatchObject({
+      showSteps: false,
+      stepsVisibilitySource: 'inferred',
+    });
+    await request(appFor(otherUser))
+      .patch('/v1/me/dashboard-preferences')
+      .send({ showSteps: true })
+      .expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({
+        showSteps: true,
+        stepsVisibilitySource: 'explicit',
+      }));
+  });
+
+  it('returns a provider-aware walking estimate without changing expenditure or ledger state', async () => {
+    const app = appFor();
+    const today = getLocalDateForTimezone(timezone);
+    await prisma.user.create({
+      data: {
+        id: user.id,
+        email: user.email,
+        profile: { create: { timezone } },
+        providerSelection: {
+          create: { authoritativeActivityProvider: 'google_health_fitbit' },
+        },
+        dailyStepAggregates: {
+          create: {
+            localDate: new Date(`${today}T00:00:00.000Z`),
+            timezone,
+            provider: 'google_health_fitbit',
+            providerRecordId: 'fitbit-steps-today',
+            totalSteps: 20_000,
+            importedAt: new Date(),
+            providerUpdatedAt: new Date(),
+            syncStatus: 'ready',
+            isCurrentDay: true,
+          },
+        },
+        currentDayWorkouts: {
+          create: [8_000, 10_000, 12_000].map((totalSteps, index) => ({
+            localDate: new Date(`${localDateOffset(today, -(index + 1))}T00:00:00.000Z`),
+            timezone,
+            provider: 'google_health_fitbit',
+            providerWorkoutId: `walk-${index}`,
+            activityType: 'walking',
+            displayName: 'Walk',
+            startedAt: new Date(`${localDateOffset(today, -(index + 1))}T12:00:00.000Z`),
+            endedAt: new Date(`${localDateOffset(today, -(index + 1))}T13:00:00.000Z`),
+            durationMinutes: 60,
+            totalEnergyBurned: totalSteps / 20,
+            totalSteps,
+            importedAt: new Date(),
+            providerUpdatedAt: new Date(),
+            syncStatus: 'ready',
+            isCurrentDay: false,
+          })),
+        },
+      },
+    });
+
+    const response = await request(app)
+      .get(`/v1/me/today?timezone=${encodeURIComponent(timezone)}`)
+      .expect(200);
+    expect(response.body.steps).toMatchObject({
+      count: 20_000,
+      source: 'Fitbit',
+      estimatedContributionCalories: 1_000,
+      estimatedCaloriesPer1000Steps: 50,
+      calibrationWorkoutCount: 3,
+      calibrationTotalSteps: 30_000,
+      calibrationTotalCalories: 1_500,
+      estimationStatus: 'ready',
+    });
+    expect(response.body.burned).toMatchObject({ adjusted: null, raw: null });
+    expect(await prisma.calorieLedgerTransaction.count({ where: { userId: user.id } })).toBe(0);
+
+    await prisma.user.create({
+      data: {
+        id: otherUser.id,
+        email: otherUser.email,
+        profile: { create: { timezone } },
+        providerSelection: {
+          create: { authoritativeActivityProvider: 'google_health_fitbit' },
+        },
+        dailyStepAggregates: {
+          create: {
+            localDate: new Date(`${today}T00:00:00.000Z`), timezone,
+            provider: 'google_health_fitbit', providerRecordId: 'other-steps-today',
+            totalSteps: 10_000, importedAt: new Date(), providerUpdatedAt: new Date(),
+            syncStatus: 'ready', isCurrentDay: true,
+          },
+        },
+        currentDayWorkouts: {
+          create: {
+            localDate: new Date(`${localDateOffset(today, -1)}T00:00:00.000Z`), timezone,
+            provider: 'google_health_fitbit', providerWorkoutId: 'other-run',
+            activityType: 'running', displayName: 'Run',
+            startedAt: new Date(`${localDateOffset(today, -1)}T12:00:00.000Z`),
+            endedAt: new Date(`${localDateOffset(today, -1)}T13:00:00.000Z`),
+            durationMinutes: 60, totalEnergyBurned: 160, totalSteps: 2_000,
+            importedAt: new Date(), providerUpdatedAt: new Date(), syncStatus: 'ready',
+            isCurrentDay: false,
+          },
+        },
+      },
+    });
+    const otherResponse = await request(appFor(otherUser))
+      .get(`/v1/me/today?timezone=${encodeURIComponent(timezone)}`)
+      .expect(200);
+    expect(otherResponse.body.steps).toMatchObject({
+      estimatedContributionCalories: 800,
+      calibrationWorkoutCount: 1,
+      calibrationTotalSteps: 2_000,
+      calibrationTotalCalories: 160,
+    });
   });
 
   it('records partial sync outcomes without raw payloads and enforces session ownership', async () => {

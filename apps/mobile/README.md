@@ -17,6 +17,9 @@ The mobile app should follow the repository-level V1 source of truth:
 - `../../docs/product/adr-013-banking-goals.md`
 - `../../docs/product/adr-014-progressive-familiarity.md`
 - `../../docs/product/adr-015-time-aware-activity-forecasting.md`
+- `../../docs/product/adr-016-authoritative-provider-selection-and-multi-provider-resolution.md`
+- `../../docs/product/adr-017-multi-provider-wearable-integration-strategy.md`
+- `../../docs/product/adr-018-direct-nutrition-provider-strategy-and-fatsecret-integration.md`
 - `../../docs/architecture/current-state-audit.md`
 
 V1 is connection-first and low-friction. The primary experience is not daily manual food logging. The app should help users connect supported intake and expenditure/health data sources, calculate a transparent lifetime calorie bank, and receive one meaningful morning bank update.
@@ -37,7 +40,7 @@ Manual food entry belongs only as fallback, correction, supplementary input, or 
 
 ## Current Scope
 
-The app includes coordinated foreground Apple Health rolling-window ingestion for expenditure, intake, steps, and normalized workouts; a provider-neutral Today read model; and persistent fixed-order card visibility preferences. Available Bank remains mandatory and first. Existing implementation visibility may require a later ADR 011 migration; this documentation change does not add discovery logic. Today's Forecast and Projected Daily Burn remain V1 estimates but must not be represented as Projected Bank data. Time-aware forecasting is documentation-planned and implementation-blocked under ADR 015. Production authentication, broad historical ingestion, background HealthKit delivery, exact-time scheduling, and notifications remain deferred.
+The app includes coordinated foreground rolling-window ingestion from Apple Health, Fitbit through Google Health, and FatSecret; a provider-neutral Today read model; authoritative provider selection; Clerk-hosted beta authentication; and persistent fixed-order card visibility preferences. FatSecret imports only existing diary daily totals and never creates food entries. Available Bank remains mandatory and first. Existing implementation visibility may require a later ADR 011 migration; this documentation change does not add discovery logic. Today's Forecast and Projected Daily Burn remain V1 estimates but must not be represented as Projected Bank data. Time-aware forecasting is documentation-planned and implementation-blocked under ADR 015. Broad historical ingestion, background HealthKit delivery, exact-time scheduling, and notifications remain deferred.
 
 ## Development
 
@@ -51,5 +54,9 @@ npm run mobile:start
 ```
 
 HealthKit requires the installed development client and does not run in Expo Go. Rebuild after native dependency or configuration changes; JavaScript-only changes continue through Metro.
+
+Clerk authentication uses the hosted Account Portal and `expo-secure-store`. Set `EXPO_PUBLIC_AUTH_MODE=clerk` and `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` for authenticated builds. The `development` EAS profile is an internal development client; `preview` is an internal beta candidate with normal HTTPS enforcement; `production` is reserved for a future store build. Adding Clerk and Secure Store changes native configuration, so install a newly built development client before testing authentication.
+
+The EAS `development` profile enables iOS local-network HTTP only for communication with the Mac development API. Preview and production configurations retain normal ATS HTTPS enforcement. Set `EXPO_PUBLIC_API_URL` in the local `.env` to the Mac's current LAN address, restart Metro after changing it, and use the development-only HealthKit diagnostics screen to verify the resolved URL and API reachability.
 
 Before completing implementation tasks, run the relevant lint, typecheck, and test commands from the root package scripts.

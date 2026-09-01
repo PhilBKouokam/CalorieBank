@@ -13,13 +13,15 @@ Available Bank and the latest finalized contribution answer what has already rea
 Today supports this fixed ordering when the corresponding cards are visible:
 
 1. Available Bank.
-2. Latest Finalized Contribution.
-3. Today So Far.
-4. Today's Eating Budget, when enabled and reliable.
-5. Planned Treat.
-6. Steps Today.
-7. Logged Workouts.
-8. Current Goal.
+2. Recovery, when applicable. Recovery is derived bank state rather than a customizable card.
+3. Yesterday's or the latest completed contribution.
+4. Current Goal.
+5. Today So Far.
+6. Planned Treat.
+7. Steps Today.
+8. Logged Workouts.
+
+This consumer ordering and terminology supersede the earlier placement of Current Goal after activity context. Today's Eating Budget remains deferred under ADR 012 and has no current card position.
 
 Available Bank is mandatory, always first, and cannot be hidden. Supporting cards may be hidden through account-level preferences exposed by `GET` and `PATCH /v1/me/dashboard-preferences`. ADR 011 supersedes the earlier requirement that all six supporting cards be visible to every new user by default. The initial experience should remain in the Foundation stage; supporting cards can be manually enabled, progressively introduced, or contextually activated. Under ADR 014, proactive introduction requires Relevance, Familiarity, and Complementarity and should be paced one highest-value concept at a time. Manual enablement does not require a familiarity gate. The first customization version changes visibility only; drag-and-drop ordering is deferred.
 
@@ -27,7 +29,7 @@ ADR 013 does not add Banking Goals to this fixed Today-card order. Banking Goals
 
 Steps and workouts are activity context, not calorie-bank inputs. `StepProvider` and `WorkoutProvider` extend the provider-neutral adapter boundary. Apple Health is the first concrete implementation. Step snapshots are cumulative and replace older snapshots for the same user, provider, and local date. Workouts are normalized and idempotent by user, provider, and provider workout identifier.
 
-Observed workout history is separate from future Activity Opportunity recommendations. Logged workout calories are descriptive and already represented in Apple Health active energy. They must never be added to active energy, adjusted expenditure, or the ledger.
+Observed workout history is separate from future Activity Opportunity recommendations. Logged workout calories are descriptive and may already be represented in the selected provider's total expenditure. They must never be added to provider total expenditure, adjusted expenditure, or the ledger.
 
 The authoritative raw current-day expenditure remains:
 
@@ -71,9 +73,10 @@ HealthKit does not reveal whether read access to an individual type was denied. 
 - Advanced pace guidance requires a separate Forecast Confidence Gate. The current 30-minute awareness freshness threshold does not automatically become the approved time-aware forecast threshold.
 - Today's Eating Budget is an optional progressively discovered card governed by ADR 012. It must remain unavailable until its calculation policy is approved and must not be derived by stacking steps or workout calories on provider total expenditure.
 - Hiding a card does not disable ingestion or delete health data.
-- Current-day awareness never creates ledger transactions, changes Available Bank, changes Planned Treat progress, or alters the latest completed contribution. The latest contribution card may display ADR 009 provisional/locked status and correction context.
+- Current-day awareness never creates ledger transactions, changes Available Bank, changes Planned Treat progress, or alters the latest completed contribution. The latest contribution card shows only its signed value. ADR 009 provisional/locked status, lock dates, and correction context remain available to accounting and diagnostics rather than appearing in the primary consumer card.
 - Background HealthKit delivery, historical activity charts, workout analytics, and dashboard reordering remain deferred. Rolling-window workout snapshots replace removed provider workouts for that provider/date but remain banking-neutral.
 - Current visibility defaults in the implemented shell may require a later migration to ADR 011 discovery state and ADR 014 familiarity/pacing state. This ADR does not approve that schema, familiarity metric, or recommendation engine.
+- ADR 021 adds one narrow personalized default: an unset Steps preference is inferred once after at least three completed authoritative step days exist. A persisted explicit toggle always wins. Separately, one to five recent same-provider walking/running workouts with paired workout steps and active calories may calibrate a ledger-neutral step-calorie estimate.
 
 ## Rejected Alternatives
 

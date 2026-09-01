@@ -47,6 +47,7 @@ export const ingestionCategoryStatusSchema = z.enum([
   'error',
   'skipped',
 ]);
+export const MAX_INGESTION_SYNC_SESSION_DATES = 8;
 export const bankDayProcessingStatusSchema = z.enum([
   'waiting_for_intake',
   'waiting_for_expenditure',
@@ -55,6 +56,16 @@ export const bankDayProcessingStatusSchema = z.enum([
   'waiting_for_required_inputs',
   'provisional',
   'locked',
+]);
+export const openingBankStatusSchema = z.enum(['waiting_for_opening_data', 'initialized']);
+export const onboardingStageSchema = z.enum([
+  'welcome',
+  'calories_burned',
+  'calories_eaten',
+  'goal',
+  'preparing_bank',
+  'ready',
+  'complete',
 ]);
 
 export const MIN_DAILY_ENERGY_ADJUSTMENT = -2_000;
@@ -200,12 +211,21 @@ function isIanaTimezone(value: string) {
 }
 
 export const ingestionProviderSchema = z.enum(['apple_health']);
-export const bankingProviderSchema = z.enum(['apple_health', 'fitbit']);
+export const bankingProviderSchema = z.enum(['apple_health', 'google_health_fitbit']);
+export const wearableProviderSchema = z.enum(['apple_health', 'google_health_fitbit', 'garmin', 'whoop']);
+export const intakeProviderSchema = z.enum(['apple_health', 'fatsecret']);
+export const appleHealthIntakeWriterSchema = z.object({
+  bundleIdentifier: z.string().trim().min(1).max(255),
+  displayName: z.string().trim().min(1).max(100),
+}).strict();
+export const providerIdSchema = z.enum(['apple_health', 'google_health_fitbit', 'garmin', 'whoop', 'fatsecret']);
 
 export const providerSelectionInputSchema = z
   .object({
     authoritativeExpenditureProvider: bankingProviderSchema,
-    authoritativeIntakeProvider: z.literal('apple_health'),
+    authoritativeActivityProvider: wearableProviderSchema.optional(),
+    authoritativeIntakeProvider: intakeProviderSchema,
+    appleHealthIntakeWriter: appleHealthIntakeWriterSchema.nullable().optional(),
   })
   .strict();
 
@@ -224,29 +244,120 @@ export const providerSelectionResponseSchema = z.object({
     status: providerConnectionStatusSchema,
     fallbackActive: z.boolean(),
   }),
-  intake: z.object({
-    authoritativeProvider: z.literal('apple_health'),
+  activityContext: z.object({
+    authoritativeProvider: wearableProviderSchema,
     displayName: z.string().min(1),
     status: providerConnectionStatusSchema,
+    fallbackActive: z.boolean(),
+  }),
+  intake: z.object({
+    authoritativeProvider: intakeProviderSchema,
+    displayName: z.string().min(1),
+    status: providerConnectionStatusSchema,
+    writerBundleIdentifier: z.string().min(1).nullable(),
+    writerDisplayName: z.string().min(1).nullable(),
   }),
   connectedProviders: z.array(
     z.object({
-      provider: bankingProviderSchema,
+      provider: providerIdSchema,
       displayName: z.string().min(1),
       status: providerConnectionStatusSchema,
       lastSyncedAt: z.string().datetime().nullable(),
+      capabilities: z.object({
+        expenditure: z.boolean(),
+        expenditureCapability: z.enum(['full_total', 'derivable_total', 'active_only', 'unavailable']),
+        intake: z.boolean(),
+        steps: z.boolean(),
+        workouts: z.boolean(),
+        workoutEnergy: z.boolean(),
+        workoutDuration: z.boolean(),
+        distance: z.boolean(),
+        sleep: z.boolean(),
+        heartRate: z.boolean(),
+        webhooks: z.boolean(),
+        historicalBackfill: z.boolean(),
+        oauth: z.boolean(),
+      }),
     }),
   ),
 });
 
-export const fitbitAuthorizationResponseSchema = z.object({
-  authorizationUrl: z.string().url(),
+export const healthConnectionRoleStatusSchema = z.enum([
+  'connected',
+  'needs_attention',
+  'no_data',
+  'not_connected',
+]);
+
+export const healthConnectionActionSchema = z.enum([
+  'reconnect',
+  'refresh_apple_health',
+  'check_apple_health',
+  'connect',
+]).nullable();
+
+export const healthConnectionOptionSchema = z.object({
+  optionId: z.string().min(1),
+  label: z.string().min(1),
+  transportLabel: z.string().min(1).nullable(),
+  status: healthConnectionRoleStatusSchema,
+  primaryAction: healthConnectionActionSchema,
+  deviceManaged: z.boolean(),
 });
 
-export const fitbitSyncResponseSchema = z.object({
+export const healthConnectionRoleSchema = z.object({
+  selected: healthConnectionOptionSchema.nullable(),
+  alternatives: z.array(healthConnectionOptionSchema),
+  canChange: z.boolean(),
+  canAddSource: z.boolean(),
+});
+
+export const healthConnectionsResponseSchema = z.object({
+  burned: healthConnectionRoleSchema,
+  eaten: healthConnectionRoleSchema,
+  connectedServices: z.array(healthConnectionOptionSchema),
+});
+
+export const healthConnectionSelectionInputSchema = z.object({
+  optionId: z.string().trim().min(1).max(100),
+}).strict();
+
+export const providerAuthorizationResponseSchema = z.object({
+  authorizationUrl: z.string().url(),
+});
+export const googleHealthAuthorizationResponseSchema = providerAuthorizationResponseSchema;
+
+export const providerRollingSyncResponseSchema = z.object({
   datesRequested: z.array(dateStringSchema),
   datesUpdated: z.array(dateStringSchema),
   datesSkipped: z.array(dateStringSchema),
+});
+export const googleHealthSyncResponseSchema = providerRollingSyncResponseSchema;
+
+export const googleHealthBurnParityDiagnosticResponseSchema = z.object({
+  localDate: dateStringSchema,
+  liveApiKcal: z.number().nonnegative().finite().nullable(),
+  normalizedKcal: z.number().int().nonnegative().nullable(),
+  persistedAggregate: z.object({
+    rawKcal: z.number().int().nonnegative(),
+    adjustedKcal: z.number().int().nonnegative(),
+    providerFetchedAt: z.string().datetime(),
+    aggregateUpdatedAt: z.string().datetime(),
+  }).nullable(),
+  latestSnapshot: z.object({
+    rawKcal: z.number().int().nonnegative(),
+    adjustedKcal: z.number().int().nonnegative(),
+    calculatedAt: z.string().datetime(),
+  }).nullable(),
+  lifecycle: z.object({
+    status: z.enum(['provisional', 'locked']),
+    locksAt: z.string().datetime(),
+  }).nullable(),
+  parity: z.object({
+    apiToNormalized: z.boolean().nullable(),
+    normalizedToStored: z.boolean().nullable(),
+    storedToSnapshot: z.boolean().nullable(),
+  }),
 });
 
 const ingestionBaseShape = {
@@ -288,6 +399,8 @@ export const currentDayIntakeSyncSchema = z
   .object({
     ...ingestionBaseShape,
     totalCaloriesConsumed: z.number().int().min(0).max(100_000),
+    writerBundleIdentifier: z.string().trim().min(1).max(255),
+    writerDisplayName: z.string().trim().min(1).max(100),
   })
   .strict();
 
@@ -298,6 +411,19 @@ export const currentDayStepSyncSchema = z
   })
   .strict();
 
+export const restingBurnEstimateInputSchema = z.object({
+  provider: z.literal('apple_health'),
+  providerKcalPerHour: z.number().positive().finite().max(1_000),
+  evidenceType: z.literal('provider_resting_energy'),
+  observationCount: z.number().int().positive().max(10_000),
+  lookbackStartDate: dateStringSchema,
+  lookbackEndDate: dateStringSchema,
+  calculatedAt: z.string().datetime(),
+}).strict().refine(
+  (value) => value.lookbackStartDate <= value.lookbackEndDate,
+  { message: 'Resting-burn lookback dates are invalid.' },
+);
+
 export const currentDayWorkoutSchema = z
   .object({
     providerWorkoutId: z.string().trim().min(1).max(200),
@@ -307,6 +433,7 @@ export const currentDayWorkoutSchema = z
     endedAt: z.string().datetime(),
     durationMinutes: z.number().int().positive().max(1_440),
     totalEnergyBurned: z.number().int().min(0).max(100_000).nullable(),
+    totalSteps: z.number().int().min(0).max(1_000_000).nullable().default(null),
     totalDistance: z.number().nonnegative().max(1_000_000).nullable(),
     distanceUnit: z.string().trim().min(1).max(20).nullable(),
   })
@@ -358,7 +485,7 @@ export const ingestionSyncSessionStartSchema = z
     trigger: ingestionSyncTriggerSchema,
     appVersion: z.string().trim().min(1).max(40).optional(),
     providerAdapterVersion: z.string().trim().min(1).max(40).optional(),
-    datesQueried: z.array(dateStringSchema).max(3).default([]),
+    datesQueried: z.array(dateStringSchema).max(MAX_INGESTION_SYNC_SESSION_DATES).default([]),
   })
   .strict();
 
@@ -373,8 +500,8 @@ export const ingestionSyncSessionCompleteSchema = z
     recordsSkipped: z.number().int().nonnegative().max(1_000),
     warningCount: z.number().int().nonnegative().max(1_000),
     errorCode: z.string().trim().min(1).max(80).nullable().optional(),
-    datesUploaded: z.array(dateStringSchema).max(3).default([]),
-    datesSkipped: z.array(dateStringSchema).max(3).default([]),
+    datesUploaded: z.array(dateStringSchema).max(MAX_INGESTION_SYNC_SESSION_DATES).default([]),
+    datesSkipped: z.array(dateStringSchema).max(MAX_INGESTION_SYNC_SESSION_DATES).default([]),
     errors: z.array(z.string().trim().min(1).max(160)).max(12).default([]),
   })
   .strict();
@@ -460,6 +587,34 @@ export const todayResponseSchema = z.object({
     source: z.string().min(1).nullable(),
     lastSyncedAt: z.string().datetime().nullable(),
     status: todaySourceStatusSchema,
+    estimatedContributionCalories: z.number().int().nonnegative().nullable(),
+    estimatedCaloriesPer1000Steps: z.number().int().nonnegative().nullable(),
+    caloriesPerStep: z.number().nonnegative().nullable(),
+    calibrationWorkoutCount: z.number().int().nonnegative(),
+    calibrationTotalSteps: z.number().int().nonnegative(),
+    calibrationTotalCalories: z.number().int().nonnegative(),
+    estimationStatus: z.enum(['ready', 'insufficient_data', 'unavailable']),
+    providerReportedCaloriesPer1000Steps: z.number().int().nonnegative().nullable(),
+    adjustedCaloriesPer1000Steps: z.number().int().nonnegative().nullable(),
+    adjustedCaloriesPerStep: z.number().nonnegative().nullable(),
+    currentAdjustedContributionCalories: z.number().int().nonnegative().nullable(),
+    nonStepAdjustedBurnBaselineCalories: z.number().int().nonnegative().nullable(),
+  }),
+  restOfDayProjection: z.object({
+    status: z.enum(['ready', 'stale', 'insufficient_data']),
+    providerKcalPerHour: z.number().positive().nullable(),
+    adjustedKcalPerHour: z.number().positive().nullable(),
+    remainingMinutes: z.number().int().nonnegative(),
+    projectedProviderBurnCalories: z.number().int().nonnegative().nullable(),
+    projectedAdjustedBurnCalories: z.number().int().nonnegative().nullable(),
+    source: z.string().min(1).nullable(),
+    evidenceType: z.enum([
+      'provider_resting_energy',
+      'historical_low_activity_hours',
+      'historical_daily_basal',
+    ]).nullable(),
+    observationCount: z.number().int().nonnegative(),
+    calculatedAt: z.string().datetime().nullable(),
   }),
   workouts: z.object({
     items: z.array(
@@ -471,6 +626,7 @@ export const todayResponseSchema = z.object({
         endedAt: z.string().datetime(),
         durationMinutes: z.number().int().positive(),
         totalEnergyBurned: z.number().int().nonnegative().nullable(),
+        totalSteps: z.number().int().nonnegative().nullable().optional(),
         source: z.string().min(1),
       }),
     ),
@@ -484,14 +640,15 @@ export const todayResponseSchema = z.object({
 export const dashboardPreferencesShape = {
   showLatestFinalizedContribution: z.boolean().default(true),
   showTodaySoFar: z.boolean().default(true),
-  showPlannedTreat: z.boolean().default(true),
-  showSteps: z.boolean().default(true),
-  showWorkouts: z.boolean().default(true),
-  showCurrentGoal: z.boolean().default(true),
+  showPlannedTreat: z.boolean().default(false),
+  showSteps: z.boolean().default(false),
+  showWorkouts: z.boolean().default(false),
+  showCurrentGoal: z.boolean().default(false),
 } as const;
 
 export const dashboardPreferencesResponseSchema = z.object({
   ...dashboardPreferencesShape,
+  stepsVisibilitySource: z.enum(['unset', 'inferred', 'explicit']),
   updatedAt: z.string().datetime(),
 });
 
@@ -544,8 +701,13 @@ export const activityOpportunityCandidateSchema = z.object({
 });
 
 export const bankSummaryResponseSchema = z.object({
-  availableBankCalories: z.number().int(),
+  effectiveBankBalanceCalories: z.number().int(),
+  availableBankCalories: z.number().int().nonnegative(),
+  recoveryCalories: z.number().int().nonnegative(),
+  openingBankStatus: openingBankStatusSchema,
+  openingBankCalories: z.number().int().nonnegative(),
   latestFinalizedDate: dateStringSchema.nullable(),
+  latestCompletedDate: dateStringSchema.nullable(),
   latestDailyBankChange: z.number().int().nullable(),
   latestOriginalDailyBankChange: z.number().int().nullable(),
   latestContributionStatus: z.enum(['provisional', 'locked']).nullable(),
@@ -554,7 +716,34 @@ export const bankSummaryResponseSchema = z.object({
   finalizedDayCount: z.number().int().nonnegative(),
 });
 
+const onboardingSourceSchema = z.object({
+  provider: z.string().min(1),
+  displayName: z.string().min(1),
+  connected: z.boolean(),
+  status: providerConnectionStatusSchema,
+  readiness: z.enum(['ready', 'connected_waiting_for_data', 'needs_attention', 'not_connected']),
+});
+
+export const onboardingStatusResponseSchema = z.object({
+  stage: onboardingStageSchema,
+  welcomeCompleted: z.boolean(),
+  completed: z.boolean(),
+  expenditure: onboardingSourceSchema,
+  intake: onboardingSourceSchema,
+  goalConfigured: z.boolean(),
+  openingBankStatus: openingBankStatusSchema,
+  openingBankCalories: z.number().int().nonnegative(),
+  preparation: z.object({
+    expenditure: z.enum(['preparing', 'complete', 'retry_needed']),
+    intake: z.enum(['preparing', 'complete', 'retry_needed']),
+    history: z.enum(['preparing', 'complete', 'retry_needed', 'no_history']),
+  }),
+});
+
+export const onboardingWelcomeInputSchema = z.object({ completed: z.literal(true) }).strict();
+
 export const bankHistoryDaySummarySchema = z.object({
+  provenance: z.enum(['opening', 'finalized']),
   logDate: dateStringSchema,
   dailyBankChange: z.number().int(),
   originalDailyBankChange: z.number().int(),
@@ -565,16 +754,58 @@ export const bankHistoryDaySummarySchema = z.object({
   finalizedAt: z.string().datetime(),
 });
 
+export const bankHistoryMissingDaySchema = z.object({
+  logDate: dateStringSchema,
+  status: z.enum([
+    'waiting_for_data',
+    'missing_burn_data',
+    'missing_food_data',
+    'sync_failed',
+    'unprocessed',
+  ]),
+  message: z.string().min(1),
+  canRetry: z.boolean(),
+});
+
 export const bankHistoryResponseSchema = z.object({
   range: bankHistoryRangeSchema,
   startDate: dateStringSchema.nullable(),
   endDate: dateStringSchema.nullable(),
-  availableBankCalories: z.number().int(),
+  effectiveBankBalanceCalories: z.number().int(),
+  availableBankCalories: z.number().int().nonnegative(),
+  recoveryCalories: z.number().int().nonnegative(),
+  openingBankStatus: openingBankStatusSchema,
+  openingBankCalories: z.number().int().nonnegative(),
   rangeNetChangeCalories: z.number().int(),
+  days: z.array(bankHistoryDaySummarySchema),
+  missingDays: z.array(bankHistoryMissingDaySchema),
+  // Kept during the V1 client transition. New consumers use `days`.
   finalizedDays: z.array(bankHistoryDaySummarySchema),
 });
 
+export const openingBankDetailResponseSchema = z.object({
+  status: openingBankStatusSchema,
+  openingBankCalories: z.number().int().nonnegative(),
+  historicalOpeningNetCalories: z.number().int().nullable(),
+  eligibleDayCount: z.number().int().nonnegative(),
+  lookbackStartDate: dateStringSchema.nullable(),
+  lookbackEndDate: dateStringSchema.nullable(),
+  accountingStartsOn: dateStringSchema.nullable(),
+  calculationDays: z.array(z.object({
+    logDate: dateStringSchema,
+    importedTotalDailyExpenditure: z.number().int().nonnegative(),
+    expenditureAdjustmentRate: z.number().min(0).max(1),
+    adjustedExpenditure: z.number().int().nonnegative(),
+    goalMode: goalModeSchema,
+    goalAdjustmentCalories: z.number().int().nonnegative(),
+    importedCalorieIntake: z.number().int().nonnegative(),
+    dailyBankChange: z.number().int(),
+  })),
+});
+
 export const bankHistoryDayDetailResponseSchema = z.object({
+  provenance: z.enum(['opening', 'finalized']),
+  startingBalanceFloorApplied: z.boolean(),
   logDate: dateStringSchema,
   timezone: z.string().min(1),
   importedTotalDailyExpenditure: z.number().int().nonnegative(),
@@ -602,9 +833,37 @@ export const bankHistoryDayDetailResponseSchema = z.object({
       importedCalorieIntake: z.number().int().nonnegative(),
       expenditureProvider: z.string().min(1),
       intakeProvider: z.string().min(1),
+      intakeSourceDisplayName: z.string().min(1).nullable(),
       createdAt: z.string().datetime(),
     }),
   ),
+});
+
+export const historicalSourceRoleSchema = z.enum(['expenditure', 'intake']);
+export const historicalSourceOptionSchema = z.object({
+  id: z.string().min(16),
+  label: z.string().min(1),
+});
+export const historicalSourceRoleResponseSchema = z.object({
+  selected: historicalSourceOptionSchema,
+  options: z.array(historicalSourceOptionSchema),
+  canChange: z.boolean(),
+  revision: z.number().int().nonnegative(),
+  readOnlyReason: z.enum(['locked', 'opening_bank', 'no_alternative']).nullable(),
+});
+export const historicalSourceOptionsResponseSchema = z.object({
+  logDate: dateStringSchema,
+  expenditure: historicalSourceRoleResponseSchema,
+  intake: historicalSourceRoleResponseSchema,
+});
+export const historicalSourceMutationSchema = z.object({
+  optionId: z.string().min(16),
+  expectedRevision: z.number().int().nonnegative(),
+  idempotencyKey: z.string().uuid(),
+}).strict();
+export const historicalSourceMutationResponseSchema = z.object({
+  sources: historicalSourceOptionsResponseSchema,
+  day: bankHistoryDayDetailResponseSchema,
 });
 
 export const activePlannedTreatResponseSchema = z.object({
@@ -612,7 +871,7 @@ export const activePlannedTreatResponseSchema = z.object({
   name: z.string().min(1).max(MAX_PLANNED_TREAT_NAME_LENGTH),
   requiredCalories: z.number().int().min(MIN_PLANNED_TREAT_REQUIRED_CALORIES),
   targetDate: dateStringSchema.nullable(),
-  availableBankCalories: z.number().int(),
+  availableBankCalories: z.number().int().nonnegative(),
   progressCalories: z.number().int().nonnegative(),
   remainingCalories: z.number().int().nonnegative(),
   progressRatio: z.number().min(0).max(1),
@@ -625,7 +884,7 @@ export const activePlannedTreatResponseSchema = z.object({
 export const noActivePlannedTreatResponseSchema = z.object({
   status: z.literal('no_plan'),
   plannedTreat: z.null(),
-  availableBankCalories: z.number().int(),
+  availableBankCalories: z.number().int().nonnegative(),
 });
 
 export const plannedTreatGetResponseSchema = z.union([
@@ -634,9 +893,17 @@ export const plannedTreatGetResponseSchema = z.union([
 ]);
 
 export type BankSummaryResponse = z.infer<typeof bankSummaryResponseSchema>;
+export type OnboardingStage = z.infer<typeof onboardingStageSchema>;
+export type OnboardingStatusResponse = z.infer<typeof onboardingStatusResponseSchema>;
 export type BankHistoryDaySummary = z.infer<typeof bankHistoryDaySummarySchema>;
+export type BankHistoryMissingDay = z.infer<typeof bankHistoryMissingDaySchema>;
 export type BankHistoryResponse = z.infer<typeof bankHistoryResponseSchema>;
+export type OpeningBankDetailResponse = z.infer<typeof openingBankDetailResponseSchema>;
 export type BankHistoryDayDetailResponse = z.infer<typeof bankHistoryDayDetailResponseSchema>;
+export type HistoricalSourceRole = z.infer<typeof historicalSourceRoleSchema>;
+export type HistoricalSourceOptionsResponse = z.infer<typeof historicalSourceOptionsResponseSchema>;
+export type HistoricalSourceMutation = z.infer<typeof historicalSourceMutationSchema>;
+export type HistoricalSourceMutationResponse = z.infer<typeof historicalSourceMutationResponseSchema>;
 export type PlannedTreatInput = z.infer<typeof plannedTreatInputSchema>;
 export type ActivePlannedTreatResponse = z.infer<typeof activePlannedTreatResponseSchema>;
 export type NoActivePlannedTreatResponse = z.infer<typeof noActivePlannedTreatResponseSchema>;
@@ -650,9 +917,17 @@ export type IngestionProvider = z.infer<typeof ingestionProviderSchema>;
 export type BankingProvider = z.infer<typeof bankingProviderSchema>;
 export type ProviderSelectionInput = z.infer<typeof providerSelectionInputSchema>;
 export type ProviderSelectionResponse = z.infer<typeof providerSelectionResponseSchema>;
-export type FitbitAuthorizationResponse = z.infer<typeof fitbitAuthorizationResponseSchema>;
-export type FitbitSyncResponse = z.infer<typeof fitbitSyncResponseSchema>;
+export type HealthConnectionRoleStatus = z.infer<typeof healthConnectionRoleStatusSchema>;
+export type HealthConnectionOption = z.infer<typeof healthConnectionOptionSchema>;
+export type HealthConnectionsResponse = z.infer<typeof healthConnectionsResponseSchema>;
+export type HealthConnectionSelectionInput = z.infer<typeof healthConnectionSelectionInputSchema>;
+export type GoogleHealthAuthorizationResponse = z.infer<typeof googleHealthAuthorizationResponseSchema>;
+export type GoogleHealthSyncResponse = z.infer<typeof googleHealthSyncResponseSchema>;
+export type GoogleHealthBurnParityDiagnosticResponse = z.infer<
+  typeof googleHealthBurnParityDiagnosticResponseSchema
+>;
 export type CurrentDayExpenditureSync = z.infer<typeof currentDayExpenditureSyncSchema>;
+export type RestingBurnEstimateInput = z.infer<typeof restingBurnEstimateInputSchema>;
 export type CurrentDayIntakeSync = z.infer<typeof currentDayIntakeSyncSchema>;
 export type CurrentDayStepSync = z.infer<typeof currentDayStepSyncSchema>;
 export type CurrentDayWorkoutSync = z.infer<typeof currentDayWorkoutSyncSchema>;

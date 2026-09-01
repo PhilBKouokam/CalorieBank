@@ -5,15 +5,15 @@ import {
   type GoalConfigurationResponse,
   type PlannedTreatGetResponse,
   type TodayResponse,
-  type IngestionSyncTrigger,
   type DashboardPreferencesResponse,
+  type ProviderSelectionResponse,
 } from '@caloriebank/schemas';
 import { Ionicons } from '@expo/vector-icons';
-import { Link, useFocusEffect, type Href } from 'expo-router';
+import { Link, useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  AppState,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -32,19 +32,23 @@ import {
   fetchProviderSelection,
   fetchToday,
   getApiBaseUrl,
-  syncFitbit,
 } from '@/lib/api/client';
+import { runAccountLifecycle, subscribeToAccountLifecycle } from '@/lib/lifecycle/account-lifecycle';
 import {
-  getAppleHealthConnectionStatus,
-  syncAppleHealthToday,
-  type AppleHealthConnectionStatus,
-} from '@/lib/healthkit/healthkit-connection';
-
-let hasStartedRollingSyncThisLaunch = false;
+  emptyTodayDetail,
+  emptyTodayValue,
+  formatStepContributions,
+  formatWorkoutCalorieLines,
+} from '@/lib/today/presentation';
+import { getConsumerSourceName } from '@/lib/providers/presentation';
 
 function formatCalories(value: number) {
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toLocaleString()} kcal`;
+}
+
+function formatBankBalance(value: number) {
+  return `${value.toLocaleString()} kcal`;
 }
 
 function formatDisplayDate(dateString: string | null | undefined) {
@@ -69,35 +73,17 @@ function formatGoalDetail(configuration: GoalConfigurationResponse | null) {
 }
 
 function latestResultLabel(summary: BankSummaryResponse | null) {
-  if (!summary?.latestFinalizedDate) return 'Latest finalized';
+  if (!summary?.latestCompletedDate) return 'Latest completed';
 
-  const [year, month, day] = summary.latestFinalizedDate.split('-').map(Number);
-  if (!year || !month || !day) return 'Latest finalized';
+  const [year, month, day] = summary.latestCompletedDate.split('-').map(Number);
+  if (!year || !month || !day) return 'Latest completed';
 
   const latest = new Date(year, month - 1, day);
   const yesterday = new Date();
   yesterday.setHours(0, 0, 0, 0);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  return latest.getTime() === yesterday.getTime() ? 'Yesterday' : 'Latest finalized';
-}
-
-function latestResultDetail(value: number | null | undefined) {
-  if (value === null || value === undefined) return 'No completed result yet';
-  if (value > 0) return 'Added to your bank';
-  if (value < 0) return 'Withdrawn from your bank';
-  return 'No change to your bank';
-}
-
-function latestContributionStatus(summary: BankSummaryResponse | null) {
-  if (!summary?.latestContributionStatus) return null;
-  if (summary.latestContributionStatus === 'locked') return 'Locked';
-  if (!summary.latestLocksAt) return 'Provisional';
-
-  return `Provisional · Locks ${new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-  }).format(new Date(summary.latestLocksAt))}`;
+  return latest.getTime() === yesterday.getTime() ? 'Yesterday' : 'Latest completed';
 }
 
 function formatPercent(value: number) {
@@ -137,6 +123,7 @@ function isActivePlannedTreat(
 }
 
 export default function TodayScreen() {
+  const router = useRouter();
   const [bankSummary, setBankSummary] = useState<BankSummaryResponse | null>(null);
   const [bankStatus, setBankStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading');
   const [goalConfiguration, setGoalConfiguration] = useState<GoalConfigurationResponse | null>(null);
@@ -147,52 +134,51 @@ export default function TodayScreen() {
     useState<'loading' | 'ready' | 'empty' | 'error'>('loading');
   const [today, setToday] = useState<TodayResponse | null>(null);
   const [todayStatus, setTodayStatus] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
-  const [healthConnectionStatus, setHealthConnectionStatus] =
-    useState<AppleHealthConnectionStatus>('not_connected');
+  const [providerSelection, setProviderSelection] = useState<ProviderSelectionResponse | null>(null);
   const [healthSyncDetail, setHealthSyncDetail] = useState<string | null>(null);
   const [refreshingHealth, setRefreshingHealth] = useState(false);
+  const [showWhyEighty, setShowWhyEighty] = useState(false);
 
   const [dashboardPreferences, setDashboardPreferences] =
     useState<DashboardPreferencesResponse | null>(null);
 
+  const refreshVisibleReadModels = useCallback(async () => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const [summaryResult, todayResult, providerResult] = await Promise.allSettled([
+      fetchBankSummary(),
+      fetchToday(timezone),
+      fetchProviderSelection(),
+    ]);
+    if (summaryResult.status === 'fulfilled') {
+      setBankSummary(summaryResult.value);
+      setBankStatus(summaryResult.value.openingBankStatus === 'initialized' ? 'ready' : 'empty');
+    }
+    if (todayResult.status === 'fulfilled') {
+      setToday(todayResult.value);
+      setTodayStatus(todayResult.value.burned.adjusted === null && todayResult.value.eaten.calories === null ? 'unavailable' : 'ready');
+    }
+    if (providerResult.status === 'fulfilled') setProviderSelection(providerResult.value);
+  }, []);
+
+  useEffect(() => subscribeToAccountLifecycle((result) => {
+    setHealthSyncDetail(result.detail);
+    void refreshVisibleReadModels();
+  }), [refreshVisibleReadModels]);
+
   const refreshHealthAwareness = useCallback(async (
     force: boolean,
-    trigger: IngestionSyncTrigger,
   ) => {
-    const connectionStatus = await getAppleHealthConnectionStatus();
-    setHealthConnectionStatus(connectionStatus);
-
     try {
       setRefreshingHealth(force);
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const providerState = await fetchProviderSelection().catch(() => null);
-      const [appleResult, fitbitResult] = await Promise.allSettled([
-        connectionStatus === 'connected'
-          ? syncAppleHealthToday({ force, trigger })
-          : Promise.resolve(null),
-        providerState?.connectedProviders.some(
-          (provider) => provider.provider === 'fitbit' && provider.status === 'connected',
-        )
-          ? syncFitbit(timezone, force)
-          : Promise.resolve(null),
-      ]);
-      if (appleResult.status === 'rejected' && fitbitResult.status === 'rejected') {
-        throw new Error('Connected health sources could not refresh.');
-      }
-      setHealthSyncDetail(null);
-      const refreshedToday = await fetchToday(timezone);
-      setToday(refreshedToday);
-      setTodayStatus(
-        refreshedToday.burned.adjusted === null && refreshedToday.eaten.calories === null
-          ? 'unavailable'
-          : 'ready',
-      );
+      const result = await runAccountLifecycle({ force });
+      setHealthSyncDetail(result.detail);
+      await refreshVisibleReadModels();
     } catch {
       setHealthSyncDetail('Today’s health data could not refresh.');
     } finally {
       setRefreshingHealth(false);
     }
-  }, []);
+  }, [refreshVisibleReadModels]);
 
   useFocusEffect(
     useCallback(() => {
@@ -214,12 +200,13 @@ export default function TodayScreen() {
         setPlannedTreatStatus('loading');
         setTodayStatus('loading');
 
-        const [configurationResult, bankSummaryResult, plannedTreatResult, todayResult, preferencesResult] = await Promise.allSettled([
+        const [configurationResult, bankSummaryResult, plannedTreatResult, todayResult, preferencesResult, providerResult] = await Promise.allSettled([
           fetchGoalConfiguration(),
           fetchBankSummary(),
           fetchPlannedTreat(),
           fetchToday(Intl.DateTimeFormat().resolvedOptions().timeZone),
           fetchDashboardPreferences(),
+          fetchProviderSelection(),
         ]);
         if (!isMounted) return;
 
@@ -234,7 +221,9 @@ export default function TodayScreen() {
 
         if (bankSummaryResult.status === 'fulfilled') {
           setBankSummary(bankSummaryResult.value);
-          setBankStatus(bankSummaryResult.value.finalizedDayCount > 0 ? 'ready' : 'empty');
+          setBankStatus(
+            bankSummaryResult.value.openingBankStatus === 'initialized' ? 'ready' : 'empty',
+          );
         } else {
           setBankSummary(null);
           setBankStatus('error');
@@ -263,56 +252,41 @@ export default function TodayScreen() {
         if (preferencesResult.status === 'fulfilled') {
           setDashboardPreferences(preferencesResult.value);
         }
+        if (providerResult.status === 'fulfilled') setProviderSelection(providerResult.value);
       }
 
       void loadToday();
-      const syncTrigger: IngestionSyncTrigger = hasStartedRollingSyncThisLaunch
-        ? 'screen_focus'
-        : 'app_launch';
-      hasStartedRollingSyncThisLaunch = true;
-      void refreshHealthAwareness(false, syncTrigger);
-
       return () => {
         isMounted = false;
       };
-    }, [refreshHealthAwareness]),
+    }, []),
   );
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') void refreshHealthAwareness(false, 'app_foreground');
-    });
-    return () => subscription.remove();
-  }, [refreshHealthAwareness]);
-
-  const hasFinalizedDays = bankSummary && bankSummary.finalizedDayCount > 0;
+  const hasCompletedDays = Boolean(bankSummary?.latestCompletedDate);
+  const hasInitializedBank = bankSummary?.openingBankStatus === 'initialized';
   const bankValue =
     bankStatus === 'loading'
       ? 'Loading...'
-      : hasFinalizedDays
-        ? formatCalories(bankSummary.availableBankCalories)
+      : hasInitializedBank && bankSummary
+        ? formatBankBalance(bankSummary.availableBankCalories)
         : bankStatus === 'error'
           ? 'Unavailable'
           : 'Not calculated';
-  const throughText = hasFinalizedDays
-    ? `Through ${formatDisplayDate(bankSummary.latestFinalizedDate)}`
+  const throughText = bankSummary?.latestCompletedDate
+    ? `Calculated through ${formatDisplayDate(bankSummary.latestCompletedDate)}`
+    : hasInitializedBank
+      ? 'Waiting for a complete day'
     : bankStatus === 'error'
       ? 'Try again later'
-      : 'No completed days yet';
+      : 'Waiting for completed provider data';
   const latestChangeValue =
     bankStatus === 'loading'
       ? 'Loading...'
-      : hasFinalizedDays && bankSummary.latestDailyBankChange !== null
+      : hasCompletedDays && bankSummary && bankSummary.latestDailyBankChange !== null
         ? formatCalories(bankSummary.latestDailyBankChange)
         : bankStatus === 'error'
           ? 'Unavailable'
-          : 'Not calculated';
-  const latestAdjustmentText =
-    bankSummary &&
-    bankSummary.latestCorrectionCount > 0 &&
-    bankSummary.latestOriginalDailyBankChange !== null
-      ? `Adjusted from ${formatCalories(bankSummary.latestOriginalDailyBankChange)}`
-      : null;
+          : 'No completed day yet';
   const currentGoalValue =
     configurationStatus === 'loading'
       ? 'Loading...'
@@ -335,45 +309,55 @@ export default function TodayScreen() {
       ? 'Loading...'
       : today?.burned.adjusted !== null && today?.burned.adjusted !== undefined
         ? `${today.burned.adjusted.toLocaleString()} kcal`
-        : healthConnectionStatus === 'connected'
-          ? 'No data found'
-          : 'Not connected';
+        : emptyTodayValue(today?.burned.status ?? 'unavailable', 'burn data');
   const eatenValue =
     todayStatus === 'loading'
       ? 'Loading...'
       : today?.eaten.calories !== null && today?.eaten.calories !== undefined
         ? `${today.eaten.calories.toLocaleString()} kcal`
-        : healthConnectionStatus === 'connected'
-          ? 'No intake found'
-          : 'Not connected';
+        : emptyTodayValue(today?.eaten.status ?? 'unavailable', 'intake');
   const burnedDetail =
     today?.burned.raw !== null && today?.burned.raw !== undefined && today.burned.source
-      ? `${today.burned.raw.toLocaleString()} from ${today.burned.source} × ${formatPercent(today.burned.adjustmentFactor)}`
-      : healthConnectionStatus === 'connected'
-        ? 'Waiting for calorie burn data from Apple Health'
-        : 'Connect Apple Health to show calories burned';
+      ? `${today.burned.raw.toLocaleString()} from ${getConsumerSourceName(today.burned.source)} × ${formatPercent(today.burned.adjustmentFactor)}`
+      : emptyTodayDetail(today?.burned.status ?? 'unavailable', today?.burned.source ?? providerSelection?.expenditure.displayName ?? null, 'calories burned');
   const eatenDetail = today?.eaten.source
-    ? `Imported from ${today.eaten.source}`
-    : healthConnectionStatus === 'connected'
-      ? 'No calorie intake was found in Apple Health today'
-      : 'Connect Apple Health to show calories eaten';
+    ? `Imported from ${getConsumerSourceName(today.eaten.source)}`
+    : emptyTodayDetail(today?.eaten.status ?? 'unavailable', providerSelection?.intake.displayName ?? null, 'calories eaten');
   const visibleCards = dashboardPreferences ?? {
     showLatestFinalizedContribution: true,
     showTodaySoFar: true,
-    showPlannedTreat: true,
-    showSteps: true,
-    showWorkouts: true,
-    showCurrentGoal: true,
+    showPlannedTreat: false,
+    showSteps: false,
+    showWorkouts: false,
+    showCurrentGoal: false,
     updatedAt: new Date(0).toISOString(),
   };
   const stepsValue =
     todayStatus === 'loading'
       ? 'Loading...'
       : today?.steps.count === null || today?.steps.count === undefined
-        ? healthConnectionStatus === 'connected'
-          ? 'No step data found'
-          : 'Not connected'
+        ? emptyTodayValue(today?.steps.status ?? 'unavailable', 'steps')
         : today.steps.count.toLocaleString();
+  const stepsEstimate = today?.steps.estimationStatus === 'ready' &&
+      today.steps.estimatedContributionCalories !== null &&
+      today.steps.currentAdjustedContributionCalories !== null &&
+      today.burned.raw !== null &&
+      today.burned.adjusted !== null
+    ? formatStepContributions({
+      providerContributionCalories: today.steps.estimatedContributionCalories,
+      actualContributionCalories: today.steps.currentAdjustedContributionCalories,
+      providerTotalBurnCalories: today.burned.raw,
+      actualTotalBurnCalories: today.burned.adjusted,
+      burnSource: today.burned.source,
+    })
+    : null;
+  const stepsEstimateFallback = !stepsEstimate &&
+      today?.steps.count !== null && today?.steps.count !== undefined
+    ? 'Walking calorie estimate unavailable'
+    : null;
+  const stepsAccessibility = stepsEstimate
+    ? `${stepsEstimate.providerContribution}, ${stepsEstimate.providerContext}. ${stepsEstimate.actualContribution}, ${stepsEstimate.actualContext}`
+    : stepsEstimateFallback;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -383,7 +367,7 @@ export default function TodayScreen() {
           <RefreshControl
             refreshing={refreshingHealth}
             tintColor={colors.primary}
-            onRefresh={() => void refreshHealthAwareness(true, 'manual_refresh')}
+            onRefresh={() => void refreshHealthAwareness(true)}
           />
         }
       >
@@ -394,10 +378,10 @@ export default function TodayScreen() {
           <Text style={styles.wordmark}>CalorieBank</Text>
         </View>
 
-        <Link href="/bank-history" asChild>
+        <Link href="/history" asChild>
           <Pressable
             accessibilityHint="Opens Bank History."
-            accessibilityLabel={`Available Bank, ${bankValue}, ${throughText}`}
+            accessibilityLabel={`Available Bank, ${bankValue}, ${throughText}${bankSummary?.recoveryCalories ? `, Recovery, ${bankSummary.recoveryCalories} calories to recover` : ''}`}
             accessibilityRole="button"
             style={({ pressed }) => [styles.heroCard, pressed && styles.pressedCard]}
           >
@@ -413,8 +397,18 @@ export default function TodayScreen() {
           </Pressable>
         </Link>
 
+        {bankSummary && bankSummary.recoveryCalories > 0 ? (
+          <View accessibilityRole="summary" style={styles.recoverySurface}>
+            <Text style={styles.recoveryLabel}>Recovery</Text>
+            <Text style={styles.recoveryValue}>
+              {bankSummary.recoveryCalories.toLocaleString()} kcal to recover
+            </Text>
+            <Text style={styles.supportingText}>New deposits will restore your bank first.</Text>
+          </View>
+        ) : null}
+
         {visibleCards.showLatestFinalizedContribution ? (
-          <Link href="/bank-history" asChild>
+          <Link href="/history" asChild>
             <Pressable
               accessibilityHint="Opens Bank History."
               accessibilityLabel={`${latestResultLabel(bankSummary)}, ${latestChangeValue}`}
@@ -425,39 +419,50 @@ export default function TodayScreen() {
                 <Text style={styles.cardLabel}>
                   {latestResultLabel(bankSummary) === 'Yesterday'
                     ? "Yesterday's contribution"
-                    : 'Latest finalized contribution'}
+                    : 'Latest completed contribution'}
                 </Text>
                 <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
               </View>
               <Text
                 adjustsFontSizeToFit
                 numberOfLines={1}
-                style={[
-                  styles.secondaryValue,
-                  hasFinalizedDays &&
-                  bankSummary.latestDailyBankChange !== null &&
-                  bankSummary.latestDailyBankChange < 0
-                    ? styles.negativeValue
-                    : styles.positiveValue,
-                ]}
+                style={[styles.secondaryValue, styles.contributionValue]}
               >
                 {latestChangeValue}
               </Text>
-              <Text style={styles.supportingText}>
-                {latestResultDetail(hasFinalizedDays ? bankSummary.latestDailyBankChange : null)}
-              </Text>
-              {latestContributionStatus(bankSummary) ? (
-                <Text style={styles.statusText}>{latestContributionStatus(bankSummary)}</Text>
-              ) : null}
-              {latestAdjustmentText ? (
-                <Text style={styles.supportingText}>{latestAdjustmentText}</Text>
-              ) : null}
             </Pressable>
           </Link>
         ) : null}
 
-        {visibleCards.showTodaySoFar ? <View style={styles.secondaryCard}>
-          <Text style={styles.cardLabel}>Today so far</Text>
+        {visibleCards.showCurrentGoal ? <Link href="/goal-settings" asChild>
+          <Pressable
+            accessibilityHint="Opens Goal Settings."
+            accessibilityLabel={`Current goal, ${currentGoalValue}`}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardLabel}>Current goal</Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </View>
+            <Text adjustsFontSizeToFit numberOfLines={1} style={styles.secondaryValue}>
+              {currentGoalValue}
+            </Text>
+            <Text style={styles.supportingText}>{formatGoalDetail(goalConfiguration)}</Text>
+          </Pressable>
+        </Link> : null}
+
+        {visibleCards.showTodaySoFar ? <Pressable
+          accessibilityHint="Opens today's burn details."
+          accessibilityLabel={`Today so far. Burned ${burnedValue}. Eaten ${eatenValue}.`}
+          accessibilityRole="button"
+          onPress={() => router.push('/today-burn')}
+          style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
+        >
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardLabel}>Today so far</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </View>
           {todayStatus === 'loading' ? (
             <View style={styles.inlineState}>
               <ActivityIndicator color={colors.primary} />
@@ -469,7 +474,10 @@ export default function TodayScreen() {
               <Text style={styles.supportingText}>{healthSyncDetail ?? 'Today’s values could not refresh.'}</Text>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => void refreshHealthAwareness(true, 'manual_refresh')}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  void refreshHealthAwareness(true);
+                }}
                 style={({ pressed }) => [styles.retryButton, pressed && styles.pressedCard]}
               >
                 <Text style={styles.retryButtonText}>Try again</Text>
@@ -483,7 +491,22 @@ export default function TodayScreen() {
                   <Text adjustsFontSizeToFit numberOfLines={1} style={styles.metricValue}>
                     {burnedValue}
                   </Text>
-                  <Text style={styles.metricDetail}>{burnedDetail}</Text>
+                  <View style={styles.burnDetailRow}>
+                    <Text style={[styles.metricDetail, styles.burnDetail]}>{burnedDetail}</Text>
+                    <Pressable
+                      accessibilityHint="Opens a short explanation without leaving Today."
+                      accessibilityLabel="Why does CalorieBank use 80 percent?"
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        setShowWhyEighty(true);
+                      }}
+                      style={({ pressed }) => [styles.whyButton, pressed && styles.pressedCard]}
+                    >
+                      <Text style={styles.whyButtonText}>Why 80%?</Text>
+                    </Pressable>
+                  </View>
                 </View>
                 <View style={styles.todayMetric}>
                   <Text style={styles.metricLabel}>Eaten</Text>
@@ -494,33 +517,35 @@ export default function TodayScreen() {
                 </View>
               </View>
               <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>
-              {healthConnectionStatus !== 'connected' ? (
-                <Link href="/integrations" asChild>
-                  <Pressable
-                    accessibilityRole="button"
-                    style={({ pressed }) => [styles.retryButton, pressed && styles.pressedCard]}
-                  >
-                    <Text style={styles.retryButtonText}>Connect Apple Health</Text>
-                  </Pressable>
-                </Link>
+              {today?.burned.status === 'not_connected' || today?.eaten.status === 'not_connected' ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    router.push('/integrations');
+                  }}
+                  style={({ pressed }) => [styles.retryButton, pressed && styles.pressedCard]}
+                >
+                  <Text style={styles.retryButtonText}>Review Health Connections</Text>
+                </Pressable>
               ) : null}
               {healthSyncDetail ? <Text style={styles.supportingText}>{healthSyncDetail}</Text> : null}
             </>
           )}
-        </View> : null}
+        </Pressable> : null}
 
         {visibleCards.showPlannedTreat ? (
-          <Link href="/planned-treat" asChild>
-            <Pressable
-              accessibilityHint="Opens Planned Treat setup."
-              accessibilityLabel={plannedTreatAccessibility}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.secondaryCard,
-                styles.plannedTreatCard,
-                pressed && styles.pressedCard,
-              ]}
-            >
+          <Pressable
+            accessibilityHint="Opens Planned Treat setup."
+            accessibilityLabel={plannedTreatAccessibility}
+            accessibilityRole="button"
+            onPress={() => router.push('/planned-treat')}
+            style={({ pressed }) => [
+              styles.secondaryCard,
+              styles.plannedTreatCard,
+              pressed && styles.pressedCard,
+            ]}
+          >
               <View style={styles.cardHeader}>
                 <Text style={styles.cardLabel}>Planned Treat</Text>
                 <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
@@ -573,20 +598,46 @@ export default function TodayScreen() {
                   <Text style={styles.supportingText}>Choose something worth saving for</Text>
                 </>
               )}
-            </Pressable>
-          </Link>
+          </Pressable>
         ) : null}
 
         {visibleCards.showSteps ? (
-          <View style={styles.secondaryCard}>
-            <Text style={styles.cardLabel}>Steps today</Text>
+          <Pressable
+            accessibilityHint="Opens step contribution and what-if details."
+            accessibilityLabel={`Steps today, ${stepsValue}${stepsAccessibility ? `. ${stepsAccessibility}` : ''}`}
+            accessibilityRole="button"
+            onPress={() => router.push('/steps-detail')}
+            style={({ pressed }) => [
+              styles.secondaryCard,
+              pressed && styles.pressedCard,
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardLabel}>Steps today</Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </View>
             <Text adjustsFontSizeToFit numberOfLines={1} style={styles.secondaryValue}>
               {stepsValue}
             </Text>
+            {stepsEstimate ? (
+              <View style={styles.stepEstimates}>
+                <View style={styles.stepEstimateGroup}>
+                  <Text style={styles.stepEstimateValue}>{stepsEstimate.providerContribution}</Text>
+                  <Text style={styles.stepEstimateLabel}>{stepsEstimate.providerContext}</Text>
+                </View>
+                <View style={styles.stepEstimateGroup}>
+                  <Text style={styles.stepEstimateValue}>{stepsEstimate.actualContribution}</Text>
+                  <Text style={styles.stepEstimateLabel}>{stepsEstimate.actualContext}</Text>
+                </View>
+              </View>
+            ) : stepsEstimateFallback ? (
+              <Text style={styles.supportingText}>{stepsEstimateFallback}</Text>
+            ) : null}
             <Text style={styles.supportingText}>
+              {today?.steps.source ? `${getConsumerSourceName(today.steps.source)} · ` : ''}
               {formatRelativeSyncTime(today?.steps.lastSyncedAt)}
             </Text>
-          </View>
+          </Pressable>
         ) : null}
 
         {visibleCards.showWorkouts ? (
@@ -601,18 +652,27 @@ export default function TodayScreen() {
               <>
                 {today.workouts.items.slice(0, 3).map((workout) => (
                   <View key={workout.id} style={styles.workoutRow}>
-                    <Text style={styles.workoutName}>{workout.displayName}</Text>
-                    <Text style={styles.supportingText}>
-                      {workout.durationMinutes} min
-                      {workout.totalEnergyBurned === null
-                        ? ''
-                        : ` · ${workout.totalEnergyBurned.toLocaleString()} kcal`}
+                    <Text style={styles.workoutName}>
+                      {workout.displayName} · {workout.durationMinutes} min
                     </Text>
+                    {workout.totalEnergyBurned !== null ? (() => {
+                      const lines = formatWorkoutCalorieLines({
+                        totalSteps: workout.totalSteps,
+                        rawCalories: workout.totalEnergyBurned,
+                        adjustmentFactor: today.burned.adjustmentFactor,
+                      });
+                      return (
+                        <>
+                          <Text style={styles.supportingText}>{lines.reported}</Text>
+                          <Text style={styles.supportingText}>{lines.estimated}</Text>
+                        </>
+                      );
+                    })() : null}
                   </View>
                 ))}
-                <Text style={styles.supportingText}>
-                  Workout calories are already included in your burned total.
-                </Text>
+                {today.workouts.source ? (
+                  <Text style={styles.supportingText}>Imported from {getConsumerSourceName(today.workouts.source)}</Text>
+                ) : null}
                 {today.workouts.totalCount > 3 ? (
                   <Link href={'/today-workouts' as Href} style={styles.inlineLink}>
                     View all workouts
@@ -625,24 +685,47 @@ export default function TodayScreen() {
           </View>
         ) : null}
 
-        {visibleCards.showCurrentGoal ? <Link href="/goal-settings" asChild>
-          <Pressable
-            accessibilityHint="Opens Goal Settings."
-            accessibilityLabel={`Current goal, ${currentGoalValue}`}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>Current goal</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-            </View>
-            <Text adjustsFontSizeToFit numberOfLines={1} style={styles.secondaryValue}>
-              {currentGoalValue}
-            </Text>
-            <Text style={styles.supportingText}>{formatGoalDetail(goalConfiguration)}</Text>
-          </Pressable>
-        </Link> : null}
       </ScrollView>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setShowWhyEighty(false)}
+        transparent
+        visible={showWhyEighty}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close Why 80 percent explanation"
+            onPress={() => setShowWhyEighty(false)}
+            style={StyleSheet.absoluteFill}
+          />
+          <Pressable
+            accessibilityViewIsModal
+            style={styles.whyModal}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Why 80%?</Text>
+              <Pressable
+                accessibilityLabel="Close"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => setShowWhyEighty(false)}
+                style={({ pressed }) => [styles.modalClose, pressed && styles.pressedCard]}
+              >
+                <Ionicons name="close" size={24} color={colors.text} />
+              </Pressable>
+            </View>
+            <Text style={styles.modalCopy}>
+              CalorieBank’s founder trusted his watch burn during his cut but wasn’t losing weight.
+            </Text>
+            <Text style={styles.modalCopy}>
+              After learning that watches can overestimate calories burned, he started using 80% of
+              his watch burn — and started losing weight.
+            </Text>
+            <Text style={styles.modalCopy}>That’s why CalorieBank uses the 80% rule.</Text>
+          </Pressable>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -703,6 +786,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: spacing.lg,
   },
+  recoverySurface: {
+    gap: spacing.xs,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  recoveryLabel: {
+    color: colors.textMuted,
+    fontSize: typography.body,
+    fontWeight: '700',
+  },
+  recoveryValue: {
+    color: colors.text,
+    fontSize: typography.heading,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
   pressedCard: {
     opacity: 0.76,
   },
@@ -743,21 +844,30 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  positiveValue: {
+  contributionValue: {
     color: colors.primaryDark,
-  },
-  negativeValue: {
-    color: colors.text,
   },
   supportingText: {
     color: colors.textMuted,
     fontSize: typography.body,
     lineHeight: 23,
   },
-  statusText: {
-    color: colors.text,
+  stepEstimates: {
+    gap: spacing.md,
+  },
+  stepEstimateGroup: {
+    gap: spacing.xs,
+  },
+  stepEstimateLabel: {
+    color: colors.textMuted,
     fontSize: typography.caption,
     fontWeight: '700',
+  },
+  stepEstimateValue: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
   plannedTreatCard: {
     minHeight: 164,
@@ -823,6 +933,35 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     lineHeight: 18,
   },
+  burnDetailRow: { alignItems: 'flex-start', gap: spacing.xs },
+  burnDetail: { flexShrink: 1 },
+  whyButton: { minHeight: 44, justifyContent: 'center' },
+  whyButtonText: { color: colors.primaryDark, fontSize: typography.caption, fontWeight: '700' },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(18, 24, 22, 0.42)',
+    padding: spacing.lg,
+  },
+  whyModal: {
+    maxWidth: 440,
+    width: '100%',
+    alignSelf: 'center',
+    gap: spacing.md,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+  },
+  modalHeader: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  modalTitle: { flex: 1, color: colors.text, fontSize: typography.heading, fontWeight: '800' },
+  modalClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  modalCopy: { color: colors.text, fontSize: typography.body, lineHeight: 24 },
   workoutRow: {
     gap: spacing.xs,
     paddingVertical: spacing.xs,

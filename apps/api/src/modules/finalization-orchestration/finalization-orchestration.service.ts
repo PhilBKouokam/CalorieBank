@@ -83,7 +83,9 @@ export class FinalizationOrchestrationService implements FinalizationScheduler {
       fallbackProvider: 'apple_health',
       allowFallback: selection.allowExpenditureFallback,
     });
-    const intake = resolveAuthoritativeProviderRecord(intakeRecords, {
+    const intake = resolveAuthoritativeProviderRecord(intakeRecords.filter((record) =>
+      record.syncStatus === 'ready' || record.syncStatus === 'stale' || record.syncStatus === 'partial',
+    ), {
       authoritativeProvider: intakeRecords.length > 0 && intakeRecords.every((record) => record.provider === 'development')
         ? 'development' : selection.authoritativeIntakeProvider,
       allowFallback: false,
@@ -162,7 +164,7 @@ export class FinalizationOrchestrationService implements FinalizationScheduler {
   }
 
   async execute(input: FinalizationOrchestrationInput): Promise<FinalizationOrchestrationResult> {
-    const dates = [...new Set(input.dates)]
+    let dates = [...new Set(input.dates)]
       .filter((date) => date < input.currentLocalDate)
       .sort();
     const result: FinalizationOrchestrationResult = {
@@ -171,6 +173,22 @@ export class FinalizationOrchestrationService implements FinalizationScheduler {
       waitingDates: [],
       errors: [],
     };
+
+    const initialization = await this.bankHistory.initializeOpeningBank(
+      input.user,
+      input.currentLocalDate,
+      input.timezone,
+    );
+    if (initialization.outcome === 'waiting_for_opening_data') {
+      for (const date of dates) {
+        await this.recordState(input, date, input.timezone, 'waiting_for_required_inputs');
+        result.waitingDates.push({ date, status: 'waiting_for_required_inputs' });
+      }
+      return result;
+    }
+    if (initialization.accountingStartsOn) {
+      dates = dates.filter((date) => date >= initialization.accountingStartsOn!);
+    }
 
     for (const date of dates) {
       let dateTimezone = input.timezone;
@@ -207,6 +225,8 @@ export class FinalizationOrchestrationService implements FinalizationScheduler {
           await this.recordState(input, date, dateTimezone, waitingStatus);
           result.waitingDates.push({ date, status: waitingStatus });
         }
+        // Pre-CalorieBank dates are represented only by the immutable Opening Bank snapshot.
+        if (reconciliation.outcome === 'excluded') continue;
       } catch (error) {
         const code = error instanceof Error ? error.message.slice(0, 160) : 'orchestration_failed';
         result.errors.push(`${date}:${code}`);

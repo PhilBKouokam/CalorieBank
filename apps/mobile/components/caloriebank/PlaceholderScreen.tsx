@@ -1,5 +1,5 @@
 import { Link, type Href } from 'expo-router';
-import { ReactNode } from 'react';
+import { type ReactNode, type RefObject } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,6 +34,8 @@ type PlaceholderScreenProps = {
   metrics?: Metric[];
   children?: ReactNode;
   links?: RouteLink[];
+  keyboardAware?: boolean;
+  scrollViewRef?: RefObject<ScrollView | null>;
 };
 
 export function PlaceholderScreen({
@@ -43,10 +45,18 @@ export function PlaceholderScreen({
   metrics = [],
   children,
   links = [],
+  keyboardAware = false,
+  scrollViewRef,
 }: PlaceholderScreenProps) {
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        automaticallyAdjustKeyboardInsets={keyboardAware}
+        contentContainerStyle={styles.container}
+        keyboardDismissMode={keyboardAware ? 'interactive' : 'none'}
+        keyboardShouldPersistTaps={keyboardAware ? 'handled' : 'never'}
+        ref={scrollViewRef}
+      >
         <View style={styles.brandRow}>
           <View style={styles.mark}>
             <Text style={styles.markText}>CB</Text>

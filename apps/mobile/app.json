@@ -32,6 +32,8 @@
     "plugins": [
       "expo-router",
       "expo-dev-client",
+      "@clerk/expo",
+      "expo-secure-store",
       [
         "@kingstinct/react-native-healthkit",
         {

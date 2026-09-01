@@ -162,13 +162,14 @@ Today's Eating Budget is current-day guidance, not a bank balance. It may use co
 - Bank deposit: positive balance-changing event.
 - Bank withdrawal: negative balance-changing event.
 - Manual correction: user-entered or support-entered correction to imported or calculated data.
-- Historical initialization: onboarding calculation using up to seven prior complete calendar days.
-- Lifetime bank: internal cumulative non-expiring bank after initialization and confirmed ledger events. A positive value represents accumulated banked calories; a negative value represents the uncovered recovery amount after Available Bank and Emergency Bank are exhausted.
+- Historical initialization: one-time Opening Bank calculation using at most the seven immediately preceding eligible completed local calendar days.
+- Effective Bank Balance: authoritative Opening Bank snapshot plus active-accounting append-only ledger events. It may be positive, zero, or negative and is not itself the consumer Available Bank.
+- Lifetime bank: non-expiring effective accounting balance after initialization and confirmed ledger events.
 - Total Banked Calories: total genuinely accumulated calories available for allocation when no recovery amount exists. Conceptually, `total_banked_calories = available_bank + emergency_bank`.
 - Available Bank: non-negative user-visible allocation intended for planned meals, foods, events, and other deliberate spending. It is the primary spendable balance during normal banking.
 - Emergency Bank: optional non-negative protected reserve allocation intended for unexpected overages and unplanned life events. It is not normally used for planned spending.
-- Recovery Forecast: the primary user-facing experience when both Available Bank and Emergency Bank are exhausted and a negative cumulative amount remains. It explains the path back to a positive Available Bank without making a large negative number the main interface focus.
-- Recovery amount: non-negative uncovered amount that remains after Available Bank and Emergency Bank have been applied to negative daily changes.
+- Recovery Forecast: a future estimated path through an active Recovery state when sufficient approved history exists. The current Recovery amount itself is exact derived presentation, not a forecast.
+- Recovery amount: non-negative consumer representation of the negative effective balance, calculated as `max(0, -effectiveBankBalanceCalories)`. It is not a second ledger.
 - Today's Eating Budget: current-day, non-ledger guidance for total intake that would satisfy the configured daily goal under an approved live calculation.
 - Remaining Today: Today's Eating Budget minus confirmed intake so far. It is not Available Bank and may change or become negative during the day.
 - Projected Daily Burn: an estimated end-of-day expenditure value from Today's Forecast. It is not Today's Eating Budget and never creates a Projected Bank.
@@ -234,7 +235,11 @@ Do not claim:
 
 For CalorieBank V1, the connected calorie-expenditure source's total daily calorie-expenditure value is the calculation input.
 
-ADR 016 refines `source` to mean one explicit authoritative provider per banking input and date. Fitbit is the first dedicated expenditure provider. When selected, Fitbit's daily activity `caloriesOut` total enters once as `imported_total_daily_expenditure`; CalorieBank applies `0.80` once. Apple Health expenditure may be used only as an explicit fallback and only when both Active Energy and Resting/Basal Energy are available and summed once. Fitbit and Apple Health expenditure are never added together. Intake follows the same single-authority rule; Apple Health Dietary Energy remains the implemented V1 intake source.
+ADR 016 refines `source` to mean one explicit authoritative provider per banking input and date. Fitbit-derived Google Health data is the first dedicated expenditure provider. When selected, Google Health API v4's `total-calories` daily rollup enters once as `imported_total_daily_expenditure`; CalorieBank applies `0.80` once. Total Calories already includes basal metabolism and active energy. Apple Health expenditure may be used only as an explicit fallback and only when both Active Energy and Resting/Basal Energy are available and summed once. Google Health/Fitbit and Apple Health expenditure are never added together. Intake follows the same single-authority rule; Apple Health Dietary Energy remains the implemented V1 intake source.
+
+ADR 017 formalizes expenditure qualification as `FULL_TOTAL`, `DERIVABLE_TOTAL`, `ACTIVE_ONLY`, or `UNAVAILABLE`. Only the first two may feed this formula after official semantic review. Fitbit is `FULL_TOTAL`; Apple Health is `DERIVABLE_TOTAL`; Garmin remains `UNAVAILABLE` pending approved-program calorie semantics; WHOOP is `UNAVAILABLE` because cycles and workouts do not supply a user-local calendar-day total. WHOOP workout kilojoules remain context only.
+
+ADR 018 adds FatSecret as a direct authoritative intake option. The selected FatSecret daily diary total replaces Apple Health Dietary Energy for that calculation; the values are never added. A missing FatSecret diary day or provider error is unavailable, not zero. Provider switches and edited provisional diary totals use immutable calculation snapshots and correction deltas. Locked dates remain unchanged.
 
 CalorieBank does not separately calculate resting expenditure and active expenditure for the primary V1 bank formula.
 
@@ -271,7 +276,7 @@ Signed adjustment behavior:
 Interpretation:
 
 - A positive `daily_bank_change` is deposited into the user's lifetime bank.
-- A negative `daily_bank_change` creates a negative finalized ledger transaction and automatically reduces the user's bank according to the approved Available Bank, Emergency Bank, and Recovery Forecast order.
+- A negative `daily_bank_change` creates a negative finalized ledger transaction and reduces the single effective balance. Available Bank and Recovery then derive from that result under ADR 020.
 - A zero result means the user consumed exactly the goal-adjusted spending allowance for that day.
 - Banked calories do not expire.
 - The lifetime bank represents the cumulative sum of confirmed deposits and withdrawals after initialization.
@@ -283,6 +288,37 @@ There is no manual `Use Bank`, `Spend Bank`, or Planned Treat withdrawal action 
 The 0.80 adjustment applies to the complete imported total daily expenditure value used by CalorieBank. Do not add imported active calories separately after applying this formula. Do not combine this formula with a separate fixed calorie target that already represents estimated daily expenditure. Doing either would double count expenditure.
 
 The imported expenditure source and imported intake source are the operational V1 sources of truth. Their values remain estimates and user-generated records rather than direct measurements of exact physiology.
+
+## Opening Bank and Effective-Balance Presentation
+
+For a newly authenticated user, Opening Bank uses only eligible records from the immediately preceding seven completed local calendar days. A day is eligible only when it has one usable selected authoritative expenditure aggregate, one usable selected authoritative intake aggregate, and a configured goal sufficient to calculate the approved daily contribution. Current day is never eligible. Missing intake and expenditure are not zero.
+
+```text
+historicalOpeningNetCalories =
+  sum(eligible daily bank contributions in the prior-seven-day window)
+
+openingEffectiveBalanceCalories =
+  max(0, historicalOpeningNetCalories)
+```
+
+Initialization remains `WAITING_FOR_OPENING_DATA` until at least one legitimate eligible day exists. When initialized, CalorieBank persists the opening amount, each source-attributed calculation snapshot, the evaluated local-date window, and the active-accounting start date. Pre-opening provider records remain intact but never post as active daily ledger transactions. This avoids positive double counting and prevents the floored negative portion from reappearing as Recovery.
+
+Seven days is a V1 onboarding recency policy, not a claim that physiology or prior behavior resets after seven days. The floor applies once. It is never reapplied to later withdrawals or corrections. Accounts existing before ADR 020 retain their exact ledger history and receive no retroactive opening floor.
+
+After initialization:
+
+```text
+effectiveBankBalanceCalories =
+  openingEffectiveBalanceCalories
+  + sum(active-accounting ledger transactions)
+
+availableBankCalories = max(0, effectiveBankBalanceCalories)
+recoveryCalories = max(0, -effectiveBankBalanceCalories)
+```
+
+Available Bank and Recovery are mutually exclusive derived views of one accounting truth. Positive contributions automatically reduce Recovery by increasing the effective balance. Provisional corrections use the existing immutable delta mechanism and may move the presentation in either direction. Locked-day immutability is unchanged. Bank History preserves truthful signed contributions and the raw effective balance remains available to trusted read models, while consumer Available Bank never shows a negative calorie number.
+
+Planned Treat progress uses `availableBankCalories`, not the raw effective balance. During Recovery its funded progress is zero. Emergency Bank remains optional, separate, deferred, and hidden by default; this policy does not implement reserve allocation, automatic reveal, or behavior-based recommendations.
 
 Planning Database estimates are not operational sources of truth for intake. If a user plans a meal in CalorieBank and later eats it, the confirmed intake must come from the connected calorie-tracking application or an approved manual correction/fallback path before it affects the bank.
 
@@ -450,7 +486,7 @@ Priority, percentage, and manual allocation are approved conceptual methods. Pri
 
 Creating, editing, pausing, reordering, cancelling, deleting, completing, or archiving a goal must not independently change Available Bank. `Ready` means the selected allocation reached its target; it is not intake, consumption, or a withdrawal.
 
-A finalized negative contribution automatically reduces the authoritative bank under the Available Bank, Emergency Bank, and Recovery Forecast order. Because goal allocations are portions of Available Bank, they must be reduced or released under an approved withdrawal-allocation policy so:
+A finalized negative contribution automatically reduces the authoritative effective balance under ADR 020. Because future goal allocations are portions of non-negative Available Bank, they must be reduced or released under an approved withdrawal-allocation policy so:
 
 ```text
 active_goal_allocations + unassigned_available_calories
@@ -583,11 +619,7 @@ Result:
 600 kcal becomes the recovery amount
 ```
 
-Recovery Forecast is activated only for the remaining uncovered amount. The complete protection sequence is:
-
-```text
-Available Bank -> Emergency Bank -> Recovery Forecast
-```
+ADR 020 supersedes this section as current operational accounting. Recovery now represents the negative portion of the single effective balance. Emergency Bank is an optional deferred feature, hidden by default, and must not be automatically revealed because Recovery begins. The allocation and coverage behavior below remains future product exploration rather than implemented routing policy.
 
 When the Emergency Bank fully covers an unexpected overage, use language equivalent to:
 
@@ -773,7 +805,7 @@ Conceptual lifecycle:
 14. At `lockAt`, permanently lock automatic reconciliation for that day.
 15. Update the running lifetime bank from the complete append-only ledger.
 16. Allocate positive changes between Available Bank and optional Emergency Bank under the active reserve policy.
-17. Apply negative changes in order: Available Bank, Emergency Bank, Recovery Forecast.
+17. Apply signed changes to the effective balance, then derive non-negative Available Bank and Recovery under ADR 020.
 18. Derive current Total Banked Calories, Available Bank, Emergency Bank, and recovery amount.
 19. When Banking Goals are implemented, route eligible finalized Available Bank calories under the approved goal-allocation policy while preserving Unassigned and one-bank conservation.
 20. Generate an understandable history explanation including status and correction history.
@@ -814,7 +846,7 @@ adjusted_current_day_expenditure =
 
 - For the Apple Health adapter, raw total expenditure is the deterministic integer sum of cumulative active energy and basal energy for the current local day. The `0.80` rate is applied once to that total. Workout or Move calories are not added separately.
 - Active Energy alone is not a valid Apple Health total-expenditure aggregate. Missing Active or Resting/Basal Energy makes Apple Health expenditure unavailable while intake, steps, and workouts continue independently.
-- When Fitbit is authoritative, Fitbit's daily `caloriesOut` total replaces Apple Health as the expenditure input. Apple Health may still independently supply Dietary Energy, steps, and workouts.
+- When Fitbit is authoritative, Google Health API `total-calories` replaces Apple Health as the expenditure input. Its verified `steps` and `exercise` capabilities also become the authoritative activity context; Apple Health continues to supply Dietary Energy. Activity fallback is explicit and never merged.
 - Raw imported device expenditure remains available as supporting context only, such as `2,000 from Apple Health x 80%`.
 - Use source-attributed current-day total calorie intake for the eaten value.
 - Do not double-count active calories. If the source exposes total daily expenditure, use that total once.
@@ -830,7 +862,7 @@ adjusted_current_day_expenditure =
 - Current-day cumulative updates replace the prior value for the same user, local date, provider, and aggregate type. They are never added together. Older provider timestamps must not overwrite newer values.
 - Missing Apple Health dietary energy does not invalidate available expenditure. Apple does not disclose denied read access, so empty results must not be labeled definitively as permission denial.
 - Steps do not estimate calories and never modify expenditure. Logged workout energy is already represented within Apple Health active energy and must never be added again.
-- Steps, workouts, and sync-session outcomes are awareness and observability records only. They never create ledger transactions, modify Available Bank, alter Planned Treat progress, or change finalized history.
+- Steps, workouts, and sync-session outcomes are awareness and observability records only, regardless of provider. They never create ledger transactions, modify Available Bank, alter Planned Treat progress, or change finalized history. Fitbit workout calories are not added to Fitbit Total Calories.
 
 ### Today's Eating Budget Boundary
 
@@ -1119,8 +1151,8 @@ Rules:
 - Earlier references to "eligible active calories" as a possible daily-calculation input are superseded for the primary V1 formula. V1 uses imported total daily expenditure and must not add active calories separately.
 - The prompt that created this document included one conflicting acceptance bullet saying the 0.80 rate applies to eligible active calories. The same prompt also explicitly defined the approved V1 formula as applying 0.80 to imported total daily expenditure and said not to add imported active calories separately. This specification follows the explicit formula and records the conflict here.
 - Weekly, monthly, 30-day expiration, scheduled decay, and automatic resets are superseded if found in older materials.
-- Earlier guidance that would make a large negative bank balance the primary display is superseded. Available Bank displays zero while Recovery Forecast explains the path back.
-- Earlier single-bank guidance that moved directly from Available Bank to Recovery Forecast is superseded. The approved V1 protection sequence is Available Bank -> optional Emergency Bank -> Recovery Forecast.
+- Earlier guidance that would make a large negative bank balance the primary display is superseded. Available Bank displays zero while Recovery represents the negative effective balance.
+- Earlier guidance that treated unimplemented Emergency Bank routing as current V1 accounting is superseded by ADR 020. Recovery is derived directly from the effective balance; Emergency Bank remains optional and deferred.
 - Any guidance that would make Planning Database entries a bank-calculation input is superseded. Planning estimates are advisory only until confirmed intake syncs from a supported calorie-tracking source or an approved manual correction/fallback path.
 - Any guidance requiring users to configure an absolute daily calorie target is superseded. V1 uses imported total daily expenditure, the `0.80` expenditure adjustment, and the user's signed daily energy adjustment.
 - Any guidance requiring a manual `Use Bank`, `Spend Bank`, treat withdrawal, or confirm-consumption action is superseded. V1 bank usage is automatic through completed-day finalization.
@@ -1143,7 +1175,7 @@ Rules:
 - What user-day boundary, timezone-change, overnight-work, and daylight-saving policy governs remaining-time forecasts without changing finalized accounting dates?
 - What explicit target, checkpoint, walking-feasibility, familiar-activity, and uncertainty policies are required before advanced forecast output is numerical?
 - Is Apple Health dietary energy sufficiently available for the first 10 users, or is another supported intake path required?
-- The operational HealthKit query window for finalization is resolved as three local days. The separate completeness policy and up-to-seven-day onboarding initialization query remain open.
+- The operational rolling sync window remains three local days. ADR 020 resolves Opening Bank as a separate query over at most seven prior completed local dates; it initializes when at least one day has both authoritative inputs and a configured goal.
 - What minimum and maximum daily deficits and surpluses should be allowed?
 - Should weekly weight-change preferences be included in V1 onboarding, and what exact options and copy should be used?
 - What minimum-intake or allowance safeguards are required before broader beta?

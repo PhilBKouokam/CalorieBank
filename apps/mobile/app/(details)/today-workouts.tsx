@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import { fetchToday } from '@/lib/api/client';
+import { getConsumerSourceName } from '@/lib/providers/presentation';
+import { formatWorkoutCalorieLines } from '@/lib/today/presentation';
 
 export default function TodayWorkoutsScreen() {
   const [today, setToday] = useState<TodayResponse | null>(null);
@@ -20,7 +22,9 @@ export default function TodayWorkoutsScreen() {
     <SafeAreaView edges={['bottom']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Logged workouts</Text>
-        <Text style={styles.description}>Workouts recorded in Apple Health today.</Text>
+        <Text style={styles.description}>
+          {today?.workouts.source ? `Workouts imported from ${getConsumerSourceName(today.workouts.source)} today.` : 'Workouts imported from your selected activity source today.'}
+        </Text>
         <View style={styles.card}>
           {!today && !failed ? <ActivityIndicator color={colors.primary} /> : null}
           {failed ? <Text style={styles.description}>Workouts could not load. Try again later.</Text> : null}
@@ -29,17 +33,28 @@ export default function TodayWorkoutsScreen() {
           ) : null}
           {today?.workouts.items.map((workout) => (
             <View key={workout.id} style={styles.row}>
-              <Text style={styles.workoutName}>{workout.displayName}</Text>
-              <Text style={styles.description}>
-                {workout.durationMinutes} min
-                {workout.totalEnergyBurned === null
-                  ? ''
-                  : ` · ${workout.totalEnergyBurned.toLocaleString()} kcal`}
+              <Text style={styles.workoutName}>
+                {workout.displayName} · {workout.durationMinutes} min
+              </Text>
+              {workout.totalEnergyBurned !== null ? (() => {
+                const lines = formatWorkoutCalorieLines({
+                  totalSteps: workout.totalSteps,
+                  rawCalories: workout.totalEnergyBurned,
+                  adjustmentFactor: today.burned.adjustmentFactor,
+                });
+                return (
+                  <>
+                    <Text style={styles.description}>{lines.reported}</Text>
+                    <Text style={styles.description}>{lines.estimated}</Text>
+                  </>
+                );
+              })() : null}
+              <Text style={styles.source}>
+                Imported from {getConsumerSourceName(workout.source)}
               </Text>
             </View>
           ))}
         </View>
-        <Text style={styles.note}>Workout calories are already included in your burned total.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -60,5 +75,5 @@ const styles = StyleSheet.create({
   },
   row: { gap: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: spacing.sm },
   workoutName: { color: colors.text, fontSize: typography.body, fontWeight: '700' },
-  note: { color: colors.textMuted, fontSize: typography.caption, lineHeight: 18 },
+  source: { color: colors.textMuted, fontSize: typography.caption },
 });
