@@ -15,7 +15,6 @@
     },
     "preview": {
       "distribution": "internal",
-      "channel": "beta",
       "environment": "preview",
       "env": {
         "EXPO_PUBLIC_APP_ENV": "beta",
