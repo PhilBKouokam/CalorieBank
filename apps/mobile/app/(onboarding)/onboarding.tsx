@@ -19,7 +19,6 @@ import { colors, radii, spacing, typography } from '@/constants/caloriebank-them
 import {
   completeOnboarding,
   completeOnboardingWelcome,
-  fetchHealthConnections,
   fetchOnboardingStatus,
   fetchProviderSelection,
   saveProviderSelection,
@@ -43,14 +42,16 @@ import {
   type KnownFoodTracker,
 } from '@/lib/healthkit/apple-health-intake-writers';
 import {
-  appleHealthBurnIsReady,
   initialImportPlan,
   onboardingRecoveryMessage,
   preparationEditStage,
   previousSetupStage,
+  selectedAppleHealthWriter,
+  sourceNeedsData,
 } from '@/lib/onboarding/onboarding-recovery';
 
-type BusyAction = 'loading' | 'fitbit' | 'fatsecret' | 'apple' | 'preparing' | 'complete' | null;
+type AppleIntakeAction = `apple-intake:${KnownFoodTracker | 'other' | string}`;
+type BusyAction = 'loading' | 'fitbit' | 'fatsecret' | 'apple-burn' | AppleIntakeAction | 'preparing' | 'complete' | null;
 
 const stageNumber = {
   welcome: 0,
@@ -71,8 +72,6 @@ export default function OnboardingScreen() {
   const [messageTone, setMessageTone] = useState<'attention' | 'error'>('error');
   const [preparationAttempted, setPreparationAttempted] = useState(false);
   const [displayStage, setDisplayStage] = useState<OnboardingStage | null>(null);
-  const [appleBurnNeedsRefresh, setAppleBurnNeedsRefresh] = useState(false);
-  const [appleIntakeNeedsRefresh, setAppleIntakeNeedsRefresh] = useState(false);
   const [discoveredIntakeWriters, setDiscoveredIntakeWriters] =
     useState<AppleHealthIntakeWriter[]>([]);
 
@@ -108,7 +107,9 @@ export default function OnboardingScreen() {
     } catch (error) {
       const failureKind = getApiRequestFailureKind(error);
       const recoveryMessage = onboardingRecoveryMessage({
-        action: action === 'apple' || action === 'preparing' ? action : 'other',
+        action: action?.startsWith('apple') || action === 'preparing'
+          ? action === 'preparing' ? 'preparing' : 'apple'
+          : 'other',
         failureKind,
         usesAppleHealth:
           status?.expenditure.provider === 'apple_health'
@@ -175,21 +176,19 @@ export default function OnboardingScreen() {
   }
 
   async function connectApple(role: 'expenditure') {
-    await run('apple', async () => {
+    await run('apple-burn', async () => {
       if (await getAppleHealthConnectionStatus() !== 'connected') await connectAppleHealth();
-      await refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 });
-      const connections = await fetchHealthConnections();
-      if (role === 'expenditure' && !appleHealthBurnIsReady(connections)) {
-        setAppleBurnNeedsRefresh(true);
-        setMessageTone('attention');
-        setMessage('CalorieBank hasn’t found complete Apple Health burn data yet. Refresh Apple Health to check again.');
-        return;
-      }
-      setAppleBurnNeedsRefresh(false);
       await selectProvider({
         authoritativeExpenditureProvider: 'apple_health',
         authoritativeActivityProvider: 'apple_health',
       });
+      await refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 });
+      const providers = await fetchProviderSelection();
+      if (role === 'expenditure' && providers.expenditure.status !== 'ready') {
+        setMessageTone('attention');
+        setMessage('CalorieBank hasn’t found complete Apple Health burn data yet. Refresh Apple Health to check again.');
+        return;
+      }
     });
   }
 
@@ -204,16 +203,14 @@ export default function OnboardingScreen() {
     await refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 });
     const providers = await fetchProviderSelection();
     if (providers.intake.status !== 'ready') {
-      setAppleIntakeNeedsRefresh(true);
       setMessageTone('attention');
       setMessage(`${writer.displayName} data is still being loaded from Apple Health. Refresh Apple Health to check again.`);
       return;
     }
-    setAppleIntakeNeedsRefresh(false);
   }
 
   async function connectAppleIntakeTracker(tracker: KnownFoodTracker) {
-    await run('apple', async () => {
+    await run(`apple-intake:${tracker}`, async () => {
       if (await getAppleHealthConnectionStatus() !== 'connected') await connectAppleHealth();
       await refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 });
       const writers = await discoverAppleHealthIntakeWriters();
@@ -223,7 +220,6 @@ export default function OnboardingScreen() {
         lose_it: 'Lose It!', macrofactor: 'MacroFactor',
       }[tracker];
       if (!writer) {
-        setAppleIntakeNeedsRefresh(true);
         setMessageTone('attention');
         setMessage(`No food data was found from ${trackerName} yet. Refresh Apple Health to check again.`);
         return;
@@ -233,7 +229,7 @@ export default function OnboardingScreen() {
   }
 
   async function discoverOtherAppleHealthWriters() {
-    await run('apple', async () => {
+    await run('apple-intake:other', async () => {
       if (await getAppleHealthConnectionStatus() !== 'connected') await connectAppleHealth();
       const writers = await discoverAppleHealthIntakeWriters();
       if (writers.length === 0) {
@@ -244,7 +240,23 @@ export default function OnboardingScreen() {
   }
 
   async function selectDiscoveredWriter(writer: AppleHealthIntakeWriter) {
-    await run('apple', () => selectAppleHealthIntakeWriter(writer));
+    await run(`apple-intake:${writer.bundleIdentifier}`, () => selectAppleHealthIntakeWriter(writer));
+  }
+
+  async function retrySelectedSource(role: 'expenditure' | 'intake') {
+    const selected = status?.[role];
+    if (!selected) return;
+    if (selected.provider === 'apple_health') {
+      await run(role === 'expenditure' ? 'apple-burn' : 'apple-intake:retry', async () => {
+        const outcome = await refreshAppleHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 });
+        if (!outcome || outcome.syncStatus === 'failure') throw new Error('Apple Health refresh failed.');
+      });
+      return;
+    }
+    await run(selected.provider === 'fatsecret' ? 'fatsecret' : 'fitbit', () =>
+      selected.provider === 'fatsecret'
+        ? syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true)
+        : syncFitbit(Intl.DateTimeFormat().resolvedOptions().timeZone, true));
   }
 
   async function prepareBank() {
@@ -286,6 +298,8 @@ export default function OnboardingScreen() {
 
   const activeStage = displayStage ?? status.stage;
   const progress = stageNumber[activeStage];
+  const expenditureWaiting = sourceNeedsData(status.expenditure);
+  const intakeWaiting = sourceNeedsData(status.intake);
   const stageContent = (() => {
     switch (activeStage) {
       case 'welcome':
@@ -299,63 +313,62 @@ export default function OnboardingScreen() {
         return <>
           <Text style={styles.title}>What do you use to track your activity?</Text>
           <Text style={styles.detail}>Choose the device that tracks your daily calorie burn.</Text>
-          {Platform.OS === 'ios' ? <ProviderOption title="Apple Watch" detail="CalorieBank securely reads its activity data through Apple Health." busy={busy === 'apple'} onPress={() => void connectApple('expenditure')} /> : null}
-          <ProviderOption title="Fitbit" detail="Uses your Fitbit calorie burn, steps, and workouts." busy={busy === 'fitbit'} onPress={() => void connectFitbit()} />
+          {expenditureWaiting ? <WaitingForData
+            busy={busy !== null}
+            source={status.expenditure.provider === 'apple_health' ? 'Apple Health' : status.expenditure.displayName}
+            detail="Your connection is saved. CalorieBank is waiting for a complete daily calorie-burn total."
+            onRetry={() => void retrySelectedSource('expenditure')}
+          /> : <>
+          {Platform.OS === 'ios' ? <ProviderOption title="Apple Watch" detail="CalorieBank securely reads its activity data through Apple Health." busy={busy === 'apple-burn'} disabled={busy !== null} connected={status.expenditure.provider === 'apple_health' && status.expenditure.connected} onPress={() => void connectApple('expenditure')} /> : null}
+          <ProviderOption title="Fitbit" detail="Uses your Fitbit calorie burn, steps, and workouts." busy={busy === 'fitbit'} disabled={busy !== null} connected={status.expenditure.provider === 'google_health_fitbit' && status.expenditure.connected} onPress={() => void connectFitbit()} />
           {providerState?.connectedProviders.some((provider) => provider.provider === 'google_health_fitbit' && provider.status === 'connected') && status.expenditure.provider !== 'google_health_fitbit' ? (
             <PrimaryButton busy={busy !== null} label="Use connected Fitbit" onPress={() => void run('fitbit', async () => {
               await selectProvider({ authoritativeExpenditureProvider: 'google_health_fitbit', authoritativeActivityProvider: 'google_health_fitbit' });
               await syncFitbit(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
             })} />
           ) : null}
-          {status.expenditure.connected && status.expenditure.readiness === 'connected_waiting_for_data' ? <>
-            <Text style={styles.detail}>{status.expenditure.displayName} is connected, but calorie-burn data isn’t ready yet.</Text>
-            <PrimaryButton busy={busy !== null} label={status.expenditure.provider === 'apple_health' ? 'Refresh Apple Health' : 'Try again'} onPress={() => void run(status.expenditure.provider === 'apple_health' ? 'apple' : 'fitbit', () => status.expenditure.provider === 'google_health_fitbit'
-              ? syncFitbit(Intl.DateTimeFormat().resolvedOptions().timeZone, true)
-              : refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }))} />
-          </> : null}
-          {appleBurnNeedsRefresh ? <>
-            <Text style={styles.detail}>Apple Health is available, but CalorieBank hasn’t found a complete calorie-burn total yet.</Text>
-            <PrimaryButton busy={busy !== null} label="Refresh Apple Health" onPress={() => void connectApple('expenditure')} />
-          </> : null}
           <BackButton onPress={() => setDisplayStage(previousSetupStage(activeStage))} />
+          </>}
         </>;
       case 'calories_eaten':
         return <>
           <Text style={styles.title}>Where do you track your food?</Text>
           <Text style={styles.detail}>Choose one source for your daily calorie total.</Text>
+          {intakeWaiting ? <WaitingForData
+            busy={busy !== null}
+            source={status.intake.displayName}
+            detail="Your connection is saved. CalorieBank is waiting for a daily calorie total from this source."
+            onRetry={() => void retrySelectedSource('intake')}
+          /> : <>
           {Platform.OS === 'ios' ? <>
             <Text style={styles.sectionLabel}>Apps that share through Apple Health</Text>
-            <ProviderOption title="MyFitnessPal" detail="Connect through Apple Health." busy={busy === 'apple'} onPress={() => void connectAppleIntakeTracker('myfitnesspal')} />
-            <ProviderOption title="Cronometer" detail="Connect through Apple Health." busy={busy === 'apple'} onPress={() => void connectAppleIntakeTracker('cronometer')} />
-            <ProviderOption title="Lose It!" detail="Connect through Apple Health." busy={busy === 'apple'} onPress={() => void connectAppleIntakeTracker('lose_it')} />
-            <ProviderOption title="MacroFactor" detail="Connect through Apple Health." busy={busy === 'apple'} onPress={() => void connectAppleIntakeTracker('macrofactor')} />
-            <ProviderOption title="Another app using Apple Health" detail="Choose an app that shares your daily calories." busy={busy === 'apple'} onPress={() => void discoverOtherAppleHealthWriters()} />
+            <ProviderOption title="MyFitnessPal" detail="Connect through Apple Health." busy={busy === 'apple-intake:myfitnesspal'} disabled={busy !== null} connected={selectedAppleHealthWriter(providerState, 'MyFitnessPal')} onPress={() => void connectAppleIntakeTracker('myfitnesspal')} />
+            <ProviderOption title="Cronometer" detail="Connect through Apple Health." busy={busy === 'apple-intake:cronometer'} disabled={busy !== null} connected={selectedAppleHealthWriter(providerState, 'Cronometer')} onPress={() => void connectAppleIntakeTracker('cronometer')} />
+            <ProviderOption title="Lose It!" detail="Connect through Apple Health." busy={busy === 'apple-intake:lose_it'} disabled={busy !== null} connected={selectedAppleHealthWriter(providerState, 'Lose It!')} onPress={() => void connectAppleIntakeTracker('lose_it')} />
+            <ProviderOption title="MacroFactor" detail="Connect through Apple Health." busy={busy === 'apple-intake:macrofactor'} disabled={busy !== null} connected={selectedAppleHealthWriter(providerState, 'MacroFactor')} onPress={() => void connectAppleIntakeTracker('macrofactor')} />
+            <ProviderOption title="Another app using Apple Health" detail="Choose an app that shares your daily calories." busy={busy === 'apple-intake:other'} disabled={busy !== null} onPress={() => void discoverOtherAppleHealthWriters()} />
             {discoveredIntakeWriters.map((writer, index) => (
               <ProviderOption
                 key={writer.bundleIdentifier}
                 title={writer.displayName === 'Apple Health app' ? `Apple Health app ${index + 1}` : writer.displayName}
                 detail="Use this app for calories eaten."
-                busy={busy === 'apple'}
+                busy={busy === `apple-intake:${writer.bundleIdentifier}`}
+                disabled={busy !== null}
+                connected={providerState?.intake.writerBundleIdentifier === writer.bundleIdentifier}
                 onPress={() => void selectDiscoveredWriter(writer)}
               />
             ))}
           </> : null}
           <Text style={styles.sectionLabel}>Direct connection</Text>
-          <ProviderOption title="FatSecret" detail="Connect your existing FatSecret food diary directly." busy={busy === 'fatsecret'} onPress={() => void connectFatSecret()} />
+          <ProviderOption title="FatSecret" detail="Connect your existing FatSecret food diary directly." busy={busy === 'fatsecret'} disabled={busy !== null} connected={status.intake.provider === 'fatsecret' && status.intake.connected} onPress={() => void connectFatSecret()} />
           {providerState?.connectedProviders.some((provider) => provider.provider === 'fatsecret' && provider.status === 'connected') && status.intake.provider !== 'fatsecret' ? (
             <PrimaryButton busy={busy !== null} label="Use connected FatSecret" onPress={() => void run('fatsecret', async () => {
               await selectProvider({ authoritativeIntakeProvider: 'fatsecret' });
               await syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
             })} />
           ) : null}
-          {status.intake.connected && status.intake.readiness === 'connected_waiting_for_data' ? <>
-            <Text style={styles.detail}>{status.intake.displayName} is connected, but calorie data isn’t ready yet.</Text>
-            <PrimaryButton busy={busy !== null} label={status.intake.provider === 'apple_health' ? 'Refresh Apple Health' : 'Try again'} onPress={() => void run(status.intake.provider === 'apple_health' ? 'apple' : 'fatsecret', () => status.intake.provider === 'fatsecret'
-              ? syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true)
-              : refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }))} />
-          </> : null}
-          {appleIntakeNeedsRefresh ? <Text style={styles.detail}>Cronometer data is still being loaded from Apple Health.</Text> : null}
           <BackButton onPress={() => setDisplayStage(previousSetupStage(activeStage))} />
+          </>}
         </>;
       case 'goal':
         return <>
@@ -414,8 +427,12 @@ function PrimaryButton({ label, busy, onPress }: { label: string; busy: boolean;
   return <Pressable accessibilityLabel={label} accessibilityRole="button" disabled={busy} onPress={onPress} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>{label}</Text>}</Pressable>;
 }
 
-function ProviderOption({ title, detail, busy, onPress }: { title: string; detail: string; busy: boolean; onPress: () => void }) {
-  return <View style={styles.providerCard}><View style={styles.providerCopy}><Text style={styles.providerTitle}>{title}</Text><Text style={styles.note}>{detail}</Text></View><Pressable accessibilityLabel={`Connect ${title}`} accessibilityRole="button" disabled={busy} onPress={onPress} style={({ pressed }) => [styles.connectButton, pressed && styles.pressed]}>{busy ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.connectButtonText}>Connect</Text>}</Pressable></View>;
+function ProviderOption({ title, detail, busy, disabled, connected = false, onPress }: { title: string; detail: string; busy: boolean; disabled: boolean; connected?: boolean; onPress: () => void }) {
+  return <View style={[styles.providerCard, connected && styles.connectedCard]}><View style={styles.providerCopy}><Text style={styles.providerTitle}>{title}</Text><Text style={styles.note}>{connected ? 'Connected' : detail}</Text></View><Pressable accessibilityLabel={connected ? `${title} connected` : `Connect ${title}`} accessibilityRole="button" disabled={disabled || connected} onPress={onPress} style={({ pressed }) => [styles.connectButton, connected && styles.connectedButton, pressed && styles.pressed, disabled && !busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.surface} /> : <Text style={[styles.connectButtonText, connected && styles.connectedButtonText]}>{connected ? 'Connected' : 'Connect'}</Text>}</Pressable></View>;
+}
+
+function WaitingForData({ source, detail, busy, onRetry }: { source: string; detail: string; busy: boolean; onRetry: () => void }) {
+  return <View style={styles.waitingCard}><Text style={styles.connectedLabel}>Connected</Text><Text style={styles.providerTitle}>{source}</Text><Text style={styles.note}>{detail}</Text><PrimaryButton busy={busy} label="Check again" onPress={onRetry} /></View>;
 }
 
 function BackButton({ label = 'Back', onPress }: { label?: string; onPress: () => void }) {
@@ -443,14 +460,19 @@ const styles = StyleSheet.create({
   detail: { color: colors.textMuted, fontSize: typography.body, lineHeight: 24 },
   note: { color: colors.textMuted, flexShrink: 1, fontSize: typography.caption, lineHeight: 19 },
   providerCard: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, flexDirection: 'row', gap: spacing.md, minHeight: 88, padding: spacing.md },
+  connectedCard: { borderColor: colors.primary },
   providerCopy: { flex: 1, gap: spacing.xs }, providerTitle: { color: colors.text, fontSize: typography.subheading, fontWeight: '800' },
   connectButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radii.sm, justifyContent: 'center', minHeight: 48, minWidth: 92, paddingHorizontal: spacing.md },
   connectButtonText: { color: colors.surface, fontSize: typography.body, fontWeight: '700' },
+  connectedButton: { backgroundColor: colors.background, borderColor: colors.primary, borderWidth: 1 },
+  connectedButtonText: { color: colors.primaryDark },
   primaryButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radii.sm, justifyContent: 'center', marginTop: spacing.sm, minHeight: 52, paddingHorizontal: spacing.lg },
   primaryButtonText: { color: colors.surface, fontSize: typography.body, fontWeight: '800' },
   balancePanel: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, gap: spacing.xs, padding: spacing.lg },
   balanceLabel: { color: colors.textMuted, fontSize: typography.body, fontWeight: '700' }, balanceValue: { color: colors.text, fontSize: 38, fontWeight: '800' },
   preparationRow: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.sm, borderWidth: 1, gap: spacing.xs, padding: spacing.md },
+  waitingCard: { backgroundColor: colors.surface, borderColor: colors.primary, borderRadius: radii.md, borderWidth: 1, gap: spacing.sm, padding: spacing.lg },
+  connectedLabel: { color: colors.primaryDark, fontSize: typography.caption, fontWeight: '800', textTransform: 'uppercase' },
   attention: { color: colors.accent, fontSize: typography.body, lineHeight: 22 }, error: { color: colors.danger, fontSize: typography.body, lineHeight: 22 }, pressed: { opacity: 0.72 }, disabled: { opacity: 0.65 },
   linkText: { color: colors.primaryDark, fontSize: typography.body, fontWeight: '700', textAlign: 'center' },
 });

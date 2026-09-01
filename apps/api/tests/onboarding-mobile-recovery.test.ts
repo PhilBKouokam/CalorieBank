@@ -6,6 +6,8 @@ import {
   onboardingRecoveryMessage,
   preparationEditStage,
   previousSetupStage,
+  selectedAppleHealthWriter,
+  sourceNeedsData,
 } from '../../mobile/lib/onboarding/onboarding-recovery';
 import type {
   HealthConnectionsResponse,
@@ -54,6 +56,21 @@ describe('mobile onboarding recovery policy', () => {
       preparation: { expenditure: 'complete', intake: 'preparing', history: 'preparing' },
     } as OnboardingStatusResponse;
     expect(preparationEditStage(status)).toBe('calories_eaten');
+  });
+
+  it('uses a single waiting state only after a source is already connected', () => {
+    expect(sourceNeedsData({ connected: true, readiness: 'connected_waiting_for_data' } as OnboardingStatusResponse['intake'])).toBe(true);
+    expect(sourceNeedsData({ connected: false, readiness: 'not_connected' } as OnboardingStatusResponse['intake'])).toBe(false);
+    expect(sourceNeedsData({ connected: true, readiness: 'ready' } as OnboardingStatusResponse['intake'])).toBe(false);
+  });
+
+  it('marks only the selected Apple Health food writer as connected', () => {
+    const providers = {
+      intake: { authoritativeProvider: 'apple_health', writerDisplayName: 'Cronometer' },
+    } as ProviderSelectionResponse;
+    expect(selectedAppleHealthWriter(providers, 'Cronometer')).toBe(true);
+    expect(selectedAppleHealthWriter(providers, 'MyFitnessPal')).toBe(false);
+    expect(selectedAppleHealthWriter(null, 'Cronometer')).toBe(false);
   });
 
   it('uses actionable Apple Health and network errors instead of a generic connection diagnosis', () => {

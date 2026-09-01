@@ -27,6 +27,20 @@ export function previousSetupStage(stage: OnboardingStage): OnboardingStage | nu
   return null;
 }
 
+export function sourceNeedsData(
+  source: OnboardingStatusResponse['expenditure'] | OnboardingStatusResponse['intake'],
+) {
+  return source.connected && source.readiness === 'connected_waiting_for_data';
+}
+
+export function selectedAppleHealthWriter(
+  providers: ProviderSelectionResponse | null,
+  displayName: string,
+) {
+  return providers?.intake.authoritativeProvider === 'apple_health'
+    && providers.intake.writerDisplayName === displayName;
+}
+
 export function preparationEditStage(status: OnboardingStatusResponse): OnboardingStage {
   if (status.preparation.intake !== 'complete') return 'calories_eaten';
   if (status.preparation.expenditure !== 'complete') return 'calories_burned';
