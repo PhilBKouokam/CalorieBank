@@ -156,6 +156,8 @@ export function getApiRequestFailureKind(error: unknown): ApiRequestFailureKind 
 
 let loggedApiBaseUrl: string | null = null;
 let accessTokenProvider: (() => Promise<string | null>) | null = null;
+let accessTokenContext: string | null = null;
+let accessTokenGeneration = 0;
 let apiAuthState = { ready: false, activeSessionPresent: false };
 let apiNetworkDiagnostics: ApiNetworkDiagnostics = {
   baseUrl: null,
@@ -204,7 +206,12 @@ export function getApiBaseUrl() {
 export function setApiAccessTokenProvider(
   provider: (() => Promise<string | null>) | null,
   state: { ready: boolean; activeSessionPresent: boolean } = { ready: false, activeSessionPresent: false },
+  accountContext: string | null = null,
 ) {
+  if (accountContext !== accessTokenContext) {
+    accessTokenContext = accountContext;
+    accessTokenGeneration += 1;
+  }
   accessTokenProvider = provider;
   apiAuthState = state;
 }
@@ -264,11 +271,16 @@ async function apiRequest(path: string, init?: RequestInit) {
   }, 20000);
 
   try {
+    const requestAuthGeneration = accessTokenGeneration;
+    const requestTokenProvider = accessTokenProvider;
     const authMode = process.env.EXPO_PUBLIC_AUTH_MODE ?? 'development';
     if (!isApiAuthenticationReady(authMode)) {
       throw new ApiAuthenticationPendingError();
     }
-    const token = authMode === 'clerk' ? await accessTokenProvider?.() ?? null : null;
+    const token = authMode === 'clerk' ? await requestTokenProvider?.() ?? null : null;
+    if (requestAuthGeneration !== accessTokenGeneration) {
+      throw new ApiAuthenticationPendingError();
+    }
     if (authMode === 'clerk' && !token) {
       throw new ApiAuthenticationPendingError();
     }
@@ -607,6 +619,7 @@ export async function runForegroundLifecycle(
     shouldSyncHealthKit: boolean;
     unresolvedDates: string[];
     errors: Array<{ provider: string; code: string }>;
+    historyDayCount: number;
   };
 }
 

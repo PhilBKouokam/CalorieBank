@@ -20,6 +20,7 @@ type SingleFlightOptions = { force?: boolean };
 export type RollingSyncSingleFlight<T, TOptions extends SingleFlightOptions> = {
   run(options: TOptions): Promise<T>;
   isRunning(): boolean;
+  reset(): void;
 };
 
 export function rollingUploadKey(upload: RollingSyncUpload) {
@@ -117,12 +118,14 @@ export function createRollingSyncSingleFlight<T, TOptions extends SingleFlightOp
 ): RollingSyncSingleFlight<T, TOptions> {
   let active: Promise<T> | null = null;
   let queuedManual: Promise<T> | null = null;
+  let generation = 0;
 
   const start = (options: TOptions) => {
+    const runGeneration = generation;
     const execution = execute(options);
     let tracked: Promise<T>;
     tracked = execution.finally(() => {
-      if (active === tracked) active = null;
+      if (runGeneration === generation && active === tracked) active = null;
     });
     active = tracked;
     return tracked;
@@ -134,7 +137,12 @@ export function createRollingSyncSingleFlight<T, TOptions extends SingleFlightOp
       if (!options.force) return active;
 
       if (!queuedManual) {
-        const waiting = active.catch(() => undefined).then(() => start(options));
+        const activeAtQueueTime = active;
+        const queuedGeneration = generation;
+        const waiting = activeAtQueueTime.then(
+          () => queuedGeneration === generation ? start(options) : activeAtQueueTime,
+          (error) => queuedGeneration === generation ? start(options) : Promise.reject(error),
+        );
         let tracked: Promise<T>;
         tracked = waiting.finally(() => {
           if (queuedManual === tracked) queuedManual = null;
@@ -145,6 +153,11 @@ export function createRollingSyncSingleFlight<T, TOptions extends SingleFlightOp
     },
     isRunning() {
       return active !== null || queuedManual !== null;
+    },
+    reset() {
+      generation += 1;
+      active = null;
+      queuedManual = null;
     },
   };
 }

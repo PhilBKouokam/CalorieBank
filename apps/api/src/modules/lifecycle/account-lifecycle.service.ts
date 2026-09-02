@@ -39,6 +39,7 @@ export type LifecycleUserResult = {
   unresolvedDates: string[];
   refreshedProviders: string[];
   errors: Array<{ provider: string; code: string }>;
+  historyDayCount: number;
 };
 
 export class AccountLifecycleCoordinator {
@@ -99,7 +100,9 @@ export class AccountLifecycleCoordinator {
     const unresolvedDates = accountingStartsOn
       ? recentDates.slice(1).filter((date) => date >= accountingStartsOn && !completed.has(date))
       : [];
-    const dayCount = unresolvedDates.length > 0 ? MAX_CATCH_UP_DAYS : NORMAL_SYNC_DAYS;
+    const dayCount = !accountingStartsOn || unresolvedDates.length > 0
+      ? MAX_CATCH_UP_DAYS
+      : NORMAL_SYNC_DAYS;
     const datesRequested = datesThroughToday(currentLocalDate, dayCount);
     const selection = await readProviderSelection(this.db, user.id);
     const provisionalDates = await this.db.finalizedDailyBankRecord.findMany({
@@ -121,6 +124,14 @@ export class AccountLifecycleCoordinator {
     const errors: LifecycleUserResult['errors'] = [];
 
     this.log('lifecycle_user_started', { userSuffix: user.id.slice(-8), trigger, unresolvedCount: unresolvedDates.length });
+    if (dayCount === MAX_CATCH_UP_DAYS) {
+      this.log('historical_bootstrap_started', {
+        userSuffix: user.id.slice(-8),
+        trigger,
+        dateCount: datesRequested.length,
+        reason: accountingStartsOn ? 'continuity_recovery' : 'account_initialization',
+      });
+    }
     for (const provider of ['google_health_fitbit', 'fatsecret'] as const) {
       if (!providers.has(provider)) continue;
       this.log('provider_refresh_started', { userSuffix: user.id.slice(-8), provider, trigger });
@@ -158,6 +169,7 @@ export class AccountLifecycleCoordinator {
       unresolvedDates,
       refreshedProviders,
       errors: [...errors, ...orchestration.errors.map((code) => ({ provider: 'accounting', code }))],
+      historyDayCount: dayCount,
     };
     this.log('lifecycle_user_completed', {
       userSuffix: user.id.slice(-8), trigger,
@@ -165,6 +177,15 @@ export class AccountLifecycleCoordinator {
       unresolvedCount: unresolvedDates.length,
       errorCount: result.errors.length,
     });
+    if (dayCount === MAX_CATCH_UP_DAYS) {
+      this.log(result.errors.length === 0 ? 'historical_bootstrap_completed' : 'historical_bootstrap_partial', {
+        userSuffix: user.id.slice(-8),
+        trigger,
+        dateCount: datesRequested.length,
+        unresolvedCount: unresolvedDates.length,
+        errorCount: result.errors.length,
+      });
+    }
     return result;
   }
 

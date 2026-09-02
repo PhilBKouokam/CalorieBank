@@ -59,7 +59,9 @@ export function runAccountLifecycle(options: { force?: boolean } = {}): Promise<
         timezone,
         force ? 'manual_refresh' : 'app_foreground',
       );
-      if (!server.shouldSyncHealthKit) return { status: 'skipped', detail: null };
+      if (generation !== scopeGeneration || !server.shouldSyncHealthKit) {
+        return { status: 'skipped', detail: null };
+      }
       const appleStatus = await getAppleHealthConnectionStatus();
       let appleFailed = false;
       if (appleStatus === 'connected') {
@@ -67,12 +69,13 @@ export function runAccountLifecycle(options: { force?: boolean } = {}): Promise<
           await syncAppleHealthToday({
             force,
             trigger: force ? 'manual_refresh' : 'app_foreground',
-            dayCount: server.unresolvedDates.length > 0 ? 8 : 3,
+            dayCount: server.historyDayCount,
           });
         } catch {
           appleFailed = true;
         }
       }
+      if (generation !== scopeGeneration) return { status: 'skipped', detail: null };
       lastAutomaticRunAt = Date.now();
       const hasServerErrors = server.errors.length > 0;
       const reconnectProvider = server.errors.find((error) => error.code === 'needs_reconnect')?.provider;

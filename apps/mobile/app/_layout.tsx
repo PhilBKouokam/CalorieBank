@@ -39,7 +39,7 @@ function AuthenticatedAppStack() {
   setApiAccessTokenProvider(getToken, {
     ready: isLoaded && isSignedIn && Boolean(sessionId),
     activeSessionPresent: Boolean(sessionId),
-  });
+  }, userId ?? null);
   setAppleHealthAccountScope(userId ?? null);
   useEffect(() => {
     resetAccountLifecycle(userId ?? null);
