@@ -7,6 +7,7 @@ import {
 const AUTOMATIC_COOLDOWN_MS = 5 * 60 * 1000;
 let accountScope: string | null = null;
 let activeRun: Promise<AccountLifecycleResult> | null = null;
+let queuedForcedRun: Promise<AccountLifecycleResult> | null = null;
 let lastAutomaticRunAt = 0;
 let scopeGeneration = 0;
 const listeners = new Set<(result: AccountLifecycleResult) => void>();
@@ -21,6 +22,7 @@ export function resetAccountLifecycle(scope: string | null) {
   accountScope = scope;
   scopeGeneration += 1;
   activeRun = null;
+  queuedForcedRun = null;
   lastAutomaticRunAt = 0;
 }
 
@@ -30,8 +32,22 @@ export function subscribeToAccountLifecycle(listener: (result: AccountLifecycleR
 }
 
 export function runAccountLifecycle(options: { force?: boolean } = {}): Promise<AccountLifecycleResult> {
-  if (activeRun) return activeRun;
   const force = options.force ?? false;
+  if (activeRun) {
+    if (!force) return activeRun;
+    if (!queuedForcedRun) {
+      const generation = scopeGeneration;
+      queuedForcedRun = activeRun.catch(() => undefined).then(() => {
+        if (generation !== scopeGeneration) {
+          return { status: 'skipped' as const, detail: null };
+        }
+        return runAccountLifecycle({ force: true });
+      }).finally(() => {
+        if (generation === scopeGeneration) queuedForcedRun = null;
+      });
+    }
+    return queuedForcedRun;
+  }
   const generation = scopeGeneration;
   if (!force && Date.now() - lastAutomaticRunAt < AUTOMATIC_COOLDOWN_MS) {
     return Promise.resolve<AccountLifecycleResult>({ status: 'skipped', detail: null });
@@ -83,4 +99,8 @@ export function runAccountLifecycle(options: { force?: boolean } = {}): Promise<
   });
   activeRun = run;
   return run;
+}
+
+export function isAccountLifecycleRunning() {
+  return activeRun !== null || queuedForcedRun !== null;
 }

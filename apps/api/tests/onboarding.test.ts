@@ -2,7 +2,8 @@ import type { BankSummaryResponse, ProviderSelectionResponse } from '@calorieban
 import { describe, expect, it } from 'vitest';
 
 import { deriveOnboardingStatus, type OnboardingFacts } from '../src/modules/onboarding/onboarding.repository';
-import { emptyTodayDetail, emptyTodayValue } from '../../mobile/lib/today/presentation';
+import { emptyTodayDetail, emptyTodayValue, firstRunTodayEmptyState } from '../../mobile/lib/today/presentation';
+import { deriveFirstRunBootstrapState } from '../../mobile/lib/onboarding/onboarding-recovery';
 
 const selection: ProviderSelectionResponse = {
   expenditure: { authoritativeProvider: 'google_health_fitbit', displayName: 'Fitbit', status: 'ready', fallbackActive: false },
@@ -123,5 +124,39 @@ describe('consumer Today states', () => {
     expect(emptyTodayValue('partial', 'steps')).toBe('Some steps unavailable');
     expect(emptyTodayDetail('error', 'Fitbit', 'calories burned')).toBe('Fitbit needs attention');
     expect(emptyTodayDetail('unavailable', 'FatSecret', 'calories eaten')).toContain('FatSecret');
+  });
+
+  it('shows checking rather than no-data while first-run intake is still hydrating', () => {
+    expect(firstRunTodayEmptyState({
+      checking: true,
+      source: 'Cronometer',
+      noun: 'intake',
+    })).toEqual({
+      value: 'Loading today’s calories…',
+      detail: 'Checking Cronometer',
+    });
+    expect(firstRunTodayEmptyState({ checking: false, source: 'Cronometer', noun: 'intake' }))
+      .toBeNull();
+  });
+
+  it('separates current-data readiness from history and Opening Bank readiness', () => {
+    const state = deriveFirstRunBootstrapState({
+      onboarding: {
+        ...deriveOnboardingStatus(facts({ completed: true })),
+        preparation: { expenditure: 'complete', intake: 'complete', history: 'preparing' },
+      },
+      bank: { ...summary, openingBankStatus: 'waiting_for_opening_data' },
+      today: {
+        burned: { adjusted: 2400 },
+        eaten: { calories: 1800 },
+      } as never,
+    });
+    expect(state).toEqual({
+      currentBurnReady: true,
+      currentIntakeReady: true,
+      historyReady: false,
+      bankReady: false,
+      complete: false,
+    });
   });
 });

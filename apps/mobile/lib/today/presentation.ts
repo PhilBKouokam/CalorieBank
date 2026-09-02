@@ -24,6 +24,19 @@ export function emptyTodayDetail(
   return `${provider} has not reported ${noun} today`;
 }
 
+export function firstRunTodayEmptyState(input: {
+  checking: boolean;
+  source: string | null;
+  noun: 'intake' | 'burn data';
+}) {
+  if (!input.checking) return null;
+  const provider = input.source ?? 'your source';
+  return {
+    value: input.noun === 'intake' ? 'Loading today’s calories…' : 'Loading today’s burn…',
+    detail: `Checking ${provider}`,
+  };
+}
+
 export function formatStepContributions(input: {
   providerContributionCalories: number;
   actualContributionCalories: number;

@@ -7,6 +7,7 @@ import {
   type TodayResponse,
   type DashboardPreferencesResponse,
   type ProviderSelectionResponse,
+  type OnboardingStatusResponse,
 } from '@caloriebank/schemas';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useFocusEffect, useRouter, type Href } from 'expo-router';
@@ -28,15 +29,17 @@ import {
   fetchBankSummary,
   fetchDashboardPreferences,
   fetchGoalConfiguration,
+  fetchOnboardingStatus,
   fetchPlannedTreat,
   fetchProviderSelection,
   fetchToday,
   getApiBaseUrl,
 } from '@/lib/api/client';
-import { runAccountLifecycle, subscribeToAccountLifecycle } from '@/lib/lifecycle/account-lifecycle';
+import { isAccountLifecycleRunning, runAccountLifecycle, subscribeToAccountLifecycle } from '@/lib/lifecycle/account-lifecycle';
 import {
   emptyTodayDetail,
   emptyTodayValue,
+  firstRunTodayEmptyState,
   formatStepContributions,
   formatWorkoutCalorieLines,
 } from '@/lib/today/presentation';
@@ -135,6 +138,8 @@ export default function TodayScreen() {
   const [today, setToday] = useState<TodayResponse | null>(null);
   const [todayStatus, setTodayStatus] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
   const [providerSelection, setProviderSelection] = useState<ProviderSelectionResponse | null>(null);
+  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatusResponse | null>(null);
+  const [firstRunCheckPending, setFirstRunCheckPending] = useState(false);
   const [healthSyncDetail, setHealthSyncDetail] = useState<string | null>(null);
   const [refreshingHealth, setRefreshingHealth] = useState(false);
   const [showWhyEighty, setShowWhyEighty] = useState(false);
@@ -162,7 +167,8 @@ export default function TodayScreen() {
 
   useEffect(() => subscribeToAccountLifecycle((result) => {
     setHealthSyncDetail(result.detail);
-    void refreshVisibleReadModels();
+    setFirstRunCheckPending(isAccountLifecycleRunning());
+    void Promise.all([refreshVisibleReadModels(), fetchOnboardingStatus().then(setOnboardingStatus).catch(() => null)]);
   }), [refreshVisibleReadModels]);
 
   const refreshHealthAwareness = useCallback(async (
@@ -200,13 +206,16 @@ export default function TodayScreen() {
         setPlannedTreatStatus('loading');
         setTodayStatus('loading');
 
-        const [configurationResult, bankSummaryResult, plannedTreatResult, todayResult, preferencesResult, providerResult] = await Promise.allSettled([
+        const lifecycle = runAccountLifecycle();
+        setFirstRunCheckPending(true);
+        const [configurationResult, bankSummaryResult, plannedTreatResult, todayResult, preferencesResult, providerResult, onboardingResult] = await Promise.allSettled([
           fetchGoalConfiguration(),
           fetchBankSummary(),
           fetchPlannedTreat(),
           fetchToday(Intl.DateTimeFormat().resolvedOptions().timeZone),
           fetchDashboardPreferences(),
           fetchProviderSelection(),
+          fetchOnboardingStatus(),
         ]);
         if (!isMounted) return;
 
@@ -253,20 +262,44 @@ export default function TodayScreen() {
           setDashboardPreferences(preferencesResult.value);
         }
         if (providerResult.status === 'fulfilled') setProviderSelection(providerResult.value);
+        if (onboardingResult.status === 'fulfilled') setOnboardingStatus(onboardingResult.value);
+
+        void lifecycle.finally(async () => {
+          if (!isMounted) return;
+          setFirstRunCheckPending(isAccountLifecycleRunning());
+          await Promise.all([
+            refreshVisibleReadModels(),
+            fetchOnboardingStatus().then(setOnboardingStatus).catch(() => null),
+          ]);
+        });
       }
 
       void loadToday();
       return () => {
         isMounted = false;
       };
-    }, []),
+    }, [refreshVisibleReadModels]),
   );
 
   const hasCompletedDays = Boolean(bankSummary?.latestCompletedDate);
   const hasInitializedBank = bankSummary?.openingBankStatus === 'initialized';
+  const historyPreparationPending = onboardingStatus?.completed === true &&
+    onboardingStatus.preparation.history === 'preparing';
+  const firstRunIntakeState = firstRunTodayEmptyState({
+    checking: firstRunCheckPending && today?.eaten.calories == null,
+    source: providerSelection?.intake.displayName ?? null,
+    noun: 'intake',
+  });
+  const firstRunBurnState = firstRunTodayEmptyState({
+    checking: firstRunCheckPending && today?.burned.adjusted == null,
+    source: providerSelection?.expenditure.displayName ?? null,
+    noun: 'burn data',
+  });
   const bankValue =
     bankStatus === 'loading'
       ? 'Loading...'
+      : historyPreparationPending
+        ? 'Setting up…'
       : hasInitializedBank && bankSummary
         ? formatBankBalance(bankSummary.availableBankCalories)
         : bankStatus === 'error'
@@ -276,12 +309,16 @@ export default function TodayScreen() {
     ? `Calculated through ${formatDisplayDate(bankSummary.latestCompletedDate)}`
     : hasInitializedBank
       ? 'Waiting for a complete day'
+    : historyPreparationPending
+      ? 'Checking recent days…'
     : bankStatus === 'error'
       ? 'Try again later'
       : 'Waiting for completed provider data';
   const latestChangeValue =
     bankStatus === 'loading'
       ? 'Loading...'
+      : historyPreparationPending
+        ? 'Checking recent days…'
       : hasCompletedDays && bankSummary && bankSummary.latestDailyBankChange !== null
         ? formatCalories(bankSummary.latestDailyBankChange)
         : bankStatus === 'error'
@@ -307,20 +344,27 @@ export default function TodayScreen() {
   const burnedValue =
     todayStatus === 'loading'
       ? 'Loading...'
+      : firstRunBurnState
+        ? firstRunBurnState.value
       : today?.burned.adjusted !== null && today?.burned.adjusted !== undefined
         ? `${today.burned.adjusted.toLocaleString()} kcal`
         : emptyTodayValue(today?.burned.status ?? 'unavailable', 'burn data');
   const eatenValue =
     todayStatus === 'loading'
       ? 'Loading...'
+      : firstRunIntakeState
+        ? firstRunIntakeState.value
       : today?.eaten.calories !== null && today?.eaten.calories !== undefined
         ? `${today.eaten.calories.toLocaleString()} kcal`
         : emptyTodayValue(today?.eaten.status ?? 'unavailable', 'intake');
-  const burnedDetail =
-    today?.burned.raw !== null && today?.burned.raw !== undefined && today.burned.source
+  const burnedDetail = firstRunBurnState
+    ? firstRunBurnState.detail
+    : today?.burned.raw !== null && today?.burned.raw !== undefined && today.burned.source
       ? `${today.burned.raw.toLocaleString()} from ${getConsumerSourceName(today.burned.source)} × ${formatPercent(today.burned.adjustmentFactor)}`
       : emptyTodayDetail(today?.burned.status ?? 'unavailable', today?.burned.source ?? providerSelection?.expenditure.displayName ?? null, 'calories burned');
-  const eatenDetail = today?.eaten.source
+  const eatenDetail = firstRunIntakeState
+    ? firstRunIntakeState.detail
+    : today?.eaten.source
     ? `Imported from ${getConsumerSourceName(today.eaten.source)}`
     : emptyTodayDetail(today?.eaten.status ?? 'unavailable', providerSelection?.intake.displayName ?? null, 'calories eaten');
   const visibleCards = dashboardPreferences ?? {

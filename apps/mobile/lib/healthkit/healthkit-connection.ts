@@ -135,19 +135,31 @@ function logHealthKitDiagnostic(event: string, metadata: Record<string, unknown>
   console.info(`[CalorieBank HealthKit] ${event}`, metadata);
 }
 
+function logFirstRunHealthKitOutcome(outcome: AppleHealthSyncOutcome, durationMs: number) {
+  console.info(JSON.stringify({
+    component: 'first_run_bootstrap',
+    event: outcome.syncStatus === 'failure'
+      ? 'first_run_current_intake_failed'
+      : outcome.intakeFound
+        ? 'first_run_current_intake_ready'
+        : 'first_run_current_intake_no_data',
+    intakeWriterStatus: outcome.intakeWriterStatus ?? 'unknown',
+    syncStatus: outcome.syncStatus,
+    uploadSucceeded: outcome.syncStatus !== 'failure',
+    durationMs,
+  }));
+}
+
 async function saveHealthKitDiagnostics(snapshot: HealthKitDiagnosticsSnapshot) {
-  if (!__DEV__) return;
   await AsyncStorage.setItem(appleHealthAccountStorageKey(DIAGNOSTICS_KEY), JSON.stringify(snapshot));
 }
 
 export async function getAppleHealthDiagnostics(): Promise<HealthKitDiagnosticsSnapshot | null> {
-  if (!__DEV__) return null;
   const stored = await readJson<HealthKitDiagnosticsSnapshot | null>(appleHealthAccountStorageKey(DIAGNOSTICS_KEY), null);
   return stored ? createHealthKitDiagnosticsSnapshot(stored) : null;
 }
 
 async function recordGlobalSyncFailure(error: unknown) {
-  if (!__DEV__) return;
   const previous = await getAppleHealthDiagnostics();
   const safeError = safeHealthKitError(error);
   const snapshot = createHealthKitDiagnosticsSnapshot({
@@ -714,6 +726,9 @@ async function executeAppleHealthRollingWindowSync(
       trigger: options.trigger ?? 'screen_focus',
       result: outcome.syncStatus,
     });
+    if (options.trigger === 'connection' || options.trigger === 'provider_reconnect') {
+      logFirstRunHealthKitOutcome(outcome, Date.now() - new Date(startedAt).getTime());
+    }
     return outcome;
   } catch (error) {
     await recordGlobalSyncFailure(error);

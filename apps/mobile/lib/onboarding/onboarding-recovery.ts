@@ -1,9 +1,27 @@
 import type {
+  BankSummaryResponse,
   HealthConnectionsResponse,
   OnboardingStage,
   OnboardingStatusResponse,
   ProviderSelectionResponse,
+  TodayResponse,
 } from '@caloriebank/schemas';
+
+export function deriveFirstRunBootstrapState(input: {
+  onboarding: OnboardingStatusResponse;
+  bank: BankSummaryResponse;
+  today: TodayResponse;
+}) {
+  const historyReady = input.onboarding.preparation.history === 'complete' ||
+    input.onboarding.preparation.history === 'no_history';
+  return {
+    currentBurnReady: input.today.burned.adjusted !== null,
+    currentIntakeReady: input.today.eaten.calories !== null,
+    historyReady,
+    bankReady: input.bank.openingBankStatus === 'initialized',
+    complete: historyReady,
+  };
+}
 
 export function appleHealthBurnIsReady(connections: HealthConnectionsResponse) {
   return [connections.burned.selected, ...connections.burned.alternatives]

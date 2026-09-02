@@ -55,6 +55,7 @@ import {
   sourceSelectionSatisfiesOnboarding,
   withOnboardingTimeout,
 } from '@/lib/onboarding/onboarding-recovery';
+import { runFirstRunBootstrap } from '@/lib/onboarding/first-run-bootstrap';
 
 type AppleIntakeAction = `apple-intake:${KnownFoodTracker | 'other' | string}`;
 type BusyAction = 'loading' | 'fitbit' | 'fatsecret' | 'apple-burn' | AppleIntakeAction | 'preparing' | 'complete' | null;
@@ -558,7 +559,12 @@ export default function OnboardingScreen() {
           {status.preparation.history === 'no_history'
             ? <Text style={styles.detail}>You’re ready. Your bank will start with your first completed day.</Text>
             : status.openingBankCalories === 0 ? <Text style={styles.detail}>Today’s a fresh start.</Text> : null}
-          <PrimaryButton busy={busy === 'complete'} label="Go to Today" onPress={() => void run('complete', async () => { await completeOnboarding(); })} />
+          <PrimaryButton busy={busy === 'complete'} label="Go to Today" onPress={() => void run('complete', async () => {
+            await completeOnboarding();
+            // Completion changes lifecycle eligibility without changing Clerk identity.
+            // Start a fresh run explicitly so the root's pre-completion run cannot swallow it.
+            void runFirstRunBootstrap();
+          })} />
         </>;
       case 'complete':
         return null;

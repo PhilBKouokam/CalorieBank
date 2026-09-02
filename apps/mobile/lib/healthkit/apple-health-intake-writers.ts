@@ -78,6 +78,24 @@ export function resolveKnownFoodTracker(
 }
 
 export async function sourceForSelectedWriter(bundleIdentifier: string) {
-  const writers = await discoverAppleHealthIntakeWriters();
-  return writers.find((writer) => writer.bundleIdentifier === bundleIdentifier) ?? null;
+  const healthKit = await import('@kingstinct/react-native-healthkit');
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - DISCOVERY_LOOKBACK_DAYS);
+  const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const filter = { date: { startDate, endDate, strictStartDate: true, strictEndDate: true } };
+  const sources = await healthKit.querySources(DIETARY_ENERGY, filter);
+  const source = sources.find((candidate) => candidate.bundleIdentifier === bundleIdentifier);
+  if (!source) return null;
+  const statistics = await healthKit.queryStatisticsForQuantity(
+    DIETARY_ENERGY,
+    ['cumulativeSum'],
+    { filter: { ...filter, sources: [source] }, unit: 'kcal' },
+  );
+  return {
+    bundleIdentifier: source.bundleIdentifier,
+    displayName: displayNameForSource(source),
+    sourceName: source.name,
+    totalCalories: statistics.sumQuantity?.quantity ?? 0,
+    source,
+  };
 }
