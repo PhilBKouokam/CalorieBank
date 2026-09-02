@@ -92,6 +92,28 @@ describe('rolling historical synchronization policy', () => {
     expect(queue[0]).not.toHaveProperty('url');
   });
 
+  it('reports fingerprint-skipped uploads separately from absent query results', () => {
+    const upload = {
+      kind: 'intake',
+      localDate: '2026-09-01',
+      body: {
+        totalCaloriesConsumed: 1810,
+        writerBundleIdentifier: 'CRONOMETER-GOLD',
+        writerDisplayName: 'Cronometer',
+      },
+    };
+    const fingerprint = rollingUploadFingerprint(upload);
+    const result = mergeRollingSyncOutbox(
+      [],
+      [upload],
+      { 'apple_health:intake:2026-09-01': fingerprint },
+      '2026-09-02T12:00:00Z',
+    );
+
+    expect(result.queue).toHaveLength(0);
+    expect(result.skippedUploads).toEqual([upload]);
+  });
+
   it('collapses concurrent automatic triggers into one rolling sync', async () => {
     let release: (() => void) | undefined;
     let executions = 0;
@@ -129,6 +151,28 @@ describe('rolling historical synchronization policy', () => {
     releases.shift()?.();
     await expect(Promise.all([manualOne, manualTwo])).resolves.toEqual([2, 2]);
     expect(executions).toBe(2);
+  });
+
+  it('lets a new account run independently after account-owned singleflight state resets', async () => {
+    const releases: Array<() => void> = [];
+    const executions: string[] = [];
+    const coordinator = createRollingSyncSingleFlight(async (options: { force?: boolean; account: string }) => {
+      executions.push(options.account);
+      await new Promise<void>((resolve) => releases.push(resolve));
+      return options.account;
+    });
+
+    const accountA = coordinator.run({ account: 'A' });
+    coordinator.reset();
+    const accountB = coordinator.run({ account: 'B' });
+    expect(executions).toEqual(['A', 'B']);
+
+    releases[0]?.();
+    await expect(accountA).resolves.toBe('A');
+    expect(coordinator.isRunning()).toBe(true);
+    releases[1]?.();
+    await expect(accountB).resolves.toBe('B');
+    expect(coordinator.isRunning()).toBe(false);
   });
 });
 

@@ -78,7 +78,7 @@ describe('completed-day query evidence', () => {
 });
 
 describe('account lifecycle coordinator', () => {
-  function fixture(options: { unresolved?: boolean; intakeProvider?: string } = {}) {
+  function fixture(options: { unresolved?: boolean; intakeProvider?: string; accountingStartsOn?: string | null } = {}) {
     const fitbit = { syncRollingWindow: vi.fn().mockResolvedValue({}) };
     const fatSecret = { syncRollingWindow: vi.fn().mockResolvedValue({}) };
     const finalization = { execute: vi.fn().mockResolvedValue({ datesReconciled: [], datesLocked: [], waitingDates: [], errors: [] }) };
@@ -95,7 +95,9 @@ describe('account lifecycle coordinator', () => {
         authoritativeActivityProvider: 'google_health_fitbit',
       }) },
     };
-    const bankHistory = { getAccountingStartDate: vi.fn().mockResolvedValue('2026-08-30') };
+    const bankHistory = { getAccountingStartDate: vi.fn().mockResolvedValue(
+      options.accountingStartsOn === undefined ? '2026-08-30' : options.accountingStartsOn,
+    ) };
     const coordinator = new AccountLifecycleCoordinator(
       db as never,
       bankHistory as never,
@@ -128,6 +130,19 @@ describe('account lifecycle coordinator', () => {
     expect(fitbit.syncRollingWindow).toHaveBeenCalledWith(expect.anything(), '2026-08-31', 'America/Chicago', false, 8, 'scheduled');
     expect(fatSecret.syncRollingWindow).toHaveBeenCalledWith(expect.anything(), '2026-08-31', 'America/Chicago', false, 8, 'scheduled');
     expect(finalization.execute.mock.calls[0]![0].dates).toHaveLength(7);
+  });
+
+  it('uses the full eight-date bootstrap before a fresh account has an accounting boundary', async () => {
+    const { coordinator, fitbit } = fixture({ accountingStartsOn: null });
+    const result = await coordinator.runUser(
+      { id: '00000000-0000-4000-8000-000000000002', email: 'second@example.com' },
+      'America/Chicago',
+      'app_foreground',
+    );
+    expect(result.historyDayCount).toBe(8);
+    expect(fitbit.syncRollingWindow).toHaveBeenCalledWith(
+      expect.anything(), '2026-08-31', 'America/Chicago', false, 8, 'app_foreground',
+    );
   });
 });
 

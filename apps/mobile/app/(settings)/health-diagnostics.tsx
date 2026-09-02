@@ -160,7 +160,7 @@ export default function HealthDiagnosticsScreen() {
     <SafeAreaView edges={['bottom']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.intro}>
-          Development-only metadata for the latest Apple Health synchronization. No individual
+          Internal metadata for the latest Apple Health synchronization. No individual
           HealthKit samples are shown.
         </Text>
 
@@ -190,7 +190,7 @@ export default function HealthDiagnosticsScreen() {
           />
         </View>
 
-        <View style={styles.card}>
+        {__DEV__ ? <View style={styles.card}>
           <Text style={styles.sectionTitle}>Google Health Burn Parity</Text>
           <Text style={styles.intro}>
             Read-only comparison of the live total-calories rollup with CalorieBank storage.
@@ -237,7 +237,7 @@ export default function HealthDiagnosticsScreen() {
           </Pressable>
           {burnDiagnosticError ? <DiagnosticRow label="Diagnostic error" value={burnDiagnosticError} /> : null}
           {burnDiagnostic ? <BurnParityRows diagnostic={burnDiagnostic} /> : null}
-        </View>
+        </View> : null}
 
         <View style={styles.card}>
           <DiagnosticRow
@@ -326,7 +326,7 @@ export default function HealthDiagnosticsScreen() {
           </View>
         ) : null}
 
-        <View style={styles.card}>
+        {__DEV__ ? <View style={styles.card}>
           <Text style={styles.sectionTitle}>Dietary Energy sources</Text>
           <Text style={styles.intro}>
             Read-only comparison for the three most recent completed local dates. Results remain
@@ -351,9 +351,9 @@ export default function HealthDiagnosticsScreen() {
           {sourceDiagnosticError ? (
             <DiagnosticRow label="Diagnostic error" value={sourceDiagnosticError} />
           ) : null}
-        </View>
+        </View> : null}
 
-        {sourceDiagnostic?.dates.map((date) => (
+        {__DEV__ ? sourceDiagnostic?.dates.map((date) => (
           <View key={`source:${date.localDate}`} style={styles.card}>
             <Text style={styles.sectionTitle}>{date.localDate}</Text>
             <DiagnosticRow label="All-source total" value={formatKcal(date.allSourceTotalKcal)} />
@@ -403,7 +403,7 @@ export default function HealthDiagnosticsScreen() {
               </View>
             ))}
           </View>
-        ))}
+        )) : null}
       </ScrollView>
     </SafeAreaView>
   );

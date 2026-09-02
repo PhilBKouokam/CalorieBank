@@ -235,7 +235,17 @@ async function enqueueChangedUploads(uploads: UploadPayload[], accountScope: str
   const merged = mergeRollingSyncOutbox(outbox, uploads, fingerprints, new Date().toISOString());
   const queue = merged.queue;
   await AsyncStorage.setItem(appleHealthAccountStorageKey(OUTBOX_KEY, accountScope), JSON.stringify(queue));
-  return { changedDates: merged.changedDates, skippedDates: merged.skippedDates };
+  return {
+    changedDates: merged.changedDates,
+    skippedDates: merged.skippedDates,
+    skippedItems: merged.skippedUploads.map((upload) => ({
+      category: upload.kind,
+      localDate: upload.localDate,
+      endpoint: UPLOAD_ENDPOINTS[upload.kind],
+      status: 'skipped' as const,
+      errorType: 'fingerprint_match',
+    })),
+  };
 }
 
 async function uploadQueuedItem(item: QueuedUpload, syncSessionId: string, context: AppleHealthAccountContext) {
@@ -655,7 +665,7 @@ async function performAppleHealthRollingWindowSync({
     completedCount: flushed.completedCount,
     pendingCount: flushed.pendingCount,
     failedCategories: flushed.errors,
-    items: flushed.items,
+    items: [...queued.skippedItems, ...flushed.items],
   };
   diagnostics.outbox = outboxDiagnostic(
     flushed.remaining,
