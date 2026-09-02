@@ -2,12 +2,19 @@ import { describe, expect, it } from 'vitest';
 
 import {
   appleHealthBurnIsReady,
+  createOnboardingActionGate,
   initialImportPlan,
+  nextStageAfterSource,
+  onboardingSourceState,
   onboardingRecoveryMessage,
   preparationEditStage,
   previousSetupStage,
+  providerIsConnected,
   selectedAppleHealthWriter,
+  sourceActionIsPending,
+  sourceSelectionSatisfiesOnboarding,
   sourceNeedsData,
+  withOnboardingTimeout,
 } from '../../mobile/lib/onboarding/onboarding-recovery';
 import type {
   HealthConnectionsResponse,
@@ -64,6 +71,69 @@ describe('mobile onboarding recovery policy', () => {
     expect(sourceNeedsData({ connected: true, readiness: 'ready' } as OnboardingStatusResponse['intake'])).toBe(false);
   });
 
+  it('models connected, waiting, refreshing, and attention states without ambiguous booleans', () => {
+    const waiting = {
+      connected: true,
+      readiness: 'connected_waiting_for_data',
+    } as OnboardingStatusResponse['intake'];
+    expect(onboardingSourceState({ source: waiting, operation: null, recoverableError: false }))
+      .toBe('connected_waiting_for_data');
+    expect(onboardingSourceState({ source: waiting, operation: 'refreshing', recoverableError: false }))
+      .toBe('refresh_in_progress');
+    expect(onboardingSourceState({ source: waiting, operation: null, recoverableError: true }))
+      .toBe('recoverable_error');
+    expect(onboardingSourceState({
+      source: { ...waiting, readiness: 'needs_attention' },
+      operation: null,
+      recoverableError: false,
+    })).toBe('needs_attention');
+  });
+
+  it('treats a valid saved source as a complete decision even before calorie data arrives', () => {
+    const waiting = {
+      connected: true,
+      readiness: 'connected_waiting_for_data',
+    } as OnboardingStatusResponse['intake'];
+    expect(sourceSelectionSatisfiesOnboarding(waiting)).toBe(true);
+    expect(sourceSelectionSatisfiesOnboarding({ ...waiting, connected: false })).toBe(false);
+    expect(sourceSelectionSatisfiesOnboarding({ ...waiting, readiness: 'needs_attention' })).toBe(false);
+    expect(nextStageAfterSource('expenditure')).toBe('calories_eaten');
+    expect(nextStageAfterSource('intake')).toBe('goal');
+  });
+
+  it('isolates loading feedback to the source action that is actually running', () => {
+    expect(sourceActionIsPending('apple-intake:cronometer', 'apple-intake:cronometer')).toBe(true);
+    expect(sourceActionIsPending('apple-intake:cronometer', 'apple-intake:myfitnesspal')).toBe(false);
+    expect(sourceActionIsPending('apple-intake:cronometer', 'apple-intake:lose_it')).toBe(false);
+    expect(sourceActionIsPending('apple-intake:cronometer', 'apple-intake:macrofactor')).toBe(false);
+  });
+
+  it('single-flights duplicate taps until the active operation ends', () => {
+    const gate = createOnboardingActionGate();
+    expect(gate.begin('apple-intake:cronometer')).toBe(true);
+    expect(gate.begin('apple-intake:cronometer')).toBe(false);
+    expect(gate.begin('apple-intake:myfitnesspal')).toBe(false);
+    gate.end('apple-intake:cronometer');
+    expect(gate.begin('apple-intake:myfitnesspal')).toBe(true);
+  });
+
+  it('bounds stalled native onboarding work instead of leaving an infinite spinner', async () => {
+    await expect(withOnboardingTimeout(new Promise(() => undefined), 1))
+      .rejects.toThrow('ONBOARDING_OPERATION_TIMEOUT');
+  });
+
+  it('keeps connected direct providers out of ordinary reconnect presentation', () => {
+    const providers = {
+      connectedProviders: [
+        { provider: 'fatsecret', status: 'connected' },
+        { provider: 'google_health_fitbit', status: 'connected' },
+      ],
+    } as ProviderSelectionResponse;
+    expect(providerIsConnected(providers, 'fatsecret')).toBe(true);
+    expect(providerIsConnected(providers, 'google_health_fitbit')).toBe(true);
+    expect(providerIsConnected(providers, 'apple_health')).toBe(false);
+  });
+
   it('marks only the selected Apple Health food writer as connected', () => {
     const providers = {
       intake: { authoritativeProvider: 'apple_health', writerDisplayName: 'Cronometer' },
@@ -83,5 +153,8 @@ describe('mobile onboarding recovery policy', () => {
     expect(onboardingRecoveryMessage({
       action: 'other', failureKind: 'unknown', usesAppleHealth: false,
     })).toBe('Something went wrong. Try again.');
+    expect(onboardingRecoveryMessage({
+      action: 'other', failureKind: 'cancelled', usesAppleHealth: false,
+    })).toBe('Connection was cancelled. Try again or choose another source.');
   });
 });

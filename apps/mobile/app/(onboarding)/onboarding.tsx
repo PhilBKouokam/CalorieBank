@@ -1,7 +1,7 @@
 import type { OnboardingStage, OnboardingStatusResponse, ProviderSelectionInput, ProviderSelectionResponse } from '@caloriebank/schemas';
 import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -43,15 +43,40 @@ import {
 } from '@/lib/healthkit/apple-health-intake-writers';
 import {
   initialImportPlan,
+  createOnboardingActionGate,
   onboardingRecoveryMessage,
+  nextStageAfterSource,
+  onboardingSourceState,
   preparationEditStage,
   previousSetupStage,
+  providerIsConnected,
   selectedAppleHealthWriter,
-  sourceNeedsData,
+  sourceActionIsPending,
+  sourceSelectionSatisfiesOnboarding,
+  withOnboardingTimeout,
 } from '@/lib/onboarding/onboarding-recovery';
 
 type AppleIntakeAction = `apple-intake:${KnownFoodTracker | 'other' | string}`;
 type BusyAction = 'loading' | 'fitbit' | 'fatsecret' | 'apple-burn' | AppleIntakeAction | 'preparing' | 'complete' | null;
+type SourceRole = 'expenditure' | 'intake';
+type ActionOutcome = {
+  message?: string;
+  tone?: 'attention' | 'error';
+  stayOnStage?: OnboardingStage;
+} | void;
+
+class OnboardingConsumerError extends Error {
+  constructor(readonly consumerMessage: string) {
+    super(consumerMessage);
+    this.name = 'OnboardingConsumerError';
+  }
+}
+
+function cancelledConnectionError() {
+  const error = new Error('Connection cancelled');
+  error.name = 'AbortError';
+  return error;
+}
 
 const stageNumber = {
   welcome: 0,
@@ -70,10 +95,13 @@ export default function OnboardingScreen() {
   const [busy, setBusy] = useState<BusyAction>('loading');
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<'attention' | 'error'>('error');
+  const [initialLoadFailed, setInitialLoadFailed] = useState(false);
   const [preparationAttempted, setPreparationAttempted] = useState(false);
   const [displayStage, setDisplayStage] = useState<OnboardingStage | null>(null);
+  const [editingRole, setEditingRole] = useState<SourceRole | null>(null);
   const [discoveredIntakeWriters, setDiscoveredIntakeWriters] =
     useState<AppleHealthIntakeWriter[]>([]);
+  const actionGate = useRef(createOnboardingActionGate());
 
   const refresh = useCallback(async () => {
     try {
@@ -83,28 +111,42 @@ export default function OnboardingScreen() {
       ]);
       setStatus(next);
       setProviderState(providers);
+      setInitialLoadFailed(false);
       if (next.completed) router.replace('/today');
       return next;
     } catch {
+      setInitialLoadFailed(true);
       setMessage('Setup could not refresh. Check your connection and try again.');
       return null;
-    } finally {
-      setBusy(null);
     }
   }, [router]);
 
-  useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
+  useFocusEffect(useCallback(() => {
+    if (actionGate.current.isActive()) return;
+    setBusy((current) => current ?? 'loading');
+    void refresh().finally(() => setBusy(null));
+  }, [refresh]));
 
-  async function run(action: BusyAction, work: () => Promise<unknown>) {
+  async function run(action: Exclude<BusyAction, 'loading' | null>, work: () => Promise<ActionOutcome>) {
+    if (!actionGate.current.begin(action)) return;
     setBusy(action);
     setMessage(null);
     setMessageTone('error');
     try {
-      await work();
-      setDisplayStage(null);
+      const outcome = await work();
       if (action !== 'preparing') setPreparationAttempted(false);
       await refresh();
+      setDisplayStage(outcome?.stayOnStage ?? null);
+      setEditingRole(null);
+      if (outcome?.message) {
+        setMessageTone(outcome.tone ?? 'attention');
+        setMessage(outcome.message);
+      }
     } catch (error) {
+      // OAuth or provider sync can persist a connection before a later refresh fails.
+      // Reload server truth before presenting recovery so connected sources never look lost.
+      await refresh().catch(() => null);
+      setEditingRole(null);
       const failureKind = getApiRequestFailureKind(error);
       const recoveryMessage = onboardingRecoveryMessage({
         action: action?.startsWith('apple') || action === 'preparing'
@@ -116,10 +158,16 @@ export default function OnboardingScreen() {
           || status?.intake.provider === 'apple_health',
       });
       setMessage(
-        error instanceof ProviderAuthorizationError && error.code === 'INVALID_REDIRECT'
-          ? 'Fitbit could not start because its return address is invalid. Try again.'
+        error instanceof Error && error.message === 'ONBOARDING_OPERATION_TIMEOUT'
+          ? 'This is taking longer than expected. Try again; your saved connection will not be lost.'
+          : error instanceof OnboardingConsumerError
+          ? error.consumerMessage
+          : error instanceof ProviderAuthorizationError && error.code === 'INVALID_REDIRECT'
+          ? `${action === 'fatsecret' ? 'FatSecret' : 'Fitbit'} could not start because its return address is invalid. Try again.`
           : error instanceof ProviderAuthorizationError && error.code === 'CONFIGURATION_ERROR'
-            ? 'Fitbit is temporarily unavailable. Try again later.'
+            ? `${action === 'fatsecret' ? 'FatSecret' : 'Fitbit'} is temporarily unavailable. Try again later.`
+            : error instanceof ProviderAuthorizationError && error.code === 'ALREADY_CONNECTED'
+              ? `${action === 'fatsecret' ? 'FatSecret' : 'Fitbit'} is already connected. Use the saved connection instead of reconnecting.`
             : error instanceof Error && (
               error.message.startsWith('Fitbit is connected') ||
               error.message.startsWith('FatSecret is connected')
@@ -127,8 +175,16 @@ export default function OnboardingScreen() {
               ? error.message
             : recoveryMessage,
       );
+    } finally {
+      actionGate.current.end(action);
       setBusy(null);
     }
+  }
+
+  function showStage(stage: OnboardingStage | null, editRole: SourceRole | null = null) {
+    setMessage(null);
+    setDisplayStage(stage);
+    setEditingRole(editRole);
   }
 
   async function selectProvider(input: Partial<ProviderSelectionInput>) {
@@ -151,14 +207,20 @@ export default function OnboardingScreen() {
       const redirect = MOBILE_INTEGRATION_REDIRECT_URI;
       const { authorizationUrl } = await startFitbitAuthorization(redirect);
       const result = await WebBrowser.openAuthSessionAsync(authorizationUrl, redirect);
-      if (result.type !== 'success') throw new Error('Connection cancelled');
+      if (result.type !== 'success') throw cancelledConnectionError();
       await selectProvider({
         authoritativeExpenditureProvider: 'google_health_fitbit',
         authoritativeActivityProvider: 'google_health_fitbit',
       });
-      await syncFitbit(Intl.DateTimeFormat().resolvedOptions().timeZone, true).catch(() => {
-        throw new Error('Fitbit is connected, but CalorieBank couldn’t get your calorie data yet.');
-      });
+      try {
+        await syncFitbit(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
+      } catch {
+        return {
+          stayOnStage: 'calories_burned',
+          tone: 'attention',
+          message: 'Fitbit is connected. Calorie-burn data is not ready yet, but you can continue setup.',
+        };
+      }
     });
   }
 
@@ -167,27 +229,42 @@ export default function OnboardingScreen() {
       const redirect = MOBILE_INTEGRATION_REDIRECT_URI;
       const { authorizationUrl } = await startFatSecretAuthorization(redirect);
       const result = await WebBrowser.openAuthSessionAsync(authorizationUrl, redirect);
-      if (result.type !== 'success') throw new Error('Connection cancelled');
+      if (result.type !== 'success') throw cancelledConnectionError();
       await selectProvider({ authoritativeIntakeProvider: 'fatsecret' });
-      await syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true).catch(() => {
-        throw new Error('FatSecret is connected, but CalorieBank couldn’t get your calorie data yet.');
-      });
+      try {
+        await syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
+      } catch {
+        return {
+          stayOnStage: 'calories_eaten',
+          tone: 'attention',
+          message: 'FatSecret is connected. Food data is not ready yet, but you can continue setup.',
+        };
+      }
     });
   }
 
   async function connectApple(role: 'expenditure') {
     await run('apple-burn', async () => {
-      if (await getAppleHealthConnectionStatus() !== 'connected') await connectAppleHealth();
+      if (await getAppleHealthConnectionStatus() !== 'connected') {
+        const connection = await connectAppleHealth();
+        if (connection !== 'connected') {
+          throw new OnboardingConsumerError('Apple Health is not available on this device. Choose Fitbit or try again later.');
+        }
+      }
       await selectProvider({
         authoritativeExpenditureProvider: 'apple_health',
         authoritativeActivityProvider: 'apple_health',
       });
-      await refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 });
+      await withOnboardingTimeout(
+        refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }),
+      );
       const providers = await fetchProviderSelection();
       if (role === 'expenditure' && providers.expenditure.status !== 'ready') {
-        setMessageTone('attention');
-        setMessage('CalorieBank hasn’t found complete Apple Health burn data yet. Refresh Apple Health to check again.');
-        return;
+        return {
+          stayOnStage: 'calories_burned',
+          tone: 'attention',
+          message: 'Apple Health is connected. CalorieBank hasn’t found a complete calorie-burn total yet, but you can continue setup.',
+        };
       }
     });
   }
@@ -200,40 +277,62 @@ export default function OnboardingScreen() {
         displayName: writer.displayName,
       },
     });
-    await refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 });
+    await withOnboardingTimeout(
+      refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }),
+    );
     const providers = await fetchProviderSelection();
     if (providers.intake.status !== 'ready') {
-      setMessageTone('attention');
-      setMessage(`${writer.displayName} data is still being loaded from Apple Health. Refresh Apple Health to check again.`);
-      return;
+      return {
+        stayOnStage: 'calories_eaten' as const,
+        tone: 'attention' as const,
+        message: `${writer.displayName} is connected. CalorieBank will use its calories when they appear in Apple Health.`,
+      };
     }
   }
 
   async function connectAppleIntakeTracker(tracker: KnownFoodTracker) {
     await run(`apple-intake:${tracker}`, async () => {
-      if (await getAppleHealthConnectionStatus() !== 'connected') await connectAppleHealth();
-      await refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 });
-      const writers = await discoverAppleHealthIntakeWriters();
+      if (await getAppleHealthConnectionStatus() !== 'connected') {
+        const connection = await connectAppleHealth();
+        if (connection !== 'connected') {
+          throw new OnboardingConsumerError('Apple Health is not available on this device. Choose FatSecret or try again later.');
+        }
+      }
+      await withOnboardingTimeout(
+        refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }),
+      );
+      const writers = await withOnboardingTimeout(discoverAppleHealthIntakeWriters());
       const writer = resolveKnownFoodTracker(tracker, writers);
       const trackerName = {
         cronometer: 'Cronometer', myfitnesspal: 'MyFitnessPal',
         lose_it: 'Lose It!', macrofactor: 'MacroFactor',
       }[tracker];
       if (!writer) {
-        setMessageTone('attention');
-        setMessage(`No food data was found from ${trackerName} yet. Refresh Apple Health to check again.`);
-        return;
+        return {
+          stayOnStage: 'calories_eaten',
+          tone: 'attention',
+          message: `No calories from ${trackerName} were found in Apple Health yet. Check again after ${trackerName} has shared food data, or choose another source.`,
+        };
       }
-      await selectAppleHealthIntakeWriter(writer);
+      return selectAppleHealthIntakeWriter(writer);
     });
   }
 
   async function discoverOtherAppleHealthWriters() {
     await run('apple-intake:other', async () => {
-      if (await getAppleHealthConnectionStatus() !== 'connected') await connectAppleHealth();
-      const writers = await discoverAppleHealthIntakeWriters();
+      if (await getAppleHealthConnectionStatus() !== 'connected') {
+        const connection = await connectAppleHealth();
+        if (connection !== 'connected') {
+          throw new OnboardingConsumerError('Apple Health is not available on this device. Choose FatSecret or try again later.');
+        }
+      }
+      const writers = await withOnboardingTimeout(discoverAppleHealthIntakeWriters());
       if (writers.length === 0) {
-        throw new Error('No calorie data was found from an app using Apple Health.');
+        return {
+          stayOnStage: 'calories_eaten',
+          tone: 'attention',
+          message: 'No food apps with calorie data were found in Apple Health yet. Check again later or choose FatSecret.',
+        };
       }
       setDiscoveredIntakeWriters(writers);
     });
@@ -248,15 +347,40 @@ export default function OnboardingScreen() {
     if (!selected) return;
     if (selected.provider === 'apple_health') {
       await run(role === 'expenditure' ? 'apple-burn' : 'apple-intake:retry', async () => {
-        const outcome = await refreshAppleHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 });
+        const outcome = await withOnboardingTimeout(
+          refreshAppleHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 }),
+        );
         if (!outcome || outcome.syncStatus === 'failure') throw new Error('Apple Health refresh failed.');
+        const providers = await fetchProviderSelection();
+        const selectedRole = role === 'expenditure' ? providers.expenditure : providers.intake;
+        if (selectedRole.status !== 'ready') {
+          return {
+            stayOnStage: role === 'expenditure' ? 'calories_burned' : 'calories_eaten',
+            tone: 'attention',
+            message: role === 'expenditure'
+              ? 'No complete calorie-burn total was found yet. Apple Health is still connected, and you can continue setup.'
+              : `No new calorie total was found yet. ${status?.intake.displayName ?? 'Your food source'} is still connected, and you can continue setup.`,
+          };
+        }
       });
       return;
     }
-    await run(selected.provider === 'fatsecret' ? 'fatsecret' : 'fitbit', () =>
-      selected.provider === 'fatsecret'
-        ? syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true)
-        : syncFitbit(Intl.DateTimeFormat().resolvedOptions().timeZone, true));
+    await run(selected.provider === 'fatsecret' ? 'fatsecret' : 'fitbit', async () => {
+      if (selected.provider === 'fatsecret') {
+        await syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
+      } else {
+        await syncFitbit(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
+      }
+      const providers = await fetchProviderSelection();
+      const selectedRole = role === 'expenditure' ? providers.expenditure : providers.intake;
+      if (selectedRole.status !== 'ready') {
+        return {
+          stayOnStage: role === 'expenditure' ? 'calories_burned' : 'calories_eaten',
+          tone: 'attention',
+          message: `${selected.displayName} is connected. No new calorie data was found yet, and you can continue setup.`,
+        };
+      }
+    });
   }
 
   async function prepareBank() {
@@ -272,7 +396,9 @@ export default function OnboardingScreen() {
         requests.push(syncFatSecret(timezone, true, true));
       }
       if (plan.appleHealth) {
-        requests.push(refreshAppleHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 }).then((outcome) => {
+        requests.push(withOnboardingTimeout(
+          refreshAppleHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 }),
+        ).then((outcome) => {
           if (!outcome || outcome.syncStatus === 'failure') {
             throw new Error('Apple Health refresh failed.');
           }
@@ -292,14 +418,37 @@ export default function OnboardingScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status?.stage, preparationAttempted]);
 
+  if (!status && initialLoadFailed && busy !== 'loading') {
+    return <SetupLoadError onRetry={() => {
+      setBusy('loading');
+      void refresh().finally(() => setBusy(null));
+    }} />;
+  }
+
   if (!status || busy === 'loading') {
     return <CenteredState title="Loading setup…" detail="Checking your saved progress." />;
   }
 
   const activeStage = displayStage ?? status.stage;
   const progress = stageNumber[activeStage];
-  const expenditureWaiting = sourceNeedsData(status.expenditure);
-  const intakeWaiting = sourceNeedsData(status.intake);
+  const fitbitConnected = providerIsConnected(providerState, 'google_health_fitbit');
+  const fatSecretConnected = providerIsConnected(providerState, 'fatsecret');
+  const expenditureActionActive = busy === 'apple-burn' || busy === 'fitbit';
+  const intakeActionActive = busy === 'fatsecret' || busy?.startsWith('apple-intake:') === true;
+  const expenditureState = onboardingSourceState({
+    source: status.expenditure,
+    operation: expenditureActionActive
+      ? status.expenditure.connected ? 'refreshing' : 'connecting'
+      : null,
+    recoverableError: false,
+  });
+  const intakeState = onboardingSourceState({
+    source: status.intake,
+    operation: intakeActionActive
+      ? status.intake.connected ? 'refreshing' : 'connecting'
+      : null,
+    recoverableError: false,
+  });
   const stageContent = (() => {
     switch (activeStage) {
       case 'welcome':
@@ -307,37 +456,47 @@ export default function OnboardingScreen() {
           <Text style={styles.eyebrow}>Welcome to CalorieBank</Text>
           <Text style={styles.title}>Eat what you love. Stay on track.</Text>
           <Text style={styles.detail}>CalorieBank turns calories you save into a balance you can use later.</Text>
-          <PrimaryButton busy={busy !== null} label="Get started" onPress={() => void run('complete', completeOnboardingWelcome)} />
+          <PrimaryButton busy={busy === 'complete'} label="Get started" onPress={() => void run('complete', async () => { await completeOnboardingWelcome(); })} />
         </>;
       case 'calories_burned':
         return <>
           <Text style={styles.title}>What do you use to track your activity?</Text>
           <Text style={styles.detail}>Choose the device that tracks your daily calorie burn.</Text>
-          {expenditureWaiting ? <WaitingForData
-            busy={busy !== null}
+          {status.expenditure.connected && editingRole !== 'expenditure' ? <ConnectedSource
+            busy={expenditureActionActive}
+            canContinue={sourceSelectionSatisfiesOnboarding(status.expenditure)}
             source={status.expenditure.provider === 'apple_health' ? 'Apple Health' : status.expenditure.displayName}
-            detail="Your connection is saved. CalorieBank is waiting for a complete daily calorie-burn total."
+            state={expenditureState}
+            waitingDetail="CalorieBank will use this source when a complete calorie-burn total is available."
+            onBack={() => showStage(previousSetupStage(activeStage))}
+            onChange={() => showStage('calories_burned', 'expenditure')}
+            onContinue={() => showStage(nextStageAfterSource('expenditure'))}
             onRetry={() => void retrySelectedSource('expenditure')}
           /> : <>
-          {Platform.OS === 'ios' ? <ProviderOption title="Apple Watch" detail="CalorieBank securely reads its activity data through Apple Health." busy={busy === 'apple-burn'} disabled={busy !== null} connected={status.expenditure.provider === 'apple_health' && status.expenditure.connected} onPress={() => void connectApple('expenditure')} /> : null}
-          <ProviderOption title="Fitbit" detail="Uses your Fitbit calorie burn, steps, and workouts." busy={busy === 'fitbit'} disabled={busy !== null} connected={status.expenditure.provider === 'google_health_fitbit' && status.expenditure.connected} onPress={() => void connectFitbit()} />
-          {providerState?.connectedProviders.some((provider) => provider.provider === 'google_health_fitbit' && provider.status === 'connected') && status.expenditure.provider !== 'google_health_fitbit' ? (
+          {Platform.OS === 'ios' ? <ProviderOption title="Apple Watch" detail="CalorieBank securely reads its activity data through Apple Health." busy={sourceActionIsPending(busy, 'apple-burn')} disabled={busy !== null} connected={status.expenditure.provider === 'apple_health' && status.expenditure.connected} onPress={() => void connectApple('expenditure')} /> : null}
+          <ProviderOption title="Fitbit" detail="Uses your Fitbit calorie burn, steps, and workouts." busy={sourceActionIsPending(busy, 'fitbit')} disabled={busy !== null} connected={fitbitConnected} onPress={() => void connectFitbit()} />
+          {fitbitConnected && status.expenditure.provider !== 'google_health_fitbit' ? (
             <PrimaryButton busy={busy !== null} label="Use connected Fitbit" onPress={() => void run('fitbit', async () => {
               await selectProvider({ authoritativeExpenditureProvider: 'google_health_fitbit', authoritativeActivityProvider: 'google_health_fitbit' });
               await syncFitbit(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
             })} />
           ) : null}
-          <BackButton onPress={() => setDisplayStage(previousSetupStage(activeStage))} />
+          <BackButton onPress={() => showStage(previousSetupStage(activeStage))} />
           </>}
         </>;
       case 'calories_eaten':
         return <>
           <Text style={styles.title}>Where do you track your food?</Text>
           <Text style={styles.detail}>Choose one source for your daily calorie total.</Text>
-          {intakeWaiting ? <WaitingForData
-            busy={busy !== null}
+          {status.intake.connected && editingRole !== 'intake' ? <ConnectedSource
+            busy={intakeActionActive}
+            canContinue={sourceSelectionSatisfiesOnboarding(status.intake)}
             source={status.intake.displayName}
-            detail="Your connection is saved. CalorieBank is waiting for a daily calorie total from this source."
+            state={intakeState}
+            waitingDetail={`CalorieBank will use calories from ${status.intake.displayName} when they appear${status.intake.provider === 'apple_health' ? ' in Apple Health' : ''}.`}
+            onBack={() => showStage(previousSetupStage(activeStage))}
+            onChange={() => showStage('calories_eaten', 'intake')}
+            onContinue={() => showStage(nextStageAfterSource('intake'))}
             onRetry={() => void retrySelectedSource('intake')}
           /> : <>
           {Platform.OS === 'ios' ? <>
@@ -360,14 +519,14 @@ export default function OnboardingScreen() {
             ))}
           </> : null}
           <Text style={styles.sectionLabel}>Direct connection</Text>
-          <ProviderOption title="FatSecret" detail="Connect your existing FatSecret food diary directly." busy={busy === 'fatsecret'} disabled={busy !== null} connected={status.intake.provider === 'fatsecret' && status.intake.connected} onPress={() => void connectFatSecret()} />
-          {providerState?.connectedProviders.some((provider) => provider.provider === 'fatsecret' && provider.status === 'connected') && status.intake.provider !== 'fatsecret' ? (
+          <ProviderOption title="FatSecret" detail="Connect your existing FatSecret food diary directly." busy={busy === 'fatsecret'} disabled={busy !== null} connected={fatSecretConnected} onPress={() => void connectFatSecret()} />
+          {fatSecretConnected && status.intake.provider !== 'fatsecret' ? (
             <PrimaryButton busy={busy !== null} label="Use connected FatSecret" onPress={() => void run('fatsecret', async () => {
               await selectProvider({ authoritativeIntakeProvider: 'fatsecret' });
               await syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
             })} />
           ) : null}
-          <BackButton onPress={() => setDisplayStage(previousSetupStage(activeStage))} />
+          <BackButton onPress={() => showStage(previousSetupStage(activeStage))} />
           </>}
         </>;
       case 'goal':
@@ -375,7 +534,7 @@ export default function OnboardingScreen() {
           <Text style={styles.title}>Choose your goal</Text>
           <Text style={styles.detail}>Tell CalorieBank how you want completed days calculated.</Text>
           <GoalConfigurationForm mode="onboarding" onSaved={() => { setDisplayStage(null); void refresh(); }} />
-          <BackButton onPress={() => setDisplayStage(previousSetupStage(activeStage))} />
+          <BackButton onPress={() => showStage(previousSetupStage(activeStage))} />
         </>;
       case 'preparing_bank':
         return <>
@@ -386,7 +545,7 @@ export default function OnboardingScreen() {
           <PreparationRow label="Calories eaten" source={status.intake.displayName} state={status.preparation.intake} waitingLabel={status.intake.provider === 'apple_health' ? 'Waiting for Apple Health data' : undefined} />
           <PrimaryButton busy={busy === 'preparing'} label={status.expenditure.provider === 'apple_health' || status.intake.provider === 'apple_health' ? 'Refresh Apple Health' : 'Try again'} onPress={() => void prepareBank()} />
           <Pressable accessibilityRole="button" accessibilityLabel="Check connections" onPress={() => router.push({ pathname: '/integrations', params: { returnTo: 'onboarding' } })}><Text style={styles.linkText}>Check connections</Text></Pressable>
-          <BackButton label="Edit setup" onPress={() => setDisplayStage(preparationEditStage(status))} />
+          <BackButton label="Edit setup" onPress={() => showStage(preparationEditStage(status))} />
         </>;
       case 'ready':
         return <>
@@ -399,7 +558,7 @@ export default function OnboardingScreen() {
           {status.preparation.history === 'no_history'
             ? <Text style={styles.detail}>You’re ready. Your bank will start with your first completed day.</Text>
             : status.openingBankCalories === 0 ? <Text style={styles.detail}>Today’s a fresh start.</Text> : null}
-          <PrimaryButton busy={busy === 'complete'} label="Go to Today" onPress={() => void run('complete', completeOnboarding)} />
+          <PrimaryButton busy={busy === 'complete'} label="Go to Today" onPress={() => void run('complete', async () => { await completeOnboarding(); })} />
         </>;
       case 'complete':
         return null;
@@ -423,6 +582,10 @@ function CenteredState({ title, detail }: { title: string; detail: string }) {
   return <SafeAreaView style={styles.safeArea}><View style={styles.centered}><ActivityIndicator color={colors.primary} size="large" /><Text style={styles.title}>{title}</Text><Text style={styles.detail}>{detail}</Text></View></SafeAreaView>;
 }
 
+function SetupLoadError({ onRetry }: { onRetry: () => void }) {
+  return <SafeAreaView style={styles.safeArea}><View style={styles.centered}><Text style={styles.title}>Unable to load setup</Text><Text style={styles.detail}>Check your internet connection and try again.</Text><PrimaryButton busy={false} label="Try again" onPress={onRetry} /></View></SafeAreaView>;
+}
+
 function PrimaryButton({ label, busy, onPress }: { label: string; busy: boolean; onPress: () => void }) {
   return <Pressable accessibilityLabel={label} accessibilityRole="button" disabled={busy} onPress={onPress} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>{label}</Text>}</Pressable>;
 }
@@ -431,8 +594,52 @@ function ProviderOption({ title, detail, busy, disabled, connected = false, onPr
   return <View style={[styles.providerCard, connected && styles.connectedCard]}><View style={styles.providerCopy}><Text style={styles.providerTitle}>{title}</Text><Text style={styles.note}>{connected ? 'Connected' : detail}</Text></View><Pressable accessibilityLabel={connected ? `${title} connected` : `Connect ${title}`} accessibilityRole="button" disabled={disabled || connected} onPress={onPress} style={({ pressed }) => [styles.connectButton, connected && styles.connectedButton, pressed && styles.pressed, disabled && !busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.surface} /> : <Text style={[styles.connectButtonText, connected && styles.connectedButtonText]}>{connected ? 'Connected' : 'Connect'}</Text>}</Pressable></View>;
 }
 
-function WaitingForData({ source, detail, busy, onRetry }: { source: string; detail: string; busy: boolean; onRetry: () => void }) {
-  return <View style={styles.waitingCard}><Text style={styles.connectedLabel}>Connected</Text><Text style={styles.providerTitle}>{source}</Text><Text style={styles.note}>{detail}</Text><PrimaryButton busy={busy} label="Check again" onPress={onRetry} /></View>;
+function ConnectedSource({
+  source,
+  state,
+  waitingDetail,
+  busy,
+  canContinue,
+  onContinue,
+  onRetry,
+  onChange,
+  onBack,
+}: {
+  source: string;
+  state: ReturnType<typeof onboardingSourceState>;
+  waitingDetail: string;
+  busy: boolean;
+  canContinue: boolean;
+  onContinue: () => void;
+  onRetry: () => void;
+  onChange: () => void;
+  onBack: () => void;
+}) {
+  const needsAttention = state === 'needs_attention' || state === 'recoverable_error';
+  const detail = busy
+    ? `Checking ${source}…`
+    : state === 'connected_ready'
+      ? 'Connected and ready.'
+      : needsAttention
+        ? `${source} needs attention before it can be used.`
+        : waitingDetail;
+  return <>
+    <View style={styles.waitingCard}>
+      <Text style={styles.connectedLabel}>Connected</Text>
+      <Text style={styles.providerTitle}>{source}</Text>
+      <Text accessibilityLiveRegion="polite" style={styles.note}>{detail}</Text>
+      {canContinue && !busy ? <PrimaryButton busy={false} label="Continue" onPress={onContinue} /> : null}
+      <SecondaryButton busy={busy} label={needsAttention ? 'Try again' : 'Check again'} onPress={onRetry} />
+      <Pressable accessibilityLabel="Choose a different source" accessibilityRole="button" disabled={busy} onPress={onChange} style={({ pressed }) => [styles.linkButton, pressed && styles.pressed, busy && styles.disabled]}>
+        <Text style={styles.linkText}>Choose a different source</Text>
+      </Pressable>
+    </View>
+    <BackButton onPress={onBack} />
+  </>;
+}
+
+function SecondaryButton({ label, busy, onPress }: { label: string; busy: boolean; onPress: () => void }) {
+  return <Pressable accessibilityLabel={label} accessibilityRole="button" disabled={busy} onPress={onPress} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed, busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.secondaryButtonText}>{label}</Text>}</Pressable>;
 }
 
 function BackButton({ label = 'Back', onPress }: { label?: string; onPress: () => void }) {
@@ -468,10 +675,13 @@ const styles = StyleSheet.create({
   connectedButtonText: { color: colors.primaryDark },
   primaryButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radii.sm, justifyContent: 'center', marginTop: spacing.sm, minHeight: 52, paddingHorizontal: spacing.lg },
   primaryButtonText: { color: colors.surface, fontSize: typography.body, fontWeight: '800' },
+  secondaryButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.primary, borderRadius: radii.sm, borderWidth: 1, justifyContent: 'center', minHeight: 52, paddingHorizontal: spacing.lg },
+  secondaryButtonText: { color: colors.primaryDark, fontSize: typography.body, fontWeight: '800' },
   balancePanel: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, gap: spacing.xs, padding: spacing.lg },
   balanceLabel: { color: colors.textMuted, fontSize: typography.body, fontWeight: '700' }, balanceValue: { color: colors.text, fontSize: 38, fontWeight: '800' },
   preparationRow: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.sm, borderWidth: 1, gap: spacing.xs, padding: spacing.md },
   waitingCard: { backgroundColor: colors.surface, borderColor: colors.primary, borderRadius: radii.md, borderWidth: 1, gap: spacing.sm, padding: spacing.lg },
+  linkButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44 },
   connectedLabel: { color: colors.primaryDark, fontSize: typography.caption, fontWeight: '800', textTransform: 'uppercase' },
   attention: { color: colors.accent, fontSize: typography.body, lineHeight: 22 }, error: { color: colors.danger, fontSize: typography.body, lineHeight: 22 }, pressed: { opacity: 0.72 }, disabled: { opacity: 0.65 },
   linkText: { color: colors.primaryDark, fontSize: typography.body, fontWeight: '700', textAlign: 'center' },

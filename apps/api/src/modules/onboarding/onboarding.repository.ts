@@ -36,6 +36,13 @@ function selectedSource(
   };
 }
 
+export function sourceSelectionSatisfiesSetup(
+  source: OnboardingStatusResponse['expenditure'] | OnboardingStatusResponse['intake'],
+) {
+  return source.connected
+    && (source.readiness === 'ready' || source.readiness === 'connected_waiting_for_data');
+}
+
 export function deriveOnboardingStatus(facts: OnboardingFacts): OnboardingStatusResponse {
   const expenditure = selectedSource(
     facts.providerSelection.expenditure,
@@ -62,8 +69,8 @@ export function deriveOnboardingStatus(facts: OnboardingFacts): OnboardingStatus
   let stage: OnboardingStage;
   if (facts.completed) stage = 'complete';
   else if (!facts.welcomeCompleted) stage = 'welcome';
-  else if (expenditure.readiness !== 'ready') stage = 'calories_burned';
-  else if (intake.readiness !== 'ready') stage = 'calories_eaten';
+  else if (!sourceSelectionSatisfiesSetup(expenditure)) stage = 'calories_burned';
+  else if (!sourceSelectionSatisfiesSetup(intake)) stage = 'calories_eaten';
   else if (!facts.goalConfigured) stage = 'goal';
   else if (
     facts.bankSummary.openingBankStatus === 'waiting_for_opening_data' &&

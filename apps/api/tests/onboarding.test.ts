@@ -64,10 +64,25 @@ describe('connection-first onboarding', () => {
     expect(deriveOnboardingStatus(facts()).stage).toBe('ready');
   });
 
-  it('distinguishes connected sources from usable sources and permits completed no-history setup', () => {
+  it('lets a saved source continue setup while data is still arriving', () => {
     const waiting = structuredClone(selection);
     waiting.expenditure.status = 'unavailable';
-    expect(deriveOnboardingStatus(facts({ providerSelection: waiting })).stage).toBe('calories_burned');
+    const result = deriveOnboardingStatus(facts({ providerSelection: waiting, goalConfigured: false }));
+    expect(result.stage).toBe('goal');
+    expect(result.expenditure).toMatchObject({
+      connected: true,
+      readiness: 'connected_waiting_for_data',
+    });
+
+    const intakeWaiting = structuredClone(selection);
+    intakeWaiting.intake.status = 'unavailable';
+    expect(deriveOnboardingStatus(facts({
+      providerSelection: intakeWaiting,
+      goalConfigured: false,
+    })).stage).toBe('goal');
+  });
+
+  it('permits completed no-history setup', () => {
     expect(deriveOnboardingStatus(facts({
       bankSummary: { ...summary, openingBankStatus: 'waiting_for_opening_data' },
       preparation: { expenditure: 'complete', intake: 'complete', history: 'no_history' },
@@ -81,6 +96,13 @@ describe('connection-first onboarding', () => {
     const result = deriveOnboardingStatus(facts({ providerSelection: attention }));
     expect(result.stage).toBe('calories_burned');
     expect(result.expenditure).toMatchObject({ connected: true, readiness: 'needs_attention' });
+  });
+
+  it('does not accept a disconnected selected source as a completed decision', () => {
+    const disconnected = structuredClone(selection);
+    disconnected.connectedProviders[2]!.status = 'not_connected';
+    disconnected.intake.status = 'unavailable';
+    expect(deriveOnboardingStatus(facts({ providerSelection: disconnected })).stage).toBe('calories_eaten');
   });
 
   it('preserves zero and positive Opening Bank results', () => {

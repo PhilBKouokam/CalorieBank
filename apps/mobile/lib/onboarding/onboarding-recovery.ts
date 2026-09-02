@@ -33,6 +33,89 @@ export function sourceNeedsData(
   return source.connected && source.readiness === 'connected_waiting_for_data';
 }
 
+export type OnboardingSourceState =
+  | 'not_selected'
+  | 'connection_in_progress'
+  | 'connected_ready'
+  | 'connected_waiting_for_data'
+  | 'refresh_in_progress'
+  | 'recoverable_error'
+  | 'needs_attention';
+
+export function onboardingSourceState(input: {
+  source: OnboardingStatusResponse['expenditure'] | OnboardingStatusResponse['intake'];
+  operation: 'connecting' | 'refreshing' | null;
+  recoverableError: boolean;
+}): OnboardingSourceState {
+  if (input.operation === 'connecting') return 'connection_in_progress';
+  if (input.operation === 'refreshing') return 'refresh_in_progress';
+  if (input.recoverableError) return 'recoverable_error';
+  if (input.source.readiness === 'needs_attention') return 'needs_attention';
+  if (input.source.connected && input.source.readiness === 'ready') return 'connected_ready';
+  if (sourceNeedsData(input.source)) return 'connected_waiting_for_data';
+  return 'not_selected';
+}
+
+export function sourceSelectionSatisfiesOnboarding(
+  source: OnboardingStatusResponse['expenditure'] | OnboardingStatusResponse['intake'],
+) {
+  return source.connected
+    && (source.readiness === 'ready' || source.readiness === 'connected_waiting_for_data');
+}
+
+export function sourceActionIsPending(activeAction: string | null, sourceAction: string) {
+  return activeAction === sourceAction;
+}
+
+export function createOnboardingActionGate() {
+  let active: string | null = null;
+  return {
+    begin(action: string) {
+      if (active !== null) return false;
+      active = action;
+      return true;
+    },
+    end(action: string) {
+      if (active === action) active = null;
+    },
+    isActive() {
+      return active !== null;
+    },
+  };
+}
+
+export function providerIsConnected(
+  providers: ProviderSelectionResponse | null,
+  provider: string,
+) {
+  return providers?.connectedProviders.some(
+    (connection) => connection.provider === provider && connection.status === 'connected',
+  ) ?? false;
+}
+
+export function nextStageAfterSource(role: 'expenditure' | 'intake'): OnboardingStage {
+  return role === 'expenditure' ? 'calories_eaten' : 'goal';
+}
+
+export function withOnboardingTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs = 45_000,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('ONBOARDING_OPERATION_TIMEOUT')), timeoutMs);
+    operation.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
 export function selectedAppleHealthWriter(
   providers: ProviderSelectionResponse | null,
   displayName: string,
@@ -57,6 +140,9 @@ export function onboardingRecoveryMessage(input: {
   }
   if (input.failureKind === 'timeout') {
     return 'CalorieBank took too long to respond. Try again.';
+  }
+  if (input.failureKind === 'cancelled') {
+    return 'Connection was cancelled. Try again or choose another source.';
   }
   if (input.action === 'apple' || (input.action === 'preparing' && input.usesAppleHealth)) {
     return 'CalorieBank couldn’t refresh Apple Health. Try again.';

@@ -577,7 +577,7 @@ export async function startFatSecretAuthorization(mobileRedirectUri = MOBILE_INT
   const response = await apiRequest(
     `/v1/me/integrations/fatsecret/authorize?mobileRedirectUri=${encodeURIComponent(mobileRedirectUri)}`,
   );
-  if (!response.ok) throw new Error('FatSecret connection is not available.');
+  if (!response.ok) await providerAuthorizationError(response);
   return providerAuthorizationResponseSchema.parse(await response.json());
 }
 
