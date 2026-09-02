@@ -66,6 +66,11 @@ export type HealthKitDiagnosticsSnapshot = {
     queryEnd: string;
   }>;
   queries: HealthKitQueryDiagnostic[];
+  intakeWriterChecks: Array<{
+    localDate: string;
+    status: 'succeeded' | 'failed' | 'writer_not_found';
+    sampleCount: number | null;
+  }>;
   upload: HealthKitUploadDiagnostic;
   outbox: HealthKitOutboxDiagnostic;
   error: HealthKitDiagnosticError | null;
@@ -115,6 +120,7 @@ export function createHealthKitDiagnosticsSnapshot(
     overallSyncResult: input.overallSyncResult ?? 'not_run',
     rollingDates: input.rollingDates ?? [],
     queries: input.queries ?? [],
+    intakeWriterChecks: input.intakeWriterChecks ?? [],
     upload: {
       ...EMPTY_UPLOAD,
       ...input.upload,

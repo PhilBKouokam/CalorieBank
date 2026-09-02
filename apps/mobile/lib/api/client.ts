@@ -38,6 +38,8 @@ import {
   type BankHistoryDayDetailResponse,
   type BankHistoryRange,
   type BankHistoryResponse,
+  healthHistoryDiagnosticResponseSchema,
+  type HealthHistoryDiagnosticResponse,
   type OpeningBankDetailResponse,
   type GoogleHealthBurnParityDiagnosticResponse,
   type BankSummaryResponse,
@@ -429,6 +431,16 @@ export async function fetchBankHistory(range: BankHistoryRange): Promise<BankHis
   }
 
   return bankHistoryResponseSchema.parse(await response.json());
+}
+
+export async function fetchHealthHistoryDiagnostics(
+  dates: string[],
+): Promise<HealthHistoryDiagnosticResponse> {
+  const response = await apiRequest(
+    `/v1/me/bank-history-diagnostics?dates=${encodeURIComponent(dates.join(','))}`,
+  );
+  if (!response.ok) throw new Error(`Unable to load health history diagnostics (${response.status}).`);
+  return healthHistoryDiagnosticResponseSchema.parse(await response.json());
 }
 
 export async function fetchOpeningBankDetail(): Promise<OpeningBankDetailResponse> {

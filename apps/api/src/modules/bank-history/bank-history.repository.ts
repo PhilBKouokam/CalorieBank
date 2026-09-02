@@ -20,6 +20,7 @@ import type {
   HistoricalSourceMutation,
   HistoricalSourceMutationResponse,
   HistoricalSourceOptionsResponse,
+  HealthHistoryDiagnosticResponse,
 } from '@caloriebank/schemas';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { createHash } from 'node:crypto';
@@ -110,6 +111,7 @@ export interface BankHistoryRepository {
   getAccountingStartDate(userId: string): Promise<string | null>;
   getSummary(userId: string): Promise<BankSummaryResponse>;
   getHistory(userId: string, range: BankHistoryRange): Promise<BankHistoryResponse>;
+  getHealthHistoryDiagnostics?(userId: string, dates: string[]): Promise<HealthHistoryDiagnosticResponse>;
   getOpeningBankDetail(userId: string): Promise<OpeningBankDetailResponse>;
   getDayDetail(userId: string, logDate: string): Promise<BankHistoryDayDetailResponse | null>;
   getHistoricalSourceOptions?(userId: string, logDate: string): Promise<HistoricalSourceOptionsResponse>;
@@ -1155,6 +1157,58 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         : latest?.lockAt.toISOString() ?? null,
       latestCorrectionCount: latestIsOpening ? 0 : latest?.correctionCount ?? 0,
       finalizedDayCount: count,
+    };
+  }
+
+  async getHealthHistoryDiagnostics(
+    userId: string,
+    localDates: string[],
+  ): Promise<HealthHistoryDiagnosticResponse> {
+    const dates = localDates.map(parseLogDate);
+    const [initialization, finalized, opening, processing] = await Promise.all([
+      this.db.bankAccountInitialization.findUnique({
+        where: { userId },
+        select: { timezone: true },
+      }),
+      this.db.finalizedDailyBankRecord.findMany({
+        where: { userId, logDate: { in: dates } },
+        select: { logDate: true },
+      }),
+      this.db.openingBankCalculationDay.findMany({
+        where: { userId, logDate: { in: dates } },
+        select: { logDate: true },
+      }),
+      this.db.bankDayProcessingState.findMany({
+        where: { userId, logDate: { in: dates } },
+        select: { logDate: true, lastErrorCode: true },
+      }),
+    ]);
+    const calculated = new Set([...finalized, ...opening].map((item) => toDateOnly(item.logDate)));
+    const processingByDate = new Map(processing.map((item) => [toDateOnly(item.logDate), item]));
+
+    return {
+      dates: await Promise.all(localDates.map(async (localDate) => {
+        const authority = initialization?.timezone
+          ? await resolveDaySourceAuthority(this.db, userId, parseLogDate(localDate), initialization.timezone)
+          : null;
+        const intakeAggregatePresent = Boolean(authority?.selectedIntake);
+        const expenditureAggregatePresent = Boolean(authority?.selectedExpenditure);
+        const failed = Boolean(processingByDate.get(localDate)?.lastErrorCode);
+        return {
+          localDate,
+          intakeAggregatePresent,
+          expenditureAggregatePresent,
+          historicalState: calculated.has(localDate)
+            ? 'finalized' as const
+            : failed
+              ? 'failed' as const
+              : !intakeAggregatePresent
+                ? 'waiting_for_intake' as const
+                : !expenditureAggregatePresent
+                  ? 'waiting_for_burn' as const
+                  : 'ready' as const,
+        };
+      })),
     };
   }
 

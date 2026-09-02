@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -48,6 +48,16 @@ export default function IntegrationsScreen() {
   const [addRole, setAddRole] = useState<Role | null>(null);
   const [service, setService] = useState<ServiceName | null>(null);
   const [intakeWriters, setIntakeWriters] = useState<AppleHealthIntakeWriter[]>([]);
+  const diagnosticsOpening = useRef(false);
+  const reopenAppleHealthDetails = useRef(false);
+
+  useFocusEffect(useCallback(() => {
+    diagnosticsOpening.current = false;
+    if (reopenAppleHealthDetails.current) {
+      reopenAppleHealthDetails.current = false;
+      setService('Apple Health');
+    }
+  }, []));
 
   const load = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
@@ -262,6 +272,14 @@ export default function IntegrationsScreen() {
     void disconnectService(item.serviceName);
   }
 
+  function openAppleHealthDiagnostics() {
+    if (diagnosticsOpening.current) return;
+    diagnosticsOpening.current = true;
+    reopenAppleHealthDetails.current = true;
+    setService(null);
+    requestAnimationFrame(() => router.push('/health-diagnostics'));
+  }
+
   if (loading && !connections) return <SafeAreaView edges={['bottom']} style={styles.safeArea}><View style={styles.loading}><ActivityIndicator color={colors.primary} /></View></SafeAreaView>;
 
   return (
@@ -298,7 +316,7 @@ export default function IntegrationsScreen() {
       </ScrollView>
       <RoleSelector appleBurnState={appleBurnState} busy={busy !== null} data={roleSheet ? displayConnections?.[roleSheet] ?? null : null} message={message} messageTone={messageTone} onAdd={() => { setAddRole(roleSheet); setRoleSheet(null); setMessage(null); }} onAppleDetails={() => { setRoleSheet(null); setService('Apple Health'); }} onClose={closeSheets} onRefreshApple={() => void refreshService('Apple Health')} onSelect={(option) => roleSheet ? void selectRole(roleSheet, option) : undefined} role={roleSheet} />
       <AddSourceSheet busy={busy} connections={displayConnections} intakeWriters={intakeWriters} message={message} messageTone={messageTone} onAppleBurn={() => void connectAppleHealthForBurn()} onAppleIntake={() => void discoverFoodTrackers()} onClose={closeSheets} onFatSecret={() => void connectFatSecretForEaten()} onFitbit={() => void connectFitbitForBurn()} onWriter={(writer) => void selectFoodTracker(writer)} role={addRole} />
-      <ServiceSheet appleBurnState={appleBurnState} busy={busy} connections={displayConnections} message={message} messageTone={messageTone} name={service} onChange={(role) => { setService(null); openRole(role); }} onClose={() => { setService(null); setMessage(null); }} onDisconnect={(name) => void disconnectService(name)} onReconnect={(name) => void reconnectService(name)} onRefresh={(name) => void refreshService(name)} />
+      <ServiceSheet appleBurnState={appleBurnState} busy={busy} connections={displayConnections} message={message} messageTone={messageTone} name={service} onChange={(role) => { setService(null); openRole(role); }} onClose={() => { setService(null); setMessage(null); }} onDiagnostics={openAppleHealthDiagnostics} onDisconnect={(name) => void disconnectService(name)} onReconnect={(name) => void reconnectService(name)} onRefresh={(name) => void refreshService(name)} />
     </SafeAreaView>
   );
 }
@@ -442,7 +460,7 @@ function SourceAction({ disabled, label, detail, onPress }: { disabled: boolean;
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.optionRow, pressed && styles.pressed]}><View style={styles.optionText}><Text style={styles.optionLabel}>{label}</Text>{detail ? <Text style={styles.optionDetail}>{detail}</Text> : null}</View><Ionicons color={colors.textMuted} name="chevron-forward" size={20} /></Pressable>;
 }
 
-function ServiceSheet({ appleBurnState, busy, connections, message, messageTone, name, onChange, onClose, onDisconnect, onReconnect, onRefresh }: { appleBurnState: AppleHealthBurnState; busy: string | null; connections: HealthConnectionsResponse | null; message: string | null; messageTone: 'attention' | 'error' | 'success'; name: ServiceName | null; onChange: (role: Role) => void; onClose: () => void; onDisconnect: (name: 'Fitbit' | 'FatSecret') => void; onReconnect: (name: 'Fitbit' | 'FatSecret') => void; onRefresh: (name: ServiceName) => void }) {
+function ServiceSheet({ appleBurnState, busy, connections, message, messageTone, name, onChange, onClose, onDiagnostics, onDisconnect, onReconnect, onRefresh }: { appleBurnState: AppleHealthBurnState; busy: string | null; connections: HealthConnectionsResponse | null; message: string | null; messageTone: 'attention' | 'error' | 'success'; name: ServiceName | null; onChange: (role: Role) => void; onClose: () => void; onDiagnostics: () => void; onDisconnect: (name: 'Fitbit' | 'FatSecret') => void; onReconnect: (name: 'Fitbit' | 'FatSecret') => void; onRefresh: (name: ServiceName) => void }) {
   const usedForBurn = connections?.burned.selected?.label === name;
   const usedForEaten = connections?.eaten.selected?.label === name || (name === 'Apple Health' && connections?.eaten.selected?.transportLabel === 'Apple Health');
   const usage = [usedForBurn ? 'Calories Burned' : null, usedForEaten ? 'Calories Eaten' : null].filter(Boolean).join(', ');
@@ -458,7 +476,7 @@ function ServiceSheet({ appleBurnState, busy, connections, message, messageTone,
       <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Manage Apple Health permissions</Text></Pressable>
     </> : needsAttention && (name === 'Fitbit' || name === 'FatSecret') ? <Pressable accessibilityRole="button" disabled={busy !== null} onPress={() => onReconnect(name)} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Reconnect</Text></Pressable> : <Pressable accessibilityRole="button" disabled={busy !== null} onPress={() => name && onRefresh(name)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Refresh</Text></Pressable>}
     {name === 'Fitbit' || name === 'FatSecret' ? usedForBurn || usedForEaten ? <View style={styles.guardBlock}><Text style={styles.body}>{hasAlternative ? 'Choose another' : 'Add or choose another'} calories {name === 'Fitbit' ? 'burned' : 'eaten'} source before disconnecting {name}.</Text><Pressable accessibilityRole="button" onPress={() => onChange(guardedRole)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{hasAlternative ? 'Change source' : 'Add another source'}</Text></Pressable></View> : <Pressable accessibilityRole="button" disabled={busy !== null} onPress={() => onDisconnect(name)} style={styles.dangerButton}><Text style={styles.dangerText}>Disconnect {name}</Text></Pressable> : null}
-    {(__DEV__ || process.env.EXPO_PUBLIC_APP_ENV === 'beta') && name === 'Apple Health' ? <Link href="/health-diagnostics" asChild><Pressable accessibilityRole="button" style={styles.devButton}><Text style={styles.devText}>Diagnostics</Text></Pressable></Link> : null}
+    {(__DEV__ || process.env.EXPO_PUBLIC_APP_ENV === 'beta') && name === 'Apple Health' ? <Pressable accessibilityRole="button" disabled={busy !== null} onPress={onDiagnostics} style={styles.devButton}><Text style={styles.devText}>Diagnostics</Text></Pressable> : null}
     {busy ? <ActivityIndicator color={colors.primary} style={styles.sheetSpinner} /> : null}{message ? <Text style={messageTone === 'success' ? styles.successText : messageTone === 'attention' ? styles.attentionText : styles.errorText}>{message}</Text> : null}
   </Sheet>;
 }

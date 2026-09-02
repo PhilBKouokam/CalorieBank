@@ -105,6 +105,17 @@ class MemoryBankHistoryRepository implements BankHistoryRepository {
     };
   }
 
+  async getHealthHistoryDiagnostics(_userId: string, dates: string[]) {
+    return {
+      dates: dates.map((localDate) => ({
+        localDate,
+        intakeAggregatePresent: false,
+        expenditureAggregatePresent: true,
+        historicalState: 'waiting_for_intake' as const,
+      })),
+    };
+  }
+
   async getOpeningBankDetail() {
     return {
       status: 'initialized' as const,
@@ -270,6 +281,24 @@ describe('bank history API', () => {
 
     expect(response.body).toEqual(detail);
     expect(response.body.versions).toHaveLength(1);
+  });
+
+  it('returns authenticated safe per-date HealthKit server evidence', async () => {
+    const response = await request(
+      createApp(undefined, { bankHistoryRepository: new MemoryBankHistoryRepository() }),
+    )
+      .get('/v1/me/bank-history-diagnostics?dates=2026-09-01')
+      .expect(200);
+
+    expect(response.body).toEqual({
+      dates: [{
+        localDate: '2026-09-01',
+        intakeAggregatePresent: false,
+        expenditureAggregatePresent: true,
+        historicalState: 'waiting_for_intake',
+      }],
+    });
+    expect(JSON.stringify(response.body)).not.toMatch(/email|token|bundle|calories/i);
   });
 
   it('returns 404 for unknown date', async () => {

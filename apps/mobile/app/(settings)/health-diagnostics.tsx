@@ -1,16 +1,17 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Redirect, useFocusEffect } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import {
   checkApiReachability,
+  fetchHealthHistoryDiagnostics,
   fetchGoogleHealthBurnParityDiagnostic,
   type ApiNetworkDiagnostics,
 } from '@/lib/api/client';
-import type { GoogleHealthBurnParityDiagnosticResponse } from '@caloriebank/schemas';
-import { getAppleHealthDiagnostics } from '@/lib/healthkit/healthkit-connection';
+import type { GoogleHealthBurnParityDiagnosticResponse, HealthHistoryDiagnosticResponse } from '@caloriebank/schemas';
+import { refreshAppleHealthDiagnosticSampleCounts } from '@/lib/healthkit/healthkit-connection';
 import type {
   HealthKitDiagnosticCategory,
   HealthKitDiagnosticsSnapshot,
@@ -20,6 +21,11 @@ import {
   type DietaryEnergySourceDiagnosticError,
   type DietaryEnergySourceDiagnosticReport,
 } from '@/lib/healthkit/dietary-energy-source-diagnostic';
+import {
+  betaDiagnosticsEnabled,
+  buildHealthKitDateDiagnosticReports,
+  formatHealthKitDiagnosticReport,
+} from '@/lib/healthkit/healthkit-diagnostic-report';
 
 const categories: { key: HealthKitDiagnosticCategory; label: string }[] = [
   { key: 'active_energy', label: 'Active Energy' },
@@ -67,23 +73,6 @@ function querySummary(
   return 'Query succeeded';
 }
 
-function uploadSummary(
-  diagnostics: HealthKitDiagnosticsSnapshot,
-  category: HealthKitDiagnosticCategory,
-  localDate: string,
-) {
-  const uploadCategory = category === 'active_energy' || category === 'resting_energy'
-    ? 'expenditure'
-    : category === 'dietary_energy'
-      ? 'intake'
-      : category;
-  const upload = diagnostics.upload.items?.find(
-    (item) => item.category === uploadCategory && item.localDate === localDate,
-  );
-  if (!upload) return 'not queued';
-  return upload.errorType ? `${upload.status} · ${upload.errorType}` : upload.status;
-}
-
 function categoryPresent(
   diagnostics: HealthKitDiagnosticsSnapshot,
   category: HealthKitDiagnosticCategory,
@@ -105,6 +94,7 @@ function completeBurnPresent(diagnostics: HealthKitDiagnosticsSnapshot) {
 export default function HealthDiagnosticsScreen() {
   const [diagnostics, setDiagnostics] = useState<HealthKitDiagnosticsSnapshot | null>(null);
   const [apiDiagnostics, setApiDiagnostics] = useState<ApiNetworkDiagnostics | null>(null);
+  const [serverDiagnostics, setServerDiagnostics] = useState<HealthHistoryDiagnosticResponse | null>(null);
   const [sourceDiagnostic, setSourceDiagnostic] =
     useState<DietaryEnergySourceDiagnosticReport | null>(null);
   const [sourceDiagnosticError, setSourceDiagnosticError] = useState<string | null>(null);
@@ -117,12 +107,30 @@ export default function HealthDiagnosticsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void getAppleHealthDiagnostics().then(setDiagnostics);
+      void refreshAppleHealthDiagnosticSampleCounts().then(async (snapshot) => {
+        setDiagnostics(snapshot);
+        const dates = snapshot?.rollingDates.map((item) => item.localDate) ?? [];
+        if (dates.length === 0) return;
+        setServerDiagnostics(await fetchHealthHistoryDiagnostics(dates).catch(() => null));
+      });
       void checkApiReachability().then(setApiDiagnostics);
     }, []),
   );
 
-  if (!__DEV__) return <Redirect href="/integrations" />;
+  const reports = useMemo(
+    () => buildHealthKitDateDiagnosticReports(diagnostics, serverDiagnostics),
+    [diagnostics, serverDiagnostics],
+  );
+  const diagnosticsEnabled = betaDiagnosticsEnabled(process.env.EXPO_PUBLIC_APP_ENV, __DEV__);
+
+  if (!diagnosticsEnabled) return <Redirect href="/integrations" />;
+
+  async function shareReport() {
+    await Share.share({
+      title: 'CalorieBank HealthKit diagnostic report',
+      message: formatHealthKitDiagnosticReport(reports),
+    });
+  }
 
   async function runSourceDiagnostic() {
     if (sourceDiagnosticRunning) return;
@@ -163,6 +171,20 @@ export default function HealthDiagnosticsScreen() {
           Internal metadata for the latest Apple Health synchronization. No individual
           HealthKit samples are shown.
         </Text>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Share or copy diagnostic report"
+          disabled={reports.length === 0}
+          onPress={() => void shareReport()}
+          style={({ pressed }) => [
+            styles.diagnosticButton,
+            pressed && styles.pressed,
+            reports.length === 0 && styles.disabled,
+          ]}
+        >
+          <Text style={styles.diagnosticButtonText}>Share or copy diagnostic report</Text>
+        </Pressable>
 
         <View style={styles.card}>
           <DiagnosticRow label="API base URL" value={apiDiagnostics?.baseUrl ?? 'Not configured'} />
@@ -306,16 +328,18 @@ export default function HealthDiagnosticsScreen() {
           />
         </View>
 
-        {diagnostics?.rollingDates.map((date) => (
-          <View key={date.localDate} style={styles.card}>
-            <Text style={styles.sectionTitle}>{date.localDate}</Text>
-            {categories.map((category) => (
-              <DiagnosticRow
-                key={`${date.localDate}:${category.key}`}
-                label={category.label}
-                value={`${querySummary(diagnostics, category.key, date.localDate)} · Upload ${uploadSummary(diagnostics, category.key, date.localDate)}`}
-              />
-            ))}
+        {reports.map((report) => (
+          <View key={report.localDate} style={styles.card}>
+            <Text style={styles.sectionTitle}>{report.localDate}</Text>
+            <DiagnosticRow label="Dietary Energy query" value={report.dietaryQuery} />
+            <DiagnosticRow label="Sample count" value={report.sampleCount === null ? 'Unknown' : String(report.sampleCount)} />
+            <DiagnosticRow label="Exact selected writer matched" value={report.selectedWriterMatched} />
+            <DiagnosticRow label="Normalized intake aggregate created" value={report.normalizedIntakeAggregateCreated ? 'Yes' : 'No'} />
+            <DiagnosticRow label="Upload" value={report.upload} />
+            <DiagnosticRow label="Fingerprint skip reason" value={report.fingerprintSkipReason ?? 'None'} />
+            <DiagnosticRow label="Server intake aggregate after refresh" value={report.serverIntakeAggregate} />
+            <DiagnosticRow label="Server burn aggregate after refresh" value={report.serverExpenditureAggregate} />
+            <DiagnosticRow label="Historical date state" value={report.historicalState} />
           </View>
         ))}
 

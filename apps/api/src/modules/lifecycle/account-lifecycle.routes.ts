@@ -20,7 +20,12 @@ export function createAccountLifecycleRouter(
       const input = inputSchema.parse(req.body);
       const profile = await coordinator.prepareForegroundUser(user.id, input.timezone);
       if (!profile.onboardingComplete) {
-        res.json({ shouldSyncHealthKit: false, unresolvedDates: [], errors: [] });
+        res.json({
+          shouldSyncHealthKit: false,
+          unresolvedDates: [],
+          errors: [],
+          historyDayCount: 0,
+        });
         return;
       }
       const result = await coordinator.runUser(user, input.timezone, input.trigger);
@@ -28,6 +33,7 @@ export function createAccountLifecycleRouter(
         shouldSyncHealthKit: true,
         unresolvedDates: result.unresolvedDates,
         errors: result.errors,
+        historyDayCount: result.historyDayCount,
       });
     } catch (error) {
       next(error);

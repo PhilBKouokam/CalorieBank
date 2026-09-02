@@ -29,6 +29,11 @@ import {
   safeHealthKitError,
   type HealthKitQueryDiagnostic,
 } from '../../mobile/lib/healthkit/healthkit-diagnostics';
+import {
+  betaDiagnosticsEnabled,
+  buildHealthKitDateDiagnosticReports,
+  formatHealthKitDiagnosticReport,
+} from '../../mobile/lib/healthkit/healthkit-diagnostic-report';
 
 const input: FetchDailyAggregateInput = {
   userId: 'device-user',
@@ -102,6 +107,104 @@ describe('Apple Health provider adapters', () => {
     expect(keyA).not.toBe(keyB);
     expect(keyA).toContain('account:user_A');
     expect(keyB).toContain('account:user_B');
+  });
+
+  it('enables diagnostics in beta preview without exposing them in production', () => {
+    expect(betaDiagnosticsEnabled('beta', false)).toBe(true);
+    expect(betaDiagnosticsEnabled('production', false)).toBe(false);
+    expect(betaDiagnosticsEnabled(undefined, true)).toBe(true);
+  });
+
+  it('builds a conclusive safe report for fingerprint-skipped historical intake', () => {
+    const diagnostics = createHealthKitDiagnosticsSnapshot({
+      rollingDates: [{
+        localDate: '2026-09-01',
+        queryStart: '2026-09-01T05:00:00.000Z',
+        queryEnd: '2026-09-02T05:00:00.000Z',
+      }],
+      queries: [{
+        category: 'dietary_energy',
+        localDate: '2026-09-01',
+        queryStart: '2026-09-01T05:00:00.000Z',
+        queryEnd: '2026-09-02T05:00:00.000Z',
+        status: 'success',
+        sampleCount: 8,
+        normalizedAggregate: 1810,
+        error: null,
+      }],
+      upload: {
+        status: 'success', attemptedCount: 0, completedCount: 0, pendingCount: 0,
+        failedCategories: [],
+        items: [{
+          category: 'intake', localDate: '2026-09-01', endpoint: '/v1/me/ingestion/intake',
+          status: 'skipped', errorType: 'fingerprint_match',
+        }],
+      },
+    });
+    const reports = buildHealthKitDateDiagnosticReports(diagnostics, {
+      dates: [{
+        localDate: '2026-09-01', intakeAggregatePresent: false,
+        expenditureAggregatePresent: true, historicalState: 'waiting_for_intake',
+      }],
+    });
+
+    expect(reports[0]).toMatchObject({
+      dietaryQuery: 'succeeded', sampleCount: 8, selectedWriterMatched: 'yes',
+      normalizedIntakeAggregateCreated: true, upload: 'fingerprint skipped',
+      fingerprintSkipReason: 'fingerprint_match', serverIntakeAggregate: 'absent',
+      serverExpenditureAggregate: 'present', historicalState: 'waiting for intake',
+    });
+    const copied = formatHealthKitDiagnosticReport(reports);
+    expect(copied).toContain('Upload: fingerprint skipped');
+    expect(copied).not.toMatch(/email|oauth|secret|raw health/i);
+  });
+
+  it('distinguishes empty query, upload failure, and post-upload server absence', () => {
+    const base = createHealthKitDiagnosticsSnapshot({
+      rollingDates: [{
+        localDate: '2026-09-01',
+        queryStart: '2026-09-01T05:00:00.000Z',
+        queryEnd: '2026-09-02T05:00:00.000Z',
+      }],
+    });
+    const server = { dates: [{
+      localDate: '2026-09-01', intakeAggregatePresent: false,
+      expenditureAggregatePresent: true, historicalState: 'waiting_for_intake' as const,
+    }] };
+    const empty = buildHealthKitDateDiagnosticReports(createHealthKitDiagnosticsSnapshot({
+      ...base,
+      queries: [{
+        category: 'dietary_energy', localDate: '2026-09-01',
+        queryStart: '2026-09-01T05:00:00.000Z', queryEnd: '2026-09-02T05:00:00.000Z',
+        status: 'empty', sampleCount: 0, normalizedAggregate: null, error: null,
+      }],
+    }), server)[0];
+    expect(empty).toMatchObject({ sampleCount: 0, selectedWriterMatched: 'no', upload: 'not queued' });
+
+    const queried = { ...base, queries: [{
+      category: 'dietary_energy' as const, localDate: '2026-09-01',
+      queryStart: '2026-09-01T05:00:00.000Z', queryEnd: '2026-09-02T05:00:00.000Z',
+      status: 'success' as const, sampleCount: 8, normalizedAggregate: 1810, error: null,
+    }] };
+    const failed = buildHealthKitDateDiagnosticReports(createHealthKitDiagnosticsSnapshot({
+      ...queried,
+      upload: { status: 'failure', attemptedCount: 1, completedCount: 0, pendingCount: 1,
+        failedCategories: ['2026-09-01:intake'], items: [{
+          category: 'intake', localDate: '2026-09-01', endpoint: '/v1/me/ingestion/intake',
+          status: 'failure', errorType: 'network',
+        }] },
+    }), server)[0];
+    expect(failed?.upload).toBe('failed');
+
+    const uploaded = buildHealthKitDateDiagnosticReports(createHealthKitDiagnosticsSnapshot({
+      ...queried,
+      upload: { status: 'success', attemptedCount: 1, completedCount: 1, pendingCount: 0,
+        failedCategories: [], items: [{
+          category: 'intake', localDate: '2026-09-01', endpoint: '/v1/me/ingestion/intake',
+          status: 'success', errorType: null,
+        }] },
+    }), server)[0];
+    expect(uploaded).toMatchObject({ upload: 'succeeded', serverIntakeAggregate: 'absent' });
   });
 
   it('classifies expected aborts separately from network failures and timeouts', () => {

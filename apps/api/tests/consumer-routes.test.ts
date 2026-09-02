@@ -177,6 +177,18 @@ describe('consumer routes', () => {
     expect(source).toContain('Another app using Apple Health');
   });
 
+  it('opens beta HealthKit diagnostics once outside the Apple Health modal', () => {
+    const integrations = mobileFile('app/(settings)/integrations.tsx');
+    const diagnostics = mobileFile('app/(settings)/health-diagnostics.tsx');
+    expect(integrations).toContain("requestAnimationFrame(() => router.push('/health-diagnostics'))");
+    expect(integrations).toContain('if (diagnosticsOpening.current) return');
+    expect(integrations).toContain("setService(null)");
+    expect(integrations).not.toContain('<Link href="/health-diagnostics"');
+    expect(integrations).toContain('reopenAppleHealthDetails.current = true');
+    expect(diagnostics).toContain('betaDiagnosticsEnabled(process.env.EXPO_PUBLIC_APP_ENV, __DEV__)');
+    expect(diagnostics).toContain('Share or copy diagnostic report');
+  });
+
   it('presents Available Bank as an unsigned balance and keeps Today contribution concise', () => {
     const source = mobileFile('app/(tabs)/today.tsx');
     expect(source).toContain('formatBankBalance(bankSummary.availableBankCalories)');

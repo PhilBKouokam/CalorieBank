@@ -1,4 +1,4 @@
-import { bankHistoryRangeSchema, historicalSourceMutationSchema } from '@caloriebank/schemas';
+import { bankHistoryRangeSchema, healthHistoryDiagnosticQuerySchema, historicalSourceMutationSchema } from '@caloriebank/schemas';
 import { Router } from 'express';
 
 import { AppError } from '../../errors';
@@ -38,6 +38,22 @@ export function createBankHistoryRouter(
   router.get('/bank-opening', async (_req, res, next) => {
     try {
       res.json(await repository.getOpeningBankDetail(resolveRequestUser(userSource, res).id));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/bank-history-diagnostics', async (req, res, next) => {
+    try {
+      const parsed = healthHistoryDiagnosticQuerySchema.safeParse({
+        dates: typeof req.query.dates === 'string' ? req.query.dates.split(',') : [],
+      });
+      if (!parsed.success) throw new AppError('Diagnostic dates are invalid.', 400, parsed.error.flatten());
+      if (!repository.getHealthHistoryDiagnostics) throw new AppError('Health diagnostics are unavailable.', 501);
+      res.json(await repository.getHealthHistoryDiagnostics(
+        resolveRequestUser(userSource, res).id,
+        parsed.data.dates,
+      ));
     } catch (error) {
       next(error);
     }

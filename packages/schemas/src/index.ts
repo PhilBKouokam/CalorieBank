@@ -783,6 +783,25 @@ export const bankHistoryResponseSchema = z.object({
   finalizedDays: z.array(bankHistoryDaySummarySchema),
 });
 
+export const healthHistoryDiagnosticQuerySchema = z.object({
+  dates: z.array(dateStringSchema).min(1).max(MAX_INGESTION_SYNC_SESSION_DATES),
+}).strict();
+
+export const healthHistoryDiagnosticResponseSchema = z.object({
+  dates: z.array(z.object({
+    localDate: dateStringSchema,
+    intakeAggregatePresent: z.boolean(),
+    expenditureAggregatePresent: z.boolean(),
+    historicalState: z.enum([
+      'ready',
+      'waiting_for_intake',
+      'waiting_for_burn',
+      'failed',
+      'finalized',
+    ]),
+  })),
+});
+
 export const openingBankDetailResponseSchema = z.object({
   status: openingBankStatusSchema,
   openingBankCalories: z.number().int().nonnegative(),
@@ -898,6 +917,8 @@ export type OnboardingStatusResponse = z.infer<typeof onboardingStatusResponseSc
 export type BankHistoryDaySummary = z.infer<typeof bankHistoryDaySummarySchema>;
 export type BankHistoryMissingDay = z.infer<typeof bankHistoryMissingDaySchema>;
 export type BankHistoryResponse = z.infer<typeof bankHistoryResponseSchema>;
+export type HealthHistoryDiagnosticQuery = z.infer<typeof healthHistoryDiagnosticQuerySchema>;
+export type HealthHistoryDiagnosticResponse = z.infer<typeof healthHistoryDiagnosticResponseSchema>;
 export type OpeningBankDetailResponse = z.infer<typeof openingBankDetailResponseSchema>;
 export type BankHistoryDayDetailResponse = z.infer<typeof bankHistoryDayDetailResponseSchema>;
 export type HistoricalSourceRole = z.infer<typeof historicalSourceRoleSchema>;

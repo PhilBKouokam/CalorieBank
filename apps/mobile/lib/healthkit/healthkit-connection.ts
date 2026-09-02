@@ -190,6 +190,59 @@ export async function getAppleHealthDiagnostics(accountScope = activeAccountScop
   return stored ? createHealthKitDiagnosticsSnapshot(stored) : null;
 }
 
+export async function refreshAppleHealthDiagnosticSampleCounts() {
+  const context = captureAccountContext();
+  const diagnostics = await getAppleHealthDiagnostics(context.scope);
+  if (!diagnostics || diagnostics.rollingDates.length === 0) return diagnostics;
+  const selection = await fetchProviderSelection();
+  assertAccountContext(context);
+  const bundleIdentifier = selection.intake.authoritativeProvider === 'apple_health'
+    ? selection.intake.writerBundleIdentifier
+    : null;
+  if (!bundleIdentifier) return diagnostics;
+
+  const writer = await sourceForSelectedWriter(bundleIdentifier);
+  assertAccountContext(context);
+  if (!writer) {
+    diagnostics.intakeWriterChecks = diagnostics.rollingDates.map(({ localDate }) => ({
+      localDate,
+      status: 'writer_not_found' as const,
+      sampleCount: null,
+    }));
+    await saveHealthKitDiagnostics(diagnostics, context.scope);
+    return diagnostics;
+  }
+
+  const healthKit = await loadHealthKit();
+  diagnostics.intakeWriterChecks = await Promise.all(diagnostics.rollingDates.map(async (date) => {
+    try {
+      const samples = await healthKit.queryQuantitySamples(
+        'HKQuantityTypeIdentifierDietaryEnergyConsumed',
+        {
+          filter: {
+            date: {
+              startDate: new Date(date.queryStart),
+              endDate: new Date(date.queryEnd),
+              strictStartDate: true,
+              strictEndDate: true,
+            },
+            sources: [writer.source],
+          },
+          limit: 0,
+          ascending: true,
+          unit: 'kcal',
+        },
+      );
+      return { localDate: date.localDate, status: 'succeeded' as const, sampleCount: samples.length };
+    } catch {
+      return { localDate: date.localDate, status: 'failed' as const, sampleCount: null };
+    }
+  }));
+  assertAccountContext(context);
+  await saveHealthKitDiagnostics(diagnostics, context.scope);
+  return diagnostics;
+}
+
 async function recordGlobalSyncFailure(error: unknown, context: AppleHealthAccountContext) {
   const previous = await getAppleHealthDiagnostics(context.scope);
   const safeError = safeHealthKitError(error);
@@ -516,6 +569,7 @@ async function performAppleHealthRollingWindowSync({
       queryEnd: window.dayEnd.toISOString(),
     })),
     queries: [],
+    intakeWriterChecks: [],
     upload: {
       status: 'not_attempted',
       attemptedCount: 0,
@@ -626,6 +680,23 @@ async function performAppleHealthRollingWindowSync({
 
   const queued = await enqueueChangedUploads(uploads, context.scope);
   const pendingBeforeFlush = await loadOutbox(context.scope);
+  diagnostics.upload = {
+    status: pendingBeforeFlush.length > 0 ? 'partial' : 'not_attempted',
+    attemptedCount: 0,
+    completedCount: 0,
+    pendingCount: pendingBeforeFlush.length,
+    failedCategories: [],
+    items: [
+      ...queued.skippedItems,
+      ...pendingBeforeFlush.map((item) => ({
+        category: item.kind,
+        localDate: item.localDate,
+        endpoint: UPLOAD_ENDPOINTS[item.kind],
+        status: 'queued' as const,
+        errorType: null,
+      })),
+    ],
+  };
   diagnostics.outbox = outboxDiagnostic(pendingBeforeFlush, 'not_run');
   await saveHealthKitDiagnostics(diagnostics, context.scope);
   const anchor = windows[0];
