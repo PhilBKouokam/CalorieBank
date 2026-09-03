@@ -13,6 +13,7 @@ import { Platform } from 'react-native';
 
 import {
   completeIngestionSyncSession,
+  fetchHealthHistoryDiagnostics,
   fetchProviderSelection,
   fetchToday,
   getApiRequestFailureKind,
@@ -280,14 +281,34 @@ function outboxDiagnostic(queue: readonly QueuedUpload[], lastRetryStatus: 'not_
   };
 }
 
-async function enqueueChangedUploads(uploads: UploadPayload[], accountScope: string) {
+async function enqueueChangedUploads(
+  uploads: UploadPayload[],
+  accountScope: string,
+  serverPresence: Map<string, boolean> | null,
+) {
   const [outbox, fingerprints] = await Promise.all([
     loadOutbox(accountScope),
     readJson<Record<string, string>>(appleHealthAccountStorageKey(FINGERPRINTS_KEY, accountScope), {}),
   ]);
-  const merged = mergeRollingSyncOutbox(outbox, uploads, fingerprints, new Date().toISOString());
+  const merged = mergeRollingSyncOutbox(
+    outbox,
+    uploads,
+    fingerprints,
+    new Date().toISOString(),
+    (upload) => {
+      if (upload.kind !== 'intake' && upload.kind !== 'expenditure') return true;
+      return serverPresence?.get(`${upload.kind}:${upload.localDate}`) === true;
+    },
+  );
   const queue = merged.queue;
   await AsyncStorage.setItem(appleHealthAccountStorageKey(OUTBOX_KEY, accountScope), JSON.stringify(queue));
+  for (const upload of merged.staleFingerprintUploads) {
+    logHealthKitDiagnostic('stale_fingerprint_recovery_queued', {
+      category: upload.kind,
+      localDate: upload.localDate,
+      reason: 'server_aggregate_absent',
+    });
+  }
   return {
     changedDates: merged.changedDates,
     skippedDates: merged.skippedDates,
@@ -678,7 +699,22 @@ async function performAppleHealthRollingWindowSync({
   diagnostics.overallSyncResult = deriveHealthKitSyncStatus(diagnostics.queries, diagnostics.upload);
   await saveHealthKitDiagnostics(diagnostics, context.scope);
 
-  const queued = await enqueueChangedUploads(uploads, context.scope);
+  const serverDates = [...new Set(
+    uploads
+      .filter((upload) => upload.kind === 'intake' || upload.kind === 'expenditure')
+      .map((upload) => upload.localDate),
+  )];
+  const serverEvidence = serverDates.length > 0
+    ? await fetchHealthHistoryDiagnostics(serverDates).catch(() => null)
+    : null;
+  assertAccountContext(context);
+  const serverPresence = serverEvidence
+    ? new Map(serverEvidence.dates.flatMap((date) => [
+      [`intake:${date.localDate}`, date.appleHealthIntakeAggregatePresent] as const,
+      [`expenditure:${date.localDate}`, date.appleHealthExpenditureAggregatePresent] as const,
+    ]))
+    : null;
+  const queued = await enqueueChangedUploads(uploads, context.scope, serverPresence);
   const pendingBeforeFlush = await loadOutbox(context.scope);
   diagnostics.upload = {
     status: pendingBeforeFlush.length > 0 ? 'partial' : 'not_attempted',

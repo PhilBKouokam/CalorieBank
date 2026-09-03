@@ -792,6 +792,8 @@ export const healthHistoryDiagnosticResponseSchema = z.object({
     localDate: dateStringSchema,
     intakeAggregatePresent: z.boolean(),
     expenditureAggregatePresent: z.boolean(),
+    appleHealthIntakeAggregatePresent: z.boolean(),
+    appleHealthExpenditureAggregatePresent: z.boolean(),
     historicalState: z.enum([
       'ready',
       'waiting_for_intake',

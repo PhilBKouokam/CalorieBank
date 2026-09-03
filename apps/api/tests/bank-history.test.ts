@@ -111,6 +111,8 @@ class MemoryBankHistoryRepository implements BankHistoryRepository {
         localDate,
         intakeAggregatePresent: false,
         expenditureAggregatePresent: true,
+        appleHealthIntakeAggregatePresent: false,
+        appleHealthExpenditureAggregatePresent: false,
         historicalState: 'waiting_for_intake' as const,
       })),
     };
@@ -295,6 +297,8 @@ describe('bank history API', () => {
         localDate: '2026-09-01',
         intakeAggregatePresent: false,
         expenditureAggregatePresent: true,
+        appleHealthIntakeAggregatePresent: false,
+        appleHealthExpenditureAggregatePresent: false,
         historicalState: 'waiting_for_intake',
       }],
     });

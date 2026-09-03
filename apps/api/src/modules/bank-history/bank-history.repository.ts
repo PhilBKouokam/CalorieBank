@@ -1165,7 +1165,8 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
     localDates: string[],
   ): Promise<HealthHistoryDiagnosticResponse> {
     const dates = localDates.map(parseLogDate);
-    const [initialization, finalized, opening, processing] = await Promise.all([
+    const selection = await readProviderSelection(this.db, userId);
+    const [initialization, finalized, opening, processing, appleHealthIntake, appleHealthExpenditure] = await Promise.all([
       this.db.bankAccountInitialization.findUnique({
         where: { userId },
         select: { timezone: true },
@@ -1182,9 +1183,40 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         where: { userId, logDate: { in: dates } },
         select: { logDate: true, lastErrorCode: true },
       }),
+      this.db.dailyIntakeAggregate.findMany({
+        where: {
+          userId,
+          localDate: { in: dates },
+          provider: 'apple_health',
+          ...(selection.appleHealthIntakeWriterBundleId
+            ? { writerBundleIdentifier: selection.appleHealthIntakeWriterBundleId }
+            : {}),
+        },
+        select: { localDate: true, timezone: true, syncStatus: true },
+      }),
+      this.db.dailyExpenditureAggregate.findMany({
+        where: { userId, localDate: { in: dates }, provider: 'apple_health' },
+        select: {
+          localDate: true,
+          timezone: true,
+          syncStatus: true,
+          rawTotalDailyExpenditure: true,
+        },
+      }),
     ]);
     const calculated = new Set([...finalized, ...opening].map((item) => toDateOnly(item.logDate)));
     const processingByDate = new Map(processing.map((item) => [toDateOnly(item.logDate), item]));
+    const usableStatuses = new Set(['ready', 'stale', 'partial']);
+    const appleHealthIntakeDates = new Set(appleHealthIntake
+      .filter((item) => item.timezone === initialization?.timezone && usableStatuses.has(item.syncStatus))
+      .map((item) => toDateOnly(item.localDate)));
+    const appleHealthExpenditureDates = new Set(appleHealthExpenditure
+      .filter((item) =>
+        item.timezone === initialization?.timezone
+        && usableStatuses.has(item.syncStatus)
+        && item.rawTotalDailyExpenditure > 0,
+      )
+      .map((item) => toDateOnly(item.localDate)));
 
     return {
       dates: await Promise.all(localDates.map(async (localDate) => {
@@ -1198,6 +1230,8 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           localDate,
           intakeAggregatePresent,
           expenditureAggregatePresent,
+          appleHealthIntakeAggregatePresent: appleHealthIntakeDates.has(localDate),
+          appleHealthExpenditureAggregatePresent: appleHealthExpenditureDates.has(localDate),
           historicalState: calculated.has(localDate)
             ? 'finalized' as const
             : failed

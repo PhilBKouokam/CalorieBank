@@ -92,7 +92,7 @@ describe('rolling historical synchronization policy', () => {
     expect(queue[0]).not.toHaveProperty('url');
   });
 
-  it('reports fingerprint-skipped uploads separately from absent query results', () => {
+  it('skips a matching fingerprint only when the server aggregate is present', () => {
     const upload = {
       kind: 'intake',
       localDate: '2026-09-01',
@@ -108,10 +108,83 @@ describe('rolling historical synchronization policy', () => {
       [upload],
       { 'apple_health:intake:2026-09-01': fingerprint },
       '2026-09-02T12:00:00Z',
+      () => true,
     );
 
     expect(result.queue).toHaveLength(0);
     expect(result.skippedUploads).toEqual([upload]);
+    expect(result.staleFingerprintUploads).toEqual([]);
+  });
+
+  it('requeues a matching fingerprint when the server aggregate is absent', () => {
+    const upload = {
+      kind: 'intake',
+      localDate: '2026-09-01',
+      body: {
+        totalCaloriesConsumed: 1810,
+        writerBundleIdentifier: 'CRONOMETER-GOLD',
+        writerDisplayName: 'Cronometer',
+      },
+    };
+    const result = mergeRollingSyncOutbox(
+      [],
+      [upload],
+      { 'apple_health:intake:2026-09-01': rollingUploadFingerprint(upload) },
+      '2026-09-02T12:00:00Z',
+      () => false,
+    );
+
+    expect(result.skippedUploads).toEqual([]);
+    expect(result.staleFingerprintUploads).toEqual([upload]);
+    expect(result.queue).toHaveLength(1);
+  });
+
+  it('keeps a server-missing fingerprint retryable after an upload failure', () => {
+    const upload = {
+      kind: 'intake', localDate: '2026-09-01',
+      body: {
+        totalCaloriesConsumed: 1810,
+        writerBundleIdentifier: 'CRONOMETER-GOLD',
+        writerDisplayName: 'Cronometer',
+      },
+    };
+    const fingerprints = {
+      'apple_health:intake:2026-09-01': rollingUploadFingerprint(upload),
+    };
+    const firstAttempt = mergeRollingSyncOutbox(
+      [], [upload], fingerprints, '2026-09-02T12:00:00Z', () => false,
+    );
+    const retry = mergeRollingSyncOutbox(
+      [], [upload], fingerprints, '2026-09-02T12:05:00Z', () => false,
+    );
+
+    expect(firstAttempt.queue).toHaveLength(1);
+    expect(retry.queue).toHaveLength(1);
+    expect(retry.staleFingerprintUploads).toEqual([upload]);
+  });
+
+  it('recovers multiple stale historical fingerprints in one bounded run', () => {
+    const uploads = ['2026-08-30', '2026-08-31', '2026-09-01'].map((localDate) => ({
+      kind: 'intake',
+      localDate,
+      body: {
+        totalCaloriesConsumed: 1810,
+        writerBundleIdentifier: 'CRONOMETER-GOLD',
+        writerDisplayName: 'Cronometer',
+      },
+    }));
+    const fingerprints = Object.fromEntries(uploads.map((upload) => [
+      `apple_health:intake:${upload.localDate}`,
+      rollingUploadFingerprint(upload),
+    ]));
+    const result = mergeRollingSyncOutbox(
+      [], uploads, fingerprints, '2026-09-02T12:00:00Z', () => false,
+    );
+
+    expect(result.queue.map((item) => item.localDate)).toEqual([
+      '2026-08-30', '2026-08-31', '2026-09-01',
+    ]);
+    expect(result.staleFingerprintUploads).toHaveLength(3);
   });
 
   it('collapses concurrent automatic triggers into one rolling sync', async () => {

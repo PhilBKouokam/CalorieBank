@@ -39,19 +39,28 @@ export function mergeRollingSyncOutbox<T extends RollingSyncUpload>(
   uploads: T[],
   acceptedFingerprints: Record<string, string>,
   queuedAt: string,
+  canSkipAcceptedFingerprint: (upload: T) => boolean = () => true,
 ) {
   const byKey = new Map(existing.map((item) => [item.key, item]));
   const changedDates = new Set<string>();
   const skippedDates = new Set<string>();
   const skippedUploads: T[] = [];
+  const staleFingerprintUploads: T[] = [];
 
   for (const upload of uploads) {
     const key = rollingUploadKey(upload);
     const fingerprint = rollingUploadFingerprint(upload);
-    if (acceptedFingerprints[key] === fingerprint && !byKey.has(key)) {
+    if (
+      acceptedFingerprints[key] === fingerprint
+      && !byKey.has(key)
+      && canSkipAcceptedFingerprint(upload)
+    ) {
       skippedDates.add(upload.localDate);
       skippedUploads.push(upload);
       continue;
+    }
+    if (acceptedFingerprints[key] === fingerprint && !byKey.has(key)) {
+      staleFingerprintUploads.push(upload);
     }
     byKey.set(key, { ...upload, key, fingerprint, queuedAt });
     changedDates.add(upload.localDate);
@@ -65,6 +74,7 @@ export function mergeRollingSyncOutbox<T extends RollingSyncUpload>(
     changedDates: [...changedDates],
     skippedDates: [...skippedDates],
     skippedUploads,
+    staleFingerprintUploads,
   };
 }
 

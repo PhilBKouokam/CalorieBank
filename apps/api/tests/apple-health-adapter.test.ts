@@ -144,7 +144,8 @@ describe('Apple Health provider adapters', () => {
     const reports = buildHealthKitDateDiagnosticReports(diagnostics, {
       dates: [{
         localDate: '2026-09-01', intakeAggregatePresent: false,
-        expenditureAggregatePresent: true, historicalState: 'waiting_for_intake',
+        expenditureAggregatePresent: true, appleHealthIntakeAggregatePresent: false,
+        appleHealthExpenditureAggregatePresent: false, historicalState: 'waiting_for_intake',
       }],
     });
 
@@ -169,7 +170,8 @@ describe('Apple Health provider adapters', () => {
     });
     const server = { dates: [{
       localDate: '2026-09-01', intakeAggregatePresent: false,
-      expenditureAggregatePresent: true, historicalState: 'waiting_for_intake' as const,
+      expenditureAggregatePresent: true, appleHealthIntakeAggregatePresent: false,
+      appleHealthExpenditureAggregatePresent: false, historicalState: 'waiting_for_intake' as const,
     }] };
     const empty = buildHealthKitDateDiagnosticReports(createHealthKitDiagnosticsSnapshot({
       ...base,
