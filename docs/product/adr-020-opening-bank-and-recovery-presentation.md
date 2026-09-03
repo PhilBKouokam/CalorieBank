@@ -43,6 +43,8 @@ The latest completed contribution on Today is resolved from that same unified ch
 
 When the historical opening net is non-positive, individual opening-day calculations remain visible even though the one-time starting balance floor produces `0 kcal`. Detail may explain concisely that a starting balance cannot begin below zero. The displayed daily values are not altered to make their visible sum equal the floored balance.
 
+Opening Bank immutability assumes the initial-import completion evidence was truthful. If a pre-initialization Apple Health session marked a historical intake date both fingerprint-skipped and ready while the server had no aggregate, a later exact-writer recovery may idempotently complete the omitted Opening Bank calculation rows. This correction is allowed only while the original goal and provider selection are provably unchanged, and only for dates named by that false-complete session. Ordinary late provider data does not reopen or recalculate an initialized Opening Bank.
+
 When initialization is waiting, the app performs one bounded full-window synchronization attempt for both selected roles. Transient failures remain retryable and block immutable initialization. A completed attempt with no eligible day is a valid no-history result, not an indefinite onboarding failure.
 
 Accounts that existed before this policy are marked initialized with a zero opening component and no activation cutoff. Their existing ledger sum is preserved exactly; the new Available Bank and Recovery presentation applies without retroactive forgiveness.

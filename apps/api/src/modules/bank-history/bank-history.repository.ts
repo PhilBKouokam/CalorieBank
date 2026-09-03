@@ -132,6 +132,14 @@ function parseLogDate(logDate: string) {
   return new Date(`${logDate}T00:00:00.000Z`);
 }
 
+function inclusiveLocalDates(start: Date, end: Date) {
+  const dates: string[] = [];
+  for (const value = new Date(start); value <= end; value.setUTCDate(value.getUTCDate() + 1)) {
+    dates.push(toDateOnly(value));
+  }
+  return dates;
+}
+
 function apiStatus(status: 'PROVISIONAL' | 'LOCKED' | 'OPEN') {
   return status === 'PROVISIONAL' ? 'provisional' as const : 'locked' as const;
 }
@@ -465,6 +473,169 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
     return initialization?.accountingStartsOn ? toDateOnly(initialization.accountingStartsOn) : null;
   }
 
+  private async repairFalseCompleteOpeningBank(
+    transaction: Prisma.TransactionClient,
+    user: DevelopmentUser,
+    initialization: {
+      initializedAt: Date | null;
+      accountingStartsOn: Date | null;
+      lookbackStartDate: Date | null;
+      lookbackEndDate: Date | null;
+      eligibleDayCount: number;
+      historicalOpeningNetCalories: number | null;
+      openingEffectiveBalanceCalories: number | null;
+    },
+  ) {
+    if (
+      !initialization.initializedAt
+      || !initialization.accountingStartsOn
+      || !initialization.lookbackStartDate
+      || !initialization.lookbackEndDate
+    ) return null;
+
+    const [selection, goal, existingDays] = await Promise.all([
+      transaction.providerSelection.findUnique({ where: { userId: user.id } }),
+      transaction.goalConfiguration.findUnique({ where: { userId: user.id } }),
+      transaction.openingBankCalculationDay.findMany({
+        where: { userId: user.id },
+        orderBy: { logDate: 'asc' },
+      }),
+    ]);
+    if (
+      !selection
+      || selection.authoritativeIntakeProvider !== 'apple_health'
+      || !selection.appleHealthIntakeWriterBundleId
+      || selection.updatedAt > initialization.initializedAt
+    ) return null;
+
+    const storedGoal = existingDays[0]
+      ? {
+          goalMode: existingDays[0].goalMode as BankGoalMode,
+          goalAdjustmentCalories: existingDays[0].goalAdjustmentCalories,
+        }
+      : goal && goal.updatedAt <= initialization.initializedAt
+        ? {
+            goalMode: goal.goalMode as BankGoalMode,
+            goalAdjustmentCalories: Math.abs(goal.dailyEnergyAdjustment),
+          }
+        : null;
+    if (!storedGoal) return null;
+
+    const localDates = inclusiveLocalDates(
+      initialization.lookbackStartDate,
+      initialization.lookbackEndDate,
+    );
+    const existingDateSet = new Set(existingDays.map((day) => toDateOnly(day.logDate)));
+    const [falseCompleteSessions, expenditureRecords, intakeRecords] = await Promise.all([
+      transaction.ingestionSyncSession.findMany({
+        where: {
+          userId: user.id,
+          provider: 'apple_health',
+          completedAt: { gte: selection.updatedAt, lte: initialization.initializedAt },
+          intakeStatus: 'ready',
+          datesQueried: { hasSome: localDates },
+          datesSkipped: { hasSome: localDates },
+        },
+        select: { datesQueried: true, datesSkipped: true },
+      }),
+      transaction.dailyExpenditureAggregate.findMany({
+        where: {
+          userId: user.id,
+          localDate: {
+            gte: initialization.lookbackStartDate,
+            lte: initialization.lookbackEndDate,
+          },
+          provider: selection.authoritativeExpenditureProvider,
+        },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      transaction.dailyIntakeAggregate.findMany({
+        where: {
+          userId: user.id,
+          localDate: {
+            gte: initialization.lookbackStartDate,
+            lte: initialization.lookbackEndDate,
+          },
+          provider: 'apple_health',
+          writerBundleIdentifier: selection.appleHealthIntakeWriterBundleId,
+          importedAt: { gt: initialization.initializedAt },
+        },
+        orderBy: { updatedAt: 'desc' },
+      }),
+    ]);
+    if (falseCompleteSessions.length === 0) return null;
+
+    const usableStatuses = new Set(['ready', 'stale', 'partial']);
+    const repairedDays: Prisma.OpeningBankCalculationDayCreateManyInput[] = [];
+    for (const logDate of localDates) {
+      if (existingDateSet.has(logDate)) continue;
+      const falselySkipped = falseCompleteSessions.some(
+        (session) => session.datesQueried.includes(logDate) && session.datesSkipped.includes(logDate),
+      );
+      if (!falselySkipped) continue;
+
+      const expenditure = expenditureRecords.find(
+        (record) => toDateOnly(record.localDate) === logDate && usableStatuses.has(record.syncStatus),
+      );
+      const intake = intakeRecords.find(
+        (record) => toDateOnly(record.localDate) === logDate && usableStatuses.has(record.syncStatus),
+      );
+      if (!expenditure || !intake || expenditure.timezone !== intake.timezone) continue;
+
+      const calculation = calculateFinalizedDailyBankChange({
+        importedTotalDailyExpenditure: expenditure.rawTotalDailyExpenditure,
+        expenditureAdjustmentRate: expenditure.adjustmentFactor.toNumber(),
+        goalMode: storedGoal.goalMode,
+        goalAdjustmentCalories: storedGoal.goalAdjustmentCalories,
+        importedCalorieIntake: intake.totalCaloriesConsumed,
+      });
+      repairedDays.push({
+        userId: user.id,
+        logDate: parseLogDate(logDate),
+        timezone: expenditure.timezone,
+        importedTotalDailyExpenditure: expenditure.rawTotalDailyExpenditure,
+        expenditureAdjustmentRate: expenditure.adjustmentFactor,
+        adjustedExpenditure: calculation.adjustedExpenditure,
+        goalMode: storedGoal.goalMode,
+        goalAdjustmentCalories: storedGoal.goalAdjustmentCalories,
+        importedCalorieIntake: intake.totalCaloriesConsumed,
+        dailyAllowance: calculation.dailyAllowance,
+        dailyBankChange: calculation.dailyBankChange,
+        expenditureProvider: expenditure.provider,
+        expenditureProviderRecordId: expenditure.providerRecordId,
+        intakeProvider: intake.provider,
+        intakeProviderRecordId: intake.providerRecordId,
+        intakeSourceDisplayName: intake.writerDisplayName,
+      });
+    }
+    if (repairedDays.length === 0) return null;
+
+    await transaction.openingBankCalculationDay.createMany({ data: repairedDays, skipDuplicates: true });
+    const allDays = await transaction.openingBankCalculationDay.findMany({
+      where: { userId: user.id },
+      select: { dailyBankChange: true },
+    });
+    const opening = calculateOpeningEffectiveBalance(allDays.map((day) => day.dailyBankChange));
+    await transaction.bankAccountInitialization.update({
+      where: { userId: user.id },
+      data: {
+        historicalOpeningNetCalories: opening.historicalOpeningNetCalories,
+        openingEffectiveBalanceCalories: opening.openingEffectiveBalanceCalories,
+        eligibleDayCount: allDays.length,
+      },
+    });
+    console.info(JSON.stringify({
+      component: 'opening_bank',
+      event: 'false_complete_import_repaired',
+      userSuffix: user.id.slice(-8),
+      repairedDates: repairedDays.map((day) =>
+        typeof day.logDate === 'string' ? day.logDate : toDateOnly(day.logDate),
+      ),
+      openingEffectiveBalanceCalories: opening.openingEffectiveBalanceCalories,
+    }));
+    return opening.openingEffectiveBalanceCalories;
+  }
+
   async initializeOpeningBank(
     user: DevelopmentUser,
     currentLocalDate: string,
@@ -486,12 +657,18 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         };
       }
       if (initialization.status === 'INITIALIZED') {
+        const repairedBalance = await this.repairFalseCompleteOpeningBank(
+          transaction,
+          user,
+          initialization,
+        );
         return {
           outcome: 'already_initialized',
           accountingStartsOn: initialization.accountingStartsOn
             ? toDateOnly(initialization.accountingStartsOn)
             : null,
-          openingEffectiveBalanceCalories: initialization.openingEffectiveBalanceCalories ?? 0,
+          openingEffectiveBalanceCalories:
+            repairedBalance ?? initialization.openingEffectiveBalanceCalories ?? 0,
         };
       }
       if (initialization.accountingStartsOn) {

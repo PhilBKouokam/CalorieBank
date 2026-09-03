@@ -191,6 +191,23 @@ describe('Opening Bank and Recovery persistence', () => {
     expect(plannedTreat).toMatchObject({ availableBankCalories: 300, progressCalories: 300 });
   });
 
+  it('initializes every eligible prior day after the complete eight-date bootstrap attempt', async () => {
+    const user = await createUser({ openingPolicy: true });
+    for (const logDate of [
+      '2026-08-18', '2026-08-17', '2026-08-16', '2026-08-15',
+      '2026-08-14', '2026-08-13', '2026-08-12',
+    ]) {
+      await addProviderDay(user.id, logDate, 100);
+    }
+    const repository = new PrismaBankHistoryRepository(prisma, { allowSyntheticProviders: false });
+
+    await expect(repository.initializeOpeningBank(user, '2026-08-19', 'America/Chicago'))
+      .resolves.toMatchObject({ outcome: 'initialized', openingEffectiveBalanceCalories: 700 });
+    await expect(prisma.openingBankCalculationDay.count({ where: { userId: user.id } })).resolves.toBe(7);
+    await expect(prisma.calorieLedgerTransaction.count({ where: { userId: user.id } })).resolves.toBe(0);
+    expect((await repository.getHistory(user.id, 'ALL')).days).toHaveLength(7);
+  });
+
   it.each([
     { dailyChanges: [-400, 100], historicalNet: -300 },
     { dailyChanges: [100, -100], historicalNet: 0 },
@@ -262,6 +279,88 @@ describe('Opening Bank and Recovery persistence', () => {
       openingBankStatus: 'waiting_for_opening_data',
       openingBankCalories: 0,
     });
+  });
+
+  it('repairs a false-complete Opening Bank when acknowledged HealthKit skips lacked server intake', async () => {
+    const user = await createUser({ openingPolicy: true });
+    const skippedDates = Array.from({ length: 8 }, (_, offset) => {
+      const date = new Date('2026-08-19T12:00:00.000Z');
+      date.setUTCDate(date.getUTCDate() - offset);
+      return date.toISOString().slice(0, 10);
+    });
+    await prisma.ingestionSyncSession.updateMany({
+      where: { userId: user.id, provider: 'apple_health' },
+      data: { completedAt: new Date(), datesSkipped: skippedDates },
+    });
+    const repository = new PrismaBankHistoryRepository(prisma, { allowSyntheticProviders: false });
+    await expect(repository.initializeOpeningBank(user, '2026-08-19', 'America/Chicago'))
+      .resolves.toMatchObject({ outcome: 'no_history', openingEffectiveBalanceCalories: 0 });
+    await expect(repository.initializeOpeningBank(user, '2026-08-20', 'America/Chicago'))
+      .resolves.toMatchObject({ outcome: 'initialized', openingEffectiveBalanceCalories: 0 });
+    await repository.postProvisionalDailyRecord(user, {
+      logDate: '2026-08-20',
+      timezone: 'America/Chicago',
+      importedTotalDailyExpenditure: 2500,
+      goalMode: 'maintain',
+      goalAdjustmentCalories: 0,
+      importedCalorieIntake: 1722,
+      expenditureProvider: 'apple_health',
+      expenditureProviderRecordId: 'apple_health:expenditure:2026-08-20',
+      intakeProvider: 'apple_health',
+      intakeProviderRecordId: 'apple_health:intake:2026-08-20',
+      intakeSourceDisplayName: 'Cronometer',
+      intakeWriterBundleIdentifier: 'CRONOMETER-GOLD',
+    });
+    const ledgerBeforeRepair = await prisma.calorieLedgerTransaction.findMany({
+      where: { userId: user.id }, orderBy: { createdAt: 'asc' },
+    });
+    const initialized = await prisma.bankAccountInitialization.findUniqueOrThrow({
+      where: { userId: user.id },
+    });
+
+    await addProviderDay(user.id, '2026-08-18', 400);
+    await addProviderDay(user.id, '2026-08-17', -100);
+    const recoveredAt = new Date(initialized.initializedAt!.getTime() + 1_000);
+    await Promise.all([
+      prisma.dailyExpenditureAggregate.updateMany({ where: { userId: user.id }, data: { importedAt: recoveredAt } }),
+      prisma.dailyIntakeAggregate.updateMany({ where: { userId: user.id }, data: { importedAt: recoveredAt } }),
+    ]);
+
+    await expect(repository.initializeOpeningBank(user, '2026-08-21', 'America/Chicago'))
+      .resolves.toMatchObject({ outcome: 'already_initialized', openingEffectiveBalanceCalories: 300 });
+    expect((await repository.getHistory(user.id, 'ALL')).days.map((day) => [
+      day.logDate, day.dailyBankChange, day.provenance,
+    ])).toEqual([
+      ['2026-08-20', 278, 'finalized'],
+      ['2026-08-18', 400, 'opening'],
+      ['2026-08-17', -100, 'opening'],
+    ]);
+    await repository.initializeOpeningBank(user, '2026-08-21', 'America/Chicago');
+    await expect(prisma.openingBankCalculationDay.count({ where: { userId: user.id } })).resolves.toBe(2);
+    await expect(prisma.calorieLedgerTransaction.findMany({
+      where: { userId: user.id }, orderBy: { createdAt: 'asc' },
+    })).resolves.toEqual(ledgerBeforeRepair);
+    await expect(prisma.finalizedDailyBankRecord.count({ where: { userId: user.id } })).resolves.toBe(1);
+  });
+
+  it('does not rewrite a legitimate no-history boundary for ordinary late provider data', async () => {
+    const user = await createUser({ openingPolicy: true });
+    const repository = new PrismaBankHistoryRepository(prisma, { allowSyntheticProviders: false });
+    await repository.initializeOpeningBank(user, '2026-08-19', 'America/Chicago');
+    await repository.initializeOpeningBank(user, '2026-08-20', 'America/Chicago');
+    const initialized = await prisma.bankAccountInitialization.findUniqueOrThrow({
+      where: { userId: user.id },
+    });
+    await addProviderDay(user.id, '2026-08-18', 400);
+    const recoveredAt = new Date(initialized.initializedAt!.getTime() + 1_000);
+    await Promise.all([
+      prisma.dailyExpenditureAggregate.updateMany({ where: { userId: user.id }, data: { importedAt: recoveredAt } }),
+      prisma.dailyIntakeAggregate.updateMany({ where: { userId: user.id }, data: { importedAt: recoveredAt } }),
+    ]);
+
+    await expect(repository.initializeOpeningBank(user, '2026-08-21', 'America/Chicago'))
+      .resolves.toMatchObject({ outcome: 'already_initialized', openingEffectiveBalanceCalories: 0 });
+    await expect(prisma.openingBankCalculationDay.count({ where: { userId: user.id } })).resolves.toBe(0);
   });
 
   it('posts the first post-signup completed day normally after a no-history opening boundary', async () => {
