@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app';
 import { prisma } from '../src/db/client';
-import { env } from '../src/env';
 import { getLocalDateForTimezone } from '../src/modules/today/today.time';
+import { localDevelopmentApiEnv } from './support/test-api-env';
 
 const timezone = 'America/Chicago';
 const user = {
@@ -24,7 +24,11 @@ afterEach(async () => {
 
 describe('historical sync orchestration persistence', () => {
   it('posts a completed day automatically, records waiting dates, and remains idempotent', async () => {
-    const app = createApp({ ...env, DEV_USER_ID: user.id, DEV_USER_EMAIL: user.email, TODAY_INGESTION_MODE: 'device' });
+    const app = createApp(localDevelopmentApiEnv({
+      DEV_USER_ID: user.id,
+      DEV_USER_EMAIL: user.email,
+      TODAY_INGESTION_MODE: 'device',
+    }));
     const today = getLocalDateForTimezone(timezone);
     const yesterday = previousDate(today, 1);
     const previous = previousDate(today, 2);

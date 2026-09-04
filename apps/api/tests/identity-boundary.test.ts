@@ -13,6 +13,7 @@ import type {
   GoalConfigurationRepository,
 } from '../src/modules/goal-configuration/goal-configuration.repository';
 import type { TodayAggregateRepository } from '../src/modules/today/today.repository';
+import { localDevelopmentApiEnv } from './support/test-api-env';
 
 const users: Record<string, DevelopmentUser> = {
   'token-a': { id: '10000000-0000-4000-8000-000000000001', email: 'a@test.local' },
@@ -73,6 +74,13 @@ function emptyToday(date: string, timezone: string): TodayResponse {
 }
 
 describe('beta identity and ownership boundary', () => {
+  it('keeps local development test authentication independent from ambient Clerk configuration', () => {
+    expect(localDevelopmentApiEnv()).toMatchObject({
+      APP_ENV: 'local',
+      AUTH_MODE: 'development',
+    });
+  });
+
   it('fails closed when a beta or production environment attempts to use DEV_USER_ID', () => {
     expect(() => parseApiEnv({ APP_ENV: 'beta', AUTH_MODE: 'development', CORS_ORIGIN: 'https://app.example.test' })).toThrow(
       'Beta and production environments require Clerk authentication',

@@ -12,6 +12,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app';
+import { localDevelopmentApiEnv } from './support/test-api-env';
 import type {
   DevelopmentUser,
   GoalConfigurationRepository,
@@ -172,7 +173,7 @@ describe('goal configuration display helpers', () => {
 describe('/v1/me/goal-configuration', () => {
   it('returns 404 before the development user has configured a goal', async () => {
     const repository = new MemoryGoalConfigurationRepository();
-    const response = await request(createApp(undefined, { goalConfigurationRepository: repository }))
+    const response = await request(createApp(localDevelopmentApiEnv(), { goalConfigurationRepository: repository }))
       .get('/v1/me/goal-configuration')
       .expect(404);
 
@@ -183,7 +184,7 @@ describe('/v1/me/goal-configuration', () => {
 
   it('saves and retrieves the development user goal configuration', async () => {
     const repository = new MemoryGoalConfigurationRepository();
-    const app = createApp(undefined, { goalConfigurationRepository: repository });
+    const app = createApp(localDevelopmentApiEnv(), { goalConfigurationRepository: repository });
 
     const saved = await request(app)
       .put('/v1/me/goal-configuration')
@@ -207,7 +208,7 @@ describe('/v1/me/goal-configuration', () => {
 
   it('rejects invalid goal configurations', async () => {
     const repository = new MemoryGoalConfigurationRepository();
-    const response = await request(createApp(undefined, { goalConfigurationRepository: repository }))
+    const response = await request(createApp(localDevelopmentApiEnv(), { goalConfigurationRepository: repository }))
       .put('/v1/me/goal-configuration')
       .send({
         goalMode: 'cut',

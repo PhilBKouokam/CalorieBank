@@ -7,6 +7,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app';
+import { localDevelopmentApiEnv } from './support/test-api-env';
 import type { DevelopmentUser } from '../src/modules/goal-configuration/goal-configuration.repository';
 import { derivePlannedTreatProgress } from '../src/modules/planned-treat/planned-treat.progress';
 import type { PlannedTreatRepository } from '../src/modules/planned-treat/planned-treat.repository';
@@ -82,7 +83,7 @@ class MemoryPlannedTreatRepository implements PlannedTreatRepository {
 describe('planned treat API', () => {
   it('returns no active treat', async () => {
     const response = await request(
-      createApp(undefined, { plannedTreatRepository: new MemoryPlannedTreatRepository() }),
+      createApp(localDevelopmentApiEnv(), { plannedTreatRepository: new MemoryPlannedTreatRepository() }),
     )
       .get('/v1/me/planned-treat')
       .expect(200);
@@ -96,7 +97,7 @@ describe('planned treat API', () => {
 
   it('creates and retrieves a planned treat with real progress fields', async () => {
     const repository = new MemoryPlannedTreatRepository();
-    const app = createApp(undefined, { plannedTreatRepository: repository });
+    const app = createApp(localDevelopmentApiEnv(), { plannedTreatRepository: repository });
 
     const created = await request(app)
       .post('/v1/me/planned-treat')
@@ -119,7 +120,7 @@ describe('planned treat API', () => {
 
   it('updates and deletes a planned treat', async () => {
     const repository = new MemoryPlannedTreatRepository(1650);
-    const app = createApp(undefined, { plannedTreatRepository: repository });
+    const app = createApp(localDevelopmentApiEnv(), { plannedTreatRepository: repository });
 
     await request(app)
       .post('/v1/me/planned-treat')
@@ -144,7 +145,7 @@ describe('planned treat API', () => {
   });
 
   it('rejects invalid planned treats', async () => {
-    const app = createApp(undefined, { plannedTreatRepository: new MemoryPlannedTreatRepository() });
+    const app = createApp(localDevelopmentApiEnv(), { plannedTreatRepository: new MemoryPlannedTreatRepository() });
 
     await request(app)
       .post('/v1/me/planned-treat')
@@ -158,7 +159,7 @@ describe('planned treat API', () => {
   });
 
   it('does not expose a manual planned-treat spend action', async () => {
-    await request(createApp(undefined, { plannedTreatRepository: new MemoryPlannedTreatRepository() }))
+    await request(createApp(localDevelopmentApiEnv(), { plannedTreatRepository: new MemoryPlannedTreatRepository() }))
       .post('/v1/me/planned-treat/spend')
       .send({ id: '00000000-0000-4000-8000-000000000010' })
       .expect(404);

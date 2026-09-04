@@ -17,8 +17,8 @@ import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app';
 import { prisma } from '../src/db/client';
-import { env } from '../src/env';
 import type { DevelopmentUser } from '../src/modules/goal-configuration/goal-configuration.repository';
+import { localDevelopmentApiEnv } from './support/test-api-env';
 import {
   DevelopmentExpenditureProvider,
   DevelopmentIntakeProvider,
@@ -263,7 +263,7 @@ describe('provider-neutral Today ingestion', () => {
       repository,
     }).syncDailyAggregates(user, aggregateInput);
 
-    const response = await request(createApp(undefined, { todayRepository: repository }))
+    const response = await request(createApp(localDevelopmentApiEnv(), { todayRepository: repository }))
       .get('/v1/me/today')
       .expect(200);
 
@@ -292,7 +292,7 @@ describe('provider-neutral Today ingestion', () => {
       repository,
     }).syncDailyAggregates(user, aggregateInput);
     const before = { expenditure: repository.expenditure, intake: repository.intake };
-    const response = await request(createApp(undefined, {
+    const response = await request(createApp(localDevelopmentApiEnv(), {
       todayRepository: repository,
       todayPredictionResolver: {
         resolveRestingBurnEstimate: async () => {
@@ -462,7 +462,7 @@ describe('provider-neutral Today ingestion', () => {
     const timezone = 'America/Chicago';
     const localDate = getLocalDateForTimezone(timezone);
     const app = createApp(
-      { ...env, DEV_USER_ID: user.id, DEV_USER_EMAIL: user.email },
+      localDevelopmentApiEnv({ DEV_USER_ID: user.id, DEV_USER_EMAIL: user.email }),
       { todayRepository: repository },
     );
 
@@ -534,12 +534,11 @@ describe('provider-neutral Today ingestion', () => {
       allowSyntheticProviders: false,
     });
     const app = createApp(
-      {
-        ...env,
+      localDevelopmentApiEnv({
         DEV_USER_ID: persistenceUser.id,
         DEV_USER_EMAIL: persistenceUser.email,
         TODAY_INGESTION_MODE: 'device',
-      },
+      }),
       { todayRepository: repository },
     );
     const firstUpdatedAt = new Date();

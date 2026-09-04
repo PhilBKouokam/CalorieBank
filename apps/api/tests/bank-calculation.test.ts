@@ -4,6 +4,7 @@ import {
   calculateAdjustedCurrentDayExpenditure,
   calculateFinalizedDailyBankChange,
   calculateOpeningEffectiveBalance,
+  selectOpeningBankPeriod,
   calculateRemainingTreatGapFromAvailableBank,
   estimateActivityCalorieRange,
   evaluateActivityOpportunityEligibility,
@@ -131,18 +132,43 @@ describe('finalized daily bank calculation', () => {
 });
 
 describe('Opening Bank and Recovery derivation', () => {
-  it('floors only the one-time opening amount', () => {
+  it('selects the longest most-recent positive opening suffix', () => {
     expect(calculateOpeningEffectiveBalance([500, -200, 100])).toEqual({
       historicalOpeningNetCalories: 400,
       openingEffectiveBalanceCalories: 400,
     });
     expect(calculateOpeningEffectiveBalance([-500, 200])).toEqual({
-      historicalOpeningNetCalories: -300,
-      openingEffectiveBalanceCalories: 0,
+      historicalOpeningNetCalories: 200,
+      openingEffectiveBalanceCalories: 200,
     });
     expect(calculateOpeningEffectiveBalance([0])).toEqual({
       historicalOpeningNetCalories: 0,
       openingEffectiveBalanceCalories: 0,
+    });
+
+    const fixture = [190, 219, 199, -2314, 284, 235];
+    expect(selectOpeningBankPeriod(fixture, (value) => value)).toEqual({
+      selectedDays: [284, 235],
+      openingNetCalories: 519,
+    });
+  });
+
+  it('keeps the longest positive suffix and never cherry-picks dates', () => {
+    expect(selectOpeningBankPeriod([100, -50, 25], (value) => value)).toEqual({
+      selectedDays: [100, -50, 25],
+      openingNetCalories: 75,
+    });
+    expect(selectOpeningBankPeriod([-300, 0, 300], (value) => value)).toEqual({
+      selectedDays: [0, 300],
+      openingNetCalories: 300,
+    });
+    expect(selectOpeningBankPeriod([100, -100], (value) => value)).toEqual({
+      selectedDays: [],
+      openingNetCalories: 0,
+    });
+    expect(selectOpeningBankPeriod([-200], (value) => value)).toEqual({
+      selectedDays: [],
+      openingNetCalories: 0,
     });
   });
 

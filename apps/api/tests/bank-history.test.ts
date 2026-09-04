@@ -9,6 +9,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app';
+import { localDevelopmentApiEnv } from './support/test-api-env';
 import type {
   BankHistoryRepository,
   PostProvisionalDailyBankRecordInput,
@@ -175,7 +176,7 @@ const detail: BankHistoryDayDetailResponse = {
 describe('bank history API', () => {
   it('returns summary with no data', async () => {
     const response = await request(
-      createApp(undefined, { bankHistoryRepository: new MemoryBankHistoryRepository() }),
+      createApp(localDevelopmentApiEnv(), { bankHistoryRepository: new MemoryBankHistoryRepository() }),
     )
       .get('/v1/me/bank-summary')
       .expect(200);
@@ -199,7 +200,7 @@ describe('bank history API', () => {
 
   it('returns summary with seeded data', async () => {
     const response = await request(
-      createApp(undefined, { bankHistoryRepository: new MemoryBankHistoryRepository([detail]) }),
+      createApp(localDevelopmentApiEnv(), { bankHistoryRepository: new MemoryBankHistoryRepository([detail]) }),
     )
       .get('/v1/me/bank-summary')
       .expect(200);
@@ -225,7 +226,7 @@ describe('bank history API', () => {
       effectiveDailyBankChange: -900,
     };
     const response = await request(
-      createApp(undefined, { bankHistoryRepository: new MemoryBankHistoryRepository([negative]) }),
+      createApp(localDevelopmentApiEnv(), { bankHistoryRepository: new MemoryBankHistoryRepository([negative]) }),
     )
       .get('/v1/me/bank-summary')
       .expect(200);
@@ -238,13 +239,13 @@ describe('bank history API', () => {
   });
 
   it('validates history range', async () => {
-    await request(createApp(undefined, { bankHistoryRepository: new MemoryBankHistoryRepository() }))
+    await request(createApp(localDevelopmentApiEnv(), { bankHistoryRepository: new MemoryBankHistoryRepository() }))
       .get('/v1/me/bank-history?range=BAD')
       .expect(400);
   });
 
   it('returns Opening Bank provenance separately from ordinary completed days', async () => {
-    const response = await request(createApp(undefined, { bankHistoryRepository: new MemoryBankHistoryRepository() }))
+    const response = await request(createApp(localDevelopmentApiEnv(), { bankHistoryRepository: new MemoryBankHistoryRepository() }))
       .get('/v1/me/bank-opening')
       .expect(200);
 
@@ -258,7 +259,7 @@ describe('bank history API', () => {
 
   it('returns ordered history', async () => {
     const response = await request(
-      createApp(undefined, {
+      createApp(localDevelopmentApiEnv(), {
         bankHistoryRepository: new MemoryBankHistoryRepository([
           { ...detail, logDate: '2026-07-18', dailyBankChange: 50 },
           detail,
@@ -276,7 +277,7 @@ describe('bank history API', () => {
 
   it('returns selected-day detail', async () => {
     const response = await request(
-      createApp(undefined, { bankHistoryRepository: new MemoryBankHistoryRepository([detail]) }),
+      createApp(localDevelopmentApiEnv(), { bankHistoryRepository: new MemoryBankHistoryRepository([detail]) }),
     )
       .get('/v1/me/bank-history/2026-07-19')
       .expect(200);
@@ -287,7 +288,7 @@ describe('bank history API', () => {
 
   it('returns authenticated safe per-date HealthKit server evidence', async () => {
     const response = await request(
-      createApp(undefined, { bankHistoryRepository: new MemoryBankHistoryRepository() }),
+      createApp(localDevelopmentApiEnv(), { bankHistoryRepository: new MemoryBankHistoryRepository() }),
     )
       .get('/v1/me/bank-history-diagnostics?dates=2026-09-01')
       .expect(200);
@@ -306,7 +307,7 @@ describe('bank history API', () => {
   });
 
   it('returns 404 for unknown date', async () => {
-    await request(createApp(undefined, { bankHistoryRepository: new MemoryBankHistoryRepository([detail]) }))
+    await request(createApp(localDevelopmentApiEnv(), { bankHistoryRepository: new MemoryBankHistoryRepository([detail]) }))
       .get('/v1/me/bank-history/2026-07-18')
       .expect(404);
   });

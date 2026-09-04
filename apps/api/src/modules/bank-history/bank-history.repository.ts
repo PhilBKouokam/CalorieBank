@@ -7,6 +7,7 @@ import {
   getPreviousCompletedLocalDates,
   getProvisionalLockAt,
   resolveAuthoritativeProviderRecord,
+  selectOpeningBankPeriod,
   type BankGoalMode,
 } from '@caloriebank/domain';
 import type {
@@ -473,6 +474,31 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
     return initialization?.accountingStartsOn ? toDateOnly(initialization.accountingStartsOn) : null;
   }
 
+  private async applyOpeningBankPeriodPolicy(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+  ) {
+    const allDays = await transaction.openingBankCalculationDay.findMany({
+      where: { userId },
+      orderBy: { logDate: 'asc' },
+    });
+    const period = selectOpeningBankPeriod(allDays, (day) => day.dailyBankChange);
+    const selectedIds = new Set(period.selectedDays.map((day) => day.id));
+    const discardedIds = allDays.filter((day) => !selectedIds.has(day.id)).map((day) => day.id);
+    if (discardedIds.length > 0) {
+      await transaction.openingBankCalculationDay.deleteMany({ where: { id: { in: discardedIds } } });
+    }
+    await transaction.bankAccountInitialization.update({
+      where: { userId },
+      data: {
+        historicalOpeningNetCalories: period.openingNetCalories,
+        openingEffectiveBalanceCalories: period.openingNetCalories,
+        eligibleDayCount: period.selectedDays.length,
+      },
+    });
+    return period.openingNetCalories;
+  }
+
   private async repairFalseCompleteOpeningBank(
     transaction: Prisma.TransactionClient,
     user: DevelopmentUser,
@@ -558,7 +584,6 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           },
           provider: 'apple_health',
           writerBundleIdentifier: selection.appleHealthIntakeWriterBundleId,
-          importedAt: { gt: initialization.initializedAt },
         },
         orderBy: { updatedAt: 'desc' },
       }),
@@ -572,7 +597,6 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       const falselySkipped = falseCompleteSessions.some(
         (session) => session.datesQueried.includes(logDate) && session.datesSkipped.includes(logDate),
       );
-      if (!falselySkipped) continue;
 
       const expenditure = expenditureRecords.find(
         (record) => toDateOnly(record.localDate) === logDate && usableStatuses.has(record.syncStatus),
@@ -581,6 +605,10 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         (record) => toDateOnly(record.localDate) === logDate && usableStatuses.has(record.syncStatus),
       );
       if (!expenditure || !intake || expenditure.timezone !== intake.timezone) continue;
+      const existedAtInitialization =
+        expenditure.importedAt <= initialization.initializedAt
+        && intake.importedAt <= initialization.initializedAt;
+      if (!falselySkipped && !existedAtInitialization) continue;
 
       const calculation = calculateFinalizedDailyBankChange({
         importedTotalDailyExpenditure: expenditure.rawTotalDailyExpenditure,
@@ -611,19 +639,10 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
     if (repairedDays.length === 0) return null;
 
     await transaction.openingBankCalculationDay.createMany({ data: repairedDays, skipDuplicates: true });
-    const allDays = await transaction.openingBankCalculationDay.findMany({
-      where: { userId: user.id },
-      select: { dailyBankChange: true },
-    });
-    const opening = calculateOpeningEffectiveBalance(allDays.map((day) => day.dailyBankChange));
-    await transaction.bankAccountInitialization.update({
-      where: { userId: user.id },
-      data: {
-        historicalOpeningNetCalories: opening.historicalOpeningNetCalories,
-        openingEffectiveBalanceCalories: opening.openingEffectiveBalanceCalories,
-        eligibleDayCount: allDays.length,
-      },
-    });
+    const openingEffectiveBalanceCalories = await this.applyOpeningBankPeriodPolicy(
+      transaction,
+      user.id,
+    );
     console.info(JSON.stringify({
       component: 'opening_bank',
       event: 'false_complete_import_repaired',
@@ -631,9 +650,9 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       repairedDates: repairedDays.map((day) =>
         typeof day.logDate === 'string' ? day.logDate : toDateOnly(day.logDate),
       ),
-      openingEffectiveBalanceCalories: opening.openingEffectiveBalanceCalories,
+      openingEffectiveBalanceCalories,
     }));
-    return opening.openingEffectiveBalanceCalories;
+    return openingEffectiveBalanceCalories;
   }
 
   async initializeOpeningBank(
@@ -657,18 +676,21 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         };
       }
       if (initialization.status === 'INITIALIZED') {
-        const repairedBalance = await this.repairFalseCompleteOpeningBank(
+        await this.repairFalseCompleteOpeningBank(
           transaction,
           user,
           initialization,
+        );
+        const openingEffectiveBalanceCalories = await this.applyOpeningBankPeriodPolicy(
+          transaction,
+          user.id,
         );
         return {
           outcome: 'already_initialized',
           accountingStartsOn: initialization.accountingStartsOn
             ? toDateOnly(initialization.accountingStartsOn)
             : null,
-          openingEffectiveBalanceCalories:
-            repairedBalance ?? initialization.openingEffectiveBalanceCalories ?? 0,
+          openingEffectiveBalanceCalories,
         };
       }
       if (initialization.accountingStartsOn) {
@@ -848,11 +870,15 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         };
       }
 
+      const period = selectOpeningBankPeriod(
+        calculationDays.slice().sort((left, right) => left.logDate.localeCompare(right.logDate)),
+        (day) => day.dailyBankChange,
+      );
       const opening = calculateOpeningEffectiveBalance(
-        calculationDays.map((day) => day.dailyBankChange),
+        period.selectedDays.map((day) => day.dailyBankChange),
       );
       await transaction.openingBankCalculationDay.createMany({
-        data: calculationDays.map(({ logDate, ...day }) => ({
+        data: period.selectedDays.map(({ logDate, ...day }) => ({
           userId: user.id,
           logDate: parseLogDate(logDate),
           ...day,
@@ -865,7 +891,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           status: 'INITIALIZED',
           historicalOpeningNetCalories: opening.historicalOpeningNetCalories,
           openingEffectiveBalanceCalories: opening.openingEffectiveBalanceCalories,
-          eligibleDayCount: calculationDays.length,
+          eligibleDayCount: period.selectedDays.length,
           lookbackStartDate: parseLogDate(dates.at(-1)!),
           lookbackEndDate: parseLogDate(dates[0]!),
           accountingStartsOn: parseLogDate(currentLocalDate),
@@ -873,7 +899,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           initializedAt: this.now(),
         },
       });
-      this.logOpeningInitialization({ userId: user.id, currentLocalDate, outcome: 'initialized', eligibleDateCount: calculationDays.length, missingByDate, openingEffectiveBalanceCalories: opening.openingEffectiveBalanceCalories, accountingStartsOn: currentLocalDate });
+      this.logOpeningInitialization({ userId: user.id, currentLocalDate, outcome: 'initialized', eligibleDateCount: period.selectedDays.length, missingByDate, openingEffectiveBalanceCalories: opening.openingEffectiveBalanceCalories, accountingStartsOn: currentLocalDate });
       return {
         outcome: 'initialized',
         accountingStartsOn: currentLocalDate,

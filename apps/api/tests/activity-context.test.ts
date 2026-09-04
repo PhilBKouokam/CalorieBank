@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app';
 import { prisma } from '../src/db/client';
-import { env } from '../src/env';
-import { getLocalDateForTimezone } from '../src/modules/today/today.time';
 import { CURRENT_DAY_STALE_AFTER_MS, currentDayFreshness } from '../src/modules/today/today.freshness';
+import { getLocalDateForTimezone } from '../src/modules/today/today.time';
+import { localDevelopmentApiEnv } from './support/test-api-env';
 
 const timezone = 'America/Chicago';
 const user = {
@@ -18,12 +18,11 @@ const otherUser = {
 };
 
 function appFor(currentUser = user) {
-  return createApp({
-    ...env,
+  return createApp(localDevelopmentApiEnv({
     DEV_USER_ID: currentUser.id,
     DEV_USER_EMAIL: currentUser.email,
     TODAY_INGESTION_MODE: 'device',
-  });
+  }));
 }
 
 function localDateOffset(localDate: string, offset: number) {

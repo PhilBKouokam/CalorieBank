@@ -208,13 +208,107 @@ describe('Opening Bank and Recovery persistence', () => {
     expect((await repository.getHistory(user.id, 'ALL')).days).toHaveLength(7);
   });
 
-  it.each([
-    { dailyChanges: [-400, 100], historicalNet: -300 },
-    { dailyChanges: [100, -100], historicalNet: 0 },
-  ])('floors a $historicalNet opening net once without creating Recovery', async ({ dailyChanges }) => {
+  it('retains only the longest most-recent positive opening suffix', async () => {
     const user = await createUser({ openingPolicy: true });
-    await addProviderDay(user.id, '2026-08-18', dailyChanges[0]!);
-    await addProviderDay(user.id, '2026-08-17', dailyChanges[1]!);
+    const fixture = [
+      ['2026-08-13', 190],
+      ['2026-08-14', 219],
+      ['2026-08-15', 199],
+      ['2026-08-16', -2314],
+      ['2026-08-17', 284],
+      ['2026-08-18', 235],
+    ] as const;
+    for (const [logDate, dailyBankChange] of fixture) {
+      await addProviderDay(user.id, logDate, dailyBankChange);
+    }
+    const repository = new PrismaBankHistoryRepository(prisma, { allowSyntheticProviders: false });
+
+    await expect(repository.initializeOpeningBank(user, '2026-08-19', 'America/Chicago'))
+      .resolves.toMatchObject({ outcome: 'initialized', openingEffectiveBalanceCalories: 519 });
+    expect(await repository.getSummary(user.id)).toMatchObject({
+      effectiveBankBalanceCalories: 519,
+      availableBankCalories: 519,
+      recoveryCalories: 0,
+      openingBankCalories: 519,
+    });
+    const history = await repository.getHistory(user.id, 'ALL');
+    expect(history.days).toHaveLength(2);
+    expect(history.days.map((day) => [day.logDate, day.dailyBankChange])).toEqual([
+      ['2026-08-18', 235],
+      ['2026-08-17', 284],
+    ]);
+    expect(await prisma.calorieLedgerTransaction.count({ where: { userId: user.id } })).toBe(0);
+  });
+
+  it('self-heals an initialized account from the superseded floor-with-all-rows policy', async () => {
+    const user = await createUser({ openingPolicy: true });
+    const fixture = [
+      ['2026-08-13', 190],
+      ['2026-08-14', 219],
+      ['2026-08-15', 199],
+      ['2026-08-16', 100],
+      ['2026-08-17', 284],
+      ['2026-08-18', 235],
+    ] as const;
+    for (const [logDate, dailyBankChange] of fixture) {
+      await addProviderDay(user.id, logDate, dailyBankChange);
+    }
+    const repository = new PrismaBankHistoryRepository(prisma, { allowSyntheticProviders: false });
+    await repository.initializeOpeningBank(user, '2026-08-19', 'America/Chicago');
+    await prisma.openingBankCalculationDay.update({
+      where: { userId_logDate: { userId: user.id, logDate: new Date('2026-08-16T00:00:00.000Z') } },
+      data: { dailyBankChange: -2314 },
+    });
+    await prisma.bankAccountInitialization.update({
+      where: { userId: user.id },
+      data: {
+        historicalOpeningNetCalories: -1187,
+        openingEffectiveBalanceCalories: 0,
+        eligibleDayCount: 6,
+      },
+    });
+    await repository.postProvisionalDailyRecord(user, {
+      logDate: '2026-09-01',
+      timezone: 'America/Chicago',
+      importedTotalDailyExpenditure: 2500,
+      goalMode: 'maintain',
+      goalAdjustmentCalories: 0,
+      importedCalorieIntake: 1722,
+      finalizedAt: new Date('2026-09-02T06:00:00.000Z'),
+    });
+    const ledgerBefore = await prisma.calorieLedgerTransaction.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    await expect(repository.initializeOpeningBank(user, '2026-09-02', 'America/Chicago'))
+      .resolves.toMatchObject({ outcome: 'already_initialized', openingEffectiveBalanceCalories: 519 });
+    expect((await repository.getHistory(user.id, 'ALL')).days.map((day) => [
+      day.logDate, day.dailyBankChange, day.provenance,
+    ])).toEqual([
+      ['2026-09-01', 278, 'finalized'],
+      ['2026-08-18', 235, 'opening'],
+      ['2026-08-17', 284, 'opening'],
+    ]);
+    expect(await repository.getSummary(user.id)).toMatchObject({
+      openingBankCalories: 519,
+      availableBankCalories: 797,
+    });
+    await repository.initializeOpeningBank(user, '2026-09-02', 'America/Chicago');
+    await expect(prisma.calorieLedgerTransaction.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'asc' },
+    })).resolves.toEqual(ledgerBefore);
+  });
+
+  it.each([
+    { dailyChanges: [-400, -100] },
+    { dailyChanges: [0] },
+  ])('starts at zero with no opening rows when no positive suffix exists', async ({ dailyChanges }) => {
+    const user = await createUser({ openingPolicy: true });
+    for (const [index, dailyBankChange] of dailyChanges.entries()) {
+      await addProviderDay(user.id, `2026-08-${String(18 - index).padStart(2, '0')}`, dailyBankChange);
+    }
     const repository = new PrismaBankHistoryRepository(prisma, { allowSyntheticProviders: false });
 
     await repository.initializeOpeningBank(user, '2026-08-19', 'America/Chicago');
@@ -224,17 +318,23 @@ describe('Opening Bank and Recovery persistence', () => {
       recoveryCalories: 0,
       openingBankCalories: 0,
     });
-    const history = await repository.getHistory(user.id, 'ALL');
-    expect(history.days).toHaveLength(2);
-    expect(history.days.map((day) => day.dailyBankChange)).toEqual(dailyChanges);
-    expect((await repository.getDayDetail(user.id, '2026-08-18'))?.startingBalanceFloorApplied).toBe(true);
+    await expect(prisma.openingBankCalculationDay.count({ where: { userId: user.id } })).resolves.toBe(0);
+    expect((await repository.getHistory(user.id, 'ALL')).days).toHaveLength(0);
     expect(await prisma.calorieLedgerTransaction.count({ where: { userId: user.id } })).toBe(0);
   });
 
   it('unifies opening and finalized dates while filtering ranges across both types', async () => {
     const user = await createUser({ openingPolicy: true });
-    await addProviderDay(user.id, '2026-08-18', 400);
-    await addProviderDay(user.id, '2026-08-17', -100);
+    for (const [logDate, dailyBankChange] of [
+      ['2026-08-18', 235],
+      ['2026-08-13', 190],
+      ['2026-08-17', 284],
+      ['2026-08-14', 219],
+      ['2026-08-16', -2314],
+      ['2026-08-15', 199],
+    ] as const) {
+      await addProviderDay(user.id, logDate, dailyBankChange);
+    }
     const repository = new PrismaBankHistoryRepository(prisma, { allowSyntheticProviders: false });
     await repository.initializeOpeningBank(user, '2026-08-19', 'America/Chicago');
     await repository.postProvisionalDailyRecord(user, {
@@ -318,8 +418,16 @@ describe('Opening Bank and Recovery persistence', () => {
       where: { userId: user.id },
     });
 
-    await addProviderDay(user.id, '2026-08-18', 400);
-    await addProviderDay(user.id, '2026-08-17', -100);
+    for (const [logDate, dailyBankChange] of [
+      ['2026-08-18', 235],
+      ['2026-08-13', 190],
+      ['2026-08-17', 284],
+      ['2026-08-14', 219],
+      ['2026-08-16', -2314],
+      ['2026-08-15', 199],
+    ] as const) {
+      await addProviderDay(user.id, logDate, dailyBankChange);
+    }
     const recoveredAt = new Date(initialized.initializedAt!.getTime() + 1_000);
     await Promise.all([
       prisma.dailyExpenditureAggregate.updateMany({ where: { userId: user.id }, data: { importedAt: recoveredAt } }),
@@ -327,13 +435,13 @@ describe('Opening Bank and Recovery persistence', () => {
     ]);
 
     await expect(repository.initializeOpeningBank(user, '2026-08-21', 'America/Chicago'))
-      .resolves.toMatchObject({ outcome: 'already_initialized', openingEffectiveBalanceCalories: 300 });
+      .resolves.toMatchObject({ outcome: 'already_initialized', openingEffectiveBalanceCalories: 519 });
     expect((await repository.getHistory(user.id, 'ALL')).days.map((day) => [
       day.logDate, day.dailyBankChange, day.provenance,
     ])).toEqual([
       ['2026-08-20', 278, 'finalized'],
-      ['2026-08-18', 400, 'opening'],
-      ['2026-08-17', -100, 'opening'],
+      ['2026-08-18', 235, 'opening'],
+      ['2026-08-17', 284, 'opening'],
     ]);
     await repository.initializeOpeningBank(user, '2026-08-21', 'America/Chicago');
     await expect(prisma.openingBankCalculationDay.count({ where: { userId: user.id } })).resolves.toBe(2);
