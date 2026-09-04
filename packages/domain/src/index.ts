@@ -167,16 +167,39 @@ export function deriveConsumerBankBalances(effectiveBankBalanceCalories: number)
   };
 }
 
-export function calculateOpeningEffectiveBalance(dailyBankChanges: readonly number[]) {
+export function selectOpeningBankPeriod<T>(
+  days: readonly T[],
+  getDailyBankChange: (day: T) => number,
+) {
+  const dailyBankChanges = days.map(getDailyBankChange);
   for (const dailyBankChange of dailyBankChanges) {
     if (!Number.isInteger(dailyBankChange)) {
       throw new BankCalculationError('Opening Bank daily changes must be integers.');
     }
   }
-  const historicalOpeningNetCalories = dailyBankChanges.reduce((sum, value) => sum + value, 0);
+
+  let openingNetCalories = dailyBankChanges.reduce((sum, value) => sum + value, 0);
+  let startIndex = 0;
+  while (startIndex < days.length && openingNetCalories <= 0) {
+    openingNetCalories -= dailyBankChanges[startIndex]!;
+    startIndex += 1;
+  }
+
+  if (startIndex === days.length) {
+    return { selectedDays: [] as T[], openingNetCalories: 0 };
+  }
+
   return {
-    historicalOpeningNetCalories,
-    openingEffectiveBalanceCalories: Math.max(0, historicalOpeningNetCalories),
+    selectedDays: days.slice(startIndex),
+    openingNetCalories,
+  };
+}
+
+export function calculateOpeningEffectiveBalance(dailyBankChanges: readonly number[]) {
+  const period = selectOpeningBankPeriod(dailyBankChanges, (value) => value);
+  return {
+    historicalOpeningNetCalories: period.openingNetCalories,
+    openingEffectiveBalanceCalories: period.openingNetCalories,
   };
 }
 

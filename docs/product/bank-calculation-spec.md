@@ -294,16 +294,20 @@ The imported expenditure source and imported intake source are the operational V
 For a newly authenticated user, Opening Bank uses only eligible records from the immediately preceding seven completed local calendar days. A day is eligible only when it has one usable selected authoritative expenditure aggregate, one usable selected authoritative intake aggregate, and a configured goal sufficient to calculate the approved daily contribution. Current day is never eligible. Missing intake and expenditure are not zero.
 
 ```text
+selectedOpeningDays =
+  longest most-recent contiguous suffix of eligible prior-day records
+  whose Daily Bank Change sum is strictly greater than zero
+
 historicalOpeningNetCalories =
-  sum(eligible daily bank contributions in the prior-seven-day window)
+  sum(selectedOpeningDays Daily Bank Change values)
 
 openingEffectiveBalanceCalories =
-  max(0, historicalOpeningNetCalories)
+  historicalOpeningNetCalories
 ```
 
 Initialization remains `WAITING_FOR_OPENING_DATA` until at least one legitimate eligible day exists. When initialized, CalorieBank persists the opening amount, each source-attributed calculation snapshot, the evaluated local-date window, and the active-accounting start date. Pre-opening provider records remain intact but never post as active daily ledger transactions. This avoids positive double counting and prevents the floored negative portion from reappearing as Recovery.
 
-Seven days is a V1 onboarding recency policy, not a claim that physiology or prior behavior resets after seven days. The floor applies once. It is never reapplied to later withdrawals or corrections. Accounts existing before ADR 020 retain their exact ledger history and receive no retroactive opening floor.
+Seven days is a V1 onboarding recency policy, not a claim that physiology or prior behavior resets after seven days. The positive-suffix selection applies once to Opening Bank and is never applied to later withdrawals, corrections, or Recovery. Accounts existing before ADR 020 retain their exact ledger history and receive no retroactive Opening Bank selection.
 
 After initialization:
 

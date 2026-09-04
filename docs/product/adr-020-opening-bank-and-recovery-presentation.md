@@ -21,8 +21,9 @@ Recovery is not a second ledger or mutable account. Positive future contribution
 For a newly authenticated user, Opening Bank initialization considers at most the immediately preceding seven completed local calendar days. A day is eligible only when the selected authoritative expenditure and intake records are both usable and the configured goal can produce the approved daily calculation. Current day, incomplete days, and competing unselected providers are excluded.
 
 ```text
-historicalOpeningNetCalories = sum(eligible prior-day contributions)
-openingEffectiveBalanceCalories = max(0, historicalOpeningNetCalories)
+selectedOpeningDays = longest most-recent contiguous suffix of eligible prior-day contributions whose sum is > 0
+historicalOpeningNetCalories = sum(selectedOpeningDays)
+openingEffectiveBalanceCalories = historicalOpeningNetCalories
 ```
 
 Initialization cannot commit until both selected roles have completed a deliberate query attempt covering current day plus the seven prior completed local dates. A queried date with no data is missing; an unqueried date is incomplete preparation and cannot justify an immutable Opening Bank. Matching eligible days then produce one immutable initialization boundary and its calculation snapshots.
@@ -37,13 +38,13 @@ effectiveBankBalanceCalories =
   + sum(append-only active-accounting ledger transactions)
 ```
 
-Consumer History answers how each completed day affected the bank. Its read model therefore combines immutable Opening Bank calculation dates and later finalized dates into one chronological collection with the same row and calculation-detail treatment. An internal `opening` or `finalized` provenance marker remains available, and opening-day detail may say `Included in your starting bank.` This presentation does not create ledger transactions, change `accountingStartsOn`, or make opening dates eligible for later finalization.
+Consumer History answers how each completed day affected the bank. Its read model therefore combines the selected Opening Bank calculation dates and later finalized dates into one chronological collection with the same row and calculation-detail treatment. An internal `opening` or `finalized` provenance marker remains available, and opening-day detail may say `Included in your starting bank.` This presentation does not create ledger transactions, change `accountingStartsOn`, or make opening dates eligible for later finalization.
 
 The latest completed contribution on Today is resolved from that same unified chronology. If yesterday is an immutable Opening Bank calculation date and no later finalized date exists, Today presents yesterday's contribution normally rather than claiming that no completed day exists.
 
-When the historical opening net is non-positive, individual opening-day calculations remain visible even though the one-time starting balance floor produces `0 kcal`. Detail may explain concisely that a starting balance cannot begin below zero. The displayed daily values are not altered to make their visible sum equal the floored balance.
+Opening Bank history must mathematically explain the Opening Bank amount. Eligible days are ordered oldest to newest. If the entire period sums to a strictly positive value, all days are retained. Otherwise CalorieBank removes only the oldest remaining date until the remaining contiguous suffix is strictly positive. The first positive suffix is retained, making it the longest most-recent positive suffix. If no non-empty suffix is positive, Opening Bank is `0 kcal` and no Opening Bank calculation-day rows are retained. This supersedes the former rule that retained every eligible day while flooring a non-positive aggregate to zero.
 
-Opening Bank immutability assumes the initial-import completion evidence was truthful. If a pre-initialization Apple Health session marked a historical intake date both fingerprint-skipped and ready while the server had no aggregate, a later exact-writer recovery may idempotently complete the omitted Opening Bank calculation rows. This correction is allowed only while the original goal and provider selection are provably unchanged, and only for dates named by that false-complete session. Ordinary late provider data does not reopen or recalculate an initialized Opening Bank.
+Opening Bank immutability assumes the initial-import completion evidence was truthful. If a pre-initialization Apple Health session marked a historical intake date both fingerprint-skipped and ready while the server had no aggregate, a later exact-writer recovery may idempotently reconstruct the complete eligible opening period. The same longest-positive-suffix rule then replaces the Opening Bank calculation rows and amount so recovery converges to clean initialization regardless of aggregate arrival order. This correction is allowed only while the original goal and provider selection are provably unchanged, and only for dates named by that false-complete session. Ordinary late provider data does not reopen or recalculate an initialized Opening Bank.
 
 When initialization is waiting, the app performs one bounded full-window synchronization attempt for both selected roles. Transient failures remain retryable and block immutable initialization. A completed attempt with no eligible day is a valid no-history result, not an indefinite onboarding failure.
 
