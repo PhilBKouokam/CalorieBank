@@ -786,3 +786,11 @@ export async function deletePlannedTreat(): Promise<void> {
     throw new Error(`Unable to remove your Planned Treat (${response.status}).`);
   }
 }
+
+export async function deleteCalorieBankAccount(): Promise<void> {
+  const response = await apiRequest('/v1/me/account', {
+    method: 'DELETE',
+    body: JSON.stringify({ confirmation: 'DELETE' }),
+  });
+  if (!response.ok) throw await responseError(response);
+}

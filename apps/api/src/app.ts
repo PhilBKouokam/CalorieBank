@@ -68,6 +68,9 @@ import {
 import { createOnboardingRouter } from './modules/onboarding/onboarding.routes';
 import { AccountLifecycleCoordinator } from './modules/lifecycle/account-lifecycle.service';
 import { createAccountLifecycleRouter } from './modules/lifecycle/account-lifecycle.routes';
+import { AccountSafetyService } from './modules/account-safety/account-safety.service';
+import { createAccountSafetyRouter } from './modules/account-safety/account-safety.routes';
+import { createRateLimit } from './security/rate-limit';
 
 type AppDependencies = {
   goalConfigurationRepository?: GoalConfigurationRepository;
@@ -169,6 +172,11 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
     }
   });
   app.use(authentication.requireUser);
+  const accountSafetyService = new AccountSafetyService(prisma, config, googleHealthFitbitService);
+  app.use('/v1/me/integrations', createRateLimit({ limit: 60, windowMs: 15 * 60 * 1000, operation: 'provider_operations' }));
+  app.use('/v1/me/ingestion', createRateLimit({ limit: 60, windowMs: 15 * 60 * 1000, operation: 'provider_ingestion' }));
+  app.use('/v1/me/lifecycle', createRateLimit({ limit: 12, windowMs: 15 * 60 * 1000, operation: 'lifecycle_refresh' }));
+  app.use('/v1/me', createAccountSafetyRouter(accountSafetyService, currentUser));
   app.use(
     '/v1/me/goal-configuration',
     createGoalConfigurationRouter(

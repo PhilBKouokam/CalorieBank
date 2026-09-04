@@ -1195,4 +1195,32 @@ export class GoogleHealthFitbitService {
     }
     await this.db.googleHealthConnection.deleteMany({ where: { userId: user.id } });
   }
+
+  async revokeForAccountDeletion(user: DevelopmentUser) {
+    const connection = await this.db.googleHealthConnection.findUnique({ where: { userId: user.id } });
+    if (!connection) return;
+    const secrets = configured(this.config);
+    const token = decryptGoogleHealthSecret(connection.encryptedRefreshToken, secrets.encryptionKey);
+    let response: Response;
+    try {
+      response = await this.fetcher(this.config.GOOGLE_HEALTH_REVOKE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ token }),
+      });
+    } catch {
+      throw new AppError('Fitbit access could not be revoked. Try deleting your account again.', 502, {
+        code: 'PROVIDER_REVOCATION_FAILED', provider: 'google_health_fitbit',
+      });
+    }
+    if (!response.ok) {
+      throw new AppError('Fitbit access could not be revoked. Try deleting your account again.', 502, {
+        code: 'PROVIDER_REVOCATION_FAILED', provider: 'google_health_fitbit',
+      });
+    }
+    await this.db.$transaction([
+      this.db.googleHealthConnection.deleteMany({ where: { userId: user.id } }),
+      this.db.googleHealthOAuthAttempt.deleteMany({ where: { userId: user.id } }),
+    ]);
+  }
 }

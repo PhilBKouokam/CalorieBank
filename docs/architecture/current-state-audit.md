@@ -632,6 +632,7 @@ Future tables:
 
 ### Phase 5: Beta Readiness
 
+- PB.1 is complete. PB.2 is **Private Beta Readiness & Account Safety** and covers observability/redaction, private-beta rate limits, account deletion, backup/restore operations, support-safe diagnostics, regression coverage, and distribution readiness. Morning Bank Update follows PB.2.
 - Add observability, error tracking, backups, rate limits, privacy policy support, account deletion, and support tooling.
 - Add seed/sandbox data and end-to-end tests for connection-first onboarding, sync, ledger calculation, notification generation, and explanation history.
 - Validate initial-experience simplicity, manual feature discoverability, dismissal behavior, and the difference between Projected Daily Burn and a prohibited Projected Bank.
@@ -710,14 +711,14 @@ References: [Health Connect aggregate data](https://developer.android.com/health
 
 These questions genuinely affect implementation choices:
 
-1. Is Apple Health dietary energy sufficiently available from the first 10 users' calorie trackers, or is a second intake adapter required?
-2. How should onboarding communicate that Opening Bank may use fewer than seven days when only a subset has complete authoritative inputs? ADR 020 resolves the accounting eligibility and waiting rules.
+1. Resolved for private beta: Apple Health exact-writer intake and FatSecret are implemented intake paths; broader tracker coverage remains a later integration decision.
+2. Resolved by ADR 020: Opening Bank retains the longest most-recent strictly-positive eligible suffix and presents only those dates.
 3. What travel/timezone policy governs open-day aggregate replacement and later reconciliation?
-4. Should V1 use password auth, Sign in with Apple, or both for the private beta?
-5. Which source can provide imported total daily expenditure for the first 10 users?
+4. Resolved for private beta: Clerk owns authentication; additional public-launch sign-in methods remain a later decision.
+5. Resolved for private beta: Fitbit through Google Health and Apple Health are supported authoritative expenditure paths.
 6. How should active, resting, total, and unknown expenditure classifications be stored and displayed when source data contains multiple types?
 7. What fallback should be used when only intake or only expenditure data is available?
-8. What missing-input retry and user messaging policy applies when a completed day cannot post provisionally after midnight?
+8. Resolved for private beta by ADRs 009 and 010 plus PB.1 continuity recovery; notification behavior remains a later milestone.
 9. What timezone change behavior is allowed after onboarding?
 10. Does existing MongoDB production data need to be migrated, or can V1 start with fresh beta data?
 11. What minimum privacy/security bar is required before inviting beta users, especially around health-adjacent data?

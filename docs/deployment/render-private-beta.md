@@ -10,6 +10,12 @@ Create a Render Blueprint from this repository, then supply every `sync: false` 
 
 Both services intentionally deploy branch `codex/private-beta-release`. Do not create the Blueprint until that branch and all listed migrations are present on GitHub.
 
+## Database Backup And Recovery
+
+`caloriebank-beta-db` uses Render's paid `0.1c-256mb` PostgreSQL plan. Render owns platform backup and point-in-time recovery; the available PITR window depends on the workspace plan, not this compute-size identifier. Confirm the active window in **Render Dashboard > caloriebank-beta-db > Recovery**. Render currently documents three days for Hobby workspaces and seven days for Pro or higher, while on-demand logical exports are retained for seven days.
+
+Restore into a separate recovery database first. Validate migrations, row counts, account isolation, and read-only bank/history responses there before changing either service's `DATABASE_URL`. Never restore over or run destructive verification against the active beta database. Database recovery does not restore Clerk identities, provider-dashboard authorization, Render/EAS environment variables, or device-local HealthKit data. PB.2 documents this procedure; a real restore is not verified until an isolated recovery database has been created and checked.
+
 The clean build explicitly includes build tooling, generates Prisma Client, and compiles the API and lifecycle entry point. The paid web service runs `npm run db:deploy` as Render's pre-deploy command, then starts only the API process. The cron executes compiled JavaScript through `npm run lifecycle:run`; it does not depend on a TypeScript runtime in the scheduled process. The readiness probe is public at `/health/ready`, checks database connectivity, and exposes no account data.
 
 The EAS preview environment must set:

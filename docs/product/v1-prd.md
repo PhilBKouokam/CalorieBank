@@ -6,6 +6,12 @@ Date: 2026-07-16
 
 This PRD is the authoritative V1 product document. It supersedes prior food-logging-first assumptions in older audits, prototype docs, and implementation notes. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. Supporting architecture guidance lives in `docs/architecture/current-state-audit.md`; focused accepted decisions are recorded in ADRs 001-015. Progressive Feature Discovery, including the distinction between V1 availability and first-use visibility, is governed by `docs/product/adr-011-progressive-feature-discovery.md`. Progressive Familiarity, including recommendation readiness, complementarity, and pacing, is governed by `docs/product/adr-014-progressive-familiarity.md`. Today's Eating Budget product boundaries and unresolved calculation requirements are governed by `docs/product/adr-012-todays-eating-budget.md`. Banking Goals, one-bank conservation, conceptual allocation methods, and implementation-blocking withdrawal policy decisions are governed by `docs/product/adr-013-banking-goals.md`. Time-Aware Activity Forecasting, including system confidence, user readiness, time opportunity, and burn-target feasibility, is governed by `docs/product/adr-015-time-aware-activity-forecasting.md`.
 
+## Private Beta Milestones
+
+- **PB.1: Core banking and lifecycle reliability — complete.** The accepted connection-first, ingestion, Opening Bank, completed-day continuity, account-isolation, and lifecycle behavior is the baseline.
+- **PB.2: Private Beta Readiness & Account Safety.** Production-safe observability and redaction, private-beta rate limits, self-service account deletion, provider and Clerk cleanup, backup/restore operations, support-safe diagnostics, regression coverage, and distribution readiness. PB.2 must not change PB.1 accounting.
+- **Morning Bank Update follows PB.2.** Notification permission and delivery are a subsequent product milestone, not PB.2.
+
 ## V1 Mission
 
 Validate whether users can connect their existing health and calorie data, understand and trust an automatically updated calorie-bank balance, and use the morning bank update to plan enjoyable foods with less friction and guilt.
@@ -910,7 +916,7 @@ The approved HealthKit historical scope is intentionally limited to three local 
 
 ## Notification Requirements
 
-The primary future V1 notification remains the morning bank update. It is not implemented for private beta PB.1B; reliable lifecycle processing and truthful source freshness are prerequisites. When implemented, it should include, when available:
+The primary future V1 notification remains the morning bank update. It is not part of PB.2 and remains a subsequent product milestone. When implemented, it should include, when available:
 
 - Yesterday's relevant result.
 - Calories added to or deducted from the bank.
@@ -999,6 +1005,14 @@ The notification taxonomy remains restrained:
 - Do not hide calculation policy, source status, missing or incomplete data, corrections, errors, safety disclaimers, estimate labels, active recovery guidance, or integration failures behind feature-discovery eligibility.
 - Progressive Familiarity must not become a permission gate, gamified unlock system, or reason to withhold contextually required information.
 - Behavioral feature recommendations may use only data available under approved permissions and must explain relevance using limited, visible evidence rather than claiming broad surveillance or unsupported intent.
+
+### Pre-Public-Launch Direct Provider Ownership
+
+A directly authenticated external provider identity, such as Fitbit, must have at most one active CalorieBank account owner at a time. This is not a restriction on how many CalorieBank accounts a person may create. It prevents ambiguous ownership and health-data association for a stable provider identity.
+
+If a direct provider identity is already owned by another CalorieBank account, CalorieBank must reject a second connection without silently transferring ownership or connecting the provider to both accounts. A later intentional recovery or transfer flow must verify and explain the ownership change. Apple Health is excluded because HealthKit does not expose an equivalent stable global account identity to CalorieBank.
+
+This is a pre-public-launch requirement. It is not part of the current private-beta PB.2 implementation scope unless a separately approved PB.2 contract explicitly includes it.
 
 ## Internal Alpha Success Criteria
 

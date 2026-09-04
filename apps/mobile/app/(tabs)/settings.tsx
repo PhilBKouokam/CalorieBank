@@ -40,6 +40,12 @@ export default function SettingsScreen() {
             <Ionicons color={colors.text} name="log-out-outline" size={22} />
             <Text style={styles.signOutText}>Sign Out</Text>
           </Pressable>
+          <Link href="/delete-account" asChild>
+            <Pressable accessibilityRole="button" style={({ pressed }) => [styles.deleteAccount, pressed && styles.pressed]}>
+              <Ionicons color={colors.danger} name="trash-outline" size={22} />
+              <Text style={styles.deleteAccountText}>Delete Account</Text>
+            </Pressable>
+          </Link>
         </> : null}
       </ScrollView>
     </SafeAreaView>
@@ -57,4 +63,6 @@ const styles = StyleSheet.create({
   rowDetail: { color: colors.textMuted, fontSize: typography.caption, lineHeight: 18 },
   signOut: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, flexDirection: 'row', gap: spacing.sm, minHeight: 52, paddingHorizontal: spacing.md },
   signOutText: { color: colors.text, fontSize: typography.body, fontWeight: '700' }, pressed: { opacity: 0.7 },
+  deleteAccount: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, minHeight: 52, paddingHorizontal: spacing.md },
+  deleteAccountText: { color: colors.danger, fontSize: typography.body, fontWeight: '700' },
 });

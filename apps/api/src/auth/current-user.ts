@@ -14,6 +14,7 @@ declare global {
   namespace Express {
     interface Locals {
       currentUser?: DevelopmentUser;
+      requestId?: string;
     }
   }
 }

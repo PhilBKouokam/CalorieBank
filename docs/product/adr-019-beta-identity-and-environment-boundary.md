@@ -37,6 +37,12 @@ The API refuses parsed configuration when beta or production selects development
 - Missing or invalid credentials return `401`; public health and provider callback routes remain narrowly exempt.
 - A Clerk-enabled mobile build and a development-auth API are an invalid pair and fail closed before any `/v1/me/*` data is resolved.
 
+## PB.2 Account Deletion
+
+An authenticated user may permanently delete their CalorieBank account after an explicit destructive confirmation. The server derives ownership from the verified Clerk subject and never accepts a user ID from the client. It first attempts supported direct-provider revocation, then deletes the Clerk identity, then deletes the internal `User`; existing cascading relations remove CalorieBank-owned aggregates, history, ledger records, configuration, provider credentials, sync state, and related operational data. Ledger immutability governs normal account operation and does not require retaining a deleted account.
+
+Fitbit/Google Health supports token revocation and deletion stops if that revocation cannot be confirmed. FatSecret has no separate supported revocation operation in the current adapter; its encrypted delegated credentials and attempts are removed with the account. Apple Health permissions remain device-controlled, while all server-side Apple Health-derived records and associations are removed. Failures are reported without tokens or personal data and may be retried when the authenticated identity still exists.
+
 ## Alternatives Rejected
 
 - **Shared beta user:** violates health-data and ledger isolation.
