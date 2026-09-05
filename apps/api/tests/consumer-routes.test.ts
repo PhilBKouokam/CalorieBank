@@ -195,6 +195,11 @@ describe('consumer routes', () => {
     expect(source).toContain('style={[styles.secondaryValue, styles.contributionValue]}');
     expect(source).not.toMatch(/latestDailyBankChange < 0[\s\S]*negativeValue/);
     expect(source).not.toMatch(/Added to your bank|Withdrawn from your bank|Adjusted from|May still update/);
+    expect(source.indexOf('hasInitializedBank && bankSummary'))
+      .toBeLessThan(source.indexOf("bankStatus === 'loading'"));
+    expect(source.indexOf('hasCompletedDays && bankSummary'))
+      .toBeLessThan(source.indexOf("bankStatus === 'loading'", source.indexOf('const latestChangeValue')));
+    expect(source).toContain('{latestContributionContext}');
   });
 
   it('keeps progressive detail behind accessible Today cards', () => {

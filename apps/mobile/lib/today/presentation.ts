@@ -1,4 +1,4 @@
-import type { TodaySoFarDataFreshnessStatus } from '@caloriebank/schemas';
+import type { BankSummaryResponse, TodaySoFarDataFreshnessStatus } from '@caloriebank/schemas';
 
 import { getConsumerSourceName } from '../providers/presentation';
 
@@ -34,6 +34,31 @@ export function firstRunTodayEmptyState(input: {
   return {
     value: input.noun === 'intake' ? 'Loading today’s calories…' : 'Loading today’s burn…',
     detail: `Checking ${provider}`,
+  };
+}
+
+export function hasUsableBankSummary(summary: BankSummaryResponse | null) {
+  return summary != null && (
+    summary.openingBankStatus === 'initialized'
+    || hasLatestCompletedContribution(summary)
+  );
+}
+
+export function hasLatestCompletedContribution(summary: BankSummaryResponse | null) {
+  return summary?.latestCompletedDate != null && summary.latestDailyBankChange != null;
+}
+
+export function presentTodayContribution(value: number) {
+  if (value < 0) {
+    return {
+      context: 'Enjoyed',
+      value: `${Math.abs(value).toLocaleString()} kcal`,
+    };
+  }
+
+  return {
+    context: null,
+    value: `${value > 0 ? '+' : ''}${value.toLocaleString()} kcal`,
   };
 }
 

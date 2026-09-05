@@ -2,7 +2,14 @@ import type { BankSummaryResponse, ProviderSelectionResponse } from '@calorieban
 import { describe, expect, it } from 'vitest';
 
 import { deriveOnboardingStatus, type OnboardingFacts } from '../src/modules/onboarding/onboarding.repository';
-import { emptyTodayDetail, emptyTodayValue, firstRunTodayEmptyState } from '../../mobile/lib/today/presentation';
+import {
+  emptyTodayDetail,
+  emptyTodayValue,
+  firstRunTodayEmptyState,
+  hasLatestCompletedContribution,
+  hasUsableBankSummary,
+  presentTodayContribution,
+} from '../../mobile/lib/today/presentation';
 import { deriveFirstRunBootstrapState } from '../../mobile/lib/onboarding/onboarding-recovery';
 
 const selection: ProviderSelectionResponse = {
@@ -119,6 +126,47 @@ describe('connection-first onboarding', () => {
 });
 
 describe('consumer Today states', () => {
+  it('keeps known accounting visible while background preparation remains unresolved', () => {
+    const knownSummary = {
+      ...summary,
+      openingBankStatus: 'initialized' as const,
+      availableBankCalories: 2296,
+      latestCompletedDate: '2026-09-04',
+      latestDailyBankChange: -83,
+    };
+
+    expect(hasUsableBankSummary(knownSummary)).toBe(true);
+    expect(hasLatestCompletedContribution(knownSummary)).toBe(true);
+    expect(presentTodayContribution(knownSummary.latestDailyBankChange)).toEqual({
+      context: 'Enjoyed',
+      value: '83 kcal',
+    });
+  });
+
+  it('preserves setup only when no usable bank read model exists', () => {
+    expect(hasUsableBankSummary({
+      ...summary,
+      openingBankStatus: 'waiting_for_opening_data',
+      latestCompletedDate: null,
+      latestDailyBankChange: null,
+    })).toBe(false);
+  });
+
+  it('treats a completed contribution as usable accounting even if preparation is stale', () => {
+    expect(hasUsableBankSummary({
+      ...summary,
+      openingBankStatus: 'waiting_for_opening_data',
+      latestCompletedDate: '2026-09-04',
+      latestDailyBankChange: -83,
+    })).toBe(true);
+  });
+
+  it('presents signed completed contributions appropriately on Today', () => {
+    expect(presentTodayContribution(500)).toEqual({ context: null, value: '+500 kcal' });
+    expect(presentTodayContribution(-500)).toEqual({ context: 'Enjoyed', value: '500 kcal' });
+    expect(presentTodayContribution(0)).toEqual({ context: null, value: '0 kcal' });
+  });
+
   it('keeps provider attribution in stale, partial, and error states', () => {
     expect(emptyTodayValue('stale', 'intake')).toBe('Out of date');
     expect(emptyTodayValue('partial', 'steps')).toBe('Some steps unavailable');

@@ -42,13 +42,11 @@ import {
   firstRunTodayEmptyState,
   formatStepContributions,
   formatWorkoutCalorieLines,
+  hasLatestCompletedContribution,
+  hasUsableBankSummary,
+  presentTodayContribution,
 } from '@/lib/today/presentation';
 import { getConsumerSourceName } from '@/lib/providers/presentation';
-
-function formatCalories(value: number) {
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toLocaleString()} kcal`;
-}
 
 function formatBankBalance(value: number) {
   return `${value.toLocaleString()} kcal`;
@@ -281,8 +279,8 @@ export default function TodayScreen() {
     }, [refreshVisibleReadModels]),
   );
 
-  const hasCompletedDays = Boolean(bankSummary?.latestCompletedDate);
-  const hasInitializedBank = bankSummary?.openingBankStatus === 'initialized';
+  const hasCompletedDays = hasLatestCompletedContribution(bankSummary);
+  const hasInitializedBank = hasUsableBankSummary(bankSummary);
   const historyPreparationPending = onboardingStatus?.completed === true &&
     onboardingStatus.preparation.history === 'preparing';
   const firstRunIntakeState = firstRunTodayEmptyState({
@@ -296,12 +294,12 @@ export default function TodayScreen() {
     noun: 'burn data',
   });
   const bankValue =
-    bankStatus === 'loading'
-      ? 'Loading...'
-      : historyPreparationPending
-        ? 'Setting up…'
-      : hasInitializedBank && bankSummary
-        ? formatBankBalance(bankSummary.availableBankCalories)
+    hasInitializedBank && bankSummary
+      ? formatBankBalance(bankSummary.availableBankCalories)
+      : bankStatus === 'loading'
+        ? 'Loading...'
+        : historyPreparationPending
+          ? 'Setting up…'
         : bankStatus === 'error'
           ? 'Unavailable'
           : 'Not calculated';
@@ -315,15 +313,18 @@ export default function TodayScreen() {
       ? 'Try again later'
       : 'Waiting for completed provider data';
   const latestChangeValue =
-    bankStatus === 'loading'
-      ? 'Loading...'
-      : historyPreparationPending
-        ? 'Checking recent days…'
-      : hasCompletedDays && bankSummary && bankSummary.latestDailyBankChange !== null
-        ? formatCalories(bankSummary.latestDailyBankChange)
+    hasCompletedDays && bankSummary && bankSummary.latestDailyBankChange !== null
+      ? presentTodayContribution(bankSummary.latestDailyBankChange).value
+      : bankStatus === 'loading'
+        ? 'Loading...'
+        : historyPreparationPending
+          ? 'Checking recent days…'
         : bankStatus === 'error'
           ? 'Unavailable'
           : 'No completed day yet';
+  const latestContributionContext = hasCompletedDays && bankSummary && bankSummary.latestDailyBankChange !== null
+    ? presentTodayContribution(bankSummary.latestDailyBankChange).context
+    : null;
   const currentGoalValue =
     configurationStatus === 'loading'
       ? 'Loading...'
@@ -455,7 +456,9 @@ export default function TodayScreen() {
           <Link href="/history" asChild>
             <Pressable
               accessibilityHint="Opens Bank History."
-              accessibilityLabel={`${latestResultLabel(bankSummary)}, ${latestChangeValue}`}
+              accessibilityLabel={`${latestResultLabel(bankSummary)}, ${
+                latestContributionContext ? `${latestContributionContext}, ` : ''
+              }${latestChangeValue}`}
               accessibilityRole="button"
               style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
             >
@@ -467,6 +470,9 @@ export default function TodayScreen() {
                 </Text>
                 <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
               </View>
+              {latestContributionContext ? (
+                <Text style={styles.contributionContext}>{latestContributionContext}</Text>
+              ) : null}
               <Text
                 adjustsFontSizeToFit
                 numberOfLines={1}
@@ -890,6 +896,11 @@ const styles = StyleSheet.create({
   },
   contributionValue: {
     color: colors.primaryDark,
+  },
+  contributionContext: {
+    color: colors.textMuted,
+    fontSize: typography.body,
+    fontWeight: '700',
   },
   supportingText: {
     color: colors.textMuted,
