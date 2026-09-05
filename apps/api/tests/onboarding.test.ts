@@ -138,8 +138,7 @@ describe('consumer Today states', () => {
     expect(hasUsableBankSummary(knownSummary)).toBe(true);
     expect(hasLatestCompletedContribution(knownSummary)).toBe(true);
     expect(presentTodayContribution(knownSummary.latestDailyBankChange)).toEqual({
-      context: 'Enjoyed',
-      value: '83 kcal',
+      value: 'Enjoyed 83 kcal',
     });
   });
 
@@ -162,9 +161,10 @@ describe('consumer Today states', () => {
   });
 
   it('presents signed completed contributions appropriately on Today', () => {
-    expect(presentTodayContribution(500)).toEqual({ context: null, value: '+500 kcal' });
-    expect(presentTodayContribution(-500)).toEqual({ context: 'Enjoyed', value: '500 kcal' });
-    expect(presentTodayContribution(0)).toEqual({ context: null, value: '0 kcal' });
+    expect(presentTodayContribution(500)).toEqual({ value: '+500 kcal' });
+    expect(presentTodayContribution(-500)).toEqual({ value: 'Enjoyed 500 kcal' });
+    expect(presentTodayContribution(-1234)).toEqual({ value: 'Enjoyed 1,234 kcal' });
+    expect(presentTodayContribution(0)).toEqual({ value: '0 kcal' });
   });
 
   it('keeps provider attribution in stale, partial, and error states', () => {

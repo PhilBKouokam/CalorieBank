@@ -199,7 +199,8 @@ describe('consumer routes', () => {
       .toBeLessThan(source.indexOf("bankStatus === 'loading'"));
     expect(source.indexOf('hasCompletedDays && bankSummary'))
       .toBeLessThan(source.indexOf("bankStatus === 'loading'", source.indexOf('const latestChangeValue')));
-    expect(source).toContain('{latestContributionContext}');
+    expect(source).toContain('minimumFontScale={0.8}');
+    expect(source).not.toContain('latestContributionContext');
   });
 
   it('keeps progressive detail behind accessible Today cards', () => {

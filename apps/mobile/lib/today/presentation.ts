@@ -51,13 +51,11 @@ export function hasLatestCompletedContribution(summary: BankSummaryResponse | nu
 export function presentTodayContribution(value: number) {
   if (value < 0) {
     return {
-      context: 'Enjoyed',
-      value: `${Math.abs(value).toLocaleString()} kcal`,
+      value: `Enjoyed ${Math.abs(value).toLocaleString()} kcal`,
     };
   }
 
   return {
-    context: null,
     value: `${value > 0 ? '+' : ''}${value.toLocaleString()} kcal`,
   };
 }

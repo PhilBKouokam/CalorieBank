@@ -322,9 +322,6 @@ export default function TodayScreen() {
         : bankStatus === 'error'
           ? 'Unavailable'
           : 'No completed day yet';
-  const latestContributionContext = hasCompletedDays && bankSummary && bankSummary.latestDailyBankChange !== null
-    ? presentTodayContribution(bankSummary.latestDailyBankChange).context
-    : null;
   const currentGoalValue =
     configurationStatus === 'loading'
       ? 'Loading...'
@@ -456,9 +453,7 @@ export default function TodayScreen() {
           <Link href="/history" asChild>
             <Pressable
               accessibilityHint="Opens Bank History."
-              accessibilityLabel={`${latestResultLabel(bankSummary)}, ${
-                latestContributionContext ? `${latestContributionContext}, ` : ''
-              }${latestChangeValue}`}
+              accessibilityLabel={`${latestResultLabel(bankSummary)}, ${latestChangeValue}`}
               accessibilityRole="button"
               style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
             >
@@ -470,11 +465,9 @@ export default function TodayScreen() {
                 </Text>
                 <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
               </View>
-              {latestContributionContext ? (
-                <Text style={styles.contributionContext}>{latestContributionContext}</Text>
-              ) : null}
               <Text
                 adjustsFontSizeToFit
+                minimumFontScale={0.8}
                 numberOfLines={1}
                 style={[styles.secondaryValue, styles.contributionValue]}
               >
@@ -896,11 +889,7 @@ const styles = StyleSheet.create({
   },
   contributionValue: {
     color: colors.primaryDark,
-  },
-  contributionContext: {
-    color: colors.textMuted,
-    fontSize: typography.body,
-    fontWeight: '700',
+    fontSize: 28,
   },
   supportingText: {
     color: colors.textMuted,
