@@ -40,6 +40,7 @@ const EnvSchema = z.object({
   FATSECRET_AUTHORIZE_URL: z.string().url().default('https://authentication.fatsecret.com/oauth/authorize'),
   FATSECRET_ACCESS_TOKEN_URL: z.string().url().default('https://authentication.fatsecret.com/oauth/access_token'),
   FATSECRET_API_BASE_URL: z.string().url().default('https://platform.fatsecret.com/rest'),
+  EXPO_ACCESS_TOKEN: z.string().trim().min(1).optional(),
 }).superRefine((value, context) => {
   if (value.APP_ENV !== 'local' && value.AUTH_MODE !== 'clerk') {
     context.addIssue({

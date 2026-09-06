@@ -56,6 +56,7 @@ import {
   withOnboardingTimeout,
 } from '@/lib/onboarding/onboarding-recovery';
 import { runFirstRunBootstrap } from '@/lib/onboarding/first-run-bootstrap';
+import { enableMorningBankUpdate } from '@/lib/notifications/morning-bank-update';
 
 type AppleIntakeAction = `apple-intake:${KnownFoodTracker | 'other' | string}`;
 type BusyAction = 'loading' | 'fitbit' | 'fatsecret' | 'apple-burn' | AppleIntakeAction | 'preparing' | 'complete' | null;
@@ -98,6 +99,7 @@ export default function OnboardingScreen() {
   const [messageTone, setMessageTone] = useState<'attention' | 'error'>('error');
   const [initialLoadFailed, setInitialLoadFailed] = useState(false);
   const [preparationAttempted, setPreparationAttempted] = useState(false);
+  const [morningUpdateState, setMorningUpdateState] = useState<'idle' | 'loading' | 'enabled' | 'denied' | 'error'>('idle');
   const [displayStage, setDisplayStage] = useState<OnboardingStage | null>(null);
   const [editingRole, setEditingRole] = useState<SourceRole | null>(null);
   const [discoveredIntakeWriters, setDiscoveredIntakeWriters] =
@@ -559,6 +561,24 @@ export default function OnboardingScreen() {
           {status.preparation.history === 'no_history'
             ? <Text style={styles.detail}>You’re ready. Your bank will start with your first completed day.</Text>
             : status.openingBankCalories === 0 ? <Text style={styles.detail}>Today’s a fresh start.</Text> : null}
+          <View style={styles.morningUpdatePanel}>
+            <Text style={styles.providerTitle}>Get your Morning Bank Update</Text>
+            <Text style={styles.note}>Wake up knowing where your bank stands after yesterday is ready.</Text>
+            {morningUpdateState === 'enabled' ? <Text style={styles.connectedLabel}>Enabled</Text> : (
+              <SecondaryButton
+                busy={morningUpdateState === 'loading'}
+                label="Enable Morning Bank Update"
+                onPress={() => {
+                  setMorningUpdateState('loading');
+                  void enableMorningBankUpdate()
+                    .then((result) => setMorningUpdateState(result.permission === 'granted' ? 'enabled' : 'denied'))
+                    .catch(() => setMorningUpdateState('error'));
+                }}
+              />
+            )}
+            {morningUpdateState === 'denied' ? <Text style={styles.note}>Notifications remain off. You can enable them later in Settings.</Text> : null}
+            {morningUpdateState === 'error' ? <Text style={styles.error}>Notifications could not be enabled. You can try again later in Settings.</Text> : null}
+          </View>
           <PrimaryButton busy={busy === 'complete'} label="Go to Today" onPress={() => void run('complete', async () => {
             await completeOnboarding();
             // Completion changes lifecycle eligibility without changing Clerk identity.
@@ -684,6 +704,7 @@ const styles = StyleSheet.create({
   secondaryButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.primary, borderRadius: radii.sm, borderWidth: 1, justifyContent: 'center', minHeight: 52, paddingHorizontal: spacing.lg },
   secondaryButtonText: { color: colors.primaryDark, fontSize: typography.body, fontWeight: '800' },
   balancePanel: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, gap: spacing.xs, padding: spacing.lg },
+  morningUpdatePanel: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, gap: spacing.sm, padding: spacing.lg },
   balanceLabel: { color: colors.textMuted, fontSize: typography.body, fontWeight: '700' }, balanceValue: { color: colors.text, fontSize: 38, fontWeight: '800' },
   preparationRow: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.sm, borderWidth: 1, gap: spacing.xs, padding: spacing.md },
   waitingCard: { backgroundColor: colors.surface, borderColor: colors.primary, borderRadius: radii.md, borderWidth: 1, gap: spacing.sm, padding: spacing.lg },

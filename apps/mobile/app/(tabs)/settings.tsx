@@ -1,21 +1,33 @@
 import { useClerk } from '@clerk/expo';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useRouter, type Href } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
+import { detachMorningBankUpdateDevice } from '@/lib/notifications/morning-bank-update';
 
 const settingsRows: { href: Href; icon: keyof typeof Ionicons.glyphMap; label: string; detail: string }[] = [
   { href: '/goal-settings', icon: 'flag-outline', label: 'Goal', detail: 'Choose how completed days contribute to your bank.' },
   { href: '/integrations', icon: 'heart-outline', label: 'Health Connections', detail: 'Manage where burned and eaten calories come from.' },
   { href: '/customize-today', icon: 'options-outline', label: 'Customize Today', detail: 'Choose which supporting cards appear on Today.' },
+  { href: '/morning-bank-update' as Href, icon: 'notifications-outline', label: 'Morning Bank Update', detail: 'Manage your daily completed-bank notification.' },
 ];
 
 export default function SettingsScreen() {
   const { signOut } = useClerk();
   const router = useRouter();
   const usesClerk = (process.env.EXPO_PUBLIC_AUTH_MODE ?? 'development') === 'clerk';
+  const [signOutError, setSignOutError] = useState(false);
+  async function signOutSafely() {
+    setSignOutError(false);
+    try {
+      await detachMorningBankUpdateDevice();
+      await signOut();
+      router.replace('/sign-in');
+    } catch { setSignOutError(true); }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -36,10 +48,11 @@ export default function SettingsScreen() {
 
         {usesClerk ? <>
           <Text style={styles.sectionLabel}>Account</Text>
-          <Pressable accessibilityLabel="Sign out of CalorieBank" accessibilityRole="button" onPress={() => void signOut().then(() => router.replace('/sign-in'))} style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}>
+          <Pressable accessibilityLabel="Sign out of CalorieBank" accessibilityRole="button" onPress={() => void signOutSafely()} style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}>
             <Ionicons color={colors.text} name="log-out-outline" size={22} />
             <Text style={styles.signOutText}>Sign Out</Text>
           </Pressable>
+          {signOutError ? <Text accessibilityLiveRegion="assertive" style={styles.signOutError}>Sign out could not finish safely. Check your connection and try again.</Text> : null}
           <Link href="/delete-account" asChild>
             <Pressable accessibilityRole="button" style={({ pressed }) => [styles.deleteAccount, pressed && styles.pressed]}>
               <Ionicons color={colors.danger} name="trash-outline" size={22} />
@@ -65,4 +78,5 @@ const styles = StyleSheet.create({
   signOutText: { color: colors.text, fontSize: typography.body, fontWeight: '700' }, pressed: { opacity: 0.7 },
   deleteAccount: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, minHeight: 52, paddingHorizontal: spacing.md },
   deleteAccountText: { color: colors.danger, fontSize: typography.body, fontWeight: '700' },
+  signOutError: { color: colors.danger, fontSize: typography.caption, lineHeight: 18 },
 });

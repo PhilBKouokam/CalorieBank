@@ -59,6 +59,15 @@ Set the following on **both** `caloriebank-beta-api` and `caloriebank-beta-lifec
 | `FATSECRET_CONSUMER_KEY` | No | FatSecret Platform OAuth 1.0 application |
 | `FATSECRET_CONSUMER_SECRET` | Yes | Same FatSecret application |
 | `FATSECRET_REDIRECT_URI` | No | Exact deployed FatSecret callback shown above |
+| `EXPO_ACCESS_TOKEN` | Yes | Optional Expo Push Service access token when enhanced push security is enabled; configure on API and lifecycle, never in the mobile bundle |
+
+## Morning Bank Update
+
+1. Deploy the Prisma migration before starting the updated API or lifecycle service.
+2. Configure valid Apple Push Notification credentials for the EAS project and build a new preview binary containing `expo-notifications`.
+3. If Expo enhanced push security is enabled, set the same secret `EXPO_ACCESS_TOKEN` on both Blueprint services. The lifecycle service sends pushes; keeping the API environment aligned avoids configuration drift.
+4. The hourly lifecycle evaluates each user's 07:00-11:59 local window, submits eligible notifications to Expo, and checks accepted-ticket receipts after 15 minutes.
+5. Verify logs contain delivery event names and safe account references only. Push tokens and bank amounts must not be logged.
 
 `NODE_ENV=production`, `APP_ENV=beta`, `AUTH_MODE=clerk`, and `TODAY_INGESTION_MODE=device` are fixed by the Blueprint. `DEV_USER_ID`, `DEV_USER_EMAIL`, `SHADOW_DATABASE_URL`, all `WHOOP_*` values, and provider endpoint override variables are not beta service configuration.
 

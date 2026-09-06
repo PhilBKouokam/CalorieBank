@@ -6,6 +6,7 @@ import { FinalizationOrchestrationService } from '../modules/finalization-orches
 import { GoogleHealthFitbitService } from '../modules/google-health/google-health.service';
 import { AccountLifecycleCoordinator } from '../modules/lifecycle/account-lifecycle.service';
 import { PrismaTodayAggregateRepository } from '../modules/today/today.repository';
+import { ExpoPushTransport, MorningBankUpdateService } from '../modules/morning-bank-update/morning-bank-update.service';
 
 async function run() {
   const bankHistory = new PrismaBankHistoryRepository(prisma, {
@@ -23,6 +24,12 @@ async function run() {
     finalization,
     new GoogleHealthFitbitService(prisma, today, env, finalization),
     new FatSecretService(prisma, today, env, fetch, undefined, undefined, finalization),
+    undefined,
+    new MorningBankUpdateService(
+      prisma,
+      bankHistory,
+      new ExpoPushTransport(env.EXPO_ACCESS_TOKEN ? { accessToken: env.EXPO_ACCESS_TOKEN } : {}),
+    ),
   );
   await coordinator.runDueAccounts();
 }

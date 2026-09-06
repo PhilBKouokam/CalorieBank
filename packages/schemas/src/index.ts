@@ -913,6 +913,18 @@ export const plannedTreatGetResponseSchema = z.union([
   noActivePlannedTreatResponseSchema,
 ]);
 
+export const morningBankUpdatePreferenceInputSchema = z.object({ enabled: z.boolean() });
+export const morningBankUpdateDeviceInputSchema = z.object({
+  expoPushToken: z.string().trim().regex(/^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/),
+  platform: z.enum(['ios', 'android']),
+});
+export const morningBankUpdateSettingsResponseSchema = z.object({
+  enabled: z.boolean(),
+  deviceRegistered: z.boolean(),
+  deviceActive: z.boolean(),
+  lastRegisteredAt: z.string().datetime().nullable(),
+});
+
 export type BankSummaryResponse = z.infer<typeof bankSummaryResponseSchema>;
 export type OnboardingStage = z.infer<typeof onboardingStageSchema>;
 export type OnboardingStatusResponse = z.infer<typeof onboardingStatusResponseSchema>;
@@ -931,6 +943,9 @@ export type PlannedTreatInput = z.infer<typeof plannedTreatInputSchema>;
 export type ActivePlannedTreatResponse = z.infer<typeof activePlannedTreatResponseSchema>;
 export type NoActivePlannedTreatResponse = z.infer<typeof noActivePlannedTreatResponseSchema>;
 export type PlannedTreatGetResponse = z.infer<typeof plannedTreatGetResponseSchema>;
+export type MorningBankUpdatePreferenceInput = z.infer<typeof morningBankUpdatePreferenceInputSchema>;
+export type MorningBankUpdateDeviceInput = z.infer<typeof morningBankUpdateDeviceInputSchema>;
+export type MorningBankUpdateSettingsResponse = z.infer<typeof morningBankUpdateSettingsResponseSchema>;
 export type TodaySoFarDataFreshnessStatus = z.infer<typeof todaySoFarDataFreshnessStatusSchema>;
 export type IngestionCategoryStatus = z.infer<typeof ingestionCategoryStatusSchema>;
 export type IngestionSyncTrigger = z.infer<typeof ingestionSyncTriggerSchema>;

@@ -42,6 +42,11 @@ export type LifecycleUserResult = {
   historyDayCount: number;
 };
 
+type MorningBankUpdateDelivery = {
+  deliverForUser(userId: string, timezone: string): Promise<unknown>;
+  reconcileReceipts(): Promise<void>;
+};
+
 export class AccountLifecycleCoordinator {
   constructor(
     private readonly db: PrismaClient,
@@ -50,6 +55,7 @@ export class AccountLifecycleCoordinator {
     private readonly fitbit: GoogleHealthFitbitService,
     private readonly fatSecret: FatSecretService,
     private readonly now: () => Date = () => new Date(),
+    private readonly morningBankUpdate?: MorningBankUpdateDelivery,
   ) {}
 
   private log(event: string, metadata: Record<string, unknown> = {}) {
@@ -192,6 +198,9 @@ export class AccountLifecycleCoordinator {
   async runDueAccounts() {
     const startedAt = this.now();
     this.log('lifecycle_run_started', { trigger: 'scheduled' });
+    await this.morningBankUpdate?.reconcileReceipts().catch(() => {
+      this.log('morning_bank_update_receipt_check_failed', { reasonCode: 'unexpected' });
+    });
     const profiles = await this.db.userProfile.findMany({
       where: { onboardingCompletedAt: { not: null } },
       include: { user: { select: { id: true, email: true } } },
@@ -200,8 +209,15 @@ export class AccountLifecycleCoordinator {
     const results: LifecycleUserResult[] = [];
     for (let index = 0; index < profiles.length; index += HOSTED_CONCURRENCY) {
       const batch = profiles.slice(index, index + HOSTED_CONCURRENCY);
-      const settled = await Promise.allSettled(batch.map((profile) =>
-        this.runUser(profile.user, profile.timezone, 'scheduled')));
+      const settled = await Promise.allSettled(batch.map(async (profile) => {
+        const result = await this.runUser(profile.user, profile.timezone, 'scheduled');
+        await this.morningBankUpdate?.deliverForUser(profile.user.id, profile.timezone).catch(() => {
+          this.log('morning_bank_update_delivery_failed', {
+            userSuffix: profile.user.id.slice(-8), reasonCode: 'unexpected',
+          });
+        });
+        return result;
+      }));
       settled.forEach((result, offset) => {
         if (result.status === 'fulfilled') results.push(result.value);
         else this.log('lifecycle_user_failed', {

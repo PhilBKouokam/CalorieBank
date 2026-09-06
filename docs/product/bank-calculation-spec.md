@@ -926,22 +926,11 @@ Do not send a definitive balance notification for a day that lacks required data
 
 ## Morning Update
 
-The primary V1 notification is one meaningful morning bank update.
+The primary V1 notification is one meaningful Morning Bank Update governed by ADR 024. It uses the server's completed accounting and current consumer bank summary. The title always leads with `Available Bank: X kcal`; the body says the user `banked`, `enjoyed`, or was `right on target` yesterday. It is never generated from current-day estimates or an incomplete completed day.
 
-It should communicate, when available:
+It communicates only Available Bank and yesterday's completed contribution. Emergency Bank, Recovery Forecast, Planned Treat, Banking Goal, provider detail, and incomplete-day messages remain separate future decisions.
 
-- Yesterday's status.
-- Yesterday's bank change.
-- Raw imported activity where useful.
-- Credited activity after applying the V1 conservative rate when applicable for explanation.
-- Available Bank.
-- Emergency Bank coverage or reserve change when relevant.
-- Recovery Forecast state when both Available Bank and Emergency Bank are exhausted.
-- Progress toward a selected food, meal, or event.
-- Whether the selected target is now covered by the available bank.
-- Banking Goal progress or Ready state only when a separate notification policy approves it.
-
-The notification must not imply that the imported wearable number was exact. Generic engagement notifications are not part of the primary V1 loop.
+Delivery is evaluated from 07:00 through 11:59 in the user's local timezone and is durably unique by user and completed local date. Notification failure and retry never alter the ledger. The notification must not imply that the imported wearable number was exact. Generic engagement notifications are not part of the primary V1 loop.
 
 Future notification categories are allowed only when they preserve trust and do not compete with the primary finalized bank update:
 

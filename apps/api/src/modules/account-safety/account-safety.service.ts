@@ -70,6 +70,9 @@ export class AccountSafetyService {
         bankAccountInitialization: { select: { status: true, accountingStartsOn: true, initializedAt: true } },
         googleHealthConnection: { select: { status: true, lastSyncedAt: true, lastErrorCode: true } },
         externalProviderConnections: { select: { provider: true, status: true, lastSyncedAt: true, lastErrorCode: true } },
+        morningBankUpdatePreference: { select: { enabled: true, updatedAt: true } },
+        pushDeviceRegistration: { select: { active: true, lastRegisteredAt: true, invalidatedAt: true } },
+        morningBankUpdateDeliveries: { orderBy: { completedLocalDate: 'desc' }, take: 1, select: { completedLocalDate: true, status: true, attemptCount: true, deliveredAt: true, failureCode: true } },
       } }),
       this.db.bankDayProcessingState.count({ where: { userId: user.id, status: { notIn: ['provisional', 'locked'] } } }),
       this.db.ingestionSyncSession.findFirst({ where: { userId: user.id }, orderBy: { startedAt: 'desc' }, select: { status: true, trigger: true, startedAt: true, completedAt: true, errorCode: true } }),
@@ -89,6 +92,11 @@ export class AccountSafetyService {
       unresolvedCompletedDayCount: unresolvedCount,
       latestSync,
       aggregatePresence: { expenditure: expenditureCount > 0, intake: intakeCount > 0 },
+      morningBankUpdate: {
+        preference: account.morningBankUpdatePreference,
+        device: account.pushDeviceRegistration,
+        latestDelivery: account.morningBankUpdateDeliveries?.[0] ?? null,
+      },
     };
   }
 }

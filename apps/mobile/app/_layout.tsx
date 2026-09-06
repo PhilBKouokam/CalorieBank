@@ -1,6 +1,7 @@
 import { ClerkProvider, useAuth } from '@clerk/expo';
 import { tokenCache } from '@clerk/expo/token-cache';
-import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
@@ -10,6 +11,7 @@ import { colors } from '@/constants/caloriebank-theme';
 import { logMobileClerkConfiguration, setApiAccessTokenProvider } from '@/lib/api/client';
 import { setAppleHealthAccountScope } from '@/lib/healthkit/healthkit-connection';
 import { resetAccountLifecycle, runAccountLifecycle } from '@/lib/lifecycle/account-lifecycle';
+import { syncMorningBankUpdateDevice } from '@/lib/notifications/morning-bank-update';
 
 function AppStack() {
   return (
@@ -35,6 +37,7 @@ function AppStack() {
 }
 
 function AuthenticatedAppStack() {
+  const router = useRouter();
   const { getToken, isLoaded, isSignedIn, sessionId, userId } = useAuth();
   setApiAccessTokenProvider(getToken, {
     ready: isLoaded && isSignedIn && Boolean(sessionId),
@@ -45,11 +48,21 @@ function AuthenticatedAppStack() {
     resetAccountLifecycle(userId ?? null);
     if (!isLoaded || !isSignedIn || !sessionId || !userId) return;
     void runAccountLifecycle();
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void runAccountLifecycle();
+    void syncMorningBankUpdateDevice().catch(() => undefined);
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response?.notification.request.content.data.category === 'morning_bank_update') router.replace('/today');
     });
-    return () => subscription.remove();
-  }, [isLoaded, isSignedIn, sessionId, userId]);
+    const notificationResponse = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (response.notification.request.content.data.category === 'morning_bank_update') router.push('/today');
+    });
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void runAccountLifecycle();
+        void syncMorningBankUpdateDevice().catch(() => undefined);
+      }
+    });
+    return () => { subscription.remove(); notificationResponse.remove(); };
+  }, [isLoaded, isSignedIn, router, sessionId, userId]);
   return <AppStack />;
 }
 

@@ -10,7 +10,7 @@ This PRD is the authoritative V1 product document. It supersedes prior food-logg
 
 - **PB.1: Core banking and lifecycle reliability — complete.** The accepted connection-first, ingestion, Opening Bank, completed-day continuity, account-isolation, and lifecycle behavior is the baseline.
 - **PB.2: Private Beta Readiness & Account Safety.** Production-safe observability and redaction, private-beta rate limits, self-service account deletion, provider and Clerk cleanup, backup/restore operations, support-safe diagnostics, regression coverage, and distribution readiness. PB.2 must not change PB.1 accounting.
-- **Morning Bank Update follows PB.2.** Notification permission and delivery are a subsequent product milestone, not PB.2.
+- **Morning Bank Update — implemented after PB.2.** ADR 024 governs permission, delivery, copy, timing, retries, and account privacy.
 
 ## V1 Mission
 
@@ -916,19 +916,9 @@ The approved HealthKit historical scope is intentionally limited to three local 
 
 ## Notification Requirements
 
-The primary future V1 notification remains the morning bank update. It is not part of PB.2 and remains a subsequent product milestone. When implemented, it should include, when available:
+The primary V1 notification is the Morning Bank Update implemented under ADR 024. It leads with Available Bank and follows with yesterday's banked, enjoyed, or right-on-target result. Emergency Bank, Recovery Forecast, Planned Treat, Banking Goal, and incomplete-day messages remain deferred and are not part of this concise delivery.
 
-- Yesterday's relevant result.
-- Calories added to or deducted from the bank.
-- Current Available Bank.
-- Emergency Bank allocation, withdrawal, or coverage when relevant.
-- Recovery Forecast state when Available Bank and Emergency Bank are exhausted.
-- Progress toward a saved food, meal, treat, or event.
-- Banking Goal progress or Ready status when notification policy explicitly approves it.
-- Whether the user has accumulated enough for the planned item.
-- A clear incomplete/pending status when data is not ready.
-
-Request notification permission only after explaining this value.
+Request notification permission only after explaining this value. Delivery is evaluated hourly from 07:00 through 11:59 in the user's local timezone, is durable and at most once per user/completed date from CalorieBank's sender, and never depends on current-day estimates.
 
 Notifications may support Progressive Feature Discovery only when Relevance, Familiarity, and Complementarity are all satisfied, the user has granted appropriate permission, pacing allows another introduction, the message provides immediate planning value, and an in-app introduction would not be more appropriate. Generic feature advertising must not compete with the morning update. Recommendation frequency, dismissal suppression, and category eligibility remain open.
 

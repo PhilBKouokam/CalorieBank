@@ -34,6 +34,7 @@
       "expo-dev-client",
       "@clerk/expo",
       "expo-secure-store",
+      "expo-notifications",
       [
         "@kingstinct/react-native-healthkit",
         {

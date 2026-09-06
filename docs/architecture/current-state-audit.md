@@ -632,7 +632,7 @@ Future tables:
 
 ### Phase 5: Beta Readiness
 
-- PB.1 is complete. PB.2 is **Private Beta Readiness & Account Safety** and covers observability/redaction, private-beta rate limits, account deletion, backup/restore operations, support-safe diagnostics, regression coverage, and distribution readiness. Morning Bank Update follows PB.2.
+- PB.1 and PB.2 are complete. Morning Bank Update follows them and is implemented under ADR 024 without changing their accounting or account-safety behavior.
 - Add observability, error tracking, backups, rate limits, privacy policy support, account deletion, and support tooling.
 - Add seed/sandbox data and end-to-end tests for connection-first onboarding, sync, ledger calculation, notification generation, and explanation history.
 - Validate initial-experience simplicity, manual feature discoverability, dismissal behavior, and the difference between Projected Daily Burn and a prohibited Projected Bank.
@@ -718,7 +718,7 @@ These questions genuinely affect implementation choices:
 5. Resolved for private beta: Fitbit through Google Health and Apple Health are supported authoritative expenditure paths.
 6. How should active, resting, total, and unknown expenditure classifications be stored and displayed when source data contains multiple types?
 7. What fallback should be used when only intake or only expenditure data is available?
-8. Resolved for private beta by ADRs 009 and 010 plus PB.1 continuity recovery; notification behavior remains a later milestone.
+8. Resolved by ADRs 009, 010, and 024: completed accounting is lifecycle-driven and Morning Bank Update delivery is durable, timezone-aware, and independent of accounting success.
 9. What timezone change behavior is allowed after onboarding?
 10. Does existing MongoDB production data need to be migrated, or can V1 start with fresh beta data?
 11. What minimum privacy/security bar is required before inviting beta users, especially around health-adjacent data?

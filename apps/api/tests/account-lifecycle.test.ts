@@ -78,11 +78,20 @@ describe('completed-day query evidence', () => {
 });
 
 describe('account lifecycle coordinator', () => {
-  function fixture(options: { unresolved?: boolean; intakeProvider?: string; accountingStartsOn?: string | null } = {}) {
+  function fixture(options: {
+    unresolved?: boolean;
+    intakeProvider?: string;
+    accountingStartsOn?: string | null;
+    morningBankUpdate?: {
+      deliverForUser(userId: string, timezone: string): Promise<unknown>;
+      reconcileReceipts(): Promise<void>;
+    };
+  } = {}) {
     const fitbit = { syncRollingWindow: vi.fn().mockResolvedValue({}) };
     const fatSecret = { syncRollingWindow: vi.fn().mockResolvedValue({}) };
     const finalization = { execute: vi.fn().mockResolvedValue({ datesReconciled: [], datesLocked: [], waitingDates: [], errors: [] }) };
     const db = {
+      userProfile: { findMany: vi.fn().mockResolvedValue([]) },
       finalizedDailyBankRecord: {
         findMany: vi.fn()
           .mockResolvedValueOnce(options.unresolved ? [] : [{ logDate: new Date('2026-08-30T00:00:00.000Z') }])
@@ -105,8 +114,9 @@ describe('account lifecycle coordinator', () => {
       fitbit as never,
       fatSecret as never,
       () => new Date('2026-08-31T15:00:00.000Z'),
+      options.morningBankUpdate,
     );
-    return { coordinator, fitbit, fatSecret, finalization };
+    return { coordinator, db, fitbit, fatSecret, finalization };
   }
 
   it('refreshes only authoritative server-readable providers', async () => {
@@ -118,6 +128,31 @@ describe('account lifecycle coordinator', () => {
     );
     expect(fitbit.syncRollingWindow).toHaveBeenCalledOnce();
     expect(fatSecret.syncRollingWindow).not.toHaveBeenCalled();
+  });
+
+  it('runs completed-day accounting before evaluating the morning update', async () => {
+    const callOrder: string[] = [];
+    const morningBankUpdate = {
+      reconcileReceipts: vi.fn(async () => { callOrder.push('receipts'); }),
+      deliverForUser: vi.fn(async () => { callOrder.push('notification'); }),
+    };
+    const { coordinator, db, finalization } = fixture({ morningBankUpdate });
+    finalization.execute.mockImplementation(async () => {
+      callOrder.push('accounting');
+      return { datesReconciled: [], datesLocked: [], waitingDates: [], errors: [] };
+    });
+    db.userProfile = { findMany: vi.fn().mockResolvedValue([{
+      timezone: 'America/Chicago',
+      user: { id: '00000000-0000-4000-8000-000000000001', email: 'test@example.com' },
+    }]) };
+
+    await coordinator.runDueAccounts();
+
+    expect(callOrder).toEqual(['receipts', 'accounting', 'notification']);
+    expect(morningBankUpdate.deliverForUser).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000001',
+      'America/Chicago',
+    );
   });
 
   it('expands bounded catch-up to eight dates and refreshes both selected server providers', async () => {

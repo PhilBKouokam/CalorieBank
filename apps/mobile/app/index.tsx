@@ -11,6 +11,7 @@ import {
   fetchOnboardingStatus,
   getApiAuthenticationState,
 } from '@/lib/api/client';
+import { detachMorningBankUpdateDevice } from '@/lib/notifications/morning-bank-update';
 
 type GateState = '/onboarding' | '/today' | 'loading' | 'error';
 type BootstrapProblem = 'session' | 'connectivity' | 'service' | 'conflict' | null;
@@ -126,7 +127,10 @@ function AuthenticatedIndexRoute() {
   const { signOut } = useClerk();
   if (!isLoaded) return <LoadingState />;
   if (!isSignedIn || !sessionId) return <Redirect href="/sign-in" />;
-  return <ApplicationGate authReady={getApiAuthenticationState().ready} onSignOut={signOut} />;
+  return <ApplicationGate authReady={getApiAuthenticationState().ready} onSignOut={async () => {
+    await detachMorningBankUpdateDevice();
+    await signOut();
+  }} />;
 }
 
 function LoadingState() {

@@ -117,6 +117,14 @@ enum HistoricalSourceRole {
   INTAKE
 }
 
+enum MorningBankUpdateDeliveryStatus {
+  ATTEMPTING
+  NO_TOKEN
+  RETRYABLE_FAILURE
+  PERMANENT_FAILURE
+  DELIVERED
+}
+
 model User {
   id                            String                              @id @default(uuid()) @db.Uuid
   // Email is descriptive account metadata. Clerk subject is the ownership key:
@@ -146,10 +154,59 @@ model User {
   bankAccountInitialization     BankAccountInitialization?
   historicalSourceOverrides     HistoricalSourceAuthorityOverride[]
   historicalSourceRequests      HistoricalSourceOverrideRequest[]
+  morningBankUpdatePreference   MorningBankUpdatePreference?
+  pushDeviceRegistration        PushDeviceRegistration?
+  morningBankUpdateDeliveries   MorningBankUpdateDelivery[]
   createdAt                     DateTime                            @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                     DateTime                            @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("users")
+}
+
+model MorningBankUpdatePreference {
+  userId    String   @id @map("user_id") @db.Uuid
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("morning_bank_update_preferences")
+}
+
+model PushDeviceRegistration {
+  userId           String    @id @map("user_id") @db.Uuid
+  expoPushToken    String    @unique @map("expo_push_token")
+  platform         String
+  active           Boolean   @default(true)
+  lastRegisteredAt DateTime  @default(now()) @map("last_registered_at") @db.Timestamptz
+  invalidatedAt    DateTime? @map("invalidated_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([active])
+  @@map("push_device_registrations")
+}
+
+model MorningBankUpdateDelivery {
+  id                 String                          @id @default(uuid()) @db.Uuid
+  userId             String                          @map("user_id") @db.Uuid
+  completedLocalDate DateTime                        @map("completed_local_date") @db.Date
+  status             MorningBankUpdateDeliveryStatus
+  attemptCount       Int                             @default(0) @map("attempt_count")
+  lastAttemptAt      DateTime?                       @map("last_attempt_at") @db.Timestamptz
+  nextRetryAt        DateTime?                       @map("next_retry_at") @db.Timestamptz
+  deliveredAt        DateTime?                       @map("delivered_at") @db.Timestamptz
+  expoTicketId       String?                         @map("expo_ticket_id")
+  receiptCheckedAt   DateTime?                       @map("receipt_checked_at") @db.Timestamptz
+  failureCode        String?                         @map("failure_code")
+  createdAt          DateTime                        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime                        @updatedAt @map("updated_at") @db.Timestamptz
+  user               User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, completedLocalDate])
+  @@index([status, nextRetryAt])
+  @@map("morning_bank_update_deliveries")
 }
 
 model RestingBurnEstimate {

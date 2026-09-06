@@ -67,6 +67,10 @@ import {
   type ProviderSelectionResponse,
   type HealthConnectionsResponse,
   type OnboardingStatusResponse,
+  morningBankUpdateDeviceInputSchema,
+  morningBankUpdatePreferenceInputSchema,
+  morningBankUpdateSettingsResponseSchema,
+  type MorningBankUpdateSettingsResponse,
 } from '@caloriebank/schemas';
 
 export type HealthResponse = {
@@ -792,5 +796,32 @@ export async function deleteCalorieBankAccount(): Promise<void> {
     method: 'DELETE',
     body: JSON.stringify({ confirmation: 'DELETE' }),
   });
+  if (!response.ok) throw await responseError(response);
+}
+
+export async function fetchMorningBankUpdateSettings(): Promise<MorningBankUpdateSettingsResponse> {
+  const response = await apiRequest('/v1/me/morning-bank-update');
+  if (!response.ok) throw await responseError(response);
+  return morningBankUpdateSettingsResponseSchema.parse(await response.json());
+}
+
+export async function updateMorningBankUpdatePreference(enabled: boolean): Promise<MorningBankUpdateSettingsResponse> {
+  const response = await apiRequest('/v1/me/morning-bank-update/preference', {
+    method: 'PATCH', body: JSON.stringify(morningBankUpdatePreferenceInputSchema.parse({ enabled })),
+  });
+  if (!response.ok) throw await responseError(response);
+  return morningBankUpdateSettingsResponseSchema.parse(await response.json());
+}
+
+export async function registerMorningBankUpdateDevice(input: { expoPushToken: string; platform: 'ios' | 'android' }): Promise<MorningBankUpdateSettingsResponse> {
+  const response = await apiRequest('/v1/me/morning-bank-update/device', {
+    method: 'PUT', body: JSON.stringify(morningBankUpdateDeviceInputSchema.parse(input)),
+  });
+  if (!response.ok) throw await responseError(response);
+  return morningBankUpdateSettingsResponseSchema.parse(await response.json());
+}
+
+export async function unregisterMorningBankUpdateDevice(): Promise<void> {
+  const response = await apiRequest('/v1/me/morning-bank-update/device', { method: 'DELETE' });
   if (!response.ok) throw await responseError(response);
 }

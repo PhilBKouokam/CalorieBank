@@ -71,6 +71,8 @@ import { createAccountLifecycleRouter } from './modules/lifecycle/account-lifecy
 import { AccountSafetyService } from './modules/account-safety/account-safety.service';
 import { createAccountSafetyRouter } from './modules/account-safety/account-safety.routes';
 import { createRateLimit } from './security/rate-limit';
+import { createMorningBankUpdateRouter } from './modules/morning-bank-update/morning-bank-update.routes';
+import { ExpoPushTransport, MorningBankUpdateService } from './modules/morning-bank-update/morning-bank-update.service';
 
 type AppDependencies = {
   goalConfigurationRepository?: GoalConfigurationRepository;
@@ -137,6 +139,11 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
     : dependencies.todayPredictionResolver ?? undefined;
   const whoopService = new WhoopService(prisma, todayRepository, config);
   const fatSecretService = new FatSecretService(prisma, todayRepository, config, fetch, undefined, undefined, finalizationScheduler);
+  const morningBankUpdateService = new MorningBankUpdateService(
+    prisma,
+    bankHistoryRepository,
+    new ExpoPushTransport(config.EXPO_ACCESS_TOKEN ? { accessToken: config.EXPO_ACCESS_TOKEN } : {}),
+  );
   const lifecycleCoordinator = finalizationScheduler
     ? new AccountLifecycleCoordinator(
         prisma,
@@ -177,6 +184,7 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
   app.use('/v1/me/ingestion', createRateLimit({ limit: 60, windowMs: 15 * 60 * 1000, operation: 'provider_ingestion' }));
   app.use('/v1/me/lifecycle', createRateLimit({ limit: 12, windowMs: 15 * 60 * 1000, operation: 'lifecycle_refresh' }));
   app.use('/v1/me', createAccountSafetyRouter(accountSafetyService, currentUser));
+  app.use('/v1/me/morning-bank-update', createMorningBankUpdateRouter(morningBankUpdateService, currentUser));
   app.use(
     '/v1/me/goal-configuration',
     createGoalConfigurationRouter(

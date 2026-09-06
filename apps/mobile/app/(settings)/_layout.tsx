@@ -17,6 +17,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="health-diagnostics" options={{ title: 'HealthKit Diagnostics' }} />
       <Stack.Screen name="customize-today" options={{ title: 'Customize Today' }} />
       <Stack.Screen name="delete-account" options={{ title: 'Delete Account' }} />
+      <Stack.Screen name="morning-bank-update" options={{ title: 'Morning Bank Update' }} />
     </Stack>
   );
 }
