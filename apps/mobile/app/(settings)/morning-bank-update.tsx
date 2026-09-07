@@ -58,7 +58,7 @@ export default function MorningBankUpdateSettingsScreen() {
         {loading ? <ActivityIndicator color={colors.primary} /> : <Switch accessibilityLabel="Morning Bank Update" onValueChange={(value) => void change(value)} value={enabled} />}
       </View>
       <Text style={styles.status}>{permission === 'denied' ? 'Notifications are off in iOS Settings' : enabled ? 'On' : 'Off'}</Text>
-      {permission === 'denied' ? <Pressable accessibilityRole="button" onPress={() => void openNotificationSettings()} style={styles.button}><Text style={styles.buttonText}>Open iOS Settings</Text></Pressable> : null}
+      {permission === 'denied' ? <Pressable accessibilityRole="button" onPress={() => void openNotificationSettings().then((opened) => { if (!opened) setMessage('Open Settings on your iPhone, then choose CalorieBank and Notifications.'); })} style={styles.button}><Text style={styles.buttonText}>Open Notification Settings</Text></Pressable> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
     </View>
   </SafeAreaView>;

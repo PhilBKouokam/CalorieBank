@@ -1,6 +1,8 @@
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { Linking, Platform } from 'react-native';
+import { Platform } from 'react-native';
+
+export { openNotificationSettings } from './open-notification-settings';
 
 import {
   fetchMorningBankUpdateSettings,
@@ -71,8 +73,4 @@ export async function syncMorningBankUpdateDevice() {
 
 export async function detachMorningBankUpdateDevice() {
   await unregisterMorningBankUpdateDevice();
-}
-
-export function openNotificationSettings() {
-  return Linking.openSettings();
 }
