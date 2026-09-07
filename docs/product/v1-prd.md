@@ -67,6 +67,14 @@ Before considering any consumer-facing feature complete, review all affected cop
 
 If a string fails this review, fix it before reporting the feature complete. Do not wait for the founder to identify robotic or implementation-oriented consumer language.
 
+#### Consumer Visual QA Release Gate
+
+Any consumer-facing UI changed or introduced for external beta must receive a visual-quality pass before being reported complete. Functional correctness alone is not consumer readiness.
+
+Inspect alignment, spacing, hierarchy, clipping, overflow, text wrapping, typography consistency, icon sizing and placement, navigation affordances, touch-target clarity, loading/error/empty-state presentation, narrow-screen behavior, and any unfinished or development-looking presentation. Check larger accessibility text where practical. Use rendered screens at representative widths when tooling permits, and distinguish those checks from physical-device QA.
+
+Ask: "Would this screen look intentional and trustworthy if a first-time user saw it in the App Store today?" Fix obvious visual defects before reporting completion; do not wait for the founder to discover them on a physical device.
+
 ### Self-explanatory consumer interfaces
 
 If CalorieBank needs to walk the user through a feature, the feature is too complicated. A first-time user with no prior context must be able to navigate and understand normal consumer surfaces without guidance. Simplify the interface itself before adding tutorials, tooltips, modals, or explanatory copy.

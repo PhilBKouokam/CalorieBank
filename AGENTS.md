@@ -86,6 +86,7 @@ Historical-first resting-burn estimation and ledger-neutral rest-of-day forecast
 ## AI Workflow
 
 - Inspect relevant files before editing.
+- Apply the Consumer Visual QA Release Gate in `docs/product/v1-prd.md` to every changed consumer UI: inspect alignment, spacing, hierarchy, clipping, overflow, wrapping, typography, icons, navigation affordances, touch targets, loading/error/empty states, and narrow screens before reporting completion. Functional correctness alone is not consumer readiness; report which visual checks were actually performed.
 - State assumptions.
 - Prefer small vertical slices.
 - Report changed files and verification results.
