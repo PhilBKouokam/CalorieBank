@@ -32,6 +32,41 @@ V1 is not for users seeking medical nutrition therapy, eating disorder treatment
 
 ## Product Principles
 
+### Consumer Copy & UI Standard
+
+CalorieBank is being prepared for real external users, not merely internal development. Every consumer-facing screen, state, label, description, error, empty state, permission explanation, notification, and CTA must be reviewed from the perspective of a normal user who knows nothing about the internal architecture.
+
+Consumer copy must:
+
+1. Sound natural when spoken aloud.
+2. Be immediately understandable without implementation knowledge.
+3. Prefer ordinary human language over technically precise internal language.
+4. Describe what happened, what something means, or what the user can do.
+5. Be concise.
+6. Preserve established CalorieBank terminology when it names a consumer product concept, such as Available Bank, Recovery, or Morning Bank Update.
+7. Never expose internal lifecycle, accounting, or provider state merely because that is how the implementation represents it.
+
+Terms such as finalized, authoritative, provisional, lifecycle, reconciliation, processing state, aggregate, sync session, idempotency, correction window, "yesterday is ready," and implementation-oriented meanings of "ready" must not casually leak into consumer UI. They may remain in code, logs, diagnostics, tests, engineering documentation, and internal architecture. Translate them into the user's reality before displaying them.
+
+| Avoid | Consumer framing |
+| --- | --- |
+| Yesterday is ready. | Your bank updated overnight. |
+| Finalized contribution available. | You banked 547 kcal yesterday. |
+| Provider refresh failed. | We couldn't refresh your latest data. |
+
+#### Consumer Copy & UI Release Gate
+
+Before considering any consumer-facing feature complete, review all affected copy and UI:
+
+- Would someone seeing CalorieBank for the first time understand this?
+- Does this sound like something a human product team would actually write?
+- Does the user need to understand an internal system concept to understand it?
+- Is any sentence technically accurate but conversationally strange?
+- Can it be shorter without losing meaning?
+- Does it match established CalorieBank terminology and tone?
+
+If a string fails this review, fix it before reporting the feature complete. Do not wait for the founder to identify robotic or implementation-oriented consumer language.
+
 ### Self-explanatory consumer interfaces
 
 If CalorieBank needs to walk the user through a feature, the feature is too complicated. A first-time user with no prior context must be able to navigate and understand normal consumer surfaces without guidance. Simplify the interface itself before adding tutorials, tooltips, modals, or explanatory copy.

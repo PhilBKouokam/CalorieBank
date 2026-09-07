@@ -25,7 +25,7 @@ export default function MorningBankUpdateSettingsScreen() {
       setPermission(result.permission);
       setEnabled(result.settings.enabled && result.permission === 'granted' && result.settings.deviceActive);
       setMessage(null);
-    } catch { setMessage('Morning Bank Update status could not be loaded. Try again.'); }
+    } catch { setMessage("We couldn't load your notification settings. Try again."); }
     finally { setLoading(false); }
   }, []);
 
@@ -39,12 +39,12 @@ export default function MorningBankUpdateSettingsScreen() {
         const result = await enableMorningBankUpdate();
         setPermission(result.permission);
         setEnabled(result.settings.enabled && result.permission === 'granted');
-        if (result.permission !== 'granted') setMessage('Notifications are disabled in iOS Settings.');
+        if (result.permission !== 'granted') setMessage('Turn on notifications for CalorieBank in iOS Settings.');
       } else {
         await disableMorningBankUpdate();
         setEnabled(false);
       }
-    } catch { setMessage('That change could not be saved. Try again.'); }
+    } catch { setMessage("We couldn't save your change. Try again."); }
     finally { setLoading(false); }
   }
 
@@ -53,11 +53,11 @@ export default function MorningBankUpdateSettingsScreen() {
       <View style={styles.row}>
         <View style={styles.copy}>
           <Text style={styles.title}>Morning Bank Update</Text>
-          <Text style={styles.detail}>Wake up knowing where your bank stands after yesterday is ready.</Text>
+          <Text style={styles.detail}>Wake up knowing how your bank updated overnight.</Text>
         </View>
         {loading ? <ActivityIndicator color={colors.primary} /> : <Switch accessibilityLabel="Morning Bank Update" onValueChange={(value) => void change(value)} value={enabled} />}
       </View>
-      <Text style={styles.status}>{permission === 'denied' ? 'Notifications disabled in iOS' : enabled ? 'Enabled' : 'Off'}</Text>
+      <Text style={styles.status}>{permission === 'denied' ? 'Notifications are off in iOS Settings' : enabled ? 'On' : 'Off'}</Text>
       {permission === 'denied' ? <Pressable accessibilityRole="button" onPress={() => void openNotificationSettings()} style={styles.button}><Text style={styles.buttonText}>Open iOS Settings</Text></Pressable> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
     </View>

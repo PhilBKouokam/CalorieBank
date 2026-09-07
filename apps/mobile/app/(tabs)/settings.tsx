@@ -12,7 +12,7 @@ const settingsRows: { href: Href; icon: keyof typeof Ionicons.glyphMap; label: s
   { href: '/goal-settings', icon: 'flag-outline', label: 'Goal', detail: 'Choose how completed days contribute to your bank.' },
   { href: '/integrations', icon: 'heart-outline', label: 'Health Connections', detail: 'Manage where burned and eaten calories come from.' },
   { href: '/customize-today', icon: 'options-outline', label: 'Customize Today', detail: 'Choose which supporting cards appear on Today.' },
-  { href: '/morning-bank-update' as Href, icon: 'notifications-outline', label: 'Morning Bank Update', detail: 'Manage your daily completed-bank notification.' },
+  { href: '/morning-bank-update' as Href, icon: 'notifications-outline', label: 'Morning Bank Update', detail: 'Choose whether to receive your morning bank update.' },
 ];
 
 export default function SettingsScreen() {

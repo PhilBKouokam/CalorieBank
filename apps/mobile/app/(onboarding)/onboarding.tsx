@@ -563,7 +563,7 @@ export default function OnboardingScreen() {
             : status.openingBankCalories === 0 ? <Text style={styles.detail}>Today’s a fresh start.</Text> : null}
           <View style={styles.morningUpdatePanel}>
             <Text style={styles.providerTitle}>Get your Morning Bank Update</Text>
-            <Text style={styles.note}>Wake up knowing where your bank stands after yesterday is ready.</Text>
+            <Text style={styles.note}>Wake up knowing how your bank updated overnight.</Text>
             {morningUpdateState === 'enabled' ? <Text style={styles.connectedLabel}>Enabled</Text> : (
               <SecondaryButton
                 busy={morningUpdateState === 'loading'}
@@ -576,8 +576,8 @@ export default function OnboardingScreen() {
                 }}
               />
             )}
-            {morningUpdateState === 'denied' ? <Text style={styles.note}>Notifications remain off. You can enable them later in Settings.</Text> : null}
-            {morningUpdateState === 'error' ? <Text style={styles.error}>Notifications could not be enabled. You can try again later in Settings.</Text> : null}
+            {morningUpdateState === 'denied' ? <Text style={styles.note}>Notifications are off. You can turn them on later in Settings.</Text> : null}
+            {morningUpdateState === 'error' ? <Text style={styles.error}>We couldn’t turn on notifications. You can try again later in Settings.</Text> : null}
           </View>
           <PrimaryButton busy={busy === 'complete'} label="Go to Today" onPress={() => void run('complete', async () => {
             await completeOnboarding();
