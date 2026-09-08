@@ -23,6 +23,8 @@ async function seedAccount(prisma: PrismaClient) {
   await prisma.user.create({ data: { id, email: `${id}@test.local` } });
   await prisma.providerSelection.create({ data: {
     userId: id,
+    expenditureSelected: true,
+    intakeSelected: true,
     authoritativeExpenditureProvider: 'google_health_fitbit',
     authoritativeActivityProvider: 'google_health_fitbit',
     authoritativeIntakeProvider: 'apple_health',

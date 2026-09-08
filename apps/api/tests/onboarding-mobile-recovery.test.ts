@@ -26,7 +26,7 @@ describe('mobile onboarding recovery policy', () => {
   it('imports Apple Health for the current account whenever either selected role uses it', () => {
     const providers = {
       expenditure: { authoritativeProvider: 'google_health_fitbit' },
-      intake: { authoritativeProvider: 'apple_health' },
+      intake: { selected: true, authoritativeProvider: 'apple_health', writerBundleIdentifier: 'CRONOMETER-GOLD' },
     } as ProviderSelectionResponse;
 
     expect(initialImportPlan(providers)).toEqual({

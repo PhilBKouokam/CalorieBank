@@ -20,6 +20,8 @@ export const DEFAULT_ACTIVITY_PROVIDER = 'apple_health';
 export const DEFAULT_INTAKE_PROVIDER = 'apple_health';
 
 export type ProviderSelectionRecord = {
+  expenditureSelected: boolean;
+  intakeSelected: boolean;
   authoritativeExpenditureProvider: string;
   authoritativeActivityProvider: string;
   authoritativeIntakeProvider: string;
@@ -70,6 +72,8 @@ export async function readProviderSelection(
 ): Promise<ProviderSelectionRecord> {
   const stored = await db.providerSelection.findUnique({ where: { userId } });
   return {
+    expenditureSelected: stored?.expenditureSelected ?? false,
+    intakeSelected: stored?.intakeSelected ?? false,
     authoritativeExpenditureProvider:
       stored?.authoritativeExpenditureProvider ?? DEFAULT_EXPENDITURE_PROVIDER,
     authoritativeActivityProvider:
@@ -91,7 +95,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
 
   private async response(userId: string): Promise<ProviderSelectionResponse> {
     const selection = await readProviderSelection(this.db, userId);
-    const [googleHealth, externalConnections, appleSync, appleExpenditure, appleIntake, fatSecretIntake, appleSteps, appleWorkout] = await Promise.all([
+    const [googleHealth, externalConnections, appleSync, appleExpenditure, appleIntake, fatSecretIntake, appleSteps, appleWorkout, fitbitExpenditure] = await Promise.all([
       this.db.googleHealthConnection.findUnique({ where: { userId } }),
       this.db.externalProviderConnection.findMany({ where: { userId } }),
       this.db.ingestionSyncSession.findFirst({
@@ -99,7 +103,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         orderBy: { completedAt: 'desc' },
       }),
       this.db.dailyExpenditureAggregate.findFirst({
-        where: { userId, provider: 'apple_health' },
+        where: { userId, provider: 'apple_health', syncStatus: { in: ['ready', 'stale', 'partial'] } },
         orderBy: { updatedAt: 'desc' },
       }),
       this.db.dailyIntakeAggregate.findFirst({
@@ -123,6 +127,10 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       this.db.currentDayWorkout.findFirst({
         where: { userId, provider: 'apple_health' }, orderBy: { updatedAt: 'desc' },
       }),
+      this.db.dailyExpenditureAggregate.findFirst({
+        where: { userId, provider: 'google_health_fitbit', syncStatus: { in: ['ready', 'stale', 'partial'] } },
+        select: { id: true },
+      }),
     ]);
     const externalConnection = (provider: string) => externalConnections.find((item) => item.provider === provider);
     const appleConnected = Boolean(appleSync || appleExpenditure || appleIntake || appleSteps || appleWorkout);
@@ -132,7 +140,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       return connection?.status === 'connected' ? 'connected' : connection ? 'needs_attention' : 'not_connected';
     };
     const expenditureReady = selection.authoritativeExpenditureProvider === 'google_health_fitbit'
-      ? googleHealth?.status === 'connected'
+      ? googleHealth?.status === 'connected' && Boolean(fitbitExpenditure)
       : Boolean(appleExpenditure);
     const activityReady = selection.authoritativeActivityProvider === 'google_health_fitbit'
       ? googleHealth?.status === 'connected'
@@ -153,6 +161,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
     const selectedActivityProvider = selection.authoritativeActivityProvider as Exclude<ProviderId, 'fatsecret'>;
     return {
       expenditure: {
+        selected: selection.expenditureSelected,
         authoritativeProvider: selection.authoritativeExpenditureProvider as 'apple_health' | 'google_health_fitbit',
         displayName: selection.authoritativeExpenditureProvider === 'google_health_fitbit' ? 'Fitbit' : 'Apple Health',
         status: expenditureReady ? 'ready' : selection.authoritativeExpenditureProvider === 'google_health_fitbit' ? fitbitStatus : 'unavailable',
@@ -171,10 +180,11 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         fallbackActive: false,
       },
       intake: {
+        selected: selection.intakeSelected && (selection.authoritativeIntakeProvider !== 'apple_health' || Boolean(selection.appleHealthIntakeWriterBundleId)),
         authoritativeProvider: selection.authoritativeIntakeProvider as 'apple_health' | 'fatsecret',
         displayName: selection.authoritativeIntakeProvider === 'fatsecret'
           ? 'FatSecret'
-          : selection.appleHealthIntakeWriterDisplayName ?? 'Choose a food tracker',
+          : selection.appleHealthIntakeWriterDisplayName ?? 'Apple Health',
         status: selection.authoritativeIntakeProvider === 'fatsecret'
           ? fatSecretIntake
             ? 'ready'
@@ -309,12 +319,12 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         { primaryAction: fatSecretStatus === 'needs_attention' ? 'reconnect' : fatSecretStatus === 'not_connected' ? 'connect' : null },
       ),
     ];
-    const burnedSelected = selection.authoritativeExpenditureProvider === 'google_health_fitbit'
+    const burnedSelected = !selection.expenditureSelected ? null : selection.authoritativeExpenditureProvider === 'google_health_fitbit'
       ? burnedOptions[1]!
       : selection.authoritativeExpenditureProvider === 'apple_health'
         ? burnedOptions[0]!
         : null;
-    const eatenSelected = selection.authoritativeIntakeProvider === 'fatsecret'
+    const eatenSelected = !selection.intakeSelected || (selection.authoritativeIntakeProvider === 'apple_health' && !selection.appleHealthIntakeWriterBundleId) ? null : selection.authoritativeIntakeProvider === 'fatsecret'
       ? eatenOptions[1]!
       : selection.authoritativeIntakeProvider === 'apple_health'
         ? eatenOptions[0]!
@@ -385,7 +395,14 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         ? 'apple_health'
         : null;
     if (!provider) throw new AppError('That calories burned source is unavailable.', 400, { code: 'HEALTH_CONNECTION_OPTION_INVALID' });
+    if (provider === 'apple_health' && !await this.db.dailyExpenditureAggregate.findFirst({
+      where: { userId: user.id, provider, syncStatus: { in: ['ready', 'stale', 'partial'] } },
+      select: { id: true },
+    })) {
+      throw new AppError('Refresh Apple Health before using it for calorie burn.', 409);
+    }
     await this.update(user, {
+      selectionRole: 'burned',
       authoritativeExpenditureProvider: provider,
       authoritativeActivityProvider: provider,
       authoritativeIntakeProvider: current.authoritativeIntakeProvider as 'apple_health' | 'fatsecret',
@@ -421,6 +438,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       }
     }
     await this.update(user, {
+      selectionRole: 'eaten',
       authoritativeExpenditureProvider: current.authoritativeExpenditureProvider as 'apple_health' | 'google_health_fitbit',
       authoritativeActivityProvider: current.authoritativeActivityProvider as 'apple_health' | 'google_health_fitbit' | 'garmin' | 'whoop',
       authoritativeIntakeProvider: provider,
@@ -429,16 +447,18 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
   }
 
   async update(user: DevelopmentUser, input: ProviderSelectionInput) {
-    if (!canProvideAuthoritativeExpenditure(input.authoritativeExpenditureProvider)) {
+    const changesBurn = input.selectionRole !== 'eaten';
+    const changesIntake = input.selectionRole !== 'burned';
+    if (changesBurn && !canProvideAuthoritativeExpenditure(input.authoritativeExpenditureProvider)) {
       throw new AppError('The selected provider cannot supply total daily expenditure.', 400);
     }
-    if (input.authoritativeExpenditureProvider === 'google_health_fitbit') {
+    if (changesBurn && input.authoritativeExpenditureProvider === 'google_health_fitbit') {
       const googleHealth = await this.db.googleHealthConnection.findUnique({ where: { userId: user.id } });
       if (!googleHealth || googleHealth.status !== 'connected') {
         throw new AppError('Connect Fitbit before selecting it for calorie burn.', 409);
       }
     }
-    if (input.authoritativeExpenditureProvider === 'apple_health') {
+    if (changesBurn && !input.selectionRole && input.authoritativeExpenditureProvider === 'apple_health') {
       const appleExpenditure = await this.db.dailyExpenditureAggregate.findFirst({
         where: { userId: user.id, provider: 'apple_health', syncStatus: { in: ['ready', 'stale', 'partial'] } },
         select: { id: true },
@@ -458,15 +478,15 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
     const authoritativeActivityProvider = input.authoritativeActivityProvider
       ?? input.authoritativeExpenditureProvider;
     const activityCapabilities = getProviderCapabilities(authoritativeActivityProvider);
-    if (!activityCapabilities.steps && !activityCapabilities.workouts) {
+    if (changesBurn && !activityCapabilities.steps && !activityCapabilities.workouts) {
       throw new AppError('The selected provider cannot supply activity context.', 400);
     }
-    if (authoritativeActivityProvider === 'google_health_fitbit') {
+    if (changesBurn && authoritativeActivityProvider === 'google_health_fitbit') {
       const googleHealth = await this.db.googleHealthConnection.findUnique({ where: { userId: user.id } });
       if (!googleHealth || googleHealth.status !== 'connected') {
         throw new AppError('Connect Fitbit before selecting it for activity.', 409);
       }
-    } else if (authoritativeActivityProvider === 'garmin' || authoritativeActivityProvider === 'whoop') {
+    } else if (changesBurn && (authoritativeActivityProvider === 'garmin' || authoritativeActivityProvider === 'whoop')) {
       const connection = await this.db.externalProviderConnection.findUnique({
         where: { userId_provider: { userId: user.id, provider: authoritativeActivityProvider } },
       });
@@ -474,7 +494,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         throw new AppError(`Connect ${authoritativeActivityProvider === 'whoop' ? 'WHOOP' : 'Garmin'} before selecting it for activity.`, 409);
       }
     }
-    if (input.authoritativeIntakeProvider === 'fatsecret') {
+    if (changesIntake && input.authoritativeIntakeProvider === 'fatsecret') {
       const connection = await this.db.externalProviderConnection.findUnique({
         where: { userId_provider: { userId: user.id, provider: 'fatsecret' } },
       });
@@ -492,31 +512,36 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         : null
       : input.appleHealthIntakeWriter;
     if (
-      input.authoritativeIntakeProvider === 'apple_health'
-      && input.appleHealthIntakeWriter === null
+      changesIntake && input.authoritativeIntakeProvider === 'apple_health'
+      && (input.appleHealthIntakeWriter === null || (input.selectionRole === 'eaten' && !selectedWriter))
     ) {
       throw new AppError('Choose the food tracker that supplies Apple Health calories.', 409, {
         code: 'APPLE_HEALTH_INTAKE_WRITER_REQUIRED',
       });
     }
+    const roleChanges = {
+      ...(changesBurn ? {
+        expenditureSelected: true,
+        authoritativeExpenditureProvider: input.authoritativeExpenditureProvider,
+        authoritativeActivityProvider,
+        allowExpenditureFallback: false,
+        allowActivityFallback: false,
+      } : {}),
+      ...(changesIntake ? {
+        intakeSelected: input.authoritativeIntakeProvider === 'fatsecret' || Boolean(selectedWriter),
+        authoritativeIntakeProvider: input.authoritativeIntakeProvider,
+        appleHealthIntakeWriterBundleId: selectedWriter?.bundleIdentifier ?? null,
+        appleHealthIntakeWriterDisplayName: selectedWriter?.displayName ?? null,
+      } : {}),
+    };
     await this.db.providerSelection.upsert({
       where: { userId: user.id },
       create: {
         userId: user.id,
-        authoritativeExpenditureProvider: input.authoritativeExpenditureProvider,
-        authoritativeActivityProvider,
-        authoritativeIntakeProvider: input.authoritativeIntakeProvider,
-        appleHealthIntakeWriterBundleId: selectedWriter?.bundleIdentifier ?? null,
-        appleHealthIntakeWriterDisplayName: selectedWriter?.displayName ?? null,
+        ...roleChanges,
       },
       update: {
-        authoritativeExpenditureProvider: input.authoritativeExpenditureProvider,
-        authoritativeActivityProvider,
-        authoritativeIntakeProvider: input.authoritativeIntakeProvider,
-        appleHealthIntakeWriterBundleId: selectedWriter?.bundleIdentifier ?? null,
-        appleHealthIntakeWriterDisplayName: selectedWriter?.displayName ?? null,
-        allowExpenditureFallback: false,
-        allowActivityFallback: false,
+        ...roleChanges,
         selectedAt: new Date(),
       },
     });

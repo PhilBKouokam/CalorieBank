@@ -51,3 +51,10 @@ Final automated gates: workspace TypeScript (API/mobile/domain/schemas), API/mob
 6. Confirm Morning Bank Update settings, direct iOS Notifications destination, preference state, and existing push/account-switch behavior on the final binary.
 
 No manual Render deployment is required: backend code, schema, and service configuration are unchanged. Existing repository auto-deploy behavior is not modified by this audit.
+# Source-selection release hold
+
+The previous candidate is superseded by physical source-selection failures.
+Before another preview, run `npm run release:friends-family` against an explicitly
+configured localhost `TEST_DATABASE_URL`. See the [state-machine gate](../engineering/source-selection-state-machine.md)
+for automation, migration scope and the five remaining device journeys. Automated
+success alone does not remove the physical release hold.

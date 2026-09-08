@@ -113,6 +113,7 @@ export default function OnboardingScreen() {
   const viewGeneration = useRef(0);
   const latestStatus = useRef<OnboardingStatusResponse | null>(null);
   const [messageAction, setMessageAction] = useState<BusyAction>(null);
+  const [messageStage, setMessageStage] = useState<OnboardingStage | null>(null);
 
   const refresh = useCallback(async () => {
     const isCurrent = refreshGeneration.current.begin();
@@ -150,6 +151,7 @@ export default function OnboardingScreen() {
   async function run(action: Exclude<BusyAction, 'loading' | null>, work: () => Promise<ActionOutcome>) {
     if (!actionGate.current.begin(action)) return;
     const generation = viewGeneration.current;
+    setMessageStage(displayStage ?? latestStatus.current?.stage ?? null);
     setBusy(action);
     setMessage(null);
     setMessageAction(action);
@@ -163,6 +165,7 @@ export default function OnboardingScreen() {
       setDisplayStage(outcome?.stayOnStage ?? null);
       setEditingRole(null);
       if (outcome?.message) {
+        setMessageStage(outcome.stayOnStage ?? displayStage ?? latestStatus.current?.stage ?? null);
         setMessageTone(outcome.tone ?? 'attention');
         setMessage(outcome.message);
       }
@@ -181,6 +184,18 @@ export default function OnboardingScreen() {
         setMessageAction('preparing');
         setMessage(notice?.message ?? null);
         setMessageTone(notice?.tone ?? 'attention');
+        return;
+      }
+      const sourceRole = action === 'fatsecret' || action.startsWith('apple-intake:')
+        ? 'intake' : action === 'fitbit' || action === 'apple-burn' ? 'expenditure' : null;
+      const expectedProvider = action === 'fatsecret' ? 'fatsecret'
+        : action === 'fitbit' ? 'google_health_fitbit' : 'apple_health';
+      const confirmed = sourceRole ? refreshed?.[sourceRole] : null;
+      if (confirmed?.provider === expectedProvider && confirmed.connected) {
+        setMessageTone('attention');
+        setMessage(confirmed.readiness === 'ready' ? null : confirmed.readiness === 'needs_attention'
+          ? `Reconnect ${confirmed.displayName} to check your latest data.`
+          : `${confirmed.displayName} is connected, but we couldn't check your latest calorie data. You can continue setup or try again.`);
         return;
       }
       const recoveryMessage = onboardingRecoveryMessage({
@@ -219,6 +234,7 @@ export default function OnboardingScreen() {
     refreshGeneration.current.invalidate();
     setBusy(null);
     setMessage(null);
+    setMessageStage(null);
     setDisplayStage(stage);
     setEditingRole(editRole);
   }
@@ -226,6 +242,7 @@ export default function OnboardingScreen() {
   async function selectProvider(input: Partial<ProviderSelectionInput>) {
     const current = await fetchProviderSelection();
     await saveProviderSelection({
+      selectionRole: input.authoritativeIntakeProvider ? 'eaten' : 'burned',
       authoritativeExpenditureProvider:
         input.authoritativeExpenditureProvider ?? current.expenditure.authoritativeProvider,
       authoritativeActivityProvider:
@@ -449,10 +466,10 @@ export default function OnboardingScreen() {
   }
 
   useEffect(() => {
-    if (status?.stage === 'preparing_bank' && busy === null && !preparationAttempted) void prepareBank();
+    if (status?.stage === 'preparing_bank' && !displayStage && busy === null && !preparationAttempted) void prepareBank();
     // Run once when the user enters preparation. Further attempts are explicit refreshes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status?.stage, preparationAttempted]);
+  }, [status?.stage, preparationAttempted, displayStage]);
 
   useEffect(() => {
     if (status?.stage !== 'preparing_bank' || !preparationAttempted || busy !== null || displayStage) return;
@@ -648,7 +665,7 @@ export default function OnboardingScreen() {
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           {progress > 0 && progress < 5 ? <Text accessibilityLabel={`Setup step ${progress} of 4`} style={styles.progress}>Step {progress} of 4</Text> : null}
           {stageContent}
-          {message && !(setupIsReady(status) && (messageAction === 'preparing' || messageAction === 'loading')) ? <Text accessibilityLiveRegion="polite" style={messageTone === 'attention' ? styles.attention : styles.error}>{message}</Text> : null}
+          {message && messageStage === activeStage && !(setupIsReady(status) && (messageAction === 'preparing' || messageAction === 'loading')) ? <Text accessibilityLiveRegion="polite" style={messageTone === 'attention' ? styles.attention : styles.error}>{message}</Text> : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

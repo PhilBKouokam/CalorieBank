@@ -5,6 +5,7 @@ import type {
   ProviderSelectionResponse,
 } from '@caloriebank/schemas';
 import type { PrismaClient } from '@prisma/client';
+import { deriveSourceState } from '@caloriebank/schemas';
 
 import { AppError } from '../../errors';
 import type { BankHistoryRepository } from '../bank-history/bank-history.repository';
@@ -23,16 +24,21 @@ export type OnboardingFacts = {
 };
 
 function selectedSource(
+  sourceRole: 'burned' | 'eaten',
   role: ProviderSelectionResponse['expenditure'] | ProviderSelectionResponse['intake'],
   connectedProviders: ProviderSelectionResponse['connectedProviders'],
 ) {
   const connection = connectedProviders.find((item) => item.provider === role.authoritativeProvider);
+  const state = deriveSourceState(sourceRole, role, connection?.status);
   return {
     provider: role.authoritativeProvider,
-    displayName: role.displayName,
-    connected: connection?.status === 'connected' || connection?.status === 'needs_attention',
+    displayName: state === 'unselected' ? (sourceRole === 'eaten' ? 'No food source selected' : 'No burn source selected') : role.displayName,
+    connected: state !== 'unselected' && (connection?.status === 'connected' || connection?.status === 'needs_attention'),
     status: role.status,
-    readiness: 'not_connected' as OnboardingStatusResponse['expenditure']['readiness'],
+    readiness: (state === 'connected_data_ready' ? 'ready'
+      : state === 'connected_no_data' ? 'connected_waiting_for_data'
+      : state === 'reconnect_required' ? 'needs_attention'
+      : 'not_connected') as OnboardingStatusResponse['expenditure']['readiness'],
   };
 }
 
@@ -45,27 +51,15 @@ export function sourceSelectionSatisfiesSetup(
 
 export function deriveOnboardingStatus(facts: OnboardingFacts): OnboardingStatusResponse {
   const expenditure = selectedSource(
+    'burned',
     facts.providerSelection.expenditure,
     facts.providerSelection.connectedProviders,
   );
   const intake = selectedSource(
+    'eaten',
     facts.providerSelection.intake,
     facts.providerSelection.connectedProviders,
   );
-  expenditure.readiness = !expenditure.connected
-    ? 'not_connected'
-    : facts.providerSelection.expenditure.status === 'needs_attention'
-      ? 'needs_attention'
-      : facts.providerSelection.expenditure.status === 'ready'
-        ? 'ready'
-        : 'connected_waiting_for_data';
-  intake.readiness = !intake.connected
-    ? 'not_connected'
-    : facts.providerSelection.intake.status === 'needs_attention'
-      ? 'needs_attention'
-      : facts.providerSelection.intake.status === 'ready'
-        ? 'ready'
-        : 'connected_waiting_for_data';
   let stage: OnboardingStage;
   if (facts.completed) stage = 'complete';
   else if (!facts.welcomeCompleted) stage = 'welcome';

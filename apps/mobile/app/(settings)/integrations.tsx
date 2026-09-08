@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,6 +11,7 @@ import { deriveAppleHealthBurnState, deriveAppleHealthPresentationState, type Ap
 import { composeAppleHealthConnections } from '@/lib/healthkit/health-connections-presentation';
 import { appleHealthIntakeRefreshMessage } from '@/lib/healthkit/connection-feedback';
 import { refreshFatSecretWithFeedback } from '@/lib/healthkit/fatsecret-feedback';
+import { createSourceOperationGate } from '@/lib/healthkit/source-operation';
 import { ApiHttpError, disconnectFatSecret, disconnectFitbit, fetchHealthConnections, fetchProviderSelection, saveProviderSelection, selectHealthConnectionRole, startFatSecretAuthorization, startFitbitAuthorization, syncFatSecret, syncFitbit } from '@/lib/api/client';
 import { discoverAppleHealthIntakeWriters, type AppleHealthIntakeWriter } from '@/lib/healthkit/apple-health-intake-writers';
 import type { HealthConnectionOption, HealthConnectionsResponse } from '@caloriebank/schemas';
@@ -29,7 +30,7 @@ function statusCopy(status: HealthConnectionOption['status']) {
 }
 
 function roleError(option?: HealthConnectionOption) {
-  if (option?.label === 'Fitbit' || option?.label === 'FatSecret') {
+  if (!option?.deviceManaged && (option?.label === 'Fitbit' || option?.label === 'FatSecret')) {
     return option.status === 'needs_attention'
       ? `Reconnect ${option.label} before using it.`
       : `Couldn't select ${option.label}. Try again.`;
@@ -47,7 +48,12 @@ export default function IntegrationsScreen() {
   const [appleBurnState, setAppleBurnState] = useState<AppleHealthBurnState>('needs_refresh');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, updateMessage] = useState<string | null>(null);
+  const operations = useRef(createSourceOperationGate());
+  const loadGeneration = useRef(0);
+  function setMessage(value: string | null) {
+    if (value === null || operations.current.current()) updateMessage(value);
+  }
   const [messageTone, setMessageTone] = useState<'attention' | 'error' | 'success'>('error');
   const [roleSheet, setRoleSheet] = useState<Role | null>(null);
   const [addRole, setAddRole] = useState<Role | null>(null);
@@ -63,22 +69,29 @@ export default function IntegrationsScreen() {
       reopenAppleHealthDetails.current = false;
       setService('Apple Health');
     }
+    return () => { operations.current.invalidate(); loadGeneration.current += 1; };
   }, []));
 
   const load = useCallback(async (showLoading = false) => {
+    const generation = ++loadGeneration.current;
     if (showLoading) setLoading(true);
     const [healthConnections, localStatus, diagnostics] = await Promise.all([
-      fetchHealthConnections(), getAppleHealthConnectionStatus(), getAppleHealthDiagnostics(),
+      fetchHealthConnections(), getAppleHealthConnectionStatus().catch(() => 'not_connected' as const), getAppleHealthDiagnostics().catch(() => null),
     ]);
+    if (generation !== loadGeneration.current) return;
     setConnections(healthConnections);
     setAppleState(deriveAppleHealthPresentationState(localStatus, diagnostics));
     setAppleBurnState(deriveAppleHealthBurnState(localStatus, diagnostics));
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void load(true).catch(() => { setMessage('Health connections couldn’t load. Try again.'); setLoading(false); });
-  }, [load]);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void load(true).then(() => { if (active) updateMessage(null); }).catch(() => {
+      if (active) { updateMessage('Health connections couldn’t load. Try again.'); setLoading(false); }
+    });
+    return () => { active = false; loadGeneration.current += 1; };
+  }, [load]));
 
   const appleUsable = appleState === 'connected' || appleState === 'connected_partial' || appleState === 'syncing';
   const displayConnections = useMemo(() => {
@@ -87,29 +100,40 @@ export default function IntegrationsScreen() {
   const burnSources = useMemo(() => buildInventory('burned', displayConnections), [displayConnections]);
   const intakeSources = useMemo(() => buildInventory('eaten', displayConnections), [displayConnections]);
 
-  function closeSheets() { setRoleSheet(null); setAddRole(null); setIntakeWriters([]); setMessage(null); }
+  function closeSheets() {
+    if (!operations.current.current()) return;
+    setRoleSheet(null); setAddRole(null); setIntakeWriters([]); setMessage(null);
+  }
+  function dismissSheets() {
+    operations.current.invalidate();
+    setRoleSheet(null); setAddRole(null); setService(null); setIntakeWriters([]); setMessage(null);
+  }
 
   async function selectRole(role: Role, option: HealthConnectionOption) {
     if (connections?.[role].selected?.optionId === option.optionId) return;
+    if (!operations.current.begin(`select:${role}:${option.optionId}`)) return;
     setBusy(`select-${role}`); setMessage(null);
     try {
       const result = await selectHealthConnectionRole(role, option.optionId);
+      if (!operations.current.current()) return;
+      loadGeneration.current += 1;
       setConnections(result);
       closeSheets();
       void load().catch(() => undefined);
     } catch { setMessage(roleError(option)); }
-    finally { setBusy(null); }
+    finally { operations.current.end(); setBusy(null); }
   }
 
   async function selectConnectedLabel(role: Role, label: string) {
     const next = await fetchHealthConnections();
     setConnections(next);
-    const option = [next[role].selected, ...next[role].alternatives].find((item) => item?.label === label);
+    const option = [next[role].selected, ...next[role].alternatives].find((item) => item?.label === label && (label === 'Apple Health' || !item.deviceManaged));
     if (!option) throw new Error('Connected source was not selectable.');
     if (next[role].selected?.optionId !== option.optionId) setConnections(await selectHealthConnectionRole(role, option.optionId));
   }
 
   async function connectFitbitForBurn() {
+    if (!operations.current.begin('connect:burned:fitbit')) return;
     setBusy('connect-fitbit'); setMessage(null);
     try {
       const { authorizationUrl } = await startFitbitAuthorization();
@@ -119,10 +143,11 @@ export default function IntegrationsScreen() {
       await selectConnectedLabel('burned', 'Fitbit');
       closeSheets(); void load().catch(() => undefined);
     } catch { setMessage('Fitbit couldn’t connect. Try again.'); }
-    finally { setBusy(null); }
+    finally { operations.current.end(); setBusy(null); }
   }
 
   async function connectFatSecretForEaten() {
+    if (!operations.current.begin('connect:eaten:fatsecret')) return;
     setBusy('connect-fatsecret'); setMessage(null);
     let authenticated = false;
     try {
@@ -137,10 +162,11 @@ export default function IntegrationsScreen() {
       setMessage(feedback.message);
       void load().catch(() => undefined);
     } catch { setMessage(authenticated ? 'FatSecret connected, but setup could not finish. Try again.' : 'FatSecret couldn’t connect. Try again.'); }
-    finally { setBusy(null); }
+    finally { operations.current.end(); setBusy(null); }
   }
 
   async function connectAppleHealthForBurn() {
+    if (!operations.current.begin('connect:burned:apple_health')) return;
     setBusy('connect-apple-burned'); setAppleState('syncing'); setMessage(null);
     try {
       const outcome = await refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect' });
@@ -162,10 +188,11 @@ export default function IntegrationsScreen() {
       await selectConnectedLabel('burned', 'Apple Health');
       closeSheets(); void load().catch(() => undefined);
     } catch { setMessageTone('error'); setMessage('Apple Health couldn’t refresh. Try again.'); }
-    finally { setBusy(null); }
+    finally { operations.current.end(); setBusy(null); }
   }
 
   async function discoverFoodTrackers() {
+    if (!operations.current.begin('discover:eaten:apple_health')) return;
     setBusy('discover-writers'); setMessage(null);
     try {
       if (!appleUsable) {
@@ -173,18 +200,21 @@ export default function IntegrationsScreen() {
         if (next !== 'connected') throw new Error('Health access unavailable.');
       }
       const writers = await discoverAppleHealthIntakeWriters();
+      if (!operations.current.current()) return;
       setIntakeWriters(writers);
       if (writers.length === 0) setMessage('No food-tracking data was found in Apple Health.');
     } catch { setMessage('Food trackers couldn’t be read from Apple Health. Refresh and try again.'); }
-    finally { setBusy(null); }
+    finally { operations.current.end(); setBusy(null); }
   }
 
   async function selectFoodTracker(writer: AppleHealthIntakeWriter) {
+    if (!operations.current.begin(`select:eaten:${writer.bundleIdentifier}`)) return;
     setBusy('select-writer'); setMessage(null);
     let saved = false;
     try {
       const providers = await fetchProviderSelection();
       await saveProviderSelection({
+        selectionRole: 'eaten',
         authoritativeExpenditureProvider: providers.expenditure.authoritativeProvider,
         authoritativeActivityProvider: providers.activityContext.authoritativeProvider,
         authoritativeIntakeProvider: 'apple_health',
@@ -195,10 +225,11 @@ export default function IntegrationsScreen() {
       setConnections(await fetchHealthConnections());
       closeSheets(); void load().catch(() => undefined);
     } catch { setMessage(saved ? `${writer.displayName} is selected, but we couldn't refresh your food data. Try again.` : `${writer.displayName} couldn’t be selected. Refresh Apple Health and try again.`); }
-    finally { setBusy(null); }
+    finally { operations.current.end(); setBusy(null); }
   }
 
   async function refreshService(name: ServiceName, role: Role = serviceRole) {
+    if (!operations.current.begin(`refresh:${role}:${name}`)) return;
     setBusy(`refresh-${name}`); setMessage(null);
     try {
       if (name === 'Fitbit') await syncFitbit(timezone(), true);
@@ -238,10 +269,11 @@ export default function IntegrationsScreen() {
       }
       setMessageTone('success'); setMessage(`${name} refreshed.`); void load().catch(() => undefined);
     } catch { setMessageTone('error'); setMessage(`${name} couldn’t refresh. Try again.`); }
-    finally { setBusy(null); }
+    finally { operations.current.end(); setBusy(null); }
   }
 
   async function reconnectService(name: 'Fitbit' | 'FatSecret') {
+    if (!operations.current.begin(`reconnect:${name}`)) return;
     setBusy(`reconnect-${name}`); setMessage(null);
     let authenticated = false;
     try {
@@ -256,10 +288,11 @@ export default function IntegrationsScreen() {
       setMessage(`${name} reconnected.`);
       void load().catch(() => undefined);
     } catch { setMessage(authenticated ? `${name} reconnected, but we couldn't refresh your latest data. Try again.` : `${name} couldn’t reconnect. Try again.`); }
-    finally { setBusy(null); }
+    finally { operations.current.end(); setBusy(null); }
   }
 
   async function disconnectService(name: 'Fitbit' | 'FatSecret') {
+    if (!operations.current.begin(`disconnect:${name}`)) return;
     setBusy(`disconnect-${name}`); setMessage(null);
     try {
       if (name === 'Fitbit') await disconnectFitbit(); else await disconnectFatSecret();
@@ -275,10 +308,11 @@ export default function IntegrationsScreen() {
       setMessage(error instanceof ApiHttpError && error.code === 'SELECTED_SOURCE_MUST_CHANGE_FIRST'
         ? `Choose another calories ${name === 'Fitbit' ? 'burned' : 'eaten'} source before disconnecting ${name}.`
         : `${name} couldn’t be disconnected. Try again.`);
-    } finally { setBusy(null); }
+    } finally { operations.current.end(); setBusy(null); }
   }
 
   function openRole(role: Role) {
+    operations.current.invalidate();
     setMessage(null);
     setServiceRole(role);
     setRoleSheet(role);
@@ -318,8 +352,8 @@ export default function IntegrationsScreen() {
           addLabel="Add burn source"
           appleBurnState={appleBurnState}
           items={burnSources}
-          onAdd={() => { setMessage(null); setAddRole('burned'); }}
-          onManage={(item) => { setMessage(null); setServiceRole('burned'); setService(item.serviceName); }}
+          onAdd={() => { operations.current.invalidate(); setMessage(null); setAddRole('burned'); }}
+          onManage={(item) => { operations.current.invalidate(); setMessage(null); setServiceRole('burned'); setService(item.serviceName); }}
           onRemove={removeFromInventory}
           role="burned"
           title="Calorie Burn Sources"
@@ -328,17 +362,17 @@ export default function IntegrationsScreen() {
           addLabel="Add food source"
           appleBurnState={appleBurnState}
           items={intakeSources}
-          onAdd={() => { setMessage(null); setAddRole('eaten'); }}
-          onManage={(item) => { setMessage(null); setServiceRole('eaten'); setService(item.serviceName); }}
+          onAdd={() => { operations.current.invalidate(); setMessage(null); setAddRole('eaten'); }}
+          onManage={(item) => { operations.current.invalidate(); setMessage(null); setServiceRole('eaten'); setService(item.serviceName); }}
           onRemove={removeFromInventory}
           role="eaten"
           title="Calorie Intake Sources"
         />
         {message && !roleSheet && !addRole && !service ? <Text style={messageTone === 'success' ? styles.successText : messageTone === 'attention' ? styles.attentionText : styles.errorText}>{message}</Text> : null}
       </ScrollView>
-      <RoleSelector onReconnect={(name) => void reconnectService(name)} appleBurnState={appleBurnState} busy={busy !== null} data={roleSheet ? displayConnections?.[roleSheet] ?? null : null} message={message} messageTone={messageTone} onAdd={() => { setAddRole(roleSheet); setRoleSheet(null); setMessage(null); }} onAppleDetails={() => { setRoleSheet(null); setService('Apple Health'); }} onClose={closeSheets} onRefreshApple={() => void refreshService('Apple Health')} onSelect={(option) => roleSheet ? void selectRole(roleSheet, option) : undefined} role={roleSheet} />
-      <AddSourceSheet busy={busy} connections={displayConnections} intakeWriters={intakeWriters} message={message} messageTone={messageTone} onAppleBurn={() => void connectAppleHealthForBurn()} onAppleIntake={() => void discoverFoodTrackers()} onClose={closeSheets} onFatSecret={() => void connectFatSecretForEaten()} onFitbit={() => void connectFitbitForBurn()} onWriter={(writer) => void selectFoodTracker(writer)} role={addRole} />
-      <ServiceSheet role={serviceRole} onChooseTracker={() => { setService(null); setRoleSheet(null); setAddRole('eaten'); setMessage(null); void discoverFoodTrackers(); }} appleBurnState={appleBurnState} busy={busy} connections={displayConnections} message={message} messageTone={messageTone} name={service} onChange={(role) => { setService(null); openRole(role); }} onClose={() => { setService(null); setMessage(null); }} onDiagnostics={openAppleHealthDiagnostics} onDisconnect={(name) => void disconnectService(name)} onReconnect={(name) => void reconnectService(name)} onRefresh={(name) => void refreshService(name)} />
+      <RoleSelector onReconnect={(name) => void reconnectService(name)} appleBurnState={appleBurnState} busy={busy !== null} data={roleSheet ? displayConnections?.[roleSheet] ?? null : null} message={message} messageTone={messageTone} onAdd={() => { setAddRole(roleSheet); setRoleSheet(null); setMessage(null); }} onAppleDetails={() => { operations.current.invalidate(); setMessage(null); setRoleSheet(null); setService('Apple Health'); }} onClose={dismissSheets} onRefreshApple={() => void refreshService('Apple Health')} onSelect={(option) => roleSheet ? void selectRole(roleSheet, option) : undefined} role={roleSheet} />
+      <AddSourceSheet busy={busy} connections={displayConnections} intakeWriters={intakeWriters} message={message} messageTone={messageTone} onAppleBurn={() => void connectAppleHealthForBurn()} onAppleIntake={() => void discoverFoodTrackers()} onClose={dismissSheets} onFatSecret={() => void connectFatSecretForEaten()} onFitbit={() => void connectFitbitForBurn()} onWriter={(writer) => void selectFoodTracker(writer)} role={addRole} />
+      <ServiceSheet role={serviceRole} onChooseTracker={() => { operations.current.invalidate(); setService(null); setRoleSheet(null); setAddRole('eaten'); setMessage(null); void discoverFoodTrackers(); }} appleBurnState={appleBurnState} busy={busy} connections={displayConnections} message={message} messageTone={messageTone} name={service} onChange={(role) => { setService(null); openRole(role); }} onClose={dismissSheets} onDiagnostics={openAppleHealthDiagnostics} onDisconnect={(name) => void disconnectService(name)} onReconnect={(name) => void reconnectService(name)} onRefresh={(name) => void refreshService(name)} />
     </SafeAreaView>
   );
 }
@@ -358,7 +392,7 @@ function buildInventory(role: Role, connections: HealthConnectionsResponse | nul
     const key = `${option.label}|${option.transportLabel ?? ''}`;
     if (seen.has(key)) return [];
     seen.add(key);
-    const serviceName: ServiceName = option.label === 'Fitbit'
+    const serviceName: ServiceName = option.deviceManaged ? 'Apple Health' : option.label === 'Fitbit'
       ? 'Fitbit'
       : option.label === 'FatSecret'
         ? 'FatSecret'
@@ -477,14 +511,14 @@ function AddSourceSheet({ busy, connections, intakeWriters, message, messageTone
   const hasAddChoice = role === 'burned' ? !fitbitConnected || !appleAvailable : true;
   return <Sheet onClose={onClose} visible={role !== null}>
     <SheetHeader onClose={onClose} title={choosingWriters ? 'Choose your food tracker' : role === 'burned' ? 'Add calories burned source' : 'Add calories eaten source'} />
-    {choosingWriters ? intakeWriters.map((writer) => <SourceAction disabled={busy !== null} key={writer.bundleIdentifier} label={writer.displayName} onPress={() => onWriter(writer)} />) : role === 'burned' ? <>{!fitbitConnected ? <SourceAction disabled={busy !== null} label="Fitbit" onPress={onFitbit} /> : null}{!appleAvailable ? <SourceAction disabled={busy !== null} label="Apple Health" onPress={onAppleBurn} /> : null}</> : <>{!fatSecretConnected ? <SourceAction disabled={busy !== null} label="FatSecret" onPress={onFatSecret} /> : null}<SourceAction detail="Choose the food app you use with Apple Health" disabled={busy !== null} label="Apple Health food tracker" onPress={onAppleIntake} /></>}
+    {choosingWriters ? intakeWriters.map((writer) => <SourceAction detail="via Apple Health" disabled={busy !== null} key={writer.bundleIdentifier} label={writer.displayName} onPress={() => onWriter(writer)} />) : role === 'burned' ? <>{!fitbitConnected ? <SourceAction disabled={busy !== null} label="Fitbit" onPress={onFitbit} /> : null}{!appleAvailable ? <SourceAction disabled={busy !== null} label="Apple Health" onPress={onAppleBurn} /> : null}</> : <>{!fatSecretConnected ? <SourceAction disabled={busy !== null} label="FatSecret" onPress={onFatSecret} /> : null}<SourceAction detail="Choose the food app you use with Apple Health" disabled={busy !== null} label="Apple Health food tracker" onPress={onAppleIntake} /></>}
     {!choosingWriters && !hasAddChoice ? <Text style={styles.emptyText}>All supported sources are connected.</Text> : null}
     {busy ? <ActivityIndicator color={colors.primary} style={styles.sheetSpinner} /> : null}{message ? <Text style={messageTone === 'success' ? styles.successText : messageTone === 'attention' ? styles.attentionText : styles.errorText}>{message}</Text> : null}<Pressable accessibilityRole="button" onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Cancel</Text></Pressable>
   </Sheet>;
 }
 
 function SourceAction({ disabled, label, detail, onPress }: { disabled: boolean; label: string; detail?: string; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.optionRow, pressed && styles.pressed]}><View style={styles.optionText}><Text style={styles.optionLabel}>{label}</Text>{detail ? <Text style={styles.optionDetail}>{detail}</Text> : null}</View><Ionicons color={colors.textMuted} name="chevron-forward" size={20} /></Pressable>;
+  return <Pressable accessibilityLabel={label} accessibilityHint={detail} accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.optionRow, pressed && styles.pressed]}><View style={styles.optionText}><Text style={styles.optionLabel}>{label}</Text>{detail ? <Text style={styles.optionDetail}>{detail}</Text> : null}</View><Ionicons color={colors.textMuted} name="chevron-forward" size={20} /></Pressable>;
 }
 
 function ServiceSheet({ role, onChooseTracker, appleBurnState, busy, connections, message, messageTone, name, onChange, onClose, onDiagnostics, onDisconnect, onReconnect, onRefresh }: { role: Role; onChooseTracker: () => void; appleBurnState: AppleHealthBurnState; busy: string | null; connections: HealthConnectionsResponse | null; message: string | null; messageTone: 'attention' | 'error' | 'success'; name: ServiceName | null; onChange: (role: Role) => void; onClose: () => void; onDiagnostics: () => void; onDisconnect: (name: 'Fitbit' | 'FatSecret') => void; onReconnect: (name: 'Fitbit' | 'FatSecret') => void; onRefresh: (name: ServiceName) => void }) {

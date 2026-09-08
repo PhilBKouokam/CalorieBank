@@ -18,7 +18,6 @@ import {
   fetchToday,
   getApiRequestFailureKind,
   startIngestionSyncSession,
-  saveProviderSelection,
   syncCurrentDayExpenditure,
   syncCurrentDayIntake,
   syncCurrentDaySteps,
@@ -50,7 +49,6 @@ import {
   type RollingSyncUpload,
 } from './rolling-sync-policy';
 import {
-  discoverAppleHealthIntakeWriters,
   sourceForSelectedWriter,
 } from './apple-health-intake-writers';
 
@@ -542,11 +540,12 @@ async function performAppleHealthRollingWindowSync({
   };
   const windows = getRollingLocalDayWindows(new Date(), dayCount);
   assertAccountContext(context);
-  let providerSelection = await fetchProviderSelection();
-  let intakeWriter = providerSelection.intake.writerBundleIdentifier
+  const providerSelection = await fetchProviderSelection();
+  const intakeWriter = providerSelection.intake.authoritativeProvider === 'apple_health'
+    && providerSelection.intake.selected !== false && providerSelection.intake.writerBundleIdentifier
     ? await sourceForSelectedWriter(providerSelection.intake.writerBundleIdentifier)
     : null;
-  let intakeWriterStatus: AppleHealthSyncOutcome['intakeWriterStatus'] =
+  const intakeWriterStatus: AppleHealthSyncOutcome['intakeWriterStatus'] =
     providerSelection.intake.authoritativeProvider !== 'apple_health'
       ? 'not_selected'
       : intakeWriter
@@ -554,27 +553,6 @@ async function performAppleHealthRollingWindowSync({
         : providerSelection.intake.writerBundleIdentifier
           ? 'missing'
           : 'selection_required';
-  if (
-    providerSelection.intake.authoritativeProvider === 'apple_health' &&
-    !providerSelection.intake.writerBundleIdentifier
-  ) {
-    const discoveredWriters = await discoverAppleHealthIntakeWriters();
-    if (discoveredWriters.length === 1) {
-      const onlyWriter = discoveredWriters[0]!;
-      assertAccountContext(context);
-      providerSelection = await saveProviderSelection({
-        authoritativeExpenditureProvider: providerSelection.expenditure.authoritativeProvider,
-        authoritativeActivityProvider: providerSelection.activityContext.authoritativeProvider,
-        authoritativeIntakeProvider: 'apple_health',
-        appleHealthIntakeWriter: {
-          bundleIdentifier: onlyWriter.bundleIdentifier,
-          displayName: onlyWriter.displayName,
-        },
-      });
-      intakeWriter = onlyWriter;
-      intakeWriterStatus = 'ready';
-    }
-  }
   const previousDiagnostics = await getAppleHealthDiagnostics(context.scope);
   const diagnostics = createHealthKitDiagnosticsSnapshot({
     ...previousDiagnostics,

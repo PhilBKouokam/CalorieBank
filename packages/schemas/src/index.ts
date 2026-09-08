@@ -1,4 +1,5 @@
 import { z } from 'zod';
+export * from './source-state';
 
 export const goalModeSchema = z.enum(['cut', 'maintain', 'bulk']);
 export const adjustmentSourceSchema = z.enum(['manual_calories', 'estimated_weight_rate']);
@@ -215,13 +216,20 @@ export const bankingProviderSchema = z.enum(['apple_health', 'google_health_fitb
 export const wearableProviderSchema = z.enum(['apple_health', 'google_health_fitbit', 'garmin', 'whoop']);
 export const intakeProviderSchema = z.enum(['apple_health', 'fatsecret']);
 export const appleHealthIntakeWriterSchema = z.object({
-  bundleIdentifier: z.string().trim().min(1).max(255),
-  displayName: z.string().trim().min(1).max(100),
+  bundleIdentifier: z.string().trim().min(1).max(255).refine(
+    (value) => !['choose a food tracker', 'apple health food tracker'].includes(value.toLowerCase()),
+    'Choose a real food tracker.',
+  ),
+  displayName: z.string().trim().min(1).max(100).refine(
+    (value) => !['choose a food tracker', 'apple health food tracker'].includes(value.toLowerCase()),
+    'Choose a real food tracker.',
+  ),
 }).strict();
 export const providerIdSchema = z.enum(['apple_health', 'google_health_fitbit', 'garmin', 'whoop', 'fatsecret']);
 
 export const providerSelectionInputSchema = z
   .object({
+    selectionRole: z.enum(['burned', 'eaten']).optional(),
     authoritativeExpenditureProvider: bankingProviderSchema,
     authoritativeActivityProvider: wearableProviderSchema.optional(),
     authoritativeIntakeProvider: intakeProviderSchema,
@@ -239,6 +247,7 @@ const providerConnectionStatusSchema = z.enum([
 
 export const providerSelectionResponseSchema = z.object({
   expenditure: z.object({
+    selected: z.boolean().optional(),
     authoritativeProvider: bankingProviderSchema,
     displayName: z.string().min(1),
     status: providerConnectionStatusSchema,
@@ -251,6 +260,7 @@ export const providerSelectionResponseSchema = z.object({
     fallbackActive: z.boolean(),
   }),
   intake: z.object({
+    selected: z.boolean().optional(),
     authoritativeProvider: intakeProviderSchema,
     displayName: z.string().min(1),
     status: providerConnectionStatusSchema,

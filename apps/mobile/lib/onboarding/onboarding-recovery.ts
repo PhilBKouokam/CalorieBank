@@ -31,10 +31,11 @@ export function appleHealthBurnIsReady(connections: HealthConnectionsResponse) {
 export function initialImportPlan(providers: ProviderSelectionResponse) {
   return {
     appleHealth:
-      providers.expenditure.authoritativeProvider === 'apple_health'
-      || providers.intake.authoritativeProvider === 'apple_health',
-    fatSecret: providers.intake.authoritativeProvider === 'fatsecret',
-    fitbit: providers.expenditure.authoritativeProvider === 'google_health_fitbit',
+      (providers.expenditure.selected !== false && providers.expenditure.authoritativeProvider === 'apple_health')
+      || (providers.intake.selected !== false && providers.intake.authoritativeProvider === 'apple_health'
+        && Boolean(providers.intake.writerBundleIdentifier)),
+    fatSecret: providers.intake.selected !== false && providers.intake.authoritativeProvider === 'fatsecret',
+    fitbit: providers.expenditure.selected !== false && providers.expenditure.authoritativeProvider === 'google_health_fitbit',
   };
 }
 

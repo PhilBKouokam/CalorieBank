@@ -273,6 +273,8 @@ model OpeningBankCalculationDay {
 
 model ProviderSelection {
   userId                             String   @id @map("user_id") @db.Uuid
+  expenditureSelected                Boolean  @default(false) @map("expenditure_selected")
+  intakeSelected                     Boolean  @default(false) @map("intake_selected")
   authoritativeExpenditureProvider   String   @default("apple_health") @map("authoritative_expenditure_provider")
   authoritativeActivityProvider      String   @default("apple_health") @map("authoritative_activity_provider")
   authoritativeIntakeProvider        String   @default("apple_health") @map("authoritative_intake_provider")
