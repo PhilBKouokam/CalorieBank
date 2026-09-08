@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -28,6 +28,7 @@ function CardContent({ interactive, label, value, detail }: SummaryCardProps & {
 }
 
 export function SummaryCard(props: SummaryCardProps) {
+  const router = useRouter();
   const cardContent = <CardContent {...props} interactive={Boolean(props.href)} />;
 
   if (!props.href) {
@@ -35,8 +36,8 @@ export function SummaryCard(props: SummaryCardProps) {
   }
 
   return (
-    <Link href={props.href} asChild>
       <Pressable
+        onPress={() => props.href && router.push(props.href)}
         accessibilityHint={props.accessibilityHint}
         accessibilityLabel={props.accessibilityLabel}
         accessibilityRole="button"
@@ -44,7 +45,6 @@ export function SummaryCard(props: SummaryCardProps) {
       >
         {cardContent}
       </Pressable>
-    </Link>
   );
 }
 

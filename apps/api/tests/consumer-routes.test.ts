@@ -15,6 +15,35 @@ function mobileFile(path: string) {
 }
 
 describe('consumer routes', () => {
+  it('keeps tappable card styles on their Pressable instead of a Link slot', () => {
+    const today = mobileFile('app/(tabs)/today.tsx');
+    const card = mobileFile('components/caloriebank/SummaryCard.tsx');
+    expect(today).not.toMatch(/<Link[^>]*asChild/);
+    expect(card).not.toContain('<Link');
+    expect(card).toContain('router.push(props.href)');
+  });
+
+  it('keeps deletion controls scrollable above the keyboard and errors consumer-safe', () => {
+    const deletion = mobileFile('app/(settings)/delete-account.tsx');
+    expect(deletion).toContain('automaticallyAdjustKeyboardInsets');
+    expect(deletion).toContain('keyboardShouldPersistTaps="handled"');
+    expect(deletion).toContain('accessibilityLabel="Type DELETE to confirm"');
+    expect(mobileFile('components/caloriebank/GoalConfigurationForm.tsx')).not.toContain('error.message');
+    expect(mobileFile('app/(modals)/ledger.tsx')).toContain('<Redirect href="/history"');
+  });
+
+  it('ships an opaque square iOS icon and branded launch asset with existing native identities', () => {
+    const config = JSON.parse(mobileFile('app.json')).expo;
+    const icon = readFileSync(resolve(process.cwd(), '../mobile', config.icon));
+    expect(icon.readUInt32BE(16)).toBe(1024);
+    expect(icon.readUInt32BE(20)).toBe(1024);
+    expect(icon[25]).toBe(2); // RGB PNG, without an alpha channel.
+    expect(config.ios.bundleIdentifier).toBe('com.caloriebank.mobile');
+    expect(config.extra.eas.projectId).toBe('85fa9667-67bb-4d6c-bbcf-8f4e492ae5f5');
+    expect(config.plugins).toContain('expo-notifications');
+    expect(config.plugins.find((entry: unknown) => Array.isArray(entry) && entry[0] === 'expo-splash-screen')[1].image).toBe(config.icon);
+  });
+
   it('maps historical source failures to actionable consumer messages', () => {
     expect(historicalSourceChangeMessage('SOURCE_NO_DATA_FOR_DATE', 'FatSecret'))
       .toBe('FatSecret doesn’t have calorie data for this day.');

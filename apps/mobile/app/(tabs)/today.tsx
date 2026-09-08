@@ -311,7 +311,7 @@ export default function TodayScreen() {
       ? 'Checking recent days…'
     : bankStatus === 'error'
       ? 'Try again later'
-      : 'Waiting for completed provider data';
+      : 'Waiting for a full day of calorie data';
   const latestChangeValue =
     hasCompletedDays && bankSummary && bankSummary.latestDailyBankChange !== null
       ? presentTodayContribution(bankSummary.latestDailyBankChange).value
@@ -420,8 +420,8 @@ export default function TodayScreen() {
           <Text style={styles.wordmark}>CalorieBank</Text>
         </View>
 
-        <Link href="/history" asChild>
           <Pressable
+            onPress={() => router.push('/history')}
             accessibilityHint="Opens Bank History."
             accessibilityLabel={`Available Bank, ${bankValue}, ${throughText}${bankSummary?.recoveryCalories ? `, Recovery, ${bankSummary.recoveryCalories} calories to recover` : ''}`}
             accessibilityRole="button"
@@ -437,7 +437,6 @@ export default function TodayScreen() {
             <Text style={styles.supportingText}>{throughText}</Text>
             {bankStatus === 'loading' ? <ActivityIndicator color={colors.primary} /> : null}
           </Pressable>
-        </Link>
 
         {bankSummary && bankSummary.recoveryCalories > 0 ? (
           <View accessibilityRole="summary" style={styles.recoverySurface}>
@@ -450,8 +449,8 @@ export default function TodayScreen() {
         ) : null}
 
         {visibleCards.showLatestFinalizedContribution ? (
-          <Link href="/history" asChild>
             <Pressable
+              onPress={() => router.push('/history')}
               accessibilityHint="Opens Bank History."
               accessibilityLabel={`${latestResultLabel(bankSummary)}, ${latestChangeValue}`}
               accessibilityRole="button"
@@ -474,11 +473,11 @@ export default function TodayScreen() {
                 {latestChangeValue}
               </Text>
             </Pressable>
-          </Link>
         ) : null}
 
-        {visibleCards.showCurrentGoal ? <Link href="/goal-settings" asChild>
+        {visibleCards.showCurrentGoal ?
           <Pressable
+            onPress={() => router.push('/goal-settings')}
             accessibilityHint="Opens Goal Settings."
             accessibilityLabel={`Current goal, ${currentGoalValue}`}
             accessibilityRole="button"
@@ -493,7 +492,7 @@ export default function TodayScreen() {
             </Text>
             <Text style={styles.supportingText}>{formatGoalDetail(goalConfiguration)}</Text>
           </Pressable>
-        </Link> : null}
+        : null}
 
         {visibleCards.showTodaySoFar ? <Pressable
           accessibilityHint="Opens today's burn details."

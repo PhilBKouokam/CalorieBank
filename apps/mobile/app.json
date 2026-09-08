@@ -38,7 +38,7 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "CalorieBank reads calories burned, calories consumed, steps, and workouts to show your daily activity context and calculate finalized bank updates.",
+          "NSHealthShareUsageDescription": "CalorieBank uses your calories burned and eaten to update your bank, and your steps and workouts to show your daily activity.",
           "NSHealthUpdateUsageDescription": false,
           "background": false
         }
@@ -46,12 +46,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#F7F7F2",
+          "backgroundColor": "#FFFFFF",
           "dark": {
-            "backgroundColor": "#111816"
+            "backgroundColor": "#FFFFFF"
           }
         }
       ]

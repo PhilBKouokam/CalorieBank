@@ -82,10 +82,11 @@ describe('beta identity and ownership boundary', () => {
   });
 
   it('fails closed when a beta or production environment attempts to use DEV_USER_ID', () => {
-    expect(() => parseApiEnv({ APP_ENV: 'beta', AUTH_MODE: 'development', CORS_ORIGIN: 'https://app.example.test' })).toThrow(
+    expect(() => parseApiEnv({ NODE_ENV: 'test', APP_ENV: 'beta', AUTH_MODE: 'development', CORS_ORIGIN: 'https://app.example.test' })).toThrow(
       'Beta and production environments require Clerk authentication',
     );
     expect(() => parseApiEnv({
+      NODE_ENV: 'test',
       APP_ENV: 'beta', AUTH_MODE: 'clerk', CLERK_PUBLISHABLE_KEY: 'pk_test_x',
       CLERK_SECRET_KEY: 'sk_test_x', CORS_ORIGIN: '*',
     })).toThrow('Beta and production environments require an explicit CORS origin');
@@ -93,6 +94,7 @@ describe('beta identity and ownership boundary', () => {
 
   it('fails closed when hosted provider configuration is missing or cryptographically invalid', () => {
     const hosted = {
+      NODE_ENV: 'test' as const,
       APP_ENV: 'beta', AUTH_MODE: 'clerk', CLERK_PUBLISHABLE_KEY: 'pk_test_x',
       CLERK_SECRET_KEY: 'sk_test_x', CORS_ORIGIN: 'https://beta.caloriebank.test',
     };

@@ -1,7 +1,7 @@
 import { useClerk } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
@@ -26,16 +26,16 @@ export default function DeleteAccountScreen() {
   };
 
   return <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-    <View style={styles.container}>
+    <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.container}>
       <Text style={styles.title}>Delete your CalorieBank account?</Text>
-      <Text style={styles.body}>This permanently removes your CalorieBank history, imported health data, goals, preferences, and provider connections. Apple Health permissions remain managed in iOS Settings.</Text>
+      <Text style={styles.body}>This permanently removes your CalorieBank history, imported health data, goals, preferences, and connected services. You can manage Apple Health permissions separately in iOS.</Text>
       <Text style={styles.label}>Type DELETE to confirm</Text>
-      <TextInput autoCapitalize="characters" editable={status !== 'deleting'} onChangeText={setConfirmation} style={styles.input} value={confirmation} />
-      {status === 'failed' ? <Text accessibilityRole="alert" style={styles.error}>Account deletion could not be completed. Nothing else is required before trying again.</Text> : null}
+      <TextInput accessibilityLabel="Type DELETE to confirm" autoCapitalize="characters" autoCorrect={false} editable={status !== 'deleting'} onChangeText={setConfirmation} style={styles.input} value={confirmation} />
+      {status === 'failed' ? <Text accessibilityRole="alert" style={styles.error}>We couldn’t finish deleting your account. Please try again.</Text> : null}
       <Pressable accessibilityRole="button" disabled={confirmation !== 'DELETE' || status === 'deleting'} onPress={() => void remove()} style={({ pressed }) => [styles.button, (confirmation !== 'DELETE' || status === 'deleting') && styles.disabled, pressed && styles.pressed]}>
         {status === 'deleting' ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.buttonText}>Delete Account</Text>}
       </Pressable>
-    </View>
+    </ScrollView>
   </SafeAreaView>;
 }
 

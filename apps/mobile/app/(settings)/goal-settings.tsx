@@ -12,7 +12,7 @@ export default function GoalSettingsScreen() {
       <PlaceholderScreen
         eyebrow="Goal"
         title="Update your goal"
-        description="Choose how your goal changes your estimated actual burn. Changes apply to future completed days."
+        description="Choose your weight goal and daily calorie adjustment. Changes apply to future days."
       >
         <GoalConfigurationForm mode="settings" onSaved={() => router.replace('/today')} />
       </PlaceholderScreen>

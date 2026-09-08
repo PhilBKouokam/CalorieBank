@@ -77,10 +77,10 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
         }
 
         setStatus('idle');
-      } catch (error) {
+      } catch {
         if (!isMounted) return;
         setStatus('error');
-        setErrorMessage(error instanceof Error ? error.message : 'Unable to load setup.');
+        setErrorMessage("We couldn't load your saved goal. Please try again.");
       }
     }
 
@@ -167,9 +167,9 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
       const configuration = await saveGoalConfiguration(parsedInput.data);
       setStatus('success');
       setTimeout(() => onSaved(configuration), mode === 'settings' ? 500 : 0);
-    } catch (error) {
+    } catch {
       setStatus('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to save your goal configuration.');
+      setErrorMessage("We couldn't save your goal. Check your connection and refresh your health data, then try again.");
     }
   }
 
@@ -177,7 +177,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
     return (
       <View style={styles.loadingPanel}>
         <ActivityIndicator color={colors.primary} size="large" />
-        <Text style={styles.help}>Loading your saved goal configuration.</Text>
+        <Text style={styles.help}>Loading your saved goal.</Text>
       </View>
     );
   }
@@ -238,8 +238,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
                 value={manualAdjustmentText}
               />
               <Text style={styles.help}>
-                Enter the positive number you want to {goalMode === 'cut' ? 'save below' : 'spend above'} adjusted
-                expenditure each day.
+                How many calories {goalMode === 'cut' ? 'below' : 'above'} your estimated actual burn do you want to aim for each day?
               </Text>
             </>
           ) : (
@@ -268,7 +267,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
                 })}
               </View>
               <Text style={styles.help}>
-                These conversions are planning estimates, not guaranteed weight-change outcomes.
+                This is an estimate. Your actual weight change may vary.
               </Text>
             </>
           )}
@@ -277,7 +276,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
 
       {status === 'success' ? (
         <Text style={styles.success}>
-          {mode === 'settings' ? 'Goal settings saved. Returning to Today.' : 'Goal configuration saved.'}
+          {mode === 'settings' ? 'Goal saved. Returning to Today.' : 'Goal saved.'}
         </Text>
       ) : null}
 

@@ -535,7 +535,7 @@ export default function OnboardingScreen() {
       case 'goal':
         return <>
           <Text style={styles.title}>Choose your goal</Text>
-          <Text style={styles.detail}>Tell CalorieBank how you want completed days calculated.</Text>
+          <Text style={styles.detail}>Choose whether you want to lose, maintain, or gain weight.</Text>
           <GoalConfigurationForm mode="onboarding" onSaved={() => { setDisplayStage(null); void refresh(); }} />
           <BackButton onPress={() => showStage(previousSetupStage(activeStage))} />
         </>;
