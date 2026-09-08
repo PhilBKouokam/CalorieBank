@@ -237,6 +237,7 @@ model BankAccountInitialization {
   accountingStartsOn              DateTime?                       @map("accounting_starts_on") @db.Date
   timezone                        String?
   initializedAt                   DateTime?                       @map("initialized_at") @db.Timestamptz
+  preparationSourceKey            String?                         @map("preparation_source_key")
   createdAt                       DateTime                        @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                       DateTime                        @updatedAt @map("updated_at") @db.Timestamptz
   user                            User                            @relation(fields: [userId], references: [id], onDelete: Cascade)

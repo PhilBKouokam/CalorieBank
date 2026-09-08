@@ -80,7 +80,7 @@ vi.mock('../../mobile/lib/healthkit/healthkit-connection', () => ({
 }));
 vi.mock('../../mobile/lib/healthkit/apple-health-intake-writers', async (original) => {
   const actual = await original<typeof import('../../mobile/lib/healthkit/apple-health-intake-writers')>();
-  return { ...actual, discoverAppleHealthIntakeWriters: async () => h.writers ? ['Cronometer', 'MyFitnessPal', 'Lose It!', 'MacroFactor', 'Detected food app'].map((name) => ({ bundleIdentifier: name === 'Cronometer' ? 'CRONOMETER-GOLD' : `test.${name}`, displayName: name, sourceName: name, totalCalories: 1 })) : [] };
+  return { ...actual, discoverAppleHealthIntakeWriters: async () => h.writers ? ['Cronometer', 'MyFitnessPal', 'Lose It!', 'MacroFactor', 'Detected food app', 'FatSecret'].map((name) => ({ bundleIdentifier: name === 'Cronometer' ? 'CRONOMETER-GOLD' : name === 'FatSecret' ? 'com.fatsecret.caloriecounter' : `test.${name}`, displayName: name, sourceName: name, totalCalories: 1 })) : [] };
 });
 vi.mock('../../mobile/lib/onboarding/first-run-bootstrap', () => ({ runFirstRunBootstrap: async () => {} }));
 vi.mock('../../mobile/lib/notifications/morning-bank-update', () => ({ enableMorningBankUpdate: async () => ({ permission: 'denied' }) }));
@@ -155,7 +155,11 @@ describe('actual onboarding component journeys', () => {
     await mount(); await press('Connect Apple Health'); await press('Connect FatSecret');
     const burn = structuredClone(data().expenditure);
     await act(async () => screen!.unmount()); await mountSettings();
-    await press('Add food source'); await press('Apple Health food tracker'); await press('Cronometer');
+    await press('Add food source'); await press('Apple Health food tracker');
+    const appleChoices = screen!.root.findAll(node => typeof node.type === 'function' && node.props.detail === 'via Apple Health').map(node => node.props.label);
+    expect(appleChoices).toContain('Cronometer');
+    expect(appleChoices).not.toContain('FatSecret');
+    await press('Cronometer');
     expect(data().intake.authoritativeProvider).toBe('apple_health');
     expect(data().intake.writerDisplayName).toBe('Cronometer');
     await press('Manage sources for calories eaten'); await press('FatSecret');

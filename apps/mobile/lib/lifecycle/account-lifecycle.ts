@@ -1,4 +1,4 @@
-import { runForegroundLifecycle } from '@/lib/api/client';
+import { fetchBankSummary, runForegroundLifecycle } from '@/lib/api/client';
 import {
   getAppleHealthConnectionStatus,
   syncAppleHealthToday,
@@ -106,4 +106,15 @@ export function runAccountLifecycle(options: { force?: boolean } = {}): Promise<
 
 export function isAccountLifecycleRunning() {
   return activeRun !== null || queuedForcedRun !== null;
+}
+
+export async function retryIncompleteOpeningAfterSourceChange() {
+  const generation = scopeGeneration;
+  try {
+    const bank = await fetchBankSummary();
+    if (generation !== scopeGeneration || bank.openingBankStatus !== 'waiting_for_opening_data') return;
+    await runAccountLifecycle({ force: true });
+  } catch {
+    // The normal foreground lifecycle retries; source selection itself already succeeded.
+  }
 }

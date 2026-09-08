@@ -534,16 +534,22 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         appleHealthIntakeWriterDisplayName: selectedWriter?.displayName ?? null,
       } : {}),
     };
-    await this.db.providerSelection.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        ...roleChanges,
-      },
-      update: {
-        ...roleChanges,
-        selectedAt: new Date(),
-      },
+    await this.db.$transaction(async (transaction) => {
+      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${user.id}), hashtext('opening-bank'))`;
+      const stored = await transaction.providerSelection.findUnique({ where: { userId: user.id } });
+      const changed = Object.entries(roleChanges).filter(([key, value]) =>
+        !stored || stored[key as keyof typeof stored] !== value);
+      if (changed.length === 0) return;
+      const materialChange = changed.some(([key]) => key !== 'appleHealthIntakeWriterDisplayName');
+      await transaction.providerSelection.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, ...roleChanges },
+        update: {
+          ...roleChanges,
+          selectedAt: materialChange ? new Date() : stored!.selectedAt,
+          updatedAt: materialChange ? new Date() : stored!.updatedAt,
+        },
+      });
     });
 
     const provisional = await this.db.finalizedDailyBankRecord.findMany({

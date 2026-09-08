@@ -28,7 +28,7 @@ import { createHash } from 'node:crypto';
 
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
 import { readProviderSelection } from '../provider-selection/provider-selection.repository';
-import { readOpeningImportState } from './opening-bank-import';
+import { openingPreparationSourceKey, readOpeningImportState } from './opening-bank-import';
 import { AppError } from '../../errors';
 import { getLocalDateForTimezone } from '../today/today.time';
 import {
@@ -663,7 +663,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
     const startedAt = Date.now();
     const result: OpeningBankInitializationResult = await this.db.$transaction(async (transaction) => {
       await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${user.id}), hashtext('opening-bank'))`;
-      const initialization = await transaction.bankAccountInitialization.findUnique({
+      let initialization = await transaction.bankAccountInitialization.findUnique({
         where: { userId: user.id },
       });
 
@@ -692,6 +692,21 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
             : null,
           openingEffectiveBalanceCalories,
         };
+      }
+      const currentSelection = await readProviderSelection(transaction, user.id);
+      const sourceKey = openingPreparationSourceKey(currentSelection);
+      if (initialization.preparationSourceKey !== sourceKey) {
+        // Only unfinished initialization can reconsider an empty source context.
+        // Existing ordinary accounting is never moved or absorbed into Opening Bank.
+        const posted = await transaction.finalizedDailyBankRecord.count({ where: { userId: user.id } });
+        const ledgerEntries = await transaction.calorieLedgerTransaction.count({ where: { userId: user.id } });
+        initialization = await transaction.bankAccountInitialization.update({
+          where: { userId: user.id },
+          data: {
+            preparationSourceKey: sourceKey,
+            ...(posted === 0 && ledgerEntries === 0 ? { accountingStartsOn: null, lookbackStartDate: null, lookbackEndDate: null } : {}),
+          },
+        });
       }
       if (initialization.accountingStartsOn) {
         const accountingStartsOn = toDateOnly(initialization.accountingStartsOn);

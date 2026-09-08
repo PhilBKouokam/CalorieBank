@@ -3,6 +3,18 @@ import type { Prisma } from '@prisma/client';
 export const OPENING_BANK_HISTORY_DAYS = 7;
 export const OPENING_BANK_SYNC_DAYS = OPENING_BANK_HISTORY_DAYS + 1;
 
+export function openingPreparationSourceKey(selection: {
+  authoritativeExpenditureProvider: string;
+  authoritativeIntakeProvider: string;
+  appleHealthIntakeWriterBundleId: string | null;
+}) {
+  return JSON.stringify([
+    selection.authoritativeExpenditureProvider,
+    selection.authoritativeIntakeProvider,
+    selection.authoritativeIntakeProvider === 'apple_health' ? selection.appleHealthIntakeWriterBundleId : null,
+  ]);
+}
+
 export type OpeningImportRoleState = 'preparing' | 'complete' | 'retry_needed';
 
 export type OpeningImportState = {
@@ -45,7 +57,8 @@ export async function readOpeningImportState(
   const sessions = await transaction.ingestionSyncSession.findMany({
     where: {
       userId,
-      completedAt: { gte: selection.updatedAt },
+      startedAt: { gt: selection.updatedAt },
+      completedAt: { not: null },
       provider: {
         in: [selection.authoritativeExpenditureProvider, selection.authoritativeIntakeProvider],
       },

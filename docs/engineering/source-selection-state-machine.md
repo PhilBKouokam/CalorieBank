@@ -1,7 +1,8 @@
 # Independent source selection release gate
 
 The September 8 physical failures supersede the preceding release candidate.
-Distribution remains on hold until this gate and the five device journeys pass.
+The core state-machine journeys subsequently passed physical QA. The focused
+source-polish and incomplete-opening recovery checks below are the remaining gate.
 
 ## Canonical truth
 
@@ -72,7 +73,51 @@ selection behavior is independently exercised against real local PostgreSQL.
 Expo configuration/dependency checks and an EAS native archive remain release
 steps. Render's normal API predeploy applies the additive migration.
 
-## Remaining device journeys
+### Source changes before Opening Bank completes
+
+`opening-source-change.persistence.test.ts` and `opening-source-polish.test.ts`
+are included automatically in this same release command. They protect these
+additional invariants:
+
+- Incomplete preparation cannot stay bound to a superseded source configuration.
+- Every new attempt uses current canonical providers and the active exact intake
+  tracker. Labels are not attempt identity.
+- Re-saving a selection preserves its query barrier. A source change and opening
+  initialization share a per-account transaction lock.
+- The hosted coordinator requests eight dates while initialization is incomplete,
+  bypassing provider cooldown when full-window query evidence is missing. Device
+  HealthKit follows that same returned range through the existing foreground run.
+- A successful Settings selection requests the existing forced foreground lifecycle
+  only for an incomplete bank; account generations discard old-account replies.
+- Completed initialization, normal ledger records and the positive-suffix math
+  are unchanged.
+
+One nullable `preparation_source_key` on `bank_account_initializations` records
+the providers and active exact tracker checked by incomplete preparation. It is
+not a new balance or authority model. Render applies its additive migration via
+the existing `db:deploy` predeploy command; no manual beta data repair is required.
+
+Food choices suppress `com.fatsecret.caloriecounter` only when direct `fatsecret`
+has a healthy connected state. Other bundles, even similarly named apps, remain.
+This filtering affects chooser options only, never stored evidence or authority.
+
+Local validation for this focused change passed 50 files / 588 tests, including
+seven new source-change persistence cases and ten source-polish/foreground-retry
+checks. The existing 18 rendered journeys now also verify chooser deduplication.
+The full release command, workspace TypeScript/lint, Prisma local migration and
+API build passed. Expo config and online dependency validation passed. The actual
+chooser layout was inspected with synthetic data at 320px and 390px without
+horizontal overflow; this does not claim physical iOS or Dynamic Type validation.
+
+Focused physical checks after the new preview:
+
+1. Empty Apple Health burn shows simple missing-data copy and permits continuing.
+2. Healthy direct FatSecret hides its duplicate Apple Health choice, not Cronometer.
+3. Change an incomplete empty-source setup to Fitbit/Cronometer; bank/history
+   recover without reset. After initialization, change a source again and confirm
+   the established Opening Bank/history are retained.
+
+## Completed core-state validation (preceding release)
 
 Local verification for this change: the release command passed 48 files / 570
 tests, including 13 persisted matrix tests, 132 state/invariant tests and 18
@@ -92,6 +137,7 @@ This is not physical iOS permission, native navigation or Dynamic Type validatio
 4. Fitbit burn + FatSecret intake.
 5. Back/Edit Setup, change a source in Settings, then return to preparation.
 
-Each must preserve independent selections, show the correct source in preparation,
-and offer a truthful retry/selection/checked-empty completion path. The compact
+The founder confirmed these core journeys passed physical QA. They preserve independent
+selections, show the correct source in preparation, and offer a truthful
+retry/selection/checked-empty completion path. The compact
 Goal selector and all accounting/notification/authentication behavior are unchanged.

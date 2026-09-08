@@ -38,6 +38,7 @@ import {
 } from '@/lib/healthkit/healthkit-connection';
 import {
   discoverAppleHealthIntakeWriters,
+  preferDirectFoodSources,
   resolveKnownFoodTracker,
   type AppleHealthIntakeWriter,
   type KnownFoodTracker,
@@ -315,7 +316,7 @@ export default function OnboardingScreen() {
         return {
           stayOnStage: 'calories_burned',
           tone: 'attention',
-          message: 'Apple Health is connected. CalorieBank hasn’t found a complete calorie-burn total yet, but you can continue setup.',
+          message: 'Apple Health doesn’t have your total calories burned for the last few days yet. You can still finish setting up CalorieBank.',
         };
       }
     });
@@ -353,7 +354,10 @@ export default function OnboardingScreen() {
       await withOnboardingTimeout(
         refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }),
       );
-      const writers = await withOnboardingTimeout(discoverAppleHealthIntakeWriters());
+      const writers = preferDirectFoodSources(
+        await withOnboardingTimeout(discoverAppleHealthIntakeWriters()),
+        (await fetchProviderSelection()).connectedProviders,
+      );
       const writer = resolveKnownFoodTracker(tracker, writers);
       const trackerName = {
         cronometer: 'Cronometer', myfitnesspal: 'MyFitnessPal',
@@ -378,12 +382,18 @@ export default function OnboardingScreen() {
           throw new OnboardingConsumerError('Apple Health is not available on this device. Choose FatSecret or try again later.');
         }
       }
-      const writers = await withOnboardingTimeout(discoverAppleHealthIntakeWriters());
+      const discovered = await withOnboardingTimeout(discoverAppleHealthIntakeWriters());
+      const writers = preferDirectFoodSources(
+        discovered,
+        (await fetchProviderSelection()).connectedProviders,
+      );
       if (writers.length === 0) {
         return {
           stayOnStage: 'calories_eaten',
           tone: 'attention',
-          message: 'No food apps with calorie data were found in Apple Health yet. Check again later or choose FatSecret.',
+          message: discovered.length > 0
+            ? 'Your food tracker is already connected directly. Choose it to continue.'
+            : 'No food apps with calorie data were found in Apple Health yet. Check again later or choose FatSecret.',
         };
       }
       setDiscoveredIntakeWriters(writers);
@@ -410,7 +420,7 @@ export default function OnboardingScreen() {
             stayOnStage: role === 'expenditure' ? 'calories_burned' : 'calories_eaten',
             tone: 'attention',
             message: role === 'expenditure'
-              ? 'No complete calorie-burn total was found yet. Apple Health is still connected, and you can continue setup.'
+              ? 'Apple Health doesn’t have your total calories burned for the last few days yet. You can still finish setting up CalorieBank.'
               : `No new calorie total was found yet. ${status?.intake.displayName ?? 'Your food source'} is still connected, and you can continue setup.`,
           };
         }
@@ -538,7 +548,7 @@ export default function OnboardingScreen() {
             canContinue={sourceSelectionSatisfiesOnboarding(status.expenditure)}
             source={status.expenditure.provider === 'apple_health' ? 'Apple Health' : status.expenditure.displayName}
             state={expenditureState}
-            waitingDetail="CalorieBank will use this source when a complete calorie-burn total is available."
+            waitingDetail="Your total calories burned aren’t available yet. You can still finish setup."
             onBack={() => showStage(previousSetupStage(activeStage))}
             onChange={() => showStage('calories_burned', 'expenditure')}
             onContinue={() => showStage(nextStageAfterSource('expenditure'))}

@@ -7,6 +7,7 @@ import type { DevelopmentUser } from '../goal-configuration/goal-configuration.r
 import type { FatSecretService } from '../fatsecret/fatsecret.service';
 import type { GoogleHealthFitbitService } from '../google-health/google-health.service';
 import { readProviderSelection } from '../provider-selection/provider-selection.repository';
+import { readOpeningImportState } from '../bank-history/opening-bank-import';
 import { getLocalDateForTimezone } from '../today/today.time';
 
 const MAX_CATCH_UP_DAYS = 8;
@@ -89,6 +90,10 @@ export class AccountLifecycleCoordinator {
     const startedAt = this.now();
     const currentLocalDate = getLocalDateForTimezone(timezone, startedAt);
     const accountingStartsOn = await this.bankHistory.getAccountingStartDate(user.id);
+    const initialization = await this.db.bankAccountInitialization.findUnique({ where: { userId: user.id } });
+    const openingIncomplete = initialization?.status === 'WAITING_FOR_OPENING_DATA';
+    const openingImport = openingIncomplete ? await readOpeningImportState(this.db, user.id, currentLocalDate) : null;
+    const needsOpeningImport = openingImport !== null && !openingImport.complete;
     const recentDates = datesThroughToday(currentLocalDate, MAX_CATCH_UP_DAYS);
     const existingRecords = accountingStartsOn
       ? await this.db.finalizedDailyBankRecord.findMany({
@@ -106,7 +111,7 @@ export class AccountLifecycleCoordinator {
     const unresolvedDates = accountingStartsOn
       ? recentDates.slice(1).filter((date) => date >= accountingStartsOn && !completed.has(date))
       : [];
-    const dayCount = !accountingStartsOn || unresolvedDates.length > 0
+    const dayCount = openingIncomplete || !accountingStartsOn || unresolvedDates.length > 0
       ? MAX_CATCH_UP_DAYS
       : NORMAL_SYNC_DAYS;
     const datesRequested = datesThroughToday(currentLocalDate, dayCount);
@@ -144,11 +149,11 @@ export class AccountLifecycleCoordinator {
       try {
         await this.withRetry(provider, async (attempt) => {
           if (provider === 'google_health_fitbit') {
-            const result = await this.fitbit.syncRollingWindow(user, currentLocalDate, timezone, attempt > 0, dayCount, trigger);
+            const result = await this.fitbit.syncRollingWindow(user, currentLocalDate, timezone, needsOpeningImport || attempt > 0, dayCount, trigger);
             if (result.retryableFailure) throw new AppError('Fitbit burn refresh was incomplete.', 502);
             return result;
           }
-          return this.fatSecret.syncRollingWindow(user, currentLocalDate, timezone, attempt > 0, dayCount, trigger);
+          return this.fatSecret.syncRollingWindow(user, currentLocalDate, timezone, needsOpeningImport || attempt > 0, dayCount, trigger);
         });
         refreshedProviders.push(provider);
         this.log('provider_refresh_completed', { userSuffix: user.id.slice(-8), provider, trigger });

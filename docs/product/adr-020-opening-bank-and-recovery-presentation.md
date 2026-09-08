@@ -48,6 +48,21 @@ Opening Bank immutability assumes the initial-import completion evidence was tru
 
 When initialization is waiting, the app performs one bounded full-window synchronization attempt for both selected roles. Transient failures remain retryable and block immutable initialization. A completed attempt with no eligible day is a valid no-history result, not an indefinite onboarding failure.
 
+An unfinished initialization belongs to the current canonical source configuration,
+not to the first sources ever checked. A material change to burn provider, intake
+provider, or active exact Apple Health intake tracker starts a fresh bounded
+preparation context while initialization remains incomplete. An old checked-empty
+boundary cannot suppress that attempt. The persisted context excludes display names
+and inactive tracker identities; saving the same selection does not invalidate
+completed query evidence. Queries started before the selection changed cannot
+prove the new context was checked. No automatic retry fabricates missing history.
+
+This rule does not reopen an initialized Opening Bank. Existing completed-day
+records, ledger transactions and established historical authority remain governed
+by their existing rules. Incomplete legacy rows without context are reconsidered
+once through the normal lifecycle; an existing ordinary-accounting boundary is
+never reset when finalized records or ledger transactions exist.
+
 Accounts that existed before this policy are marked initialized with a zero opening component and no activation cutoff. Their existing ledger sum is preserved exactly; the new Available Bank and Recovery presentation applies without retroactive forgiveness.
 
 Planned Treat progress uses `availableBankCalories`. It remains zero while the effective balance is negative and begins increasing only after Recovery is cleared. Bank History retains truthful positive and negative contributions while its top-level Available Bank summary is never negative.

@@ -13,7 +13,8 @@ import { appleHealthIntakeRefreshMessage } from '@/lib/healthkit/connection-feed
 import { refreshFatSecretWithFeedback } from '@/lib/healthkit/fatsecret-feedback';
 import { createSourceOperationGate } from '@/lib/healthkit/source-operation';
 import { ApiHttpError, disconnectFatSecret, disconnectFitbit, fetchHealthConnections, fetchProviderSelection, saveProviderSelection, selectHealthConnectionRole, startFatSecretAuthorization, startFitbitAuthorization, syncFatSecret, syncFitbit } from '@/lib/api/client';
-import { discoverAppleHealthIntakeWriters, type AppleHealthIntakeWriter } from '@/lib/healthkit/apple-health-intake-writers';
+import { discoverAppleHealthIntakeWriters, preferDirectFoodSources, type AppleHealthIntakeWriter } from '@/lib/healthkit/apple-health-intake-writers';
+import { retryIncompleteOpeningAfterSourceChange } from '@/lib/lifecycle/account-lifecycle';
 import type { HealthConnectionOption, HealthConnectionsResponse } from '@caloriebank/schemas';
 
 type Role = 'burned' | 'eaten';
@@ -118,6 +119,7 @@ export default function IntegrationsScreen() {
       if (!operations.current.current()) return;
       loadGeneration.current += 1;
       setConnections(result);
+      void retryIncompleteOpeningAfterSourceChange();
       closeSheets();
       void load().catch(() => undefined);
     } catch { setMessage(roleError(option)); }
@@ -129,7 +131,10 @@ export default function IntegrationsScreen() {
     setConnections(next);
     const option = [next[role].selected, ...next[role].alternatives].find((item) => item?.label === label && (label === 'Apple Health' || !item.deviceManaged));
     if (!option) throw new Error('Connected source was not selectable.');
-    if (next[role].selected?.optionId !== option.optionId) setConnections(await selectHealthConnectionRole(role, option.optionId));
+    if (next[role].selected?.optionId !== option.optionId) {
+      setConnections(await selectHealthConnectionRole(role, option.optionId));
+      void retryIncompleteOpeningAfterSourceChange();
+    }
   }
 
   async function connectFitbitForBurn() {
@@ -199,10 +204,14 @@ export default function IntegrationsScreen() {
         const next = await connectAppleHealth();
         if (next !== 'connected') throw new Error('Health access unavailable.');
       }
-      const writers = await discoverAppleHealthIntakeWriters();
+      const discovered = await discoverAppleHealthIntakeWriters();
+      const writers = preferDirectFoodSources(discovered,
+        (await fetchProviderSelection()).connectedProviders);
       if (!operations.current.current()) return;
       setIntakeWriters(writers);
-      if (writers.length === 0) setMessage('No food-tracking data was found in Apple Health.');
+      if (writers.length === 0) setMessage(discovered.length > 0
+        ? 'Your food tracker is already connected directly.'
+        : 'No food-tracking data was found in Apple Health.');
     } catch { setMessage('Food trackers couldn’t be read from Apple Health. Refresh and try again.'); }
     finally { operations.current.end(); setBusy(null); }
   }
@@ -221,6 +230,7 @@ export default function IntegrationsScreen() {
         appleHealthIntakeWriter: { bundleIdentifier: writer.bundleIdentifier, displayName: writer.displayName },
       });
       saved = true;
+      void retryIncompleteOpeningAfterSourceChange();
       await syncAppleHealthToday({ force: true, trigger: 'provider_reconnect' });
       setConnections(await fetchHealthConnections());
       closeSheets(); void load().catch(() => undefined);

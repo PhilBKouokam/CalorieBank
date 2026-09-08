@@ -82,6 +82,7 @@ describe('account lifecycle coordinator', () => {
     unresolved?: boolean;
     intakeProvider?: string;
     accountingStartsOn?: string | null;
+    openingIncomplete?: boolean;
     morningBankUpdate?: {
       deliverForUser(userId: string, timezone: string): Promise<unknown>;
       reconcileReceipts(): Promise<void>;
@@ -91,6 +92,8 @@ describe('account lifecycle coordinator', () => {
     const fatSecret = { syncRollingWindow: vi.fn().mockResolvedValue({}) };
     const finalization = { execute: vi.fn().mockResolvedValue({ datesReconciled: [], datesLocked: [], waitingDates: [], errors: [] }) };
     const db = {
+      bankAccountInitialization: { findUnique: vi.fn().mockResolvedValue(options.openingIncomplete ? { status: 'WAITING_FOR_OPENING_DATA' } : null) },
+      ingestionSyncSession: { findMany: vi.fn().mockResolvedValue([]) },
       userProfile: { findMany: vi.fn().mockResolvedValue([]) },
       finalizedDailyBankRecord: {
         findMany: vi.fn()
@@ -128,6 +131,14 @@ describe('account lifecycle coordinator', () => {
     );
     expect(fitbit.syncRollingWindow).toHaveBeenCalledOnce();
     expect(fatSecret.syncRollingWindow).not.toHaveBeenCalled();
+  });
+
+  it('rechecks eight dates for incomplete preparation despite an old empty accounting boundary', async () => {
+    const { coordinator, fitbit, fatSecret } = fixture({ openingIncomplete: true, intakeProvider: 'fatsecret', accountingStartsOn: '2026-08-31' });
+    const result = await coordinator.runUser({ id: '00000000-0000-4000-8000-000000000001', email: 'test@example.com' }, 'America/Chicago', 'app_foreground');
+    expect(result.historyDayCount).toBe(8);
+    expect(fitbit.syncRollingWindow).toHaveBeenCalledWith(expect.anything(), '2026-08-31', 'America/Chicago', true, 8, 'app_foreground');
+    expect(fatSecret.syncRollingWindow).toHaveBeenCalledWith(expect.anything(), '2026-08-31', 'America/Chicago', true, 8, 'app_foreground');
   });
 
   it('runs completed-day accounting before evaluating the morning update', async () => {
