@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GoalConfigurationForm } from '@/components/caloriebank/GoalConfigurationForm';
+import { refreshFatSecretWithFeedback } from '@/lib/healthkit/fatsecret-feedback';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import {
   completeOnboarding,
@@ -266,13 +267,12 @@ export default function OnboardingScreen() {
       const result = await WebBrowser.openAuthSessionAsync(authorizationUrl, redirect);
       if (result.type !== 'success') throw cancelledConnectionError();
       await selectProvider({ authoritativeIntakeProvider: 'fatsecret' });
-      try {
-        await syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
-      } catch {
+      const feedback = await refreshFatSecretWithFeedback(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
+      if (feedback.state !== 'ready') {
         return {
           stayOnStage: 'calories_eaten',
           tone: 'attention',
-          message: 'FatSecret is connected. Food data is not ready yet, but you can continue setup.',
+          message: feedback.message,
         };
       }
     });
@@ -729,7 +729,7 @@ function PreparationRow({ label, source, state, waitingLabel }: {
   state: OnboardingStatusResponse['preparation']['expenditure'];
   waitingLabel?: string;
 }) {
-  const stateLabel = state === 'complete' ? 'Ready' : state === 'retry_needed' ? 'Needs attention' : waitingLabel ?? 'Waiting for data';
+  const stateLabel = state === 'complete' ? 'Checked' : state === 'retry_needed' ? 'Couldn’t refresh · Try again' : waitingLabel ?? 'Waiting for recent data';
   return <View style={styles.preparationRow}><Text style={styles.providerTitle}>{label}</Text><Text style={styles.note}>{source} · {stateLabel}</Text></View>;
 }
 

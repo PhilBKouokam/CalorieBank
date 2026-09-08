@@ -219,7 +219,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
                   onPress={() => setAdjustmentSource(option.value)}
                   style={[styles.compactOption, selected && styles.selectedOption]}
                 >
-                  <Text style={[styles.optionText, selected && styles.selectedOptionText]}>{option.label}</Text>
+                  <Text style={[styles.optionText, styles.modeText, selected && styles.selectedOptionText]}>{option.label}</Text>
                 </Pressable>
               );
             })}
@@ -329,12 +329,18 @@ const styles = StyleSheet.create({
   },
   compactOption: {
     flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    minHeight: 52,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.sm,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
   },
+  modeText: { textAlign: 'center', flexShrink: 1 },
   selectedOption: {
     borderColor: colors.primary,
     backgroundColor: colors.primary,
