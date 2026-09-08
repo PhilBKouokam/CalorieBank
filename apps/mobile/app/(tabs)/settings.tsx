@@ -1,7 +1,7 @@
 import { useClerk } from '@clerk/expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,13 +21,19 @@ export default function SettingsScreen() {
   const router = useRouter();
   const usesClerk = (process.env.EXPO_PUBLIC_AUTH_MODE ?? 'development') === 'clerk';
   const [signOutError, setSignOutError] = useState(false);
+  const signingOutRef = useRef(false);
+  const [signingOut, setSigningOut] = useState(false);
   async function signOutSafely() {
+    if (signingOutRef.current) return;
+    signingOutRef.current = true;
+    setSigningOut(true);
     setSignOutError(false);
     try {
       await detachMorningBankUpdateDevice();
       await signOut();
       router.replace('/sign-in');
     } catch { setSignOutError(true); }
+    finally { signingOutRef.current = false; setSigningOut(false); }
   }
 
   return (
@@ -45,10 +51,10 @@ export default function SettingsScreen() {
         {usesClerk ? <>
           <Text style={styles.sectionLabel}>Account</Text>
           <View style={styles.group}>
-            <SettingsRow title="Sign Out" icon="log-out-outline" navigation={false} separator onPress={() => void signOutSafely()} />
-            <SettingsRow title="Delete Account" icon="trash-outline" destructive onPress={() => router.push('/delete-account')} />
+            <SettingsRow title={signingOut ? 'Signing out…' : 'Sign Out'} disabled={signingOut} icon="log-out-outline" navigation={false} separator onPress={() => void signOutSafely()} />
+            <SettingsRow title="Delete Account" disabled={signingOut} icon="trash-outline" destructive onPress={() => router.push('/delete-account')} />
           </View>
-          {signOutError ? <Text accessibilityLiveRegion="assertive" style={styles.signOutError}>Sign out could not finish safely. Check your connection and try again.</Text> : null}
+          {signOutError ? <Text accessibilityLiveRegion="assertive" style={styles.signOutError}>We couldn’t finish signing you out. Please try again.</Text> : null}
         </> : null}
       </ScrollView>
     </SafeAreaView>

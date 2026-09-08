@@ -11,15 +11,18 @@ type SettingsRowProps = {
   destructive?: boolean;
   navigation?: boolean;
   separator?: boolean;
+  disabled?: boolean;
 };
 
-export function SettingsRow({ title, description, icon, onPress, destructive = false, navigation = true, separator = false }: SettingsRowProps) {
+export function SettingsRow({ title, description, icon, onPress, destructive = false, navigation = true, separator = false, disabled = false }: SettingsRowProps) {
   const tint = destructive ? colors.danger : colors.text;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityHint={description}
+      disabled={disabled}
+      accessibilityState={{ disabled }}
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >

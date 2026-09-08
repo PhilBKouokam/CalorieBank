@@ -11,7 +11,7 @@ import { colors } from '@/constants/caloriebank-theme';
 import { logMobileClerkConfiguration, setApiAccessTokenProvider } from '@/lib/api/client';
 import { setAppleHealthAccountScope } from '@/lib/healthkit/healthkit-connection';
 import { resetAccountLifecycle, runAccountLifecycle } from '@/lib/lifecycle/account-lifecycle';
-import { syncMorningBankUpdateDevice } from '@/lib/notifications/morning-bank-update';
+import { setNotificationAccountScope, syncMorningBankUpdateDevice } from '@/lib/notifications/morning-bank-update';
 
 function AppStack() {
   return (
@@ -44,6 +44,7 @@ function AuthenticatedAppStack() {
     activeSessionPresent: Boolean(sessionId),
   }, userId ?? null);
   setAppleHealthAccountScope(userId ?? null);
+  setNotificationAccountScope(userId ?? null);
   useEffect(() => {
     resetAccountLifecycle(userId ?? null);
     if (!isLoaded || !isSignedIn || !sessionId || !userId) return;
@@ -75,6 +76,7 @@ export default function RootLayout() {
   }
   if (authMode !== 'clerk') {
     setAppleHealthAccountScope('local-development');
+    setNotificationAccountScope('local-development');
     resetAccountLifecycle('local-development');
     return <AppStack />;
   }

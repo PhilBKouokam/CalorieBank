@@ -9,7 +9,13 @@ import {
   registerMorningBankUpdateDevice,
   unregisterMorningBankUpdateDevice,
   updateMorningBankUpdatePreference,
+  ApiHttpError,
+  getApiRequestFailureKind,
 } from '@/lib/api/client';
+import { createNotificationOperations, retryDeviceRelease, withNotificationTokenTimeout } from './notification-operations';
+
+const operations = createNotificationOperations();
+export const setNotificationAccountScope = operations.setScope;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -39,38 +45,58 @@ export function notificationPermissionState(settings: Notifications.Notification
 async function expoPushToken() {
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
   if (!projectId) throw new Error('EAS project ID is unavailable.');
-  return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  return (await withNotificationTokenTimeout(Notifications.getExpoPushTokenAsync({ projectId }))).data;
 }
 
-async function registerCurrentDevice() {
+async function registerCurrentDevice(check: () => void) {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') throw new Error('Push notifications require a mobile device.');
   const token = await expoPushToken();
+  check();
   return registerMorningBankUpdateDevice({ expoPushToken: token, platform: Platform.OS });
 }
 
 export async function enableMorningBankUpdate() {
-  const existing = await Notifications.getPermissionsAsync();
-  const permission = notificationPermissionState(existing) === 'not_determined'
-    ? notificationPermissionState(await Notifications.requestPermissionsAsync())
-    : notificationPermissionState(existing);
-  if (permission !== 'granted') {
-    await updateMorningBankUpdatePreference(false);
-    return { permission, settings: await fetchMorningBankUpdateSettings() };
-  }
-  await registerCurrentDevice();
-  return { permission, settings: await updateMorningBankUpdatePreference(true) };
+  return operations.run(async (check) => {
+    const existing = await Notifications.getPermissionsAsync();
+    const permission = notificationPermissionState(existing) === 'not_determined'
+      ? notificationPermissionState(await Notifications.requestPermissionsAsync())
+      : notificationPermissionState(existing);
+    check();
+    if (permission !== 'granted') {
+      await updateMorningBankUpdatePreference(false);
+      check();
+      return { permission, settings: await fetchMorningBankUpdateSettings() };
+    }
+    await registerCurrentDevice(check);
+    check();
+    return { permission, settings: await updateMorningBankUpdatePreference(true) };
+  });
 }
 
 export async function disableMorningBankUpdate() {
-  return updateMorningBankUpdatePreference(false);
+  return operations.run(() => updateMorningBankUpdatePreference(false));
 }
 
-export async function syncMorningBankUpdateDevice() {
+export async function loadMorningBankUpdateSettings() {
   const permission = notificationPermissionState(await Notifications.getPermissionsAsync());
-  if (permission === 'granted') await registerCurrentDevice();
   return { permission, settings: await fetchMorningBankUpdateSettings() };
 }
 
+export async function syncMorningBankUpdateDevice() {
+  return operations.run(async (check) => {
+    const permission = notificationPermissionState(await Notifications.getPermissionsAsync());
+    check();
+    if (permission === 'granted') await registerCurrentDevice(check);
+    check();
+    return { permission, settings: await fetchMorningBankUpdateSettings() };
+  });
+}
+
 export async function detachMorningBankUpdateDevice() {
-  await unregisterMorningBankUpdateDevice();
+  await operations.release((check) => retryDeviceRelease(async () => {
+    check();
+    await unregisterMorningBankUpdateDevice();
+  }, (error) => error instanceof ApiHttpError
+    ? error.status >= 500
+    : ['network', 'timeout'].includes(getApiRequestFailureKind(error))));
 }

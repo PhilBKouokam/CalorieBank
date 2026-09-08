@@ -148,6 +148,31 @@ export function preparationEditStage(status: OnboardingStatusResponse): Onboardi
   return 'goal';
 }
 
+export function setupIsReady(status: Pick<OnboardingStatusResponse, 'stage' | 'completed'> | null) {
+  return status?.stage === 'ready' || status?.stage === 'complete' || status?.completed === true;
+}
+
+export function preparationRequestNotice(
+  status: Pick<OnboardingStatusResponse, 'stage' | 'completed'> | null,
+  failureKind: 'timeout' | 'cancelled' | 'network' | 'unknown',
+) {
+  if (setupIsReady(status)) return null;
+  if (failureKind === 'timeout' && status) {
+    return { tone: 'attention' as const, message: 'Setup is taking a little longer. We’ll check your progress again shortly.' };
+  }
+  return { tone: 'error' as const, message: status
+    ? "We couldn't refresh all your recent data. Please try again."
+    : "We couldn't check your setup. Please try again." };
+}
+
+export function createRequestGeneration() {
+  let generation = 0;
+  return {
+    invalidate() { generation += 1; },
+    begin() { const current = ++generation; return () => current === generation; },
+  };
+}
+
 export function onboardingRecoveryMessage(input: {
   action: 'apple' | 'preparing' | 'other';
   failureKind: 'timeout' | 'cancelled' | 'network' | 'unknown';

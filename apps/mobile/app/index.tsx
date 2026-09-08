@@ -27,6 +27,17 @@ function ApplicationGate({
   const [problem, setProblem] = useState<BootstrapProblem>(null);
   const [retryCount, setRetryCount] = useState(0);
   const running = useRef(false);
+  const signingOut = useRef(false);
+  const [signOutMessage, setSignOutMessage] = useState<string | null>(null);
+
+  async function signOutSafely() {
+    if (!onSignOut || signingOut.current) return;
+    signingOut.current = true;
+    setSignOutMessage('Signing out…');
+    try { await onSignOut(); }
+    catch { setSignOutMessage("We couldn't finish signing you out. Please try again."); }
+    finally { signingOut.current = false; }
+  }
 
   async function resolveInitialRoute() {
     if (running.current) return;
@@ -112,9 +123,10 @@ function ApplicationGate({
             <Pressable accessibilityRole="button" onPress={() => { setRetryCount((count) => count + 1); void resolveInitialRoute(); }} style={styles.button}>
               <Text style={styles.buttonText}>Try again</Text>
             </Pressable>
-            {onSignOut ? <Pressable accessibilityRole="button" onPress={() => void onSignOut()} style={styles.secondaryButton}>
+            {onSignOut ? <Pressable accessibilityRole="button" onPress={() => void signOutSafely()} style={styles.secondaryButton}>
               <Text style={styles.secondaryButtonText}>Sign out</Text>
             </Pressable> : null}
+            {signOutMessage ? <Text accessibilityLiveRegion="polite" style={styles.detail}>{signOutMessage}</Text> : null}
           </>
         )}
       </View>

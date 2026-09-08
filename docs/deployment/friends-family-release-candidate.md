@@ -1,5 +1,9 @@
 # Friends and Family Release Candidate - September 7, 2026
 
+## September 8 physical-QA revocation
+
+The September 7 PASS is revoked. Physical QA found notification preference/sign-out throttling and contradictory preparation success/error UI. See [release stabilization](./friends-family-stabilization.md). External distribution remains blocked until the corrected binary passes that checklist.
+
 ## Scope and baseline
 
 PB.1, PB.2, Morning Bank Update delivery, Settings navigation, and notification-settings recovery were physically accepted by the founder before this audit. This pass is release polish, not a new milestone. Accounting, provider authority, lifecycle, identity/deletion ordering, push ownership, and notification delivery are unchanged.

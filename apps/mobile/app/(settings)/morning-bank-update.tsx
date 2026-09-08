@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
@@ -8,59 +8,71 @@ import {
   disableMorningBankUpdate,
   enableMorningBankUpdate,
   openNotificationSettings,
-  syncMorningBankUpdateDevice,
+  loadMorningBankUpdateSettings,
   type MorningUpdatePermission,
 } from '@/lib/notifications/morning-bank-update';
+import { confirmPreferenceChange, createSettingsRequestGate } from '@/lib/notifications/notification-operations';
 
 export default function MorningBankUpdateSettingsScreen() {
   const [enabled, setEnabled] = useState(false);
   const [permission, setPermission] = useState<MorningUpdatePermission>('not_determined');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const gate = useRef(createSettingsRequestGate());
 
   const refresh = useCallback(async () => {
+    const request = gate.current.begin();
+    if (!request) return;
     setLoading(true);
     try {
-      const result = await syncMorningBankUpdateDevice();
+      const result = await loadMorningBankUpdateSettings();
+      if (!request.isCurrent()) return;
       setPermission(result.permission);
       setEnabled(result.settings.enabled && result.permission === 'granted' && result.settings.deviceActive);
       setMessage(null);
-    } catch { setMessage("We couldn't load your notification settings. Try again."); }
-    finally { setLoading(false); }
+    } catch { if (request.isCurrent()) setMessage("We couldn't refresh your notification settings. Try again."); }
+    finally { if (request.isCurrent()) setLoading(false); request.finish(); }
   }, []);
 
-  useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
+  useFocusEffect(useCallback(() => {
+    void refresh();
+    const currentGate = gate.current;
+    return () => currentGate.invalidate();
+  }, [refresh]));
 
   async function change(next: boolean) {
+    const request = gate.current.begin();
+    if (!request) return;
     setLoading(true);
     setMessage(null);
     try {
-      if (next) {
-        const result = await enableMorningBankUpdate();
-        setPermission(result.permission);
-        setEnabled(result.settings.enabled && result.permission === 'granted');
-        if (result.permission !== 'granted') setMessage('Turn on notifications for CalorieBank in iOS Settings.');
-      } else {
-        await disableMorningBankUpdate();
-        setEnabled(false);
-      }
-    } catch { setMessage("We couldn't save your change. Try again."); }
-    finally { setLoading(false); }
+      // A timed-out write may still have succeeded. Read truth without registering again.
+      const result = await confirmPreferenceChange(next,
+        () => next ? enableMorningBankUpdate() : disableMorningBankUpdate().then((settings) => ({ permission, settings })),
+        loadMorningBankUpdateSettings,
+        (state) => state.settings.enabled && state.permission === 'granted' && state.settings.deviceActive);
+      if (!request.isCurrent()) return;
+      setPermission(result.state.permission);
+      setEnabled(result.state.settings.enabled && result.state.permission === 'granted' && result.state.settings.deviceActive);
+      setMessage(result.message ?? (next && result.state.permission !== 'granted' ? 'Turn on notifications for CalorieBank in iOS Settings.' : null));
+    } catch { if (request.isCurrent()) setMessage("We couldn't confirm your change. Try again."); }
+    finally { if (request.isCurrent()) setLoading(false); request.finish(); }
   }
 
   return <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.row}>
         <View style={styles.copy}>
           <Text style={styles.title}>Morning Bank Update</Text>
           <Text style={styles.detail}>Wake up knowing how your bank updated overnight.</Text>
         </View>
-        {loading ? <ActivityIndicator color={colors.primary} /> : <Switch accessibilityLabel="Morning Bank Update" onValueChange={(value) => void change(value)} value={enabled} />}
+        <Switch disabled={loading} accessibilityLabel="Morning Bank Update" accessibilityState={{ busy: loading, disabled: loading }} onValueChange={(value) => void change(value)} value={enabled} />
       </View>
-      <Text style={styles.status}>{permission === 'denied' ? 'Notifications are off in iOS Settings' : enabled ? 'On' : 'Off'}</Text>
+      {loading ? <ActivityIndicator accessibilityLabel="Updating notification settings" color={colors.primary} /> : <Text style={styles.status}>{permission === 'denied' ? 'Notifications are off in iOS Settings' : enabled ? 'On' : 'Off'}</Text>}
       {permission === 'denied' ? <Pressable accessibilityRole="button" onPress={() => void openNotificationSettings().then((opened) => { if (!opened) setMessage('Open Settings on your iPhone, then choose CalorieBank and Notifications.'); })} style={styles.button}><Text style={styles.buttonText}>Open Notification Settings</Text></Pressable> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
-    </View>
+      {message && !loading ? <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.button}><Text style={styles.buttonText}>Try again</Text></Pressable> : null}
+    </ScrollView>
   </SafeAreaView>;
 }
 

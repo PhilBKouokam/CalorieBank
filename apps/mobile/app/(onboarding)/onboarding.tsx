@@ -54,6 +54,9 @@ import {
   sourceActionIsPending,
   sourceSelectionSatisfiesOnboarding,
   withOnboardingTimeout,
+  createRequestGeneration,
+  preparationRequestNotice,
+  setupIsReady,
 } from '@/lib/onboarding/onboarding-recovery';
 import { runFirstRunBootstrap } from '@/lib/onboarding/first-run-bootstrap';
 import { enableMorningBankUpdate } from '@/lib/notifications/morning-bank-update';
@@ -105,40 +108,57 @@ export default function OnboardingScreen() {
   const [discoveredIntakeWriters, setDiscoveredIntakeWriters] =
     useState<AppleHealthIntakeWriter[]>([]);
   const actionGate = useRef(createOnboardingActionGate());
+  const refreshGeneration = useRef(createRequestGeneration());
+  const viewGeneration = useRef(0);
+  const latestStatus = useRef<OnboardingStatusResponse | null>(null);
+  const [messageAction, setMessageAction] = useState<BusyAction>(null);
 
   const refresh = useCallback(async () => {
+    const isCurrent = refreshGeneration.current.begin();
     try {
       const [next, providers] = await Promise.all([
         fetchOnboardingStatus(),
         fetchProviderSelection(),
       ]);
+      if (!isCurrent()) return null;
+      latestStatus.current = next;
       setStatus(next);
       setProviderState(providers);
       setInitialLoadFailed(false);
+      setMessage(null);
       if (next.completed) router.replace('/today');
       return next;
     } catch {
+      if (!isCurrent()) return null;
       setInitialLoadFailed(true);
-      setMessage('Setup could not refresh. Check your connection and try again.');
+      if (!setupIsReady(latestStatus.current)) {
+        setMessageAction('loading');
+        setMessage('We couldn’t check your setup. Please try again.');
+      }
       return null;
     }
   }, [router]);
 
   useFocusEffect(useCallback(() => {
-    if (actionGate.current.isActive()) return;
+    const generation = ++viewGeneration.current;
     setBusy((current) => current ?? 'loading');
-    void refresh().finally(() => setBusy(null));
+    void refresh().finally(() => { if (generation === viewGeneration.current) setBusy(null); });
+    return () => { viewGeneration.current += 1; refreshGeneration.current.invalidate(); };
   }, [refresh]));
 
   async function run(action: Exclude<BusyAction, 'loading' | null>, work: () => Promise<ActionOutcome>) {
     if (!actionGate.current.begin(action)) return;
+    const generation = viewGeneration.current;
     setBusy(action);
     setMessage(null);
+    setMessageAction(action);
     setMessageTone('error');
     try {
       const outcome = await work();
+      if (generation !== viewGeneration.current) return;
       if (action !== 'preparing') setPreparationAttempted(false);
       await refresh();
+      if (generation !== viewGeneration.current) return;
       setDisplayStage(outcome?.stayOnStage ?? null);
       setEditingRole(null);
       if (outcome?.message) {
@@ -146,15 +166,24 @@ export default function OnboardingScreen() {
         setMessage(outcome.message);
       }
     } catch (error) {
+      if (generation !== viewGeneration.current) return;
       // OAuth or provider sync can persist a connection before a later refresh fails.
       // Reload server truth before presenting recovery so connected sources never look lost.
-      await refresh().catch(() => null);
+      const refreshed = await refresh();
+      if (generation !== viewGeneration.current) return;
       setEditingRole(null);
       const failureKind = getApiRequestFailureKind(error);
+      if (action === 'preparing') {
+        const notice = preparationRequestNotice(refreshed ?? latestStatus.current,
+          error instanceof Error && error.message === 'ONBOARDING_OPERATION_TIMEOUT' ? 'timeout' : failureKind);
+        setDisplayStage(null);
+        setMessageAction('preparing');
+        setMessage(notice?.message ?? null);
+        setMessageTone(notice?.tone ?? 'attention');
+        return;
+      }
       const recoveryMessage = onboardingRecoveryMessage({
-        action: action?.startsWith('apple') || action === 'preparing'
-          ? action === 'preparing' ? 'preparing' : 'apple'
-          : 'other',
+        action: action.startsWith('apple') ? 'apple' : 'other',
         failureKind,
         usesAppleHealth:
           status?.expenditure.provider === 'apple_health'
@@ -180,11 +209,14 @@ export default function OnboardingScreen() {
       );
     } finally {
       actionGate.current.end(action);
-      setBusy(null);
+      if (generation === viewGeneration.current) setBusy(null);
     }
   }
 
   function showStage(stage: OnboardingStage | null, editRole: SourceRole | null = null) {
+    viewGeneration.current += 1;
+    refreshGeneration.current.invalidate();
+    setBusy(null);
     setMessage(null);
     setDisplayStage(stage);
     setEditingRole(editRole);
@@ -387,6 +419,7 @@ export default function OnboardingScreen() {
   }
 
   async function prepareBank() {
+    const generation = viewGeneration.current;
     await run('preparing', async () => {
       const providers = await fetchProviderSelection();
       const plan = initialImportPlan(providers);
@@ -409,7 +442,7 @@ export default function OnboardingScreen() {
         }));
       }
       const results = await Promise.allSettled(requests);
-      setPreparationAttempted(true);
+      if (generation === viewGeneration.current) setPreparationAttempted(true);
       const failed = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
       if (failed) throw failed.reason;
     });
@@ -420,6 +453,24 @@ export default function OnboardingScreen() {
     // Run once when the user enters preparation. Further attempts are explicit refreshes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status?.stage, preparationAttempted]);
+
+  useEffect(() => {
+    if (status?.stage !== 'preparing_bank' || !preparationAttempted || busy !== null || displayStage) return;
+    const generation = viewGeneration.current;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    // Read-only, bounded follow-up: a client timeout does not cancel server work.
+    const check = (attempt: number) => {
+      timer = setTimeout(() => {
+        if (cancelled || generation !== viewGeneration.current) return;
+        void refresh().then((next) => {
+          if (!cancelled && !setupIsReady(next) && attempt < 2) check(attempt + 1);
+        });
+      }, [2000, 5000, 10000][attempt]);
+    };
+    check(0);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [status?.stage, preparationAttempted, busy, displayStage, refresh]);
 
   if (!status && initialLoadFailed && busy !== 'loading') {
     return <SetupLoadError onRetry={() => {
@@ -543,7 +594,7 @@ export default function OnboardingScreen() {
         return <>
           {busy === 'preparing' ? <ActivityIndicator accessibilityLabel="Preparing your bank" color={colors.primary} size="large" /> : null}
           <Text style={styles.title}>Preparing your bank</Text>
-          <Text style={styles.detail}>{busy === 'preparing' ? 'Checking your recent activity and nutrition data.' : 'Finish the source below to continue.'}</Text>
+          <Text style={styles.detail}>{busy === 'preparing' ? 'Checking your recent activity and nutrition data.' : 'Waiting for recent calorie data from your connected apps. You can refresh or review your connections below.'}</Text>
           <PreparationRow label="Calories burned" source={status.expenditure.displayName} state={status.preparation.expenditure} waitingLabel={status.expenditure.provider === 'apple_health' ? 'Waiting for Apple Health data' : undefined} />
           <PreparationRow label="Calories eaten" source={status.intake.displayName} state={status.preparation.intake} waitingLabel={status.intake.provider === 'apple_health' ? 'Waiting for Apple Health data' : undefined} />
           <PrimaryButton busy={busy === 'preparing'} label={status.expenditure.provider === 'apple_health' || status.intake.provider === 'apple_health' ? 'Refresh Apple Health' : 'Try again'} onPress={() => void prepareBank()} />
@@ -597,7 +648,7 @@ export default function OnboardingScreen() {
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           {progress > 0 && progress < 5 ? <Text accessibilityLabel={`Setup step ${progress} of 4`} style={styles.progress}>Step {progress} of 4</Text> : null}
           {stageContent}
-          {message ? <Text accessibilityLiveRegion="assertive" style={messageTone === 'attention' ? styles.attention : styles.error}>{message}</Text> : null}
+          {message && !(setupIsReady(status) && (messageAction === 'preparing' || messageAction === 'loading')) ? <Text accessibilityLiveRegion="polite" style={messageTone === 'attention' ? styles.attention : styles.error}>{message}</Text> : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
