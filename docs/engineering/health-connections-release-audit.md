@@ -16,11 +16,11 @@ Calories Eaten management always offers Apple Health food tracker configuration.
 
 The existing onboarding contract remains: a healthy connection can advance source selection without history. Final preparation still requires the existing bounded full-window import attempt; successful empty queries are checked, failed queries require retry. No fabricated history or changed Opening Bank initialization is permitted.
 
-No API, schema, ingestion, historical authority, accounting, notification or lifecycle implementation changes are included.
+The final provider-contract audit also confirmed a FatSecret v1 parser defect: the documented single-day object response was rejected by an array-only schema. The parser now normalizes the documented object/array forms to the same existing daily calculation path. [FatSecret v1 response contract](https://platform.fatsecret.com/docs/v1/food_entries.get_month). This is a reproducible retrieval failure independent of authentication, but is not proof of the founder's original response payload. API and hosted lifecycle deployment are required for this parser correction. No schema, historical authority, accounting, notification or lifecycle orchestration changes are included.
 
 ## Verification
 
-Full local API/persistence suite: 45 files / 405 tests passed against the dedicated localhost test database. Added 17 feedback and wiring regressions; existing FatSecret service tests cover auth exchange, empty dates, revoked tokens and transient errors. Workspace types, API/mobile lint, Prisma generate/validate and API production build passed.
+Before the final parser correction, the full local API/persistence suite passed 45 files / 405 tests against the dedicated localhost test database. Added 17 feedback and wiring regressions plus two parser fixtures for a single-day object and empty month; existing FatSecret service tests cover auth exchange, revoked tokens and transient errors. Final validation is reported with the release task.
 
 Goal form was rendered with React Native Web at 320px and 390px, including an enlarged-text approximation. Cut and Bulk selectors have equal widths, centered labels and wrapping without clipping. This is not physical iOS Dynamic Type verification.
 

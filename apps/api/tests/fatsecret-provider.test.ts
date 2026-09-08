@@ -12,6 +12,20 @@ const input = (localDate: string): FetchDailyAggregateInput => ({
 });
 
 describe('FatSecret diary normalization', () => {
+  it('accepts the documented single-day object response without treating it as an auth error', async () => {
+    const provider = new FatSecretIntakeProvider({ fetchMonthlyDiary: async () => ({ month: {
+      day: { date_int: String(localDateToFatSecretDateInt('2026-08-17')), calories: '1234' },
+    } }) });
+    const results = await provider.fetchRollingDailyCalorieIntakeAggregates([input('2026-08-17'), input('2026-08-16')]);
+    expect(results[0]).toMatchObject({ totalCaloriesConsumed: 1234, provider: 'fatsecret' });
+    expect(results[1]).toBeNull();
+  });
+
+  it('treats an empty month as absent data rather than a retrieval error', async () => {
+    const provider = new FatSecretIntakeProvider({ fetchMonthlyDiary: async () => ({ month: {} }) });
+    expect(await provider.fetchDailyCalorieIntakeAggregate(input('2026-08-17'))).toBeNull();
+  });
+
   it('converts civil dates without timezone or DST shifts', () => {
     for (const date of ['2024-02-29', '2026-03-08', '2026-11-01', '2027-01-01']) {
       expect(fatSecretDateIntToLocalDate(localDateToFatSecretDateInt(date))).toBe(date);

@@ -15,7 +15,10 @@ const FatSecretDaySchema = z.object({
 
 const FatSecretMonthSchema = z.object({
   month: z.object({
-    day: z.array(FatSecretDaySchema).optional(),
+    // FatSecret v1 returns an object for one day and an array for multiple days.
+    day: z.union([z.array(FatSecretDaySchema), FatSecretDaySchema])
+      .optional()
+      .transform((value) => value === undefined ? [] : Array.isArray(value) ? value : [value]),
   }).passthrough(),
 }).passthrough();
 
