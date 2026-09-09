@@ -39,7 +39,7 @@
         "@kingstinct/react-native-healthkit",
         {
           "NSHealthShareUsageDescription": "CalorieBank uses your calories burned and eaten to update your bank, and your steps and workouts to show your daily activity.",
-          "NSHealthUpdateUsageDescription": false,
+          "NSHealthUpdateUsageDescription": "CalorieBank only reads Apple Health data. It does not add or change your health information.",
           "background": false
         }
       ],
