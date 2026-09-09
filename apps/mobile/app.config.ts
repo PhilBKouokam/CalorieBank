@@ -12,7 +12,7 @@ function allowsDevelopmentLocalHttp() {
 
 function assertHostedBuildEnvironment() {
   const profile = process.env.EAS_BUILD_PROFILE;
-  if (profile !== 'preview' && profile !== 'production') return;
+  if (profile !== 'preview' && profile !== 'production' && profile !== 'testflight') return;
   const appEnvironment = process.env.EXPO_PUBLIC_APP_ENV;
   const authMode = process.env.EXPO_PUBLIC_AUTH_MODE;
   const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
@@ -24,7 +24,7 @@ function assertHostedBuildEnvironment() {
     // The error below intentionally reports only the variable name, never its value.
   }
   if (
-    (profile === 'preview' && appEnvironment !== 'beta') ||
+    ((profile === 'preview' || profile === 'testflight') && appEnvironment !== 'beta') ||
     (profile === 'production' && appEnvironment !== 'production') ||
     authMode !== 'clerk' ||
     !publishableKey ||
