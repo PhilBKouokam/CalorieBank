@@ -132,6 +132,7 @@ model User {
   email                         String
   authProvider                  String?                             @map("auth_provider")
   authSubject                   String?                             @unique @map("auth_subject")
+  deletionRequestedAt           DateTime?                           @map("deletion_requested_at") @db.Timestamptz
   profile                       UserProfile?
   goalConfiguration             GoalConfiguration?
   plannedTreat                  PlannedTreat?

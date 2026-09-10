@@ -32,6 +32,10 @@ export function createNotificationOperations() {
       releasePromise = null;
     },
     run: enqueue,
+    async pause() {
+      released = true;
+      await tail.catch(() => undefined);
+    },
     release(work: (check: () => void) => Promise<void>) {
       if (releasePromise) return releasePromise;
       const expected = generation;

@@ -7,6 +7,7 @@ import { GoogleHealthFitbitService } from '../modules/google-health/google-healt
 import { AccountLifecycleCoordinator } from '../modules/lifecycle/account-lifecycle.service';
 import { PrismaTodayAggregateRepository } from '../modules/today/today.repository';
 import { ExpoPushTransport, MorningBankUpdateService } from '../modules/morning-bank-update/morning-bank-update.service';
+import { AccountSafetyService } from '../modules/account-safety/account-safety.service';
 
 async function run() {
   const bankHistory = new PrismaBankHistoryRepository(prisma, {
@@ -18,11 +19,13 @@ async function run() {
     onBankingAggregateChanged: (user, date, timezone, sessionId) =>
       bankHistory.reconcileStoredDay(user, date, timezone, sessionId).then(() => undefined),
   });
+  const fitbit = new GoogleHealthFitbitService(prisma, today, env, finalization);
+  await new AccountSafetyService(prisma, env, fitbit).resumePendingDeletions();
   const coordinator = new AccountLifecycleCoordinator(
     prisma,
     bankHistory,
     finalization,
-    new GoogleHealthFitbitService(prisma, today, env, finalization),
+    fitbit,
     new FatSecretService(prisma, today, env, fetch, undefined, undefined, finalization),
     undefined,
     new MorningBankUpdateService(

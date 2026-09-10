@@ -43,6 +43,16 @@ An authenticated user may permanently delete their CalorieBank account after an 
 
 Fitbit/Google Health supports token revocation and deletion stops if that revocation cannot be confirmed. FatSecret has no separate supported revocation operation in the current adapter; its encrypted delegated credentials and attempts are removed with the account. Apple Health permissions remain device-controlled, while all server-side Apple Health-derived records and associations are removed. Failures are reported without tokens or personal data and may be retried when the authenticated identity still exists.
 
+Phase 1 physical-QA hardening persists explicit deletion intent on the User before
+external cleanup. Pending deletion blocks normal account APIs and push delivery.
+The hourly worker resumes interrupted requests, including after Clerk is already
+absent, and the marker disappears with the final account cascade. This preserves
+the provider -> Clerk -> internal-data order without relying on a surviving
+client session. Only Google's exact documented `invalid_token` revocation result
+counts as already absent; any cached access credential is also checked. Other
+provider errors remain failures with bounded transient retries and safe metadata.
+See [the Phase 1 correction contract](phase-1-pre-android.md#physical-qa-corrections).
+
 ## Alternatives Rejected
 
 - **Shared beta user:** violates health-data and ledger isolation.

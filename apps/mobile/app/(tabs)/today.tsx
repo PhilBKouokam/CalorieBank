@@ -11,7 +11,7 @@ import {
 } from '@caloriebank/schemas';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useFocusEffect, useRouter, type Href } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -36,6 +36,7 @@ import {
   getApiBaseUrl,
 } from '@/lib/api/client';
 import { isAccountLifecycleRunning, runAccountLifecycle, subscribeToAccountLifecycle } from '@/lib/lifecycle/account-lifecycle';
+import { CompletedContribution } from '@/components/caloriebank/CompletedContribution';
 import {
   emptyTodayDetail,
   emptyTodayValue,
@@ -141,17 +142,20 @@ export default function TodayScreen() {
   const [healthSyncDetail, setHealthSyncDetail] = useState<string | null>(null);
   const [refreshingHealth, setRefreshingHealth] = useState(false);
   const [showWhyEighty, setShowWhyEighty] = useState(false);
+  const readGeneration = useRef(0);
 
   const [dashboardPreferences, setDashboardPreferences] =
     useState<DashboardPreferencesResponse | null>(null);
 
   const refreshVisibleReadModels = useCallback(async () => {
+    const generation = ++readGeneration.current;
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const [summaryResult, todayResult, providerResult] = await Promise.allSettled([
       fetchBankSummary(),
       fetchToday(timezone),
       fetchProviderSelection(),
     ]);
+    if (generation !== readGeneration.current) return;
     if (summaryResult.status === 'fulfilled') {
       setBankSummary(summaryResult.value);
       setBankStatus(summaryResult.value.openingBankStatus === 'initialized' ? 'ready' : 'empty');
@@ -189,6 +193,7 @@ export default function TodayScreen() {
       let isMounted = true;
 
       async function loadToday() {
+        const generation = ++readGeneration.current;
         const apiBaseUrl = getApiBaseUrl();
 
         if (!apiBaseUrl) {
@@ -199,13 +204,9 @@ export default function TodayScreen() {
           return;
         }
 
-        setBankStatus('loading');
         setConfigurationStatus('loading');
         setPlannedTreatStatus('loading');
-        setTodayStatus('loading');
-
-        const lifecycle = runAccountLifecycle();
-        setFirstRunCheckPending(true);
+        setFirstRunCheckPending(isAccountLifecycleRunning());
         const [configurationResult, bankSummaryResult, plannedTreatResult, todayResult, preferencesResult, providerResult, onboardingResult] = await Promise.allSettled([
           fetchGoalConfiguration(),
           fetchBankSummary(),
@@ -226,14 +227,13 @@ export default function TodayScreen() {
           setConfigurationStatus('error');
         }
 
-        if (bankSummaryResult.status === 'fulfilled') {
+        if (generation === readGeneration.current && bankSummaryResult.status === 'fulfilled') {
           setBankSummary(bankSummaryResult.value);
           setBankStatus(
             bankSummaryResult.value.openingBankStatus === 'initialized' ? 'ready' : 'empty',
           );
-        } else {
-          setBankSummary(null);
-          setBankStatus('error');
+        } else if (generation === readGeneration.current) {
+          setBankStatus((current) => current === 'ready' ? current : 'error');
         }
 
         if (plannedTreatResult.status === 'fulfilled') {
@@ -244,32 +244,23 @@ export default function TodayScreen() {
           setPlannedTreatStatus('error');
         }
 
-        if (todayResult.status === 'fulfilled') {
+        if (generation === readGeneration.current && todayResult.status === 'fulfilled') {
           setToday(todayResult.value);
           setTodayStatus(
             todayResult.value.burned.adjusted === null && todayResult.value.eaten.calories === null
               ? 'unavailable'
               : 'ready',
           );
-        } else {
-          setToday(null);
-          setTodayStatus('error');
+        } else if (generation === readGeneration.current) {
+          setTodayStatus((current) => current === 'ready' ? current : 'error');
         }
 
         if (preferencesResult.status === 'fulfilled') {
           setDashboardPreferences(preferencesResult.value);
         }
-        if (providerResult.status === 'fulfilled') setProviderSelection(providerResult.value);
+        if (generation === readGeneration.current && providerResult.status === 'fulfilled') setProviderSelection(providerResult.value);
         if (onboardingResult.status === 'fulfilled') setOnboardingStatus(onboardingResult.value);
 
-        void lifecycle.finally(async () => {
-          if (!isMounted) return;
-          setFirstRunCheckPending(isAccountLifecycleRunning());
-          await Promise.all([
-            refreshVisibleReadModels(),
-            fetchOnboardingStatus().then(setOnboardingStatus).catch(() => null),
-          ]);
-        });
       }
 
       void loadToday();
@@ -436,7 +427,7 @@ export default function TodayScreen() {
               <Text style={styles.bankUnit}>kcal</Text>
             </View> : <Text style={styles.bankValue}>{bankValue}</Text>}
             <Text style={styles.supportingText}>{throughText}</Text>
-            {visibleCards.showLatestFinalizedContribution ? <Text style={styles.supportingText}>{latestChangeValue}</Text> : null}
+            {visibleCards.showLatestFinalizedContribution ? <CompletedContribution sentence={latestChangeValue} /> : null}
             {bankStatus === 'loading' ? <ActivityIndicator color={colors.primary} /> : null}
           </Pressable>
 
@@ -520,7 +511,7 @@ export default function TodayScreen() {
 
         {visibleCards.showTodaySoFar ? <Pressable
           accessibilityHint="Opens today's burn details."
-          accessibilityLabel={`Today so far. Eaten ${eatenValue}. Burned ${burnedValue}. Steps ${stepsValue}.`}
+          accessibilityLabel={`Today so far. Burned ${burnedValue}. Eaten ${eatenValue}.`}
           accessibilityRole="button"
           onPress={() => router.push('/today-burn')}
           style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
@@ -553,13 +544,6 @@ export default function TodayScreen() {
             <>
               <View style={styles.todayMetrics}>
                 <View style={styles.todayMetric}>
-                  <Text style={styles.metricLabel}>Eaten</Text>
-                  <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>
-                    {eatenValue}
-                  </Text>
-                  <Text style={styles.metricDetail}>{eatenDetail}</Text>
-                </View>
-                <View style={styles.todayMetric}>
                   <Text style={styles.metricLabel}>Burned</Text>
                   <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>
                     {burnedValue}
@@ -581,9 +565,12 @@ export default function TodayScreen() {
                     </Pressable>
                   </View>
                 </View>
-
+                <View style={styles.todayMetric}>
+                  <Text style={styles.metricLabel}>Eaten</Text>
+                  <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>{eatenValue}</Text>
+                  <Text style={styles.metricDetail}>{eatenDetail}</Text>
+                </View>
               </View>
-              <View style={styles.todayMetric}><Text style={styles.metricLabel}>Steps</Text><Text style={styles.metricValue}>{stepsValue}</Text></View>
               <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>
               {today?.burned.status === 'not_connected' || today?.eaten.status === 'not_connected' ? (
                 <Pressable

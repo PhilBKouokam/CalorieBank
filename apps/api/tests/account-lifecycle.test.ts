@@ -187,7 +187,7 @@ describe('account lifecycle coordinator', () => {
     );
     expect(result.historyDayCount).toBe(8);
     expect(fitbit.syncRollingWindow).toHaveBeenCalledWith(
-      expect.anything(), '2026-08-31', 'America/Chicago', false, 8, 'app_foreground',
+      expect.anything(), '2026-08-31', 'America/Chicago', true, 8, 'app_foreground',
     );
   });
 });

@@ -4,12 +4,13 @@ import {
   syncAppleHealthToday,
 } from '@/lib/healthkit/healthkit-connection';
 
-const AUTOMATIC_COOLDOWN_MS = 5 * 60 * 1000;
 let accountScope: string | null = null;
 let activeRun: Promise<AccountLifecycleResult> | null = null;
 let queuedForcedRun: Promise<AccountLifecycleResult> | null = null;
-let lastAutomaticRunAt = 0;
+let suspended = false;
+let appState = 'inactive';
 let scopeGeneration = 0;
+let runId = 0;
 const listeners = new Set<(result: AccountLifecycleResult) => void>();
 
 export type AccountLifecycleResult = {
@@ -23,7 +24,18 @@ export function resetAccountLifecycle(scope: string | null) {
   scopeGeneration += 1;
   activeRun = null;
   queuedForcedRun = null;
-  lastAutomaticRunAt = 0;
+  suspended = false;
+  appState = 'inactive';
+}
+
+export function pauseAccountLifecycle() { suspended = true; scopeGeneration += 1; queuedForcedRun = null; }
+export function resumeAccountLifecycle() { suspended = false; }
+
+// The root owns this transition; screen mounts only read cached/server models.
+export function refreshOnAppState(next: string) {
+  const entering = next === 'active' && appState !== 'active';
+  appState = next;
+  return entering ? runAccountLifecycle({ foreground: true }) : Promise.resolve<AccountLifecycleResult>({ status: 'skipped', detail: null });
 }
 
 export function subscribeToAccountLifecycle(listener: (result: AccountLifecycleResult) => void) {
@@ -31,17 +43,18 @@ export function subscribeToAccountLifecycle(listener: (result: AccountLifecycleR
   return () => { listeners.delete(listener); };
 }
 
-export function runAccountLifecycle(options: { force?: boolean } = {}): Promise<AccountLifecycleResult> {
+export function runAccountLifecycle(options: { force?: boolean; foreground?: boolean } = {}): Promise<AccountLifecycleResult> {
+  if (!accountScope || suspended) return Promise.resolve({ status: 'skipped', detail: null });
   const force = options.force ?? false;
   if (activeRun) {
-    if (!force) return activeRun;
+    if (!force && !options.foreground) return activeRun;
     if (!queuedForcedRun) {
       const generation = scopeGeneration;
       queuedForcedRun = activeRun.catch(() => undefined).then(() => {
         if (generation !== scopeGeneration) {
           return { status: 'skipped' as const, detail: null };
         }
-        return runAccountLifecycle({ force: true });
+        return runAccountLifecycle(options);
       }).finally(() => {
         if (generation === scopeGeneration) queuedForcedRun = null;
       });
@@ -49,9 +62,7 @@ export function runAccountLifecycle(options: { force?: boolean } = {}): Promise<
     return queuedForcedRun;
   }
   const generation = scopeGeneration;
-  if (!force && Date.now() - lastAutomaticRunAt < AUTOMATIC_COOLDOWN_MS) {
-    return Promise.resolve<AccountLifecycleResult>({ status: 'skipped', detail: null });
-  }
+  const currentRunId = ++runId;
   const run: Promise<AccountLifecycleResult> = (async (): Promise<AccountLifecycleResult> => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     try {
@@ -63,11 +74,12 @@ export function runAccountLifecycle(options: { force?: boolean } = {}): Promise<
         return { status: 'skipped', detail: null };
       }
       const appleStatus = await getAppleHealthConnectionStatus();
+      if (generation !== scopeGeneration || suspended) return { status: 'skipped', detail: null };
       let appleFailed = false;
       if (appleStatus === 'connected') {
         try {
           await syncAppleHealthToday({
-            force,
+            force: force || options.foreground === true,
             trigger: force ? 'manual_refresh' : 'app_foreground',
             dayCount: server.historyDayCount,
           });
@@ -76,7 +88,6 @@ export function runAccountLifecycle(options: { force?: boolean } = {}): Promise<
         }
       }
       if (generation !== scopeGeneration) return { status: 'skipped', detail: null };
-      lastAutomaticRunAt = Date.now();
       const hasServerErrors = server.errors.length > 0;
       const reconnectProvider = server.errors.find((error) => error.code === 'needs_reconnect')?.provider;
       return {
@@ -94,7 +105,7 @@ export function runAccountLifecycle(options: { force?: boolean } = {}): Promise<
     } catch {
       return { status: 'partial', detail: 'CalorieBank couldn’t update. Try again.' };
     } finally {
-      if (generation === scopeGeneration) activeRun = null;
+      if (currentRunId === runId) activeRun = null;
     }
   })().then((result) => {
     if (generation === scopeGeneration) listeners.forEach((listener) => listener(result));

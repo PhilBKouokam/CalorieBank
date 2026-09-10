@@ -256,7 +256,7 @@ export function getApiNetworkDiagnostics(): ApiNetworkDiagnostics {
   return { ...apiNetworkDiagnostics, baseUrl: getApiBaseUrl() };
 }
 
-async function apiRequest(path: string, init?: RequestInit) {
+async function apiRequest(path: string, init?: RequestInit, timeoutMs = 20000) {
   const apiBaseUrl = getApiBaseUrl();
 
   if (!apiBaseUrl) {
@@ -276,7 +276,7 @@ async function apiRequest(path: string, init?: RequestInit) {
   const timeoutId = setTimeout(() => {
     timeoutTriggered = true;
     controller.abort();
-  }, 20000);
+  }, timeoutMs);
 
   try {
     const requestAuthGeneration = accessTokenGeneration;
@@ -310,6 +310,7 @@ async function apiRequest(path: string, init?: RequestInit) {
       },
       signal: controller.signal,
     });
+    if (requestAuthGeneration !== accessTokenGeneration) throw new ApiAuthenticationPendingError();
     apiNetworkDiagnostics = {
       baseUrl: apiBaseUrl,
       reachability: 'reachable',
@@ -811,7 +812,7 @@ export async function deleteCalorieBankAccount(): Promise<void> {
   const response = await apiRequest('/v1/me/account', {
     method: 'DELETE',
     body: JSON.stringify({ confirmation: 'DELETE' }),
-  });
+  }, 60000);
   if (!response.ok) throw await responseError(response);
 }
 

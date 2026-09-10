@@ -10,7 +10,8 @@ const user = { id: '10000000-0000-4000-8000-000000000001', email: 'safe@test.loc
 
 function fakeDb(overrides: Record<string, unknown> = {}) {
   return {
-    user: { findUnique: vi.fn().mockResolvedValue({ authSubject: 'clerk_subject' }), delete: vi.fn().mockResolvedValue({}) },
+    user: { findUnique: vi.fn().mockResolvedValue({ authSubject: 'clerk_subject' }), update: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
+    pushDeviceRegistration: { updateMany: vi.fn().mockResolvedValue({}) },
     bankDayProcessingState: { count: vi.fn().mockResolvedValue(0) },
     ingestionSyncSession: { findFirst: vi.fn().mockResolvedValue(null) },
     dailyExpenditureAggregate: { count: vi.fn().mockResolvedValue(1) },
@@ -44,7 +45,8 @@ describe('PB.2 account safety', () => {
     const events: string[] = [];
     const db = fakeDb({ user: {
       findUnique: vi.fn().mockResolvedValue({ authSubject: 'clerk_subject' }),
-      delete: vi.fn().mockImplementation(async () => { events.push('data'); }),
+      update: vi.fn().mockResolvedValue({}),
+      deleteMany: vi.fn().mockImplementation(async () => { events.push('data'); }),
     } });
     const service = new AccountSafetyService(
       db,
@@ -67,7 +69,7 @@ describe('PB.2 account safety', () => {
     );
     await expect(service.deleteAccount(user)).rejects.toThrow('provider unavailable');
     expect(deleteIdentity).not.toHaveBeenCalled();
-    expect(db.user.delete).not.toHaveBeenCalled();
+    expect(db.user.deleteMany).not.toHaveBeenCalled();
   });
 
   it('treats an already absent internal account as deleted', async () => {

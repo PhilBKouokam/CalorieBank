@@ -10,7 +10,7 @@ import 'react-native-reanimated';
 import { colors } from '@/constants/caloriebank-theme';
 import { logMobileClerkConfiguration, setApiAccessTokenProvider } from '@/lib/api/client';
 import { setAppleHealthAccountScope } from '@/lib/healthkit/healthkit-connection';
-import { resetAccountLifecycle, runAccountLifecycle } from '@/lib/lifecycle/account-lifecycle';
+import { resetAccountLifecycle, refreshOnAppState } from '@/lib/lifecycle/account-lifecycle';
 import { setNotificationAccountScope, syncMorningBankUpdateDevice } from '@/lib/notifications/morning-bank-update';
 
 function AppStack() {
@@ -46,9 +46,9 @@ function AuthenticatedAppStack() {
   setAppleHealthAccountScope(userId ?? null);
   setNotificationAccountScope(userId ?? null);
   useEffect(() => {
-    resetAccountLifecycle(userId ?? null);
+    resetAccountLifecycle(isLoaded && isSignedIn && sessionId ? userId ?? null : null);
     if (!isLoaded || !isSignedIn || !sessionId || !userId) return;
-    void runAccountLifecycle();
+    void refreshOnAppState(AppState.currentState);
     void syncMorningBankUpdateDevice().catch(() => undefined);
     void Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response?.notification.request.content.data.category === 'morning_bank_update') router.replace('/today');
@@ -57,14 +57,14 @@ function AuthenticatedAppStack() {
       if (response.notification.request.content.data.category === 'morning_bank_update') router.push('/today');
     });
     const subscription = AppState.addEventListener('change', (state) => {
+      void refreshOnAppState(state);
       if (state === 'active') {
-        void runAccountLifecycle();
         void syncMorningBankUpdateDevice().catch(() => undefined);
       }
     });
     return () => { subscription.remove(); notificationResponse.remove(); };
   }, [isLoaded, isSignedIn, router, sessionId, userId]);
-  return <AppStack />;
+  return <AppStack key={userId ?? 'signed-out'} />;
 }
 
 export default function RootLayout() {

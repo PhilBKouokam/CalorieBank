@@ -6,11 +6,12 @@ import express from 'express';
 import {
   createAuthenticationBoundary,
   currentUser,
+  resolveRequestUser,
   type AuthenticationBoundary,
 } from './auth/current-user';
 import type { ApiEnv } from './env';
 import { env } from './env';
-import { errorHandler, notFoundHandler } from './errors';
+import { AppError, errorHandler, notFoundHandler } from './errors';
 import { requestLogger } from './logger';
 import { prisma } from './db/client';
 import {
@@ -184,8 +185,18 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
   const accountSafetyService = new AccountSafetyService(prisma, config, googleHealthFitbitService);
   app.use('/v1/me/integrations', createRateLimit({ limit: 60, windowMs: 15 * 60 * 1000, operation: 'provider_operations' }));
   app.use('/v1/me/ingestion', createRateLimit({ limit: 60, windowMs: 15 * 60 * 1000, operation: 'provider_ingestion' }));
-  app.use('/v1/me/lifecycle', createRateLimit({ limit: 12, windowMs: 15 * 60 * 1000, operation: 'lifecycle_refresh' }));
+  app.use('/v1/me/lifecycle', createRateLimit({ limit: 60, windowMs: 15 * 60 * 1000, operation: 'lifecycle_refresh' }));
   app.use('/v1/me', createAccountSafetyRouter(accountSafetyService, currentUser));
+  app.use('/v1/me', async (_req, res, next) => {
+    try {
+      // Security cleanup must remain reachable while deletion is pending.
+      if (_req.method === 'DELETE' && _req.path === '/morning-bank-update/device') return next();
+      const user = resolveRequestUser(currentUser, res);
+      const account = await prisma.user.findUnique({ where: { id: user.id }, select: { deletionRequestedAt: true } });
+      if (account?.deletionRequestedAt) throw new AppError('Your account deletion is in progress. Please try again shortly.', 409, { code: 'ACCOUNT_DELETION_PENDING' });
+      next();
+    } catch (error) { next(error); }
+  });
   app.use('/v1/me/morning-bank-update', createMorningBankUpdateRouter(morningBankUpdateService, currentUser));
   app.use(
     '/v1/me/goal-configuration',

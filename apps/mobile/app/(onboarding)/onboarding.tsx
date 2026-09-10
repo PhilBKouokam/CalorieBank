@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GoalConfigurationForm } from '@/components/caloriebank/GoalConfigurationForm';
+import { DailyBankTargetForm } from '@/components/caloriebank/DailyBankTargetForm';
 import { FoodTrackerHelp } from '@/components/caloriebank/FoodTrackerHelp';
 import { refreshFatSecretWithFeedback } from '@/lib/healthkit/fatsecret-feedback';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
@@ -22,6 +23,7 @@ import {
   completeOnboarding,
   completeOnboardingWelcome,
   fetchOnboardingStatus,
+  fetchDailyBankTarget,
   fetchProviderSelection,
   saveProviderSelection,
   startFatSecretAuthorization,
@@ -67,6 +69,7 @@ import { enableMorningBankUpdate } from '@/lib/notifications/morning-bank-update
 type AppleIntakeAction = `apple-intake:${KnownFoodTracker | 'other' | string}`;
 type BusyAction = 'loading' | 'fitbit' | 'fatsecret' | 'apple-burn' | AppleIntakeAction | 'preparing' | 'complete' | null;
 type SourceRole = 'expenditure' | 'intake';
+type SetupStage = OnboardingStage | 'daily_bank_target';
 type ActionOutcome = {
   message?: string;
   tone?: 'attention' | 'error';
@@ -91,9 +94,10 @@ const stageNumber = {
   calories_burned: 1,
   calories_eaten: 2,
   goal: 3,
-  preparing_bank: 4,
-  ready: 5,
-  complete: 5,
+  daily_bank_target: 4,
+  preparing_bank: 5,
+  ready: 6,
+  complete: 6,
 } as const;
 
 export default function OnboardingScreen() {
@@ -106,7 +110,8 @@ export default function OnboardingScreen() {
   const [initialLoadFailed, setInitialLoadFailed] = useState(false);
   const [preparationAttempted, setPreparationAttempted] = useState(false);
   const [morningUpdateState, setMorningUpdateState] = useState<'idle' | 'loading' | 'enabled' | 'denied' | 'error'>('idle');
-  const [displayStage, setDisplayStage] = useState<OnboardingStage | null>(null);
+  const [displayStage, setDisplayStage] = useState<SetupStage | null>(null);
+  const [dailyTarget, setDailyTarget] = useState<{ calories: number; chosen: boolean } | null>(null);
   const [editingRole, setEditingRole] = useState<SourceRole | null>(null);
   const [foodHelpTracker, setFoodHelpTracker] = useState<KnownFoodTracker | null>(null);
   const [discoveredIntakeWriters, setDiscoveredIntakeWriters] =
@@ -116,19 +121,21 @@ export default function OnboardingScreen() {
   const viewGeneration = useRef(0);
   const latestStatus = useRef<OnboardingStatusResponse | null>(null);
   const [messageAction, setMessageAction] = useState<BusyAction>(null);
-  const [messageStage, setMessageStage] = useState<OnboardingStage | null>(null);
+  const [messageStage, setMessageStage] = useState<SetupStage | null>(null);
 
   const refresh = useCallback(async () => {
     const isCurrent = refreshGeneration.current.begin();
     try {
-      const [next, providers] = await Promise.all([
+      const [next, providers, target] = await Promise.all([
         fetchOnboardingStatus(),
         fetchProviderSelection(),
+        fetchDailyBankTarget(),
       ]);
       if (!isCurrent()) return null;
       latestStatus.current = next;
       setStatus(next);
       setProviderState(providers);
+      setDailyTarget(target);
       setInitialLoadFailed(false);
       setMessage(null);
       if (next.completed) router.replace('/today');
@@ -479,10 +486,10 @@ export default function OnboardingScreen() {
   }
 
   useEffect(() => {
-    if (status?.stage === 'preparing_bank' && !displayStage && busy === null && !preparationAttempted) void prepareBank();
+    if (status?.stage === 'preparing_bank' && dailyTarget?.chosen && !displayStage && busy === null && !preparationAttempted) void prepareBank();
     // Run once when the user enters preparation. Further attempts are explicit refreshes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status?.stage, preparationAttempted, displayStage]);
+  }, [status?.stage, preparationAttempted, displayStage, dailyTarget?.chosen]);
 
   useEffect(() => {
     if (status?.stage !== 'preparing_bank' || !preparationAttempted || busy !== null || displayStage) return;
@@ -513,7 +520,7 @@ export default function OnboardingScreen() {
     return <CenteredState title="Loading setup…" detail="Checking your saved progress." />;
   }
 
-  const activeStage = displayStage ?? status.stage;
+  const activeStage = displayStage ?? (!status.completed && !dailyTarget?.chosen && ['preparing_bank', 'ready'].includes(status.stage) ? 'daily_bank_target' : status.stage);
   const progress = stageNumber[activeStage];
   const fitbitConnected = providerIsConnected(providerState, 'google_health_fitbit');
   const fatSecretConnected = providerIsConnected(providerState, 'fatsecret');
@@ -617,8 +624,13 @@ export default function OnboardingScreen() {
         return <>
           <Text style={styles.title}>Choose your goal</Text>
           <Text style={styles.detail}>Choose whether you want to lose, maintain, or gain weight.</Text>
-          <GoalConfigurationForm mode="onboarding" onSaved={() => { setDisplayStage(null); void refresh(); }} />
+          <GoalConfigurationForm mode="onboarding" onSaved={() => { setDisplayStage('daily_bank_target'); setMessage(null); void refresh(); }} />
           <BackButton onPress={() => showStage(previousSetupStage(activeStage))} />
+        </>;
+      case 'daily_bank_target':
+        return <>
+          <DailyBankTargetForm initialCalories={dailyTarget?.calories ?? 0} onSaved={() => { setDisplayStage(null); setMessage(null); void refresh(); }} />
+          <BackButton onPress={() => showStage('goal')} />
         </>;
       case 'preparing_bank':
         return <>
@@ -676,7 +688,7 @@ export default function OnboardingScreen() {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fill}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          {progress > 0 && progress < 5 ? <Text accessibilityLabel={`Setup step ${progress} of 4`} style={styles.progress}>Step {progress} of 4</Text> : null}
+          {progress > 0 && progress < 6 ? <Text accessibilityLabel={`Setup step ${progress} of 5`} style={styles.progress}>Step {progress} of 5</Text> : null}
           {stageContent}
           {activeStage === 'calories_eaten' && (editingRole === 'intake' || !status.intake.connected) && foodHelpTracker ? <FoodTrackerHelp provider="apple_health" chosenTracker={foodHelpTracker} /> : null}
           {activeStage === 'calories_eaten' && status.intake.provider === 'apple_health' && status.intake.readiness === 'connected_waiting_for_data' ? <FoodTrackerHelp provider="apple_health" bundleId={providerState?.intake.writerBundleIdentifier} /> : null}

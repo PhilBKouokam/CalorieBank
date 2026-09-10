@@ -169,6 +169,15 @@ describe('notification client resilience', () => {
     expect(wait).toHaveBeenCalledWith(1000);
   });
 
+  it('pauses registration for deletion without swallowing a later sign-out release', async () => {
+    const operations = createNotificationOperations(); operations.setScope('A');
+    await operations.pause();
+    await expect(operations.run(async () => undefined)).rejects.toThrow();
+    const release = vi.fn().mockResolvedValue(undefined);
+    await operations.release(release);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
   it('does not proceed to sign-out when release cannot be guaranteed', async () => {
     const signOut = vi.fn();
     const release = vi.fn().mockRejectedValue(new Error('offline'));

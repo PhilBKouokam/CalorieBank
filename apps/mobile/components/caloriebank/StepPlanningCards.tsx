@@ -56,8 +56,8 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
 const styles = StyleSheet.create({
   card: { gap: spacing.sm, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.surface },
   title: { color: colors.text, fontSize: typography.subheading, fontWeight: '700' },
-  result: { color: colors.primaryDark, fontSize: typography.subheading, fontWeight: '700' },
+  result: { color: colors.primaryDark, fontSize: 26, fontWeight: '800', marginTop: spacing.sm },
   detail: { color: colors.textMuted, fontSize: typography.body },
-  results: { gap: spacing.xs },
+  results: { gap: spacing.sm },
   input: { minHeight: 48, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.sm, color: colors.text, fontSize: typography.heading },
 });

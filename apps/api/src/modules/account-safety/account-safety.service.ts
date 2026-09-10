@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 import { createClerkClient } from '@clerk/express';
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 
 import type { ApiEnv } from '../../env';
 import { AppError } from '../../errors';
 import { structuredLog } from '../../logger';
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
+import { remoteStatus, retryDeletionOperation } from './deletion-retry';
 
 type ProviderRevoker = { revokeForAccountDeletion(user: DevelopmentUser): Promise<void> };
 type IdentityDeleter = (subject: string) => Promise<void>;
@@ -16,6 +17,7 @@ function safeUserReference(userId: string) {
 
 export class AccountSafetyService {
   private readonly deleteIdentity: IdentityDeleter;
+  private readonly deletions = new Map<string, Promise<{ deleted: true }>>();
 
   constructor(
     private readonly db: PrismaClient,
@@ -30,15 +32,41 @@ export class AccountSafetyService {
     });
   }
 
-  async deleteAccount(user: DevelopmentUser) {
+  deleteAccount(user: DevelopmentUser) {
+    const existing = this.deletions.get(user.id);
+    if (existing) return existing;
+    const operation = this.performDeletion(user).finally(() => this.deletions.delete(user.id));
+    this.deletions.set(user.id, operation);
+    return operation;
+  }
+
+  private async performDeletion(user: DevelopmentUser) {
     const stored = await this.db.user.findUnique({ where: { id: user.id }, select: { authSubject: true } });
     if (!stored) return { deleted: true as const };
 
-    await this.providerRevoker.revokeForAccountDeletion(user);
+    // Persist intent before irreversible external work. The hosted worker resumes
+    // this same ordered operation even if Clerk deletion ends the client session.
+    try { await this.db.user.update({ where: { id: user.id }, data: { deletionRequestedAt: new Date() } }); }
+    catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') return { deleted: true as const };
+      throw error;
+    }
+    await this.db.pushDeviceRegistration.updateMany({ where: { userId: user.id }, data: { active: false } });
+    try { await this.providerRevoker.revokeForAccountDeletion(user); }
+    catch (error) {
+      structuredLog('error', 'account_deletion_failed', {
+        accountReference: safeUserReference(user.id), phase: 'provider_revocation',
+        failureCategory: error instanceof AppError ? 'provider_rejected' : 'unexpected',
+      });
+      throw error;
+    }
 
     if (stored.authSubject) {
       try {
-        await this.deleteIdentity(stored.authSubject);
+        await retryDeletionOperation(async () => {
+          try { await this.deleteIdentity(stored.authSubject!); }
+          catch (error) { if (remoteStatus(error) !== 404) throw error; }
+        }, (error) => remoteStatus(error) === undefined || remoteStatus(error) === 429 || (remoteStatus(error) ?? 0) >= 500);
       } catch {
         structuredLog('error', 'account_deletion_failed', {
           accountReference: safeUserReference(user.id), phase: 'identity_deletion',
@@ -50,7 +78,10 @@ export class AccountSafetyService {
     }
 
     try {
-      await this.db.user.delete({ where: { id: user.id } });
+      await retryDeletionOperation(async () => {
+        // deleteMany is idempotent when another retry already finished the cascade.
+        await this.db.user.deleteMany({ where: { id: user.id } });
+      }, () => true);
     } catch (error) {
       structuredLog('error', 'account_deletion_failed', {
         accountReference: safeUserReference(user.id), phase: 'caloriebank_data_deletion',
@@ -59,6 +90,17 @@ export class AccountSafetyService {
     }
     structuredLog('info', 'account_deleted', { accountReference: safeUserReference(user.id) });
     return { deleted: true as const };
+  }
+
+  async resumePendingDeletions() {
+    const users = await this.db.user.findMany({
+      where: { deletionRequestedAt: { not: null } },
+      orderBy: { deletionRequestedAt: 'asc' }, take: 50,
+      select: { id: true, email: true },
+    });
+    for (const user of users) {
+      await this.deleteAccount(user).catch(() => undefined);
+    }
   }
 
   async diagnostics(user: DevelopmentUser) {

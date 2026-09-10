@@ -10,6 +10,8 @@ import {
 
 import type { ApiEnv } from '../../env';
 import { AppError } from '../../errors';
+import { structuredLog } from '../../logger';
+import { retryDeletionOperation } from '../account-safety/deletion-retry';
 import type { FinalizationScheduler, OrchestrationTrigger } from '../finalization-orchestration/finalization-orchestration.service';
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
 import { getLocalDateForTimezone } from '../today/today.time';
@@ -1200,23 +1202,38 @@ export class GoogleHealthFitbitService {
     const connection = await this.db.googleHealthConnection.findUnique({ where: { userId: user.id } });
     if (!connection) return;
     const secrets = configured(this.config);
-    const token = decryptGoogleHealthSecret(connection.encryptedRefreshToken, secrets.encryptionKey);
-    let response: Response;
-    try {
-      response = await this.fetcher(this.config.GOOGLE_HEALTH_REVOKE_URL, {
+    const revoke = (token: string) => retryDeletionOperation(async () => {
+      let response: Response;
+      try { response = await this.fetcher(this.config.GOOGLE_HEALTH_REVOKE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ token }),
-      });
-    } catch {
-      throw new AppError('Fitbit access could not be revoked. Try deleting your account again.', 502, {
+        signal: AbortSignal.timeout(5000),
+      }); } catch {
+      throw new AppError('Fitbit access could not be revoked. Try deleting your account again.', 503, {
         code: 'PROVIDER_REVOCATION_FAILED', provider: 'google_health_fitbit',
       });
-    }
-    if (!response.ok) {
-      throw new AppError('Fitbit access could not be revoked. Try deleting your account again.', 502, {
-        code: 'PROVIDER_REVOCATION_FAILED', provider: 'google_health_fitbit',
+      }
+      if (response.ok) return false;
+      const payload: unknown = await response.json().catch(() => null);
+      const alreadyAbsent = response.status === 400 && payload !== null && typeof payload === 'object'
+        && 'error' in payload && payload.error === 'invalid_token';
+      if (alreadyAbsent) return true;
+      structuredLog('warn', 'account_deletion_provider_rejected', {
+        accountReference: createHash('sha256').update(user.id).digest('hex').slice(0, 12),
+        provider: 'google_health_fitbit', remoteStatus: response.status,
+        failureCategory: response.status === 429 || response.status >= 500 ? 'transient' : 'revocation_not_confirmed',
       });
+      throw new AppError('Fitbit access could not be revoked. Try deleting your account again.', response.status === 429 || response.status >= 500 ? 503 : 502, {
+        code: 'PROVIDER_REVOCATION_FAILED', provider: 'google_health_fitbit',
+        retryable: response.status === 429 || response.status >= 500,
+      });
+    }, (error) => error instanceof AppError && error.statusCode === 503);
+    const refreshAlreadyAbsent = await revoke(decryptGoogleHealthSecret(connection.encryptedRefreshToken, secrets.encryptionKey));
+    // An expired refresh credential alone does not prove its cached access
+    // credential is unusable. Confirm both before removing local credentials.
+    if (refreshAlreadyAbsent && connection.encryptedAccessToken) {
+      await revoke(decryptGoogleHealthSecret(connection.encryptedAccessToken, secrets.encryptionKey));
     }
     await this.db.$transaction([
       this.db.googleHealthConnection.deleteMany({ where: { userId: user.id } }),

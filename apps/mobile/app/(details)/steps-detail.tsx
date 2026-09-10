@@ -1,25 +1,14 @@
 import { StepPlanningCards } from '@/components/caloriebank/StepPlanningCards';
-import type { TodayResponse } from '@caloriebank/schemas';
-import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
-import { fetchToday } from '@/lib/api/client';
+import { useTodayReadModel } from '@/lib/today/use-today-read-model';
 import { getConsumerSourceName } from '@/lib/providers/presentation';
 import { formatContributionPercentage } from '@/lib/today/presentation';
 
 export default function StepsDetailScreen() {
-  const [today, setToday] = useState<TodayResponse | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    fetchToday(Intl.DateTimeFormat().resolvedOptions().timeZone)
-      .then((value) => {
-        setToday(value);
-
-      })
-      .catch(() => setFailed(true));
-  }, []);
+  const { today, failed } = useTodayReadModel();
 
   const stepSource = getConsumerSourceName(today?.steps.source);
   const burnSource = getConsumerSourceName(today?.burned.source);

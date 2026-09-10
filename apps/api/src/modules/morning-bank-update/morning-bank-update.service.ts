@@ -243,6 +243,8 @@ export class MorningBankUpdateService {
     const delivery = await this.claim(userId, completedLocalDate);
     if (!delivery) return { status: 'already_handled' as const };
     const summary = await this.bankHistory.getSummary(userId);
+    const account = await this.db.user.findUnique({ where: { id: userId }, select: { deletionRequestedAt: true } });
+    if (!account || account.deletionRequestedAt) return { status: 'not_eligible' as const };
     const copy = morningBankUpdateCopy(summary.availableBankCalories, completedDay.effectiveDailyBankChange);
     structuredLog('info', 'morning_bank_update_delivery_started', { accountReference, completedLocalDate, attempt: delivery.attemptCount });
     const result = await this.transport.send({

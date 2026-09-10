@@ -37,7 +37,8 @@ into intake or activity prescriptions. A target is not a medical recommendation.
   user data: Crumbl cookies, 5,000 kcal, and a create action.
 - History uses Banked and Deficit/Maintenance/Surplus. Current Goal becomes Fitness
   Goal. Onboarding may retain Lose/Maintain/Gain weight choices.
-- Today so far orders Eaten, Burned, Steps. Its detail reuses existing rest-of-day
+- Home Today so far orders Burned, Eaten without duplicating the dedicated Steps
+  card. Detail groups Burned, Eaten, Steps in its first summary and reuses existing rest-of-day
   and bidirectional step planning without changing calculations or removing Steps.
 - Apple Health food-tracker help explains how to enable calorie sharing using
   verified tracker instructions; unknown trackers receive generic guidance.
@@ -97,10 +98,51 @@ default) and `daily_bank_target_chosen_at` fields. The authenticated target
 endpoint updates only these fields. Values are whole kcal from 0 through 2,000;
 this storage/input bound is not a recommendation. Completed onboarding users
 remain complete regardless of whether they have chosen a target. The new app
-confirms the target on the Fitness Goal form, saving it before the Fitness Goal
-so partial failure cannot save the goal without the target. Server onboarding
-stages remain backward-compatible with existing TestFlight clients, which retain
+uses five steps: burn source, food source, Fitness Goal, Daily Bank Target, then
+bank preparation. The target is a separate screen resumed from its persisted
+chosen marker; source steps cannot satisfy it. Server onboarding stages remain
+backward-compatible with existing TestFlight clients, which retain
 the safe zero default. Target writes have an independent 60-per-15-minute limit.
+
+### Physical-QA Corrections
+
+Correction validation: `release:friends-family` passed 55 files / 664 tests
+against the dedicated localhost test database, including persistence, source
+journeys, refresh concurrency, and deletion recovery. Changed component fixtures
+were rendered at 320px and 390px, plus enlarged text at 320px, with no detected
+horizontal overflow. These checks do not substitute for physical iPhone QA.
+
+Contribution sentences emphasize the amount while retaining a coherent spoken
+sentence. Planning-card primary step results use prominent green typography;
+their calculations and the walking estimator are unchanged.
+
+The authenticated root alone owns background/inactive-to-active refreshes,
+including initial active entry. Screen mounts only read models. Overlapping
+automatic calls coalesce, manual calls serialize, account generations discard
+stale completions, and sign-out pauses work before device release. Foreground
+requests bypass the old five-minute provider cooldown; scheduled execution keeps
+its existing policy. The authenticated refresh allowance is 60 per 15 minutes.
+Read-only detail subscribers retain known data through transient failures.
+
+Deletion evidence: the physical request at 15:32:10 returned 502 in 194 ms;
+there was no identity-deletion event. The old provider revoker rejected every
+non-200 result without recording its reason, so the exact historical remote
+error cannot be recovered from those logs. Its confirmed idempotency defect is
+that Google's documented `invalid_token` (expired/already revoked) blocked
+deletion. The fix accepts only that exact 400 response, verifies the cached
+access credential too when necessary, and retries transient failures boundedly.
+Other rejections still block destructive cleanup and receive safe diagnostics.
+
+The additive `users.deletion_requested_at` marker persists explicit deletion
+intent before external cleanup. Pending accounts cannot use normal account APIs
+or send notifications. The hosted worker retries up to 50 pending accounts per
+run; provider revocation still precedes Clerk deletion and database cascades.
+Clerk 404 and an already-absent internal account are idempotent success. This
+prevents a process/database interruption after Clerk deletion from stranding
+local records with no authenticated retry path. No extra health data is stored.
+The deletion request alone has a 60-second client timeout for bounded multi-step
+cleanup; ordinary networking timeouts are unchanged. Apple Health remains
+iOS-managed; FatSecret credentials still cascade under its existing contract.
 
 The shared StepPlanningCards component calls the existing bidirectional domain
 functions in both Today detail and Steps. Walking pace is a separate read-only

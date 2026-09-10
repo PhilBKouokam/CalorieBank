@@ -221,7 +221,7 @@ describe('consumer routes', () => {
   it('presents Available Bank as an unsigned balance and keeps Today contribution concise', () => {
     const source = mobileFile('app/(tabs)/today.tsx');
     expect(source).toContain('formatBankBalance(bankSummary.availableBankCalories)');
-    expect(source).toContain('<Text style={styles.supportingText}>{latestChangeValue}</Text>');
+    expect(source).toContain('<CompletedContribution sentence={latestChangeValue} />');
     expect(source).not.toMatch(/latestDailyBankChange < 0[\s\S]*negativeValue/);
     expect(source).not.toMatch(/Added to your bank|Withdrawn from your bank|Adjusted from|May still update/);
     expect(source.indexOf('hasInitializedBank && bankSummary'))
@@ -274,7 +274,8 @@ describe('consumer routes', () => {
     expect(today).not.toContain('href="/why-80"');
     expect(today).not.toMatch(/exactly|20% inaccurate/i);
     expect(mobileFile('app/(details)/_layout.tsx')).not.toContain('why-80');
-    expect(burn).toContain('mobile_today_detail_received');
+    expect(burn).toContain('useTodayReadModel()');
+    expect(mobileFile('lib/today/use-today-read-model.ts')).toContain('subscribeToAccountLifecycle');
     expect(burn).toContain('projectedProviderBurnCalories.toLocaleString()');
     expect(burn).toContain('projectedAdjustedBurnCalories.toLocaleString()');
     expect(burn).toContain('<Text style={styles.cardTitle}>At rest, you burn</Text>');

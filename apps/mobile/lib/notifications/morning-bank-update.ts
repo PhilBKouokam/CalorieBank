@@ -13,6 +13,7 @@ import {
   getApiRequestFailureKind,
 } from '@/lib/api/client';
 import { createNotificationOperations, retryDeviceRelease, withNotificationTokenTimeout } from './notification-operations';
+import { pauseAccountLifecycle, resumeAccountLifecycle } from '@/lib/lifecycle/account-lifecycle';
 
 const operations = createNotificationOperations();
 export const setNotificationAccountScope = operations.setScope;
@@ -93,10 +94,17 @@ export async function syncMorningBankUpdateDevice() {
 }
 
 export async function detachMorningBankUpdateDevice() {
-  await operations.release((check) => retryDeviceRelease(async () => {
+  pauseAccountLifecycle();
+  try { await operations.release((check) => retryDeviceRelease(async () => {
     check();
     await unregisterMorningBankUpdateDevice();
   }, (error) => error instanceof ApiHttpError
     ? error.status >= 500
-    : ['network', 'timeout'].includes(getApiRequestFailureKind(error))));
+    : ['network', 'timeout'].includes(getApiRequestFailureKind(error)))); }
+  catch (error) { resumeAccountLifecycle(); throw error; }
+}
+
+export async function prepareMorningBankUpdateAccountDeletion() {
+  pauseAccountLifecycle();
+  await operations.pause();
 }

@@ -30,6 +30,7 @@ function fixture(options: {
   type MutationArgs = { create: Record<string, unknown>; update: Record<string, unknown> };
   type WhereArgs = { where: Record<string, unknown> };
   const delegates = {
+    user: { findUnique: vi.fn(async () => ({ deletionRequestedAt: null as Date | null })) },
     morningBankUpdatePreference: {
       findUnique: vi.fn(async () => preference),
       upsert: vi.fn(async ({ create, update }: MutationArgs) => { preference = { ...preference, ...(preference ? update : create) }; return preference; }),
@@ -94,6 +95,12 @@ describe('Morning Bank Update copy', () => {
 });
 
 describe('Morning Bank Update eligibility and delivery', () => {
+  it('does not send while account deletion is pending', async () => {
+    const { service, transport, db } = fixture();
+    db.user.findUnique.mockResolvedValue({ deletionRequestedAt: new Date() });
+    expect(await service.deliverForUser(userId, 'America/Chicago')).toEqual({ status: 'not_eligible' });
+    expect(transport.send).not.toHaveBeenCalled();
+  });
   it('uses the local 7:00 through 11:59 morning window across DST seasons', () => {
     expect(isMorningBankUpdateWindow('America/Chicago', new Date('2026-03-09T12:30:00.000Z'))).toBe(true);
     expect(isMorningBankUpdateWindow('America/Chicago', new Date('2026-11-02T13:30:00.000Z'))).toBe(true);

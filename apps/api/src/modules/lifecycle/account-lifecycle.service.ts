@@ -149,11 +149,11 @@ export class AccountLifecycleCoordinator {
       try {
         await this.withRetry(provider, async (attempt) => {
           if (provider === 'google_health_fitbit') {
-            const result = await this.fitbit.syncRollingWindow(user, currentLocalDate, timezone, needsOpeningImport || attempt > 0, dayCount, trigger);
+            const result = await this.fitbit.syncRollingWindow(user, currentLocalDate, timezone, needsOpeningImport || attempt > 0 || trigger !== 'scheduled', dayCount, trigger);
             if (result.retryableFailure) throw new AppError('Fitbit burn refresh was incomplete.', 502);
             return result;
           }
-          return this.fatSecret.syncRollingWindow(user, currentLocalDate, timezone, needsOpeningImport || attempt > 0, dayCount, trigger);
+          return this.fatSecret.syncRollingWindow(user, currentLocalDate, timezone, needsOpeningImport || attempt > 0 || trigger !== 'scheduled', dayCount, trigger);
         });
         refreshedProviders.push(provider);
         this.log('provider_refresh_completed', { userSuffix: user.id.slice(-8), provider, trigger });
@@ -207,7 +207,7 @@ export class AccountLifecycleCoordinator {
       this.log('morning_bank_update_receipt_check_failed', { reasonCode: 'unexpected' });
     });
     const profiles = await this.db.userProfile.findMany({
-      where: { onboardingCompletedAt: { not: null } },
+      where: { onboardingCompletedAt: { not: null }, user: { deletionRequestedAt: null } },
       include: { user: { select: { id: true, email: true } } },
       orderBy: { updatedAt: 'asc' },
     });

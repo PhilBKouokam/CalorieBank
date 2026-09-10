@@ -8,6 +8,7 @@ import type { DevelopmentUser } from '../src/modules/goal-configuration/goal-con
 import { FatSecretService } from '../src/modules/fatsecret/fatsecret.service';
 import { GoogleHealthFitbitService } from '../src/modules/google-health/google-health.service';
 import { encryptGoogleHealthSecret } from '../src/modules/google-health/token-crypto';
+import { AccountSafetyService } from '../src/modules/account-safety/account-safety.service';
 import {
   HEALTH_CONNECTION_OPTION_IDS,
   PrismaProviderSelectionRepository,
@@ -77,6 +78,38 @@ async function seedAccount(prisma: PrismaClient) {
 }
 
 describe('health connection role semantics', () => {
+  it('durably resumes deletion after revocation, preserving other accounts and cascading operational data', async () => {
+    const prisma = new PrismaClient();
+    const account = await seedAccount(prisma);
+    const other = await seedAccount(prisma);
+    await prisma.user.update({ where: { id: account.id }, data: { authSubject: `disposable-${account.id}` } });
+    await prisma.pushDeviceRegistration.create({ data: { userId: account.id, expoPushToken: `ExpoPushToken[${account.id}]`, platform: 'ios' } });
+    await prisma.morningBankUpdatePreference.create({ data: { userId: account.id, enabled: true } });
+    await prisma.morningBankUpdateDelivery.create({ data: { userId: account.id, completedLocalDate: localDate, status: 'NO_TOKEN' } });
+    const config = { ...env, AUTH_MODE: 'development' as const, GOOGLE_HEALTH_CLIENT_ID: 'test', GOOGLE_HEALTH_CLIENT_SECRET: 'test', GOOGLE_HEALTH_REDIRECT_URI: 'https://example.com/callback', GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY: account.key };
+    const revoker = new GoogleHealthFitbitService(prisma, {} as TodayAggregateRepository, config, undefined,
+      async () => Response.json({ error: 'invalid_token' }, { status: 400 }));
+    try {
+      await expect(new AccountSafetyService(prisma, config, revoker, async () => { throw { status: 403 }; }).deleteAccount(account.user)).rejects.toMatchObject({ statusCode: 502 });
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: account.id } })).deletionRequestedAt).not.toBeNull();
+      expect((await prisma.pushDeviceRegistration.findUniqueOrThrow({ where: { userId: account.id } })).active).toBe(false);
+      expect(await prisma.googleHealthConnection.count({ where: { userId: account.id } })).toBe(0);
+      // A new service instance models a restarted worker after Clerk is already gone.
+      await new AccountSafetyService(prisma, config, revoker, async () => { throw { status: 404 }; }).resumePendingDeletions();
+      expect(await prisma.user.findUnique({ where: { id: account.id } })).toBeNull();
+      for (const count of await Promise.all([
+        prisma.pushDeviceRegistration.count({ where: { userId: account.id } }),
+        prisma.morningBankUpdatePreference.count({ where: { userId: account.id } }),
+        prisma.morningBankUpdateDelivery.count({ where: { userId: account.id } }),
+        prisma.externalProviderConnection.count({ where: { userId: account.id } }),
+        prisma.dailyIntakeAggregate.count({ where: { userId: account.id } }),
+      ])) expect(count).toBe(0);
+      expect(await prisma.user.findUnique({ where: { id: other.id } })).not.toBeNull();
+    } finally {
+      await prisma.user.deleteMany({ where: { id: { in: [account.id, other.id] } } });
+      await prisma.$disconnect();
+    }
+  });
   it('separates selected roles from connected alternatives without exposing internal provenance', async () => {
     const prisma = new PrismaClient();
     const account = await seedAccount(prisma);

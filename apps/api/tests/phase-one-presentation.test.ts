@@ -33,9 +33,38 @@ async function render(component: React.ReactElement) {
 const source = (path: string) => readFileSync(resolve(__dirname, '../../mobile', path), 'utf8');
 
 describe('Phase 1 consumer release invariants', () => {
-  it('onboarding explicitly saves the chosen target through the shared preference API', async () => {
+  it.each(['You banked 573 kcal yesterday.', 'You enjoyed 83 kcal yesterday.', 'You were right on target yesterday.'])('keeps contribution emphasis and speech coherent: %s', async (sentence) => {
+    const { CompletedContribution } = await import(resolve(__dirname, '../../mobile/components/caloriebank/CompletedContribution.tsx')) as { CompletedContribution: React.ComponentType<{ sentence: string }> };
+    const rendered = await render(React.createElement(CompletedContribution, { sentence }));
+    expect(rendered.root.findByProps({ accessibilityLabel: sentence.replace('kcal', 'kilocalories') })).toBeDefined();
+    const emphasis = rendered.root.findAll(node => String(node.type) === 'Text' && node.props.style?.fontWeight === '800');
+    expect(emphasis).toHaveLength(sentence.includes('kcal') ? 1 : 0);
+    if (emphasis.length) expect(emphasis[0]!.props.style.fontSize).toBeGreaterThan(18);
+  });
+  it('keeps Fitness Goal and Daily Bank Target on separate onboarding pages', async () => {
     const { GoalConfigurationForm } = await import(resolve(__dirname, '../../mobile/components/caloriebank/GoalConfigurationForm.tsx')) as { GoalConfigurationForm: React.ComponentType<{ mode: string; onSaved: () => void }> };
     const rendered = await render(React.createElement(GoalConfigurationForm, { mode: 'onboarding', onSaved: vi.fn() }));
+    expect(JSON.stringify(rendered.toJSON())).not.toContain('Daily Bank Target');
+    expect(JSON.stringify(rendered.toJSON())).not.toContain('How much would you like');
+  });
+  it('places burned, eaten, and steps within the same first detail card', () => {
+    const detail = source('app/(details)/today-burn.tsx');
+    const summary = detail.slice(detail.indexOf('<View style={styles.card}>'), detail.indexOf('<Text style={styles.sectionTitle}>'));
+    expect(summary.match(/<View style=\{styles.card\}>/g)).toHaveLength(1);
+    expect(summary.indexOf('>Burned</Text>')).toBeLessThan(summary.indexOf('>Eaten</Text>'));
+    expect(summary.indexOf('>Eaten</Text>')).toBeLessThan(summary.indexOf('>Steps</Text>'));
+    expect(summary).toContain('adjustmentFactor');
+  });
+  it('planning results remain prominent while using unchanged domain functions', () => {
+    const planning = source('components/caloriebank/StepPlanningCards.tsx');
+    expect(planning).toContain("result: { color: colors.primaryDark, fontSize: 26, fontWeight: '800'");
+    expect(planning).toContain('calculateBurnToStepPlan({ ...shared');
+    expect(planning).toContain('calculateStepToBurnPlan({ ...shared');
+    expect(planning.match(/<WalkingTime steps=/g)).toHaveLength(2);
+  });
+  it('onboarding explicitly saves the chosen target through the shared preference API', async () => {
+    const { DailyBankTargetForm } = await import(resolve(__dirname, '../../mobile/components/caloriebank/DailyBankTargetForm.tsx')) as { DailyBankTargetForm: React.ComponentType<{ initialCalories: number; onSaved: () => void }> };
+    const rendered = await render(React.createElement(DailyBankTargetForm, { initialCalories: 0, onSaved: vi.fn() }));
     await act(async () => rendered.root.findByProps({ accessibilityLabel: '300 calories per day' }).props.onPress());
     const buttons = rendered.root.findAll((node) => String(node.type) === 'Pressable');
     await act(async () => { buttons[buttons.length - 1]!.props.onPress(); });
@@ -65,9 +94,10 @@ describe('Phase 1 consumer release invariants', () => {
     const home = source('app/(tabs)/today.tsx');
     expect(home.indexOf('>Available Bank</Text>')).toBeLessThan(home.indexOf('>Banking Goal</Text>'));
     expect(home.indexOf('>Banking Goal</Text>')).toBeLessThan(home.indexOf('>Today so far</Text>'));
-    expect(home.indexOf('{latestChangeValue}</Text>')).toBeLessThan(home.indexOf('>Banking Goal</Text>'));
-    expect(home.indexOf('>Eaten</Text>')).toBeLessThan(home.indexOf('>Burned</Text>'));
-    expect(home.indexOf('>Burned</Text>')).toBeLessThan(home.indexOf('>Steps</Text>'));
+    expect(home.indexOf('<CompletedContribution')).toBeLessThan(home.indexOf('>Banking Goal</Text>'));
+    expect(home.indexOf('>Burned</Text>')).toBeLessThan(home.indexOf('>Eaten</Text>'));
+    expect(home).not.toContain('>Steps</Text>');
+    expect(home).toContain('Steps today');
     expect(home).toContain('Example Banking Goal: Crumbl cookies');
     expect(home).not.toContain('createOrReplacePlannedTreat');
   });

@@ -1,33 +1,13 @@
 import { StepPlanningCards } from '@/components/caloriebank/StepPlanningCards';
-import type { TodayResponse } from '@caloriebank/schemas';
-import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
-import { fetchToday } from '@/lib/api/client';
+import { useTodayReadModel } from '@/lib/today/use-today-read-model';
 import { getConsumerSourceName } from '@/lib/providers/presentation';
 
 export default function TodayBurnDetailScreen() {
-  const [today, setToday] = useState<TodayResponse | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    fetchToday(Intl.DateTimeFormat().resolvedOptions().timeZone)
-      .then((value) => {
-        if (__DEV__) {
-          console.info('[CalorieBank Today Detail] mobile_today_detail_received', {
-            restingRatePresent: value.restOfDayProjection.providerKcalPerHour !== null,
-            projectedProviderBurnPresent:
-              value.restOfDayProjection.projectedProviderBurnCalories !== null,
-            projectedEstimatedActualBurnPresent:
-              value.restOfDayProjection.projectedAdjustedBurnCalories !== null,
-          });
-        }
-        setToday(value);
-      })
-      .catch(() => setFailed(true));
-  }, []);
+  const { today, failed } = useTodayReadModel();
 
   const burnSource = getConsumerSourceName(today?.burned.source);
   const intakeSource = getConsumerSourceName(today?.eaten.source);
@@ -41,13 +21,6 @@ export default function TodayBurnDetailScreen() {
           <>
             <View style={styles.card}>
               <View style={styles.metricBlock}>
-                <Text style={styles.metricLabel}>Eaten</Text>
-                <Text style={styles.metricValue}>
-                  {today.eaten.calories === null ? 'Unavailable' : `${today.eaten.calories.toLocaleString()} kcal`}
-                </Text>
-                <Text style={styles.detail}>Imported from {intakeSource}</Text>
-              </View>
-              <View style={styles.metricBlock}>
                 <Text style={styles.metricLabel}>Burned</Text>
                 <Text style={styles.metricValue}>
                   {today.burned.adjusted === null ? 'Unavailable' : `${today.burned.adjusted.toLocaleString()} kcal`}
@@ -58,10 +31,13 @@ export default function TodayBurnDetailScreen() {
                     : `${today.burned.raw.toLocaleString()} reported by ${burnSource} × ${Math.round(today.burned.adjustmentFactor * 100)}%`}
                 </Text>
               </View>
-
+              <View style={styles.metricBlock}>
+                <Text style={styles.metricLabel}>Eaten</Text>
+                <Text style={styles.metricValue}>{today.eaten.calories === null ? 'Unavailable' : `${today.eaten.calories.toLocaleString()} kcal`}</Text>
+                <Text style={styles.detail}>Imported from {intakeSource}</Text>
+              </View>
+              <View style={styles.metricBlock}><Text style={styles.metricLabel}>Steps</Text><Text style={styles.metricValue}>{today.steps.count?.toLocaleString() ?? 'Unavailable'}</Text></View>
             </View>
-
-            <View style={styles.card}><Text style={styles.metricLabel}>Steps</Text><Text style={styles.metricValue}>{today.steps.count?.toLocaleString() ?? 'Unavailable'}</Text></View>
             <Text style={styles.sectionTitle}>If you rested for the rest of today</Text>
             <View style={styles.card}>
               {today.restOfDayProjection.status === 'ready' &&

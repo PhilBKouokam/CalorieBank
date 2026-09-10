@@ -8,6 +8,7 @@ import { deriveOnboardingStatus } from '../src/modules/onboarding/onboarding.rep
 const h = vi.hoisted(() => ({
   providers: null as ProviderSelectionResponse | null, goal: false, empty: false, fail: false, writers: true,
   pause: null as Promise<void> | null, healthUnavailable: false,
+  targetChosen: false,
   router: { push: vi.fn(), replace: vi.fn() }, saves: [] as ProviderSelectionInput[],
 }));
 const data = () => h.providers!;
@@ -38,6 +39,7 @@ async function sync() {
   return { syncStatus: 'success' };
 }
 vi.mock('react-native', () => ({
+  TextInput: 'TextInput',
   ActivityIndicator: 'ActivityIndicator', KeyboardAvoidingView: 'KeyboardAvoidingView', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View',
   Platform: { OS: 'ios' }, StyleSheet: { create: <T,>(styles: T) => styles, hairlineWidth: 1 },
   Modal: ({ visible, children }: { visible: boolean; children: React.ReactNode }) => visible ? children : null,
@@ -48,6 +50,8 @@ vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' 
 vi.mock('expo-router', () => ({ useRouter: () => h.router, useLocalSearchParams: () => ({ returnTo: 'onboarding' }), useFocusEffect: (callback: () => void | (() => void)) => React.useEffect(callback, []) }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: async (url: string) => { connect(url); return { type: 'success' }; } }));
 vi.mock('../../mobile/lib/api/client', () => ({
+  fetchDailyBankTarget: async () => ({ calories: 0, chosen: h.targetChosen }),
+  saveDailyBankTarget: async (calories: number) => { h.targetChosen = true; return { calories, chosen: true }; },
   fetchOnboardingStatus: async () => snapshot(), fetchProviderSelection: async () => structuredClone(data()),
   fetchHealthConnections: async () => connections(),
   selectHealthConnectionRole: async (role: 'burned' | 'eaten', optionId: string) => {
@@ -109,7 +113,7 @@ async function mountSettings() {
 }
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: false });
-  h.goal = false; h.empty = false; h.fail = false; h.writers = true; h.saves = []; h.pause = null; h.healthUnavailable = false;
+  h.goal = false; h.targetChosen = false; h.empty = false; h.fail = false; h.writers = true; h.saves = []; h.pause = null; h.healthUnavailable = false;
   h.providers = {
     expenditure: { selected: false, authoritativeProvider: 'apple_health', displayName: 'Apple Health', status: 'unavailable', fallbackActive: false },
     activityContext: { authoritativeProvider: 'apple_health', displayName: 'Apple Health', status: 'unavailable', fallbackActive: false },
@@ -130,6 +134,11 @@ describe('actual onboarding component journeys', () => {
       expect(text(screen!.root)).toContain('Choose your goal');
       await press('Back'); expect(text(screen!.root)).toContain(food);
       await press('Continue'); await press('Save goal');
+      expect(screen!.root.findByProps({ accessibilityLabel: 'Setup step 4 of 5' })).toBeDefined();
+      expect(text(screen!.root)).toContain('How much would you like to bank each day?');
+      expect(text(screen!.root)).not.toContain('Choose your goal');
+      await press('Continue');
+      expect(screen!.root.findByProps({ accessibilityLabel: 'Setup step 5 of 5' })).toBeDefined();
       expect(text(screen!.root)).toContain('Preparing your bank');
       expect(text(screen!.root)).toContain(food);
       expect(data().expenditure.displayName).toBe(burn);
@@ -166,14 +175,14 @@ describe('actual onboarding component journeys', () => {
     expect(data().intake.authoritativeProvider).toBe('fatsecret');
     expect(data().expenditure).toEqual(burn);
     await act(async () => screen!.unmount()); await mount();
-    await press('Save goal'); expect(text(screen!.root)).toContain('FatSecret');
+    await press('Save goal'); await press('Continue'); expect(text(screen!.root)).toContain('FatSecret');
     expect(text(screen!.root)).not.toContain('Choose a food tracker');
   });
   it('repeated Edit Setup/Back/Continue and connections navigation do not mutate selections', async () => {
-    await mount(); await press('Connect Fitbit'); await press('Connect Cronometer'); await press('Save goal');
+    await mount(); await press('Connect Fitbit'); await press('Connect Cronometer'); await press('Save goal'); await press('Continue');
     const selected = structuredClone(data());
     for (let i = 0; i < 3; i++) {
-      await press('Edit setup'); await press('Back'); await press('Back'); await press('Continue'); await press('Continue'); await press('Save goal');
+      await press('Edit setup'); await press('Back'); await press('Back'); await press('Continue'); await press('Continue'); await press('Save goal'); await press('Continue');
       expect(data()).toEqual(selected);
     }
     await press('Check connections'); expect(h.router.push).toHaveBeenCalledWith({ pathname: '/integrations', params: { returnTo: 'onboarding' } });
@@ -184,7 +193,7 @@ describe('actual onboarding component journeys', () => {
     await mount(); await press('Connect Apple Health'); await press('Connect FatSecret');
     let reject!: (error: Error) => void;
     h.pause = new Promise<void>((_resolve, fail) => { reject = fail; });
-    await press('Save goal'); await press('Edit setup');
+    await press('Save goal'); await press('Continue'); await press('Edit setup');
     await act(async () => { reject(new Error('Apple Health failed')); await settle(); });
     expect(text(screen!.root)).toContain('Choose your goal');
     expect(text(screen!.root)).not.toMatch(/couldn.t refresh|Something went wrong|too long/);
