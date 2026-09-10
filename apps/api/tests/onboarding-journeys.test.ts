@@ -141,9 +141,9 @@ describe('actual onboarding component journeys', () => {
   }
   it('no discovered food writer -> direct FatSecret alternative', async () => {
     h.writers = false; await mount(); await press('Connect Apple Health'); await press('Connect Cronometer');
-    expect(text(screen!.root)).toContain('No calories from Cronometer');
+    expect(text(screen!.root)).toContain('We haven’t found calories from Cronometer');
     await press('Connect FatSecret'); expect(text(screen!.root)).toContain('Choose your goal');
-    expect(text(screen!.root)).not.toContain('No calories from Cronometer');
+    expect(text(screen!.root)).not.toContain('We haven’t found calories from Cronometer');
   });
   it('connected/empty and failed refresh errors clear on Continue to Goal', async () => {
     h.empty = true; await mount(); await press('Connect Apple Health'); await press('Continue');

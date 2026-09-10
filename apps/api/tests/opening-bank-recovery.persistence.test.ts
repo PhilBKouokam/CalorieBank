@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { DailyBankTargetRepository } from '../src/modules/daily-bank-target/daily-bank-target.repository';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
@@ -114,6 +115,44 @@ async function addProviderDay(
 }
 
 describe('Opening Bank and Recovery persistence', () => {
+  it('Daily Bank Target is isolated planning metadata before and after initialization', async () => {
+    const user = await createUser({ openingPolicy: true });
+    const other = await createUser({ openingPolicy: true });
+    const targets = new DailyBankTargetRepository(prisma);
+    expect(await targets.get(user.id)).toEqual({ calories: 0, chosen: false });
+    const pending = await prisma.bankAccountInitialization.findUnique({ where: { userId: user.id } });
+    await targets.update(user.id, 200);
+    expect(await prisma.bankAccountInitialization.findUnique({ where: { userId: user.id } })).toEqual(pending);
+    await addProviderDay(user.id, '2026-08-17', -100);
+    await addProviderDay(user.id, '2026-08-18', 400);
+    const repository = new PrismaBankHistoryRepository(prisma, { now: () => new Date('2026-08-20T18:00:00Z'), allowSyntheticProviders: false });
+    await repository.initializeOpeningBank(user, '2026-08-19', 'America/Chicago');
+    await repository.postProvisionalDailyRecord(user, {
+      logDate: '2026-08-19', timezone: 'America/Chicago', importedTotalDailyExpenditure: 2500,
+      goalMode: 'maintain', goalAdjustmentCalories: 0, importedCalorieIntake: 2400,
+      finalizedAt: new Date('2026-08-20T06:00:00Z'),
+    });
+    async function accountingSnapshot() {
+      return {
+        initialization: await prisma.bankAccountInitialization.findUnique({ where: { userId: user.id } }),
+        opening: await prisma.openingBankCalculationDay.findMany({ where: { userId: user.id }, orderBy: { logDate: 'asc' } }),
+        ledger: await prisma.calorieLedgerTransaction.findMany({ where: { userId: user.id }, orderBy: { id: 'asc' } }),
+        history: await repository.getHistory(user.id, 'ALL'),
+        summary: await repository.getSummary(user.id),
+        selection: await prisma.providerSelection.findUnique({ where: { userId: user.id } }),
+        goal: await prisma.goalConfiguration.findUnique({ where: { userId: user.id } }),
+      };
+    }
+    const before = await accountingSnapshot();
+    expect(before.opening).toHaveLength(2);
+    expect(before.ledger.length).toBeGreaterThan(0);
+    for (const calories of [0, 100, 300, 2000, 0]) {
+      expect(await targets.update(user.id, calories)).toEqual({ calories, chosen: true });
+      expect(await new DailyBankTargetRepository(prisma).get(user.id)).toEqual({ calories, chosen: true });
+      expect(await accountingSnapshot()).toEqual(before);
+    }
+    expect(await targets.get(other.id)).toEqual({ calories: 0, chosen: false });
+  });
   afterEach(async () => {
     await prisma.user.deleteMany({ where: { id: { in: userIds.splice(0) } } });
   });

@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GoalConfigurationForm } from '@/components/caloriebank/GoalConfigurationForm';
+import { FoodTrackerHelp } from '@/components/caloriebank/FoodTrackerHelp';
 import { refreshFatSecretWithFeedback } from '@/lib/healthkit/fatsecret-feedback';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import {
@@ -107,6 +108,7 @@ export default function OnboardingScreen() {
   const [morningUpdateState, setMorningUpdateState] = useState<'idle' | 'loading' | 'enabled' | 'denied' | 'error'>('idle');
   const [displayStage, setDisplayStage] = useState<OnboardingStage | null>(null);
   const [editingRole, setEditingRole] = useState<SourceRole | null>(null);
+  const [foodHelpTracker, setFoodHelpTracker] = useState<KnownFoodTracker | null>(null);
   const [discoveredIntakeWriters, setDiscoveredIntakeWriters] =
     useState<AppleHealthIntakeWriter[]>([]);
   const actionGate = useRef(createOnboardingActionGate());
@@ -364,10 +366,11 @@ export default function OnboardingScreen() {
         lose_it: 'Lose It!', macrofactor: 'MacroFactor',
       }[tracker];
       if (!writer) {
+        setFoodHelpTracker(tracker);
         return {
           stayOnStage: 'calories_eaten',
           tone: 'attention',
-          message: `No calories from ${trackerName} were found in Apple Health yet. Check again after ${trackerName} has shared food data, or choose another source.`,
+          message: `We haven’t found calories from ${trackerName} in Apple Health yet. Check its Apple Health sharing settings, or choose another food source.`,
         };
       }
       return selectAppleHealthIntakeWriter(writer);
@@ -675,6 +678,8 @@ export default function OnboardingScreen() {
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           {progress > 0 && progress < 5 ? <Text accessibilityLabel={`Setup step ${progress} of 4`} style={styles.progress}>Step {progress} of 4</Text> : null}
           {stageContent}
+          {activeStage === 'calories_eaten' && (editingRole === 'intake' || !status.intake.connected) && foodHelpTracker ? <FoodTrackerHelp provider="apple_health" chosenTracker={foodHelpTracker} /> : null}
+          {activeStage === 'calories_eaten' && status.intake.provider === 'apple_health' && status.intake.readiness === 'connected_waiting_for_data' ? <FoodTrackerHelp provider="apple_health" bundleId={providerState?.intake.writerBundleIdentifier} /> : null}
           {message && messageStage === activeStage && !(setupIsReady(status) && (messageAction === 'preparing' || messageAction === 'loading')) ? <Text accessibilityLiveRegion="polite" style={messageTone === 'attention' ? styles.attention : styles.error}>{message}</Text> : null}
         </ScrollView>
       </KeyboardAvoidingView>

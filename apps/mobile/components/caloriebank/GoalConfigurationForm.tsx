@@ -7,7 +7,7 @@ import {
   type GoalConfigurationResponse,
   type GoalMode,
 } from '@caloriebank/schemas';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -18,7 +18,8 @@ import {
 } from 'react-native';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
-import { fetchGoalConfiguration, saveGoalConfiguration } from '@/lib/api/client';
+import { fetchGoalConfiguration, saveGoalConfiguration, fetchDailyBankTarget, saveDailyBankTarget } from '@/lib/api/client';
+import { DailyBankTargetInput } from './DailyBankTargetInput';
 
 const goalOptions: { value: GoalMode; label: string; description: string }[] = [
   { value: 'cut', label: 'Cut', description: 'Lose weight by setting a daily amount below your estimated actual burn.' },
@@ -54,6 +55,8 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
   const [selectedWeeklyRate, setSelectedWeeklyRate] = useState<number | null>(null);
   const [status, setStatus] = useState<FormStatus>('loading');
   const [errorMessage, setErrorMessage] = useState('');
+  const [dailyTarget, setDailyTarget] = useState('0');
+  const savingRef = useRef(false);
 
   const estimatedOptions = useMemo(() => estimatedWeightRateOptions[goalMode], [goalMode]);
   const usesAdjustment = goalMode !== 'maintain';
@@ -67,7 +70,9 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
 
       try {
         const configuration = await fetchGoalConfiguration();
+        const target = mode === 'onboarding' ? await fetchDailyBankTarget() : null;
         if (!isMounted) return;
+        if (target) setDailyTarget(String(target.calories));
 
         if (configuration) {
           setGoalMode(configuration.goalMode);
@@ -89,7 +94,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [mode]);
 
   function handleGoalModeChange(nextGoalMode: GoalMode) {
     setGoalMode(nextGoalMode);
@@ -147,7 +152,11 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
   }
 
   async function handleSave() {
+    if (savingRef.current) return;
     setErrorMessage('');
+    if (mode === 'onboarding' && (!dailyTarget || Number(dailyTarget) > 2000)) {
+      setStatus('error'); setErrorMessage('Choose a Daily Bank Target from 0 to 2,000 kcal.'); return;
+    }
     const input = buildInput();
     if (!input) {
       setStatus('error');
@@ -161,15 +170,19 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
       return;
     }
 
+    savingRef.current = true;
     setStatus('saving');
 
     try {
+      if (mode === 'onboarding') await saveDailyBankTarget(Number(dailyTarget));
       const configuration = await saveGoalConfiguration(parsedInput.data);
       setStatus('success');
       setTimeout(() => onSaved(configuration), mode === 'settings' ? 500 : 0);
     } catch {
       setStatus('error');
       setErrorMessage("We couldn't save your goal. Check your connection and refresh your health data, then try again.");
+    } finally {
+      savingRef.current = false;
     }
   }
 
@@ -273,6 +286,8 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
           )}
         </>
       ) : null}
+
+      {mode === 'onboarding' ? <DailyBankTargetInput value={dailyTarget} onChange={setDailyTarget} disabled={status === 'saving'} /> : null}
 
       {status === 'success' ? (
         <Text style={styles.success}>

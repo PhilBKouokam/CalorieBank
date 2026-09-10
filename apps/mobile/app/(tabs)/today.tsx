@@ -44,7 +44,7 @@ import {
   formatWorkoutCalorieLines,
   hasLatestCompletedContribution,
   hasUsableBankSummary,
-  presentTodayContribution,
+  completedContributionSentence,
 } from '@/lib/today/presentation';
 import { getConsumerSourceName } from '@/lib/providers/presentation';
 
@@ -314,7 +314,7 @@ export default function TodayScreen() {
       : 'Waiting for a full day of calorie data';
   const latestChangeValue =
     hasCompletedDays && bankSummary && bankSummary.latestDailyBankChange !== null
-      ? presentTodayContribution(bankSummary.latestDailyBankChange).value
+      ? completedContributionSentence(bankSummary.latestDailyBankChange, latestResultLabel(bankSummary) === 'Yesterday' ? 'yesterday' : `on ${formatDisplayDate(bankSummary.latestCompletedDate!)}`)
       : bankStatus === 'loading'
         ? 'Loading...'
         : historyPreparationPending
@@ -333,12 +333,12 @@ export default function TodayScreen() {
   const activePlannedTreat = isActivePlannedTreat(plannedTreat) ? plannedTreat : null;
   const plannedTreatAccessibility =
     plannedTreatStatus === 'loading'
-      ? 'Planned Treat, loading'
+      ? 'Banking Goal, loading'
       : activePlannedTreat
-        ? `Planned Treat, ${activePlannedTreat.name}, ${activePlannedTreat.progressPercent} percent ready`
+        ? `Banking Goal, ${activePlannedTreat.name}, ${activePlannedTreat.progressPercent} percent ready`
         : plannedTreatStatus === 'error'
-          ? 'Planned Treat, unavailable'
-          : 'Planned Treat, nothing planned yet';
+          ? 'Banking Goal, unavailable'
+          : 'Banking Goal. Example: Crumbl cookies, 5,000 calories. Create a Banking Goal';
   const burnedValue =
     todayStatus === 'loading'
       ? 'Loading...'
@@ -423,7 +423,7 @@ export default function TodayScreen() {
           <Pressable
             onPress={() => router.push('/history')}
             accessibilityHint="Opens Bank History."
-            accessibilityLabel={`Available Bank, ${bankValue}, ${throughText}${bankSummary?.recoveryCalories ? `, Recovery, ${bankSummary.recoveryCalories} calories to recover` : ''}`}
+            accessibilityLabel={`Available Bank, ${bankValue}, ${throughText}${visibleCards.showLatestFinalizedContribution ? `, ${latestChangeValue}` : ''}${bankSummary?.recoveryCalories ? `, Recovery, ${bankSummary.recoveryCalories} calories to recover` : ''}`}
             accessibilityRole="button"
             style={({ pressed }) => [styles.heroCard, pressed && styles.pressedCard]}
           >
@@ -431,154 +431,18 @@ export default function TodayScreen() {
               <Text style={styles.cardLabel}>Available Bank</Text>
               <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
             </View>
-            <Text adjustsFontSizeToFit numberOfLines={1} style={styles.bankValue}>
-              {bankValue}
-            </Text>
+            {hasInitializedBank && bankSummary ? <View style={styles.bankAmountRow}>
+              <Text adjustsFontSizeToFit numberOfLines={1} style={styles.bankValue}>{bankSummary.availableBankCalories.toLocaleString()}</Text>
+              <Text style={styles.bankUnit}>kcal</Text>
+            </View> : <Text style={styles.bankValue}>{bankValue}</Text>}
             <Text style={styles.supportingText}>{throughText}</Text>
+            {visibleCards.showLatestFinalizedContribution ? <Text style={styles.supportingText}>{latestChangeValue}</Text> : null}
             {bankStatus === 'loading' ? <ActivityIndicator color={colors.primary} /> : null}
           </Pressable>
 
-        {bankSummary && bankSummary.recoveryCalories > 0 ? (
-          <View accessibilityRole="summary" style={styles.recoverySurface}>
-            <Text style={styles.recoveryLabel}>Recovery</Text>
-            <Text style={styles.recoveryValue}>
-              {bankSummary.recoveryCalories.toLocaleString()} kcal to recover
-            </Text>
-            <Text style={styles.supportingText}>New deposits will restore your bank first.</Text>
-          </View>
-        ) : null}
-
-        {visibleCards.showLatestFinalizedContribution ? (
-            <Pressable
-              onPress={() => router.push('/history')}
-              accessibilityHint="Opens Bank History."
-              accessibilityLabel={`${latestResultLabel(bankSummary)}, ${latestChangeValue}`}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardLabel}>
-                  {latestResultLabel(bankSummary) === 'Yesterday'
-                    ? "Yesterday's contribution"
-                    : 'Latest completed contribution'}
-                </Text>
-                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-              </View>
-              <Text
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-                numberOfLines={1}
-                style={[styles.secondaryValue, styles.contributionValue]}
-              >
-                {latestChangeValue}
-              </Text>
-            </Pressable>
-        ) : null}
-
-        {visibleCards.showCurrentGoal ?
+        {(
           <Pressable
-            onPress={() => router.push('/goal-settings')}
-            accessibilityHint="Opens Goal Settings."
-            accessibilityLabel={`Current goal, ${currentGoalValue}`}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>Current goal</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-            </View>
-            <Text adjustsFontSizeToFit numberOfLines={1} style={styles.secondaryValue}>
-              {currentGoalValue}
-            </Text>
-            <Text style={styles.supportingText}>{formatGoalDetail(goalConfiguration)}</Text>
-          </Pressable>
-        : null}
-
-        {visibleCards.showTodaySoFar ? <Pressable
-          accessibilityHint="Opens today's burn details."
-          accessibilityLabel={`Today so far. Burned ${burnedValue}. Eaten ${eatenValue}.`}
-          accessibilityRole="button"
-          onPress={() => router.push('/today-burn')}
-          style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
-        >
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardLabel}>Today so far</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-          </View>
-          {todayStatus === 'loading' ? (
-            <View style={styles.inlineState}>
-              <ActivityIndicator color={colors.primary} />
-              <Text style={styles.supportingText}>Loading live values.</Text>
-            </View>
-          ) : todayStatus === 'error' ? (
-            <>
-              <Text style={styles.secondaryValue}>Unavailable</Text>
-              <Text style={styles.supportingText}>{healthSyncDetail ?? 'Today’s values could not refresh.'}</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={(event) => {
-                  event.stopPropagation();
-                  void refreshHealthAwareness(true);
-                }}
-                style={({ pressed }) => [styles.retryButton, pressed && styles.pressedCard]}
-              >
-                <Text style={styles.retryButtonText}>Try again</Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <View style={styles.todayMetrics}>
-                <View style={styles.todayMetric}>
-                  <Text style={styles.metricLabel}>Burned</Text>
-                  <Text adjustsFontSizeToFit numberOfLines={1} style={styles.metricValue}>
-                    {burnedValue}
-                  </Text>
-                  <View style={styles.burnDetailRow}>
-                    <Text style={[styles.metricDetail, styles.burnDetail]}>{burnedDetail}</Text>
-                    <Pressable
-                      accessibilityHint="Opens a short explanation without leaving Today."
-                      accessibilityLabel="Why does CalorieBank use 80 percent?"
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={(event) => {
-                        event.stopPropagation();
-                        setShowWhyEighty(true);
-                      }}
-                      style={({ pressed }) => [styles.whyButton, pressed && styles.pressedCard]}
-                    >
-                      <Text style={styles.whyButtonText}>Why 80%?</Text>
-                    </Pressable>
-                  </View>
-                </View>
-                <View style={styles.todayMetric}>
-                  <Text style={styles.metricLabel}>Eaten</Text>
-                  <Text adjustsFontSizeToFit numberOfLines={1} style={styles.metricValue}>
-                    {eatenValue}
-                  </Text>
-                  <Text style={styles.metricDetail}>{eatenDetail}</Text>
-                </View>
-              </View>
-              <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>
-              {today?.burned.status === 'not_connected' || today?.eaten.status === 'not_connected' ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={(event) => {
-                    event.stopPropagation();
-                    router.push('/integrations');
-                  }}
-                  style={({ pressed }) => [styles.retryButton, pressed && styles.pressedCard]}
-                >
-                  <Text style={styles.retryButtonText}>Review Health Connections</Text>
-                </Pressable>
-              ) : null}
-              {healthSyncDetail ? <Text style={styles.supportingText}>{healthSyncDetail}</Text> : null}
-            </>
-          )}
-        </Pressable> : null}
-
-        {visibleCards.showPlannedTreat ? (
-          <Pressable
-            accessibilityHint="Opens Planned Treat setup."
+            accessibilityHint="Opens Banking Goal setup."
             accessibilityLabel={plannedTreatAccessibility}
             accessibilityRole="button"
             onPress={() => router.push('/planned-treat')}
@@ -589,7 +453,7 @@ export default function TodayScreen() {
             ]}
           >
               <View style={styles.cardHeader}>
-                <Text style={styles.cardLabel}>Planned Treat</Text>
+                <Text style={styles.cardLabel}>Banking Goal</Text>
                 <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
               </View>
               {plannedTreatStatus === 'loading' ? (
@@ -600,7 +464,7 @@ export default function TodayScreen() {
               ) : activePlannedTreat ? (
                 <>
                   <View style={styles.treatTitleRow}>
-                    <Text adjustsFontSizeToFit numberOfLines={1} style={styles.treatName}>
+                    <Text adjustsFontSizeToFit numberOfLines={3} style={styles.treatName}>
                       {activePlannedTreat.name}
                     </Text>
                     {activePlannedTreat.status === 'ready' ? (
@@ -636,12 +500,126 @@ export default function TodayScreen() {
                 </>
               ) : (
                 <>
-                  <Text style={styles.treatName}>Nothing planned yet</Text>
-                  <Text style={styles.supportingText}>Choose something worth saving for</Text>
+                  <Text style={styles.treatName}>Bank for something you love.</Text>
+                  <Text accessibilityLabel="Example Banking Goal: Crumbl cookies, 5,000 calories" style={styles.supportingText}>Example: Crumbl cookies · 5,000 kcal</Text>
+                  <Text style={styles.retryButtonText}>Create a Banking Goal</Text>
                 </>
               )}
           </Pressable>
+        )}
+
+        {bankSummary && bankSummary.recoveryCalories > 0 ? (
+          <View accessibilityRole="summary" style={styles.recoverySurface}>
+            <Text style={styles.recoveryLabel}>Recovery</Text>
+            <Text style={styles.recoveryValue}>
+              {bankSummary.recoveryCalories.toLocaleString()} kcal to recover
+            </Text>
+            <Text style={styles.supportingText}>New deposits will restore your bank first.</Text>
+          </View>
         ) : null}
+
+        {visibleCards.showTodaySoFar ? <Pressable
+          accessibilityHint="Opens today's burn details."
+          accessibilityLabel={`Today so far. Eaten ${eatenValue}. Burned ${burnedValue}. Steps ${stepsValue}.`}
+          accessibilityRole="button"
+          onPress={() => router.push('/today-burn')}
+          style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
+        >
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardLabel}>Today so far</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </View>
+          {todayStatus === 'loading' ? (
+            <View style={styles.inlineState}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.supportingText}>Loading live values.</Text>
+            </View>
+          ) : todayStatus === 'error' ? (
+            <>
+              <Text style={styles.secondaryValue}>Unavailable</Text>
+              <Text style={styles.supportingText}>{healthSyncDetail ?? 'Today’s values could not refresh.'}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={(event) => {
+                  event.stopPropagation();
+                  void refreshHealthAwareness(true);
+                }}
+                style={({ pressed }) => [styles.retryButton, pressed && styles.pressedCard]}
+              >
+                <Text style={styles.retryButtonText}>Try again</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <View style={styles.todayMetrics}>
+                <View style={styles.todayMetric}>
+                  <Text style={styles.metricLabel}>Eaten</Text>
+                  <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>
+                    {eatenValue}
+                  </Text>
+                  <Text style={styles.metricDetail}>{eatenDetail}</Text>
+                </View>
+                <View style={styles.todayMetric}>
+                  <Text style={styles.metricLabel}>Burned</Text>
+                  <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>
+                    {burnedValue}
+                  </Text>
+                  <View style={styles.burnDetailRow}>
+                    <Text style={[styles.metricDetail, styles.burnDetail]}>{burnedDetail}</Text>
+                    <Pressable
+                      accessibilityHint="Opens a short explanation without leaving Today."
+                      accessibilityLabel="Why does CalorieBank use 80 percent?"
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        setShowWhyEighty(true);
+                      }}
+                      style={({ pressed }) => [styles.whyButton, pressed && styles.pressedCard]}
+                    >
+                      <Text style={styles.whyButtonText}>Why 80%?</Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+              </View>
+              <View style={styles.todayMetric}><Text style={styles.metricLabel}>Steps</Text><Text style={styles.metricValue}>{stepsValue}</Text></View>
+              <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>
+              {today?.burned.status === 'not_connected' || today?.eaten.status === 'not_connected' ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    router.push('/integrations');
+                  }}
+                  style={({ pressed }) => [styles.retryButton, pressed && styles.pressedCard]}
+                >
+                  <Text style={styles.retryButtonText}>Review Health Connections</Text>
+                </Pressable>
+              ) : null}
+              {healthSyncDetail ? <Text style={styles.supportingText}>{healthSyncDetail}</Text> : null}
+            </>
+          )}
+        </Pressable> : null}
+
+        {visibleCards.showCurrentGoal ?
+          <Pressable
+            onPress={() => router.push('/goal-settings')}
+            accessibilityHint="Opens Fitness Goal."
+            accessibilityLabel={`Fitness Goal, ${currentGoalValue}`}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardLabel}>Fitness Goal</Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </View>
+            <Text adjustsFontSizeToFit numberOfLines={1} style={styles.secondaryValue}>
+              {currentGoalValue}
+            </Text>
+            <Text style={styles.supportingText}>{formatGoalDetail(goalConfiguration)}</Text>
+          </Pressable>
+        : null}
 
         {visibleCards.showSteps ? (
           <Pressable
@@ -878,8 +856,10 @@ const styles = StyleSheet.create({
     fontSize: 44,
     fontWeight: '900',
     fontVariant: ['tabular-nums'],
-    textAlign: 'center',
+    flexShrink: 1,
   },
+  bankAmountRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: spacing.xs },
+  bankUnit: { color: colors.text, fontSize: typography.subheading, fontWeight: '700' },
   secondaryValue: {
     color: colors.text,
     fontSize: 30,

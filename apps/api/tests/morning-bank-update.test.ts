@@ -76,7 +76,7 @@ function fixture(options: {
 describe('Morning Bank Update copy', () => {
   it('puts Available Bank first for positive contributions', () => {
     expect(morningBankUpdateCopy(2843, 547)).toEqual({
-      title: 'Available Bank: 2,843 kcal', body: 'You banked 547 kcal yesterday.',
+      title: 'Available Bank: 2,843 kcal 🎉', body: 'You banked 547 kcal yesterday.',
     });
   });
 
@@ -118,7 +118,7 @@ describe('Morning Bank Update eligibility and delivery', () => {
     expect(await service.deliverForUser(userId, 'America/Chicago')).toEqual({ status: 'already_handled' });
     expect(transport.send).toHaveBeenCalledOnce();
     expect(transport.send).toHaveBeenCalledWith(expect.objectContaining({
-      title: 'Available Bank: 2,843 kcal', body: 'You banked 547 kcal yesterday.',
+      title: 'Available Bank: 2,843 kcal 🎉', body: 'You banked 547 kcal yesterday.',
     }));
   });
 

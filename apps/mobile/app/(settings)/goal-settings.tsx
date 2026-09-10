@@ -10,8 +10,8 @@ export default function GoalSettingsScreen() {
   return (
     <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <PlaceholderScreen
-        eyebrow="Goal"
-        title="Update your goal"
+        eyebrow="Fitness Goal"
+        title="Update your Fitness Goal"
         description="Choose your weight goal and daily calorie adjustment. Changes apply to future days."
       >
         <GoalConfigurationForm mode="settings" onSaved={() => router.replace('/today')} />

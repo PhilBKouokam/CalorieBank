@@ -40,7 +40,7 @@ export function isMorningBankUpdateWindow(timezone: string, now: Date) {
 }
 
 export function morningBankUpdateCopy(availableBankCalories: number, contributionCalories: number) {
-  const title = `Available Bank: ${availableBankCalories.toLocaleString('en-US')} kcal`;
+  const title = `Available Bank: ${availableBankCalories.toLocaleString('en-US')} kcal${contributionCalories > 0 ? ' 🎉' : ''}`;
   const magnitude = Math.abs(contributionCalories).toLocaleString('en-US');
   const body = contributionCalories > 0
     ? `You banked ${magnitude} kcal yesterday.`

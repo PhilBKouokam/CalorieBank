@@ -1,3 +1,4 @@
+import { StepPlanningCards } from '@/components/caloriebank/StepPlanningCards';
 import type { TodayResponse } from '@caloriebank/schemas';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -32,13 +33,20 @@ export default function TodayBurnDetailScreen() {
   const intakeSource = getConsumerSourceName(today?.eaten.source);
   return (
     <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={styles.container}>
         <Text style={styles.title}>Today so far</Text>
         {!today && !failed ? <ActivityIndicator color={colors.primary} /> : null}
         {failed ? <Text style={styles.unavailable}>Today’s values could not load.</Text> : null}
         {today ? (
           <>
             <View style={styles.card}>
+              <View style={styles.metricBlock}>
+                <Text style={styles.metricLabel}>Eaten</Text>
+                <Text style={styles.metricValue}>
+                  {today.eaten.calories === null ? 'Unavailable' : `${today.eaten.calories.toLocaleString()} kcal`}
+                </Text>
+                <Text style={styles.detail}>Imported from {intakeSource}</Text>
+              </View>
               <View style={styles.metricBlock}>
                 <Text style={styles.metricLabel}>Burned</Text>
                 <Text style={styles.metricValue}>
@@ -50,15 +58,10 @@ export default function TodayBurnDetailScreen() {
                     : `${today.burned.raw.toLocaleString()} reported by ${burnSource} × ${Math.round(today.burned.adjustmentFactor * 100)}%`}
                 </Text>
               </View>
-              <View style={styles.metricBlock}>
-                <Text style={styles.metricLabel}>Eaten</Text>
-                <Text style={styles.metricValue}>
-                  {today.eaten.calories === null ? 'Unavailable' : `${today.eaten.calories.toLocaleString()} kcal`}
-                </Text>
-                <Text style={styles.detail}>Imported from {intakeSource}</Text>
-              </View>
+
             </View>
 
+            <View style={styles.card}><Text style={styles.metricLabel}>Steps</Text><Text style={styles.metricValue}>{today.steps.count?.toLocaleString() ?? 'Unavailable'}</Text></View>
             <Text style={styles.sectionTitle}>If you rested for the rest of today</Text>
             <View style={styles.card}>
               {today.restOfDayProjection.status === 'ready' &&
@@ -83,6 +86,8 @@ export default function TodayBurnDetailScreen() {
                 </Text>
               )}
             </View>
+
+            <StepPlanningCards today={today} />
 
             {today.restOfDayProjection.providerKcalPerHour !== null &&
             today.restOfDayProjection.adjustedKcalPerHour !== null ? (

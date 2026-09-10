@@ -1,4 +1,19 @@
 import type { DailyStepAggregate, PrismaClient } from '@prisma/client';
+import { estimateWalkingTime } from '@caloriebank/domain';
+
+export async function estimateWalkingPace(db: PrismaClient, userId: string, provider: string, now = new Date()) {
+  const workouts = await db.currentDayWorkout.findMany({
+    where: { userId, provider, activityType: 'walking', syncStatus: 'ready',
+      startedAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) },
+      endedAt: { lte: now }, durationMinutes: { gt: 0 }, totalSteps: { gt: 0 } },
+    orderBy: { startedAt: 'desc' },
+  });
+  const estimate = estimateWalkingTime(100, workouts.map((workout) => ({
+    id: workout.id, provider: workout.provider, activityType: workout.activityType,
+    startedAt: workout.startedAt, durationMinutes: workout.durationMinutes, steps: workout.totalSteps ?? 0,
+  })), { provider, now });
+  return estimate ? { stepsPerMinute: estimate.stepsPerMinute, sampleCount: estimate.sampleCount } : null;
+}
 
 import { readProviderSelection } from '../provider-selection/provider-selection.repository';
 

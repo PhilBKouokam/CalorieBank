@@ -1,3 +1,5 @@
+export { estimateWalkingTime, walkingTimeFromPace, type WalkingTimeSample, type WalkingTimeEstimate } from './walking-time';
+
 export type BankGoalMode = 'cut' | 'maintain' | 'bulk';
 
 export const V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE = 0.8;

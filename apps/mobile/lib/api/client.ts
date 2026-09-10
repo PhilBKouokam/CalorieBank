@@ -1,4 +1,6 @@
 import {
+  dailyBankTargetInputSchema,
+  dailyBankTargetResponseSchema,
   bankHistoryDayDetailResponseSchema,
   openingBankDetailResponseSchema,
   bankHistoryResponseSchema,
@@ -488,7 +490,7 @@ export async function fetchPlannedTreat(): Promise<PlannedTreatGetResponse> {
   const response = await apiRequest('/v1/me/planned-treat');
 
   if (!response.ok) {
-    throw new Error(`Unable to load your Planned Treat (${response.status}).`);
+    throw new Error(`Unable to load your Banking Goal (${response.status}).`);
   }
 
   return plannedTreatGetResponseSchema.parse(await response.json());
@@ -731,6 +733,20 @@ export async function completeIngestionSyncSession(
   return ingestionSyncSessionResponseSchema.parse(await response.json());
 }
 
+export async function fetchDailyBankTarget() {
+  const response = await apiRequest('/v1/me/daily-bank-target');
+  if (!response.ok) throw new Error('Unable to load Daily Bank Target.');
+  return dailyBankTargetResponseSchema.parse(await response.json());
+}
+
+export async function saveDailyBankTarget(calories: number) {
+  const response = await apiRequest('/v1/me/daily-bank-target', {
+    method: 'PUT', body: JSON.stringify(dailyBankTargetInputSchema.parse({ calories })),
+  });
+  if (!response.ok) throw new Error('Unable to save Daily Bank Target.');
+  return dailyBankTargetResponseSchema.parse(await response.json());
+}
+
 export async function fetchDashboardPreferences(): Promise<DashboardPreferencesResponse> {
   const response = await apiRequest('/v1/me/dashboard-preferences');
   if (!response.ok) throw new Error(`Unable to load Today preferences (${response.status}).`);
@@ -759,7 +775,7 @@ export async function createOrReplacePlannedTreat(
   });
 
   if (!response.ok) {
-    throw new Error(`Unable to save your Planned Treat (${response.status}).`);
+    throw new Error(`Unable to save your Banking Goal (${response.status}).`);
   }
 
   return activePlannedTreatResponseSchema.parse(await response.json());
@@ -775,7 +791,7 @@ export async function updatePlannedTreat(
   });
 
   if (!response.ok) {
-    throw new Error(`Unable to update your Planned Treat (${response.status}).`);
+    throw new Error(`Unable to update your Banking Goal (${response.status}).`);
   }
 
   return activePlannedTreatResponseSchema.parse(await response.json());
@@ -787,7 +803,7 @@ export async function deletePlannedTreat(): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error(`Unable to remove your Planned Treat (${response.status}).`);
+    throw new Error(`Unable to remove your Banking Goal (${response.status}).`);
   }
 }
 

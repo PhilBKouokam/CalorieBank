@@ -61,7 +61,7 @@ export default function PlannedTreatScreen() {
       } catch {
         if (!isMounted) return;
         setStatus('error');
-        setMessage('Your Planned Treat could not be loaded. Try again later.');
+        setMessage('Your Banking Goal could not be loaded. Try again later.');
       }
     }
 
@@ -97,11 +97,11 @@ export default function PlannedTreatScreen() {
       }
 
       setStatus('success');
-      setMessage('Planned Treat saved.');
+      setMessage('Banking Goal saved.');
       setTimeout(() => router.replace('/today'), 400);
     } catch {
       setStatus('error');
-      setMessage('Your Planned Treat could not be saved. Try again later.');
+      setMessage('Your Banking Goal could not be saved. Try again later.');
     }
   }
 
@@ -112,11 +112,11 @@ export default function PlannedTreatScreen() {
     try {
       await deletePlannedTreat();
       setStatus('success');
-      setMessage('Planned Treat removed.');
+      setMessage('Banking Goal removed.');
       setTimeout(() => router.replace('/today'), 400);
     } catch {
       setStatus('error');
-      setMessage('Your Planned Treat could not be removed. Try again later.');
+      setMessage('Your Banking Goal could not be removed. Try again later.');
     }
   }
 
@@ -131,7 +131,7 @@ export default function PlannedTreatScreen() {
 
   return (
     <PlaceholderScreen
-      eyebrow="Planned Treat"
+      eyebrow="Banking Goal"
       title={activeTreat ? 'Edit your plan' : 'Choose something to save for'}
       description="Name one food, meal, or event. CalorieBank compares it with your real Available Bank without spending it automatically."
       keyboardAware
@@ -159,7 +159,7 @@ export default function PlannedTreatScreen() {
 
             <Text style={styles.label}>Treat name</Text>
             <TextInput
-              accessibilityLabel="Planned Treat name"
+              accessibilityLabel="Banking Goal name"
               autoCapitalize="sentences"
               onChangeText={setName}
               onFocus={() => revealInput(nameInputRef.current)}
@@ -184,7 +184,7 @@ export default function PlannedTreatScreen() {
             />
 
             <Text style={styles.help}>
-              Reaching a Planned Treat means it is ready. Your connected calorie tracker still records what you eat.
+              Reaching a Banking Goal means it is ready. Your connected calorie tracker still records what you eat.
             </Text>
 
             {message ? (
@@ -200,7 +200,7 @@ export default function PlannedTreatScreen() {
               {status === 'saving' ? (
                 <ActivityIndicator color={colors.surface} />
               ) : (
-                <Text style={styles.primaryButtonText}>Save Planned Treat</Text>
+                <Text style={styles.primaryButtonText}>Save Banking Goal</Text>
               )}
             </Pressable>
 
@@ -214,7 +214,7 @@ export default function PlannedTreatScreen() {
                 {status === 'deleting' ? (
                   <ActivityIndicator color={colors.primary} />
                 ) : (
-                  <Text style={styles.secondaryButtonText}>Remove Planned Treat</Text>
+                  <Text style={styles.secondaryButtonText}>Remove Banking Goal</Text>
                 )}
               </Pressable>
             ) : null}

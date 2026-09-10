@@ -52,14 +52,14 @@ function formatDate(value: string) {
 }
 
 function contributionVerb(value: number) {
-  if (value > 0) return 'Deposited';
+  if (value > 0) return 'Banked';
   if (value < 0) return 'Enjoyed';
   return 'No change';
 }
 
 function goalAdjustmentText(day: BankHistoryDayDetailResponse) {
-  if (day.goalMode === 'maintain') return 'Maintain weight';
-  const label = day.goalMode === 'cut' ? 'Lose weight' : 'Gain weight';
+  if (day.goalMode === 'maintain') return 'Maintenance';
+  const label = day.goalMode === 'cut' ? 'Deficit' : 'Surplus';
   return `${label} · ${day.goalAdjustmentCalories.toLocaleString()} kcal`;
 }
 

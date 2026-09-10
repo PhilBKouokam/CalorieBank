@@ -1,4 +1,6 @@
 import cors from 'cors';
+import { DailyBankTargetRepository } from './modules/daily-bank-target/daily-bank-target.repository';
+import { createDailyBankTargetRouter } from './modules/daily-bank-target/daily-bank-target.routes';
 import express from 'express';
 
 import {
@@ -232,6 +234,7 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
     '/v1/me/dashboard-preferences',
     createDashboardPreferencesRouter(dashboardPreferencesRepository, currentUser),
   );
+  app.use('/v1/me/daily-bank-target', createDailyBankTargetRouter(new DailyBankTargetRepository(prisma), currentUser));
   app.use(
     '/v1/me/ingestion/sync-sessions',
     createSyncSessionRouter(syncSessionRepository, currentUser, finalizationScheduler),

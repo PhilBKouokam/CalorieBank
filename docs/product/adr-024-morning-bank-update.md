@@ -10,6 +10,11 @@ The server evaluates delivery on the existing hourly hosted lifecycle from 07:00
 
 ## Delivery And Retry
 
+Phase 1 copy polish adds `🎉` after `kcal` in the title only when yesterday's
+contribution is positive. Negative and zero titles remain unadorned. iOS supplies
+the app-name/icon header; the title does not repeat CalorieBank. This changes no
+delivery state, eligibility, timing, or retry behavior.
+
 Delivery state is durable and unique by CalorieBank user plus completed local date. A successful Expo push ticket is the no-resend boundary. Expo may provide at-least-once transport downstream, but CalorieBank never intentionally submits a second push after ticket acceptance. A transient send failure with a known rejection retries on a later hourly run, at most three attempts and only inside the same morning window. An attempt interrupted with an unknown outcome is not automatically resubmitted, preventing a server restart from creating a duplicate. A permanent invalid-token response disables that device registration. Receipt checks begin after 15 minutes and can invalidate unusable tokens without resending an already accepted notification.
 
 Notification failure never changes accounting. Opening Bank, Available Bank, Recovery, History, ledger, provider authority, and correction behavior remain independent.

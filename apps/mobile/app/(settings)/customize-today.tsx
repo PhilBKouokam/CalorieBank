@@ -14,9 +14,8 @@ const optionalCards: {
   label: string;
 }[] = [
   { key: 'showLatestFinalizedContribution', label: 'Latest completed contribution' },
-  { key: 'showCurrentGoal', label: 'Current goal' },
+  { key: 'showCurrentGoal', label: 'Fitness Goal' },
   { key: 'showTodaySoFar', label: 'Today so far' },
-  { key: 'showPlannedTreat', label: 'Planned Treat' },
   { key: 'showSteps', label: 'Steps today' },
   { key: 'showWorkouts', label: 'Logged workouts' },
 ];

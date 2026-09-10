@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { FoodTrackerHelp } from '@/components/caloriebank/FoodTrackerHelp';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -45,6 +46,7 @@ export default function IntegrationsScreen() {
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const [connections, setConnections] = useState<HealthConnectionsResponse | null>(null);
+  const [helpBundleId, setHelpBundleId] = useState<string | null>(null);
   const [appleState, setAppleState] = useState<AppleState>('loading');
   const [appleBurnState, setAppleBurnState] = useState<AppleHealthBurnState>('needs_refresh');
   const [loading, setLoading] = useState(true);
@@ -76,11 +78,13 @@ export default function IntegrationsScreen() {
   const load = useCallback(async (showLoading = false) => {
     const generation = ++loadGeneration.current;
     if (showLoading) setLoading(true);
-    const [healthConnections, localStatus, diagnostics] = await Promise.all([
+    const [healthConnections, localStatus, diagnostics, selection] = await Promise.all([
       fetchHealthConnections(), getAppleHealthConnectionStatus().catch(() => 'not_connected' as const), getAppleHealthDiagnostics().catch(() => null),
+      fetchProviderSelection(),
     ]);
     if (generation !== loadGeneration.current) return;
     setConnections(healthConnections);
+    setHelpBundleId(selection.intake.writerBundleIdentifier);
     setAppleState(deriveAppleHealthPresentationState(localStatus, diagnostics));
     setAppleBurnState(deriveAppleHealthBurnState(localStatus, diagnostics));
     setLoading(false);
@@ -358,6 +362,7 @@ export default function IntegrationsScreen() {
         </View>
         <RoleCard data={displayConnections?.burned ?? null} onPress={() => openRole('burned')} role="burned" />
         <RoleCard data={displayConnections?.eaten ?? null} onPress={() => openRole('eaten')} role="eaten" />
+        {appleUsable && displayConnections?.eaten.selected?.transportLabel === 'Apple Health' && displayConnections.eaten.selected.status === 'no_data' ? <FoodTrackerHelp provider="apple_health" bundleId={helpBundleId} /> : null}
         <InventorySection
           addLabel="Add burn source"
           appleBurnState={appleBurnState}

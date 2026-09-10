@@ -48,6 +48,12 @@ export function hasLatestCompletedContribution(summary: BankSummaryResponse | nu
   return summary?.latestCompletedDate != null && summary.latestDailyBankChange != null;
 }
 
+export function completedContributionSentence(value: number, dateLabel = 'yesterday') {
+  if (value > 0) return `You banked ${value.toLocaleString('en-US')} kcal ${dateLabel}.`;
+  if (value < 0) return `You enjoyed ${Math.abs(value).toLocaleString('en-US')} kcal ${dateLabel}.`;
+  return `You were right on target ${dateLabel}.`;
+}
+
 export function presentTodayContribution(value: number) {
   if (value < 0) {
     return {

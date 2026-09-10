@@ -8,6 +8,12 @@ This PRD is the authoritative V1 product document. It supersedes prior food-logg
 
 ## Private Beta Milestones
 
+- **Phase 1 pre-Android coherence — approved, implementation in progress.**
+  [The Phase 1 contract](phase-1-pre-android.md) defines Daily Bank Target as
+  zero-default planning metadata, the limited Banking Goal consumer rename,
+  walking-time estimates, and the required release gates. It does not authorize
+  the deferred ADR 013 allocation system or changes to completed accounting.
+
 - **PB.1: Core banking and lifecycle reliability — complete.** The accepted connection-first, ingestion, Opening Bank, completed-day continuity, account-isolation, and lifecycle behavior is the baseline.
 - **PB.2: Private Beta Readiness & Account Safety.** Production-safe observability and redaction, private-beta rate limits, self-service account deletion, provider and Clerk cleanup, backup/restore operations, support-safe diagnostics, regression coverage, and distribution readiness. PB.2 must not change PB.1 accounting.
 - **Morning Bank Update — implemented after PB.2.** ADR 024 governs permission, delivery, copy, timing, retries, and account privacy.
@@ -282,7 +288,14 @@ Preferred language:
 
 Avoid language implying that the Planning Database is the official food log, that planning entries automatically become consumed meals, or that planning estimates automatically affect the bank.
 
-## Planned Treat
+## Banking Goal (Legacy Planned Treat Persistence)
+
+Phase 1 changes the consumer name to Banking Goal throughout the existing single
+planning-goal experience described below. Internal Planned Treat names remain for
+compatibility. The card always follows Available Bank; its empty state is an
+explicitly labeled example, never persisted. The existing comparison/progress
+semantics remain unchanged. References to Planned Treat in the legacy contract
+below identify that same persistence model, not a second consumer feature.
 
 V1 supports one active Planned Treat per user. A Planned Treat gives the all-time Available Bank a concrete purpose, such as cookies and milk, ice cream, a restaurant dinner, pizza night, or a birthday meal.
 
@@ -326,9 +339,11 @@ If Available Bank is zero or negative, progress displays as `0%` and remaining c
 
 Reaching a Planned Treat does not automatically deduct calories from the bank. Treat readiness and bank usage are separate concepts. The user still records actual consumption in their normal calorie tracker. CalorieBank later receives total intake and automatically reflects any daily overage during finalization.
 
-The Planned Treat card is an available V1 supporting card that may be manually discovered or progressively introduced. It is not required on a new user's first Today screen. Empty, saving, ready, loading, and unavailable states should use friendly consumer language and must not show raw infrastructure errors.
+The Banking Goal card is always visible after Available Bank in Phase 1. Empty, saving, ready, loading, and unavailable states use friendly consumer language and must not show raw infrastructure errors.
 
-## Banking Goals
+## Future Banking Goal Allocations
+
+The Phase 1 consumer rename does not implement this deferred allocation system.
 
 Banking Goals is an approved, progressively discovered V1 Planning capability. It lets users organize finalized Available Bank calories around foods, meals, events, or experiences they are saving for.
 
@@ -451,16 +466,14 @@ CalorieBank V1 is an all-time calorie-bank interface powered by connected expend
 The initial Today experience should remain bank-first. When corresponding optional cards are visible,
 the accepted consumer hierarchy is:
 
-1. Available Bank.
-2. Recovery, when applicable.
-3. Yesterday's or the latest completed contribution.
-4. Current Goal.
-5. Today So Far.
-6. Planned Treat.
-7. Steps Today.
-8. Logged Workouts.
+1. Available Bank, with yesterday's or the latest completed contribution inside.
+2. Banking Goal.
+3. Recovery, when applicable, as a secondary accounting notice.
+4. Today so far: Eaten, Burned, Steps.
+5. Fitness Goal and other enabled supporting cards.
+6. Steps and Logged Workouts when enabled.
 
-Available Bank is mandatory, always visible, and always first. Today So Far, Today's Eating Budget, Planned Treat, Steps Today, Logged Workouts, Current Goal, Emergency Bank, Today's Forecast, and other optional supporting cards may be available in V1 without being initially visible. Their contextual discovery and activation follow ADR 011; proactive recommendation readiness and pacing follow ADR 014.
+Available Bank is mandatory, always visible, and always first. Banking Goal follows in Phase 1. Today so far, Steps, Logged Workouts, and Fitness Goal retain their supporting visibility preferences. Future Eating Budget, Emergency Bank, and advanced forecasts remain separately gated. Contextual discovery follows ADR 011; proactive recommendation readiness and pacing follow ADR 014.
 
 Banking Goals need not appear as competing bank cards on Today. When introduced, their entry point and summary must preserve Available Bank as the single primary balance and label allocated versus Unassigned calories clearly.
 

@@ -593,6 +593,7 @@ export const todayResponseSchema = z.object({
     status: todaySourceStatusSchema,
   }),
   steps: z.object({
+    walkingPace: z.object({ stepsPerMinute: z.number().min(10).max(250), sampleCount: z.number().int().min(2).max(5) }).nullable().optional(),
     count: z.number().int().nonnegative().nullable(),
     source: z.string().min(1).nullable(),
     lastSyncedAt: z.string().datetime().nullable(),
@@ -645,6 +646,13 @@ export const todayResponseSchema = z.object({
     lastSyncedAt: z.string().datetime().nullable(),
     status: todaySourceStatusSchema,
   }),
+});
+
+export const dailyBankTargetInputSchema = z.object({
+  calories: z.number().int().min(0).max(2000),
+}).strict();
+export const dailyBankTargetResponseSchema = dailyBankTargetInputSchema.extend({
+  chosen: z.boolean(),
 });
 
 export const dashboardPreferencesShape = {

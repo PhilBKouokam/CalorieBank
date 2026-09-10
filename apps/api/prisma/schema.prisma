@@ -405,6 +405,8 @@ model ExternalProviderOAuthAttempt {
 }
 
 model UserProfile {
+  dailyBankTargetCalories Int @default(0) @map("daily_bank_target_calories")
+  dailyBankTargetChosenAt DateTime? @map("daily_bank_target_chosen_at") @db.Timestamptz
   userId                     String    @id @map("user_id") @db.Uuid
   timezone                   String    @default("UTC")
   onboardingWelcomeCompleted Boolean   @default(false) @map("onboarding_welcome_completed")

@@ -11,8 +11,9 @@ export default function SettingsLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
-      <Stack.Screen name="goal-settings" options={{ title: 'Goal Settings' }} />
-      <Stack.Screen name="planned-treat" options={{ title: 'Planned Treat' }} />
+      <Stack.Screen name="goal-settings" options={{ title: 'Fitness Goal' }} />
+      <Stack.Screen name="daily-bank-target" options={{ title: 'Daily Bank Target' }} />
+      <Stack.Screen name="planned-treat" options={{ title: 'Banking Goal' }} />
       <Stack.Screen name="integrations" options={{ title: 'Health Connections' }} />
       <Stack.Screen name="health-diagnostics" options={{ title: 'HealthKit Diagnostics' }} />
       <Stack.Screen name="customize-today" options={{ title: 'Customize Today' }} />

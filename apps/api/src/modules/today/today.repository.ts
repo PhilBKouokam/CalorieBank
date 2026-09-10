@@ -23,7 +23,7 @@ import { AppError } from '../../errors';
 import { getProviderDisplayName, isSyntheticProvider } from './provider-catalog';
 import { combineTodayFreshness, currentDayFreshness } from './today.freshness';
 import { readProviderSelection } from '../provider-selection/provider-selection.repository';
-import { estimateStepContribution } from './steps-intelligence';
+import { estimateStepContribution, estimateWalkingPace } from './steps-intelligence';
 
 export type AggregateUpsertResult = 'created' | 'updated' | 'unchanged' | 'ignored_stale';
 
@@ -679,6 +679,8 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       userId,
       stepsStatus === 'ready' ? steps : null,
     );
+    const walkingPace = stepsStatus === 'ready' && steps
+      ? await estimateWalkingPace(this.db, userId, steps.provider) : null;
     const adjustmentFactor =
       expenditure?.adjustmentFactor.toNumber() ?? V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE;
     const stepProjection =
@@ -747,6 +749,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         status: eatenStatus,
       },
       steps: {
+        walkingPace,
         count: steps?.totalSteps ?? null,
         source: steps || contextSession ? getProviderDisplayName(steps?.provider ?? contextProvider) : null,
         lastSyncedAt: steps ? latestSyncedAt(steps) : contextSyncedAt?.toISOString() ?? null,

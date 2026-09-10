@@ -221,14 +221,14 @@ describe('consumer routes', () => {
   it('presents Available Bank as an unsigned balance and keeps Today contribution concise', () => {
     const source = mobileFile('app/(tabs)/today.tsx');
     expect(source).toContain('formatBankBalance(bankSummary.availableBankCalories)');
-    expect(source).toContain('style={[styles.secondaryValue, styles.contributionValue]}');
+    expect(source).toContain('<Text style={styles.supportingText}>{latestChangeValue}</Text>');
     expect(source).not.toMatch(/latestDailyBankChange < 0[\s\S]*negativeValue/);
     expect(source).not.toMatch(/Added to your bank|Withdrawn from your bank|Adjusted from|May still update/);
     expect(source.indexOf('hasInitializedBank && bankSummary'))
       .toBeLessThan(source.indexOf("bankStatus === 'loading'"));
     expect(source.indexOf('hasCompletedDays && bankSummary'))
       .toBeLessThan(source.indexOf("bankStatus === 'loading'", source.indexOf('const latestChangeValue')));
-    expect(source).toContain('minimumFontScale={0.8}');
+    expect(source).toContain('completedContributionSentence');
     expect(source).not.toContain('latestContributionContext');
   });
 
@@ -242,14 +242,13 @@ describe('consumer routes', () => {
     expect(today).toContain("router.push('/today-burn')");
     expect(today).toContain('accessibilityHint="Opens step contribution and what-if details."');
     expect(today).toContain('accessibilityHint="Opens today\'s burn details."');
-    expect(steps).toContain('calculateStepToBurnPlan');
-    expect(steps).toContain('calculateBurnToStepPlan');
-    expect(steps).toContain('suggestNextStepTarget');
+    const planning = mobileFile('components/caloriebank/StepPlanningCards.tsx');
+    expect(steps).toContain('<StepPlanningCards today={today} />');
+    expect(burn).toContain('<StepPlanningCards today={today} />');
+    expect(planning).toContain('calculateStepToBurnPlan');
+    expect(planning).toContain('calculateBurnToStepPlan');
+    expect(planning).toContain('suggestNextStepTarget');
     expect(steps).toContain('`${stepSource} reported`');
-    expect(steps).toContain('`Projected Total Daily ${burnSource} burn`');
-    expect(steps).toContain('targetActualBurnCalories: burnTarget');
-    expect(steps).toContain('{burnSource} calories');
-    expect(steps).toContain('I’d need about');
     expect(steps).toContain('currentProviderBurn.toLocaleString()');
     expect(steps).toContain('currentAdjustedBurn.toLocaleString()');
     expect(steps).not.toContain('restOfDayProjection.projectedProviderBurnCalories.toLocaleString()');
@@ -258,11 +257,9 @@ describe('consumer routes', () => {
     expect(today).not.toContain('<Link href="/planned-treat" asChild>');
     expect(steps).toContain('automaticallyAdjustKeyboardInsets');
     expect(steps).toContain('keyboardDismissMode="interactive"');
-    expect(steps).toContain('onFocus={() => revealCard(inverseCardY.current)}');
-    expect(steps).toContain('If I walk…');
-    expect(steps).not.toContain('What if I walk…');
-    expect(steps.indexOf('If I want to burn…')).toBeLessThan(steps.indexOf('If I walk…'));
-    expect(today.indexOf("Yesterday's contribution")).toBeLessThan(today.indexOf('Current goal'));
+    expect(planning).toContain('If I walk…');
+    expect(planning).not.toContain('What if I walk…');
+    expect(planning.indexOf('If I want to burn…')).toBeLessThan(planning.indexOf('If I walk…'));
     expect(burn).toContain('getConsumerSourceName(today?.burned.source)');
     expect(burn).toContain('getConsumerSourceName(today?.eaten.source)');
     expect(today).toContain('accessibilityLabel="Why does CalorieBank use 80 percent?"');

@@ -1,11 +1,7 @@
-import {
-  calculateBurnToStepPlan,
-  calculateStepToBurnPlan,
-  suggestNextStepTarget,
-} from '@caloriebank/domain';
+import { StepPlanningCards } from '@/components/caloriebank/StepPlanningCards';
 import type { TodayResponse } from '@caloriebank/schemas';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
@@ -13,80 +9,17 @@ import { fetchToday } from '@/lib/api/client';
 import { getConsumerSourceName } from '@/lib/providers/presentation';
 import { formatContributionPercentage } from '@/lib/today/presentation';
 
-function estimateStatus(today: TodayResponse) {
-  if (today.steps.status === 'stale') return 'Your step data is out of date.';
-  if (today.steps.status === 'syncing') return 'Your step source is refreshing.';
-  if (today.steps.status === 'not_connected') return 'Connect an activity source to see steps.';
-  if (today.steps.count === null) return 'Step data is unavailable today.';
-  return 'A walking calorie estimate is unavailable for this source.';
-}
-
 export default function StepsDetailScreen() {
   const [today, setToday] = useState<TodayResponse | null>(null);
   const [failed, setFailed] = useState(false);
-  const [stepTargetInput, setStepTargetInput] = useState('');
-  const [burnTargetInput, setBurnTargetInput] = useState('');
-  const scrollRef = useRef<ScrollView>(null);
-  const forwardCardY = useRef(0);
-  const inverseCardY = useRef(0);
-
   useEffect(() => {
     fetchToday(Intl.DateTimeFormat().resolvedOptions().timeZone)
       .then((value) => {
         setToday(value);
-        if (value.steps.count !== null) {
-          setStepTargetInput(String(suggestNextStepTarget(value.steps.count)));
-        }
-        if (value.restOfDayProjection.projectedProviderBurnCalories !== null) {
-          const adjustedBaseline = value.restOfDayProjection.projectedProviderBurnCalories *
-            value.burned.adjustmentFactor;
-          setBurnTargetInput(String(Math.ceil((adjustedBaseline + 1) / 500) * 500));
-        }
+
       })
       .catch(() => setFailed(true));
   }, []);
-
-  const stepTarget = Number(stepTargetInput) || 0;
-  const burnTarget = Number(burnTargetInput) || 0;
-  const forwardPlan = useMemo(() => {
-    if (
-      !today ||
-      today.steps.status !== 'ready' ||
-      today.burned.status !== 'ready' ||
-      today.steps.count === null ||
-      today.steps.caloriesPerStep === null ||
-      today.restOfDayProjection.status !== 'ready' ||
-      today.restOfDayProjection.projectedProviderBurnCalories === null
-    ) return null;
-    return calculateStepToBurnPlan({
-      currentSteps: today.steps.count,
-      targetSteps: stepTarget,
-      providerCaloriesPerStep: today.steps.caloriesPerStep,
-      projectedProviderBurnAtRest:
-        today.restOfDayProjection.projectedProviderBurnCalories,
-      adjustmentFactor: today.burned.adjustmentFactor,
-    });
-  }, [stepTarget, today]);
-
-  const inversePlan = useMemo(() => {
-    if (
-      !today ||
-      today.steps.status !== 'ready' ||
-      today.burned.status !== 'ready' ||
-      today.steps.count === null ||
-      today.steps.caloriesPerStep === null ||
-      today.restOfDayProjection.status !== 'ready' ||
-      today.restOfDayProjection.projectedProviderBurnCalories === null
-    ) return null;
-    return calculateBurnToStepPlan({
-      currentSteps: today.steps.count,
-      targetActualBurnCalories: burnTarget,
-      providerCaloriesPerStep: today.steps.caloriesPerStep,
-      projectedProviderBurnAtRest:
-        today.restOfDayProjection.projectedProviderBurnCalories,
-      adjustmentFactor: today.burned.adjustmentFactor,
-    });
-  }, [burnTarget, today]);
 
   const stepSource = getConsumerSourceName(today?.steps.source);
   const burnSource = getConsumerSourceName(today?.burned.source);
@@ -96,9 +29,6 @@ export default function StepsDetailScreen() {
   const currentAdjustedBurn = today?.burned.adjusted ?? null;
   const providerContributionReady = providerContribution !== null && currentProviderBurn !== null;
   const actualContributionReady = actualContribution !== null && currentAdjustedBurn !== null;
-  const revealCard = (y: number) => {
-    setTimeout(() => scrollRef.current?.scrollTo({ y, animated: true }), 250);
-  };
   return (
     <SafeAreaView edges={['bottom']} style={styles.safeArea}>
       <ScrollView
@@ -106,7 +36,6 @@ export default function StepsDetailScreen() {
         contentContainerStyle={styles.container}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        ref={scrollRef}
       >
         {!today && !failed ? <ActivityIndicator color={colors.primary} /> : null}
         {failed ? <Text style={styles.unavailable}>Steps could not load.</Text> : null}
@@ -157,84 +86,7 @@ export default function StepsDetailScreen() {
               />
             </View>
 
-            <View
-              onLayout={(event) => { inverseCardY.current = event.nativeEvent.layout.y; }}
-              style={styles.card}
-            >
-              <Text style={styles.cardTitle}>If I want to burn…</Text>
-              <View style={styles.inputRow}>
-                <TextInput
-                  accessibilityLabel="Desired estimated actual calories burned today"
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  onChangeText={(value) => setBurnTargetInput(value.replace(/\D/g, ''))}
-                  onFocus={() => revealCard(inverseCardY.current)}
-                  selectTextOnFocus
-                  style={styles.input}
-                  value={burnTargetInput}
-                />
-                <Text style={styles.inputUnit}>calories</Text>
-              </View>
-              {inversePlan ? (
-                <View accessibilityLiveRegion="polite" style={styles.results}>
-                  <Text style={styles.providerEquivalent}>
-                    ~{inversePlan.requiredProviderBurnCalories.toLocaleString()} {burnSource} calories
-                  </Text>
-                  {inversePlan.alreadyOnTrack ? (
-                    <Text style={styles.onTrack}>
-                      You’re already on track to reach this without extra steps.
-                    </Text>
-                  ) : (
-                    <>
-                      <Text style={styles.metricLabel}>I’d need about</Text>
-                      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.primaryResult}>
-                        {inversePlan.totalDailyStepsNeeded.toLocaleString()} total steps
-                      </Text>
-                      <Text style={styles.supportingResult}>
-                        {inversePlan.remainingSteps.toLocaleString()} steps remaining
-                      </Text>
-                    </>
-                  )}
-                </View>
-              ) : <Text style={styles.unavailable}>{estimateStatus(today)}</Text>}
-            </View>
-
-            <View
-              onLayout={(event) => { forwardCardY.current = event.nativeEvent.layout.y; }}
-              style={styles.card}
-            >
-              <Text style={styles.cardTitle}>If I walk…</Text>
-              <View style={styles.inputRow}>
-                <TextInput
-                  accessibilityLabel="Target total steps today"
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  onChangeText={(value) => setStepTargetInput(value.replace(/\D/g, ''))}
-                  onFocus={() => revealCard(forwardCardY.current)}
-                  selectTextOnFocus
-                  style={styles.input}
-                  value={stepTargetInput}
-                />
-                <Text style={styles.inputUnit}>steps</Text>
-              </View>
-              {forwardPlan ? (
-                <View accessibilityLiveRegion="polite" style={styles.results}>
-                  <MetricRow
-                    label={`Projected Total Daily ${burnSource} burn`}
-                    value={`~${forwardPlan.projectedProviderBurnCalories.toLocaleString()} kcal`}
-                  />
-                  <MetricRow
-                    label="Estimated Total Daily Actual Burn"
-                    value={`${forwardPlan.projectedProviderBurnCalories.toLocaleString()} × ${today.burned.adjustmentFactor} = ${forwardPlan.projectedAdjustedBurnCalories.toLocaleString()} kcal`}
-                  />
-                  {forwardPlan.additionalSteps > 0 ? (
-                    <Text style={styles.supportingResult}>
-                      About {forwardPlan.additionalSteps.toLocaleString()} more steps
-                    </Text>
-                  ) : null}
-                </View>
-              ) : <Text style={styles.unavailable}>{estimateStatus(today)}</Text>}
-            </View>
+            <StepPlanningCards today={today} />
           </>
         ) : null}
       </ScrollView>
