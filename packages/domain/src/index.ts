@@ -677,10 +677,8 @@ export function calculateBurnToStepPlan(input: {
     requiredProviderBurnCalories: roundEstimateToTen(requiredProviderBurnCalories),
     additionalProviderCaloriesNeeded: roundEstimateToTen(additionalProviderCaloriesNeeded),
     totalDailyStepsNeeded,
-    remainingSteps: Math.max(
-      0,
-      Math.round((totalDailyStepsNeeded - input.currentSteps) / 100) * 100,
-    ),
+    // Subtract once: displayed total, remaining steps, and walking time must agree.
+    remainingSteps: Math.max(0, totalDailyStepsNeeded - input.currentSteps),
   };
 }
 

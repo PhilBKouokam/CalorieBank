@@ -593,6 +593,7 @@ export const todayResponseSchema = z.object({
     status: todaySourceStatusSchema,
   }),
   steps: z.object({
+    planningSnapshotReady: z.boolean().optional(),
     walkingPace: z.object({ stepsPerMinute: z.number().min(10).max(250), sampleCount: z.number().int().min(2).max(5) }).nullable().optional(),
     count: z.number().int().nonnegative().nullable(),
     source: z.string().min(1).nullable(),

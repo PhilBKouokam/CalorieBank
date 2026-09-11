@@ -1,7 +1,7 @@
 import type { DailyStepAggregate, PrismaClient } from '@prisma/client';
 import { estimateWalkingTime } from '@caloriebank/domain';
 
-export async function estimateWalkingPace(db: PrismaClient, userId: string, provider: string, now = new Date()) {
+export async function estimateWalkingPace(db: Pick<PrismaClient, 'currentDayWorkout'>, userId: string, provider: string, now = new Date()) {
   const workouts = await db.currentDayWorkout.findMany({
     where: { userId, provider, activityType: 'walking', syncStatus: 'ready',
       startedAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) },
@@ -103,7 +103,7 @@ export function shouldShowStepsByDefault(stepCounts: readonly number[]) {
 }
 
 export async function estimateStepContribution(
-  db: PrismaClient,
+  db: Pick<PrismaClient, 'currentDayWorkout'>,
   userId: string,
   currentSteps: DailyStepAggregate | null,
 ): Promise<StepEstimate> {

@@ -16,6 +16,7 @@ import type {
   DailyStepAggregate,
   IngestionCategoryStatus,
   PrismaClient,
+  Prisma,
 } from '@prisma/client';
 
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
@@ -576,13 +577,20 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
   }
 
   async getTodayForUser(userId: string, localDate: string, timezone: string): Promise<TodayResponse> {
+    return this.db.$transaction(
+      (db) => this.readTodaySnapshot(db, userId, localDate, timezone),
+      { isolationLevel: 'RepeatableRead' },
+    );
+  }
+
+  private async readTodaySnapshot(db: Prisma.TransactionClient, userId: string, localDate: string, timezone: string): Promise<TodayResponse> {
     const providerFilter = this.options.allowSyntheticProviders
       ? {}
       : { provider: { not: 'development' } };
     const date = parseLocalDate(localDate);
     const [expenditureRecords, intakeRecords, stepRecords, workoutRecords, sessions, selection, restingModel] =
       await Promise.all([
-      this.db.dailyExpenditureAggregate.findMany({
+      db.dailyExpenditureAggregate.findMany({
         where: {
           userId,
           localDate: date,
@@ -591,7 +599,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         },
         orderBy: { updatedAt: 'desc' },
       }),
-      this.db.dailyIntakeAggregate.findMany({
+      db.dailyIntakeAggregate.findMany({
         where: {
           userId,
           localDate: date,
@@ -600,20 +608,20 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         },
         orderBy: { updatedAt: 'desc' },
       }),
-      this.db.dailyStepAggregate.findMany({
+      db.dailyStepAggregate.findMany({
         where: { userId, localDate: date, isCurrentDay: true, ...providerFilter },
         orderBy: { updatedAt: 'desc' },
       }),
-      this.db.currentDayWorkout.findMany({
+      db.currentDayWorkout.findMany({
         where: { userId, localDate: date, isCurrentDay: true, ...providerFilter },
         orderBy: { startedAt: 'desc' },
       }),
-      this.db.ingestionSyncSession.findMany({
+      db.ingestionSyncSession.findMany({
         where: { userId, localDate: date, ...providerFilter },
         orderBy: { startedAt: 'desc' },
       }),
-      readProviderSelection(this.db, userId),
-      this.db.restingBurnEstimate.findUnique({ where: { userId } }),
+      readProviderSelection(db, userId),
+      db.restingBurnEstimate.findUnique({ where: { userId } }),
     ]);
     const syntheticExpenditure = this.options.allowSyntheticProviders && expenditureRecords.length > 0 && expenditureRecords.every((record) => isSyntheticProvider(record.provider));
     const syntheticIntake = this.options.allowSyntheticProviders && intakeRecords.length > 0 && intakeRecords.every((record) => isSyntheticProvider(record.provider));
@@ -675,12 +683,12 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     );
 
     const stepEstimate = await estimateStepContribution(
-      this.db,
+      db,
       userId,
       stepsStatus === 'ready' ? steps : null,
     );
     const walkingPace = stepsStatus === 'ready' && steps
-      ? await estimateWalkingPace(this.db, userId, steps.provider) : null;
+      ? await estimateWalkingPace(db, userId, steps.provider) : null;
     const adjustmentFactor =
       expenditure?.adjustmentFactor.toNumber() ?? V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE;
     const stepProjection =
@@ -705,7 +713,8 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     const remainingMinutes = getRemainingLocalDayMinutes(
       localDate,
       timezone,
-      this.options.now?.() ?? new Date(),
+      // Cumulative burn and remaining rest must share an observation time.
+      expenditure?.providerUpdatedAt ?? expenditure?.updatedAt ?? this.options.now?.() ?? new Date(),
     );
     const restProjectionStatus = (burnedStatus === 'stale' || modelAgeMs > 30 * 24 * 60 * 60 * 1000) && modelMatchesProvider
       ? 'stale' as const
@@ -749,6 +758,11 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         status: eatenStatus,
       },
       steps: {
+        planningSnapshotReady: Boolean(expenditure && steps &&
+          expenditure.provider === steps.provider && expenditure.syncSessionId &&
+          expenditure.syncSessionId === steps.syncSessionId &&
+          expenditureSession?.id === expenditure.syncSessionId &&
+          (expenditureSession.status === 'completed' || expenditureSession.status === 'partially_completed')),
         walkingPace,
         count: steps?.totalSteps ?? null,
         source: steps || contextSession ? getProviderDisplayName(steps?.provider ?? contextProvider) : null,

@@ -223,3 +223,7 @@ Favorite-activity intelligence follows Android and Burn / Eat / Bank foundations
 Running, cycling, hiking, boxing and other activity-specific planning are deferred.
 No Emergency Bank, full Burn / Eat / Bank, Eating Budget, social, CB Coins,
 automatic historical edits, or additional notification behavior is authorized.
+# Forecast Stability Addendum
+
+The canonical forecast equations, coherent-snapshot requirement, precision policy,
+and accounting firewall are recorded in [Step Target Forecast Stability](step-target-forecast-stability.md).

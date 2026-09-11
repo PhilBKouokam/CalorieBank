@@ -142,6 +142,15 @@ describe('Phase 1 consumer release invariants', () => {
     expect(planning).toContain('calculateStepToBurnPlan({ ...shared');
     expect(planning.match(/<WalkingTime steps=/g)).toHaveLength(2);
   });
+  it('does not calculate a step target from a mixed sync generation', async () => {
+    const { StepPlanningCards } = await import(resolve(__dirname, '../../mobile/components/caloriebank/StepPlanningCards.tsx')) as { StepPlanningCards: React.ComponentType<{ today: TodayResponse }> };
+    const today = { burned: { status: 'ready', source: 'Fitbit', adjustmentFactor: .8 }, steps: { status: 'ready', count: 13000, caloriesPerStep: .05, planningSnapshotReady: false }, restOfDayProjection: { status: 'ready', projectedProviderBurnCalories: 3935 } } as unknown as TodayResponse;
+    const rendered = await render(React.createElement(StepPlanningCards, { today }));
+    const text = JSON.stringify(rendered.toJSON());
+    expect(text).toContain('Refresh your activity data to update this estimate.');
+    expect(text).not.toContain('34,300');
+    expect(rendered.root.findAll(node => String(node.type) === 'Text' && node.props.style?.fontWeight === '800')).toHaveLength(0);
+  });
   it('onboarding explicitly saves the chosen target through the shared preference API', async () => {
     const { DailyBankTargetForm } = await import(resolve(__dirname, '../../mobile/components/caloriebank/DailyBankTargetForm.tsx')) as { DailyBankTargetForm: React.ComponentType<{ initialCalories: number; onSaved: () => void }> };
     const rendered = await render(React.createElement(DailyBankTargetForm, { initialCalories: 0, onSaved: vi.fn() }));

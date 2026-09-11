@@ -5,6 +5,8 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
 import { PrismaBankHistoryRepository } from '../src/modules/bank-history/bank-history.repository';
 import { PrismaPlannedTreatRepository } from '../src/modules/planned-treat/planned-treat.repository';
+import { PrismaTodayAggregateRepository } from '../src/modules/today/today.repository';
+import { calculateBurnToStepPlan, walkingTimeFromPace } from '@caloriebank/domain';
 
 const prisma = new PrismaClient();
 const userIds: string[] = [];
@@ -146,6 +148,12 @@ describe('Opening Bank and Recovery persistence', () => {
     const before = await accountingSnapshot();
     expect(before.opening).toHaveLength(2);
     expect(before.ledger.length).toBeGreaterThan(0);
+    for (const baseline of [3000, 3935, 4435]) {
+      const plan = calculateBurnToStepPlan({ currentSteps: 12679, targetActualBurnCalories: 4000, providerCaloriesPerStep: .05, projectedProviderBurnAtRest: baseline, adjustmentFactor: .8 });
+      walkingTimeFromPace(plan.remainingSteps, 100, 3);
+      await new PrismaTodayAggregateRepository(prisma, { allowSyntheticProviders: false }).getTodayForUser(user.id, '2026-08-20', 'America/Chicago');
+      expect(await accountingSnapshot()).toEqual(before);
+    }
     for (const calories of [0, 100, 300, 2000, 0]) {
       expect(await targets.update(user.id, calories)).toEqual({ calories, chosen: true });
       expect(await new DailyBankTargetRepository(prisma).get(user.id)).toEqual({ calories, chosen: true });

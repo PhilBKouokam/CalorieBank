@@ -60,7 +60,7 @@ describe('A2 progressive detail projections', () => {
         requiredProviderBurnCalories: 4_500,
         additionalProviderCaloriesNeeded: 500,
         totalDailyStepsNeeded: 38_000,
-        remainingSteps: 6_400,
+        remainingSteps: 6_389,
       });
     });
 
@@ -75,7 +75,7 @@ describe('A2 progressive detail projections', () => {
         requiredProviderBurnCalories: 3_750,
         additionalProviderCaloriesNeeded: 750,
         totalDailyStepsNeeded: 17_900,
-        remainingSteps: 9_500,
+        remainingSteps: 9_533,
       });
     });
 

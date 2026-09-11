@@ -22,6 +22,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
   const [burn, setBurn] = useState(String(baseline === null ? 0 : Math.ceil((baseline * today.burned.adjustmentFactor + 1) / 500) * 500));
   const [steps, setSteps] = useState(String(today.steps.count === null ? 0 : suggestNextStepTarget(today.steps.count)));
   const ready = today.steps.status === 'ready' && today.burned.status === 'ready'
+    && today.steps.planningSnapshotReady !== false
     && today.restOfDayProjection.status === 'ready' && baseline !== null
     && today.steps.count !== null && today.steps.caloriesPerStep !== null;
   const shared = ready ? { currentSteps: today.steps.count!, providerCaloriesPerStep: today.steps.caloriesPerStep!,
@@ -40,7 +41,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         <Text style={styles.result}>{inverse.alreadyOnTrack ? 'You’re already on track without extra steps.' : `${inverse.totalDailyStepsNeeded.toLocaleString()} total steps`}</Text>
         {!inverse.alreadyOnTrack ? <Text style={styles.supporting}>{inverse.remainingSteps.toLocaleString()} steps remaining</Text> : null}
         <WalkingTime steps={inverse.remainingSteps} pace={today.steps.walkingPace} />
-      </View> : <Text style={styles.detail}>This estimate needs recent step and calorie-burn data.</Text>}
+      </View> : <Text style={styles.detail}>{today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
     </View>
     <View style={styles.card}>
       <Text style={styles.title}>If I walk…</Text>
@@ -58,7 +59,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         </View>
         <Text style={styles.supporting}>About {forward.additionalSteps.toLocaleString()} more steps</Text>
         <WalkingTime steps={forward.additionalSteps} pace={today.steps.walkingPace} />
-      </View> : <Text style={styles.detail}>This estimate needs recent step and calorie-burn data.</Text>}
+      </View> : <Text style={styles.detail}>{today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
     </View>
   </>;
 }
