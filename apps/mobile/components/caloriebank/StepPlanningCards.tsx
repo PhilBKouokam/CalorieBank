@@ -39,7 +39,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         <Text accessibilityLabel={`Approximately ${inverse.requiredProviderBurnCalories.toLocaleString()} ${getConsumerSourceName(today.burned.source)} calories`} style={styles.supporting}>~{inverse.requiredProviderBurnCalories.toLocaleString()} {getConsumerSourceName(today.burned.source)} calories</Text>
         {!inverse.alreadyOnTrack ? <Text style={styles.supporting}>I’d need about</Text> : null}
         <Text style={styles.result}>{inverse.alreadyOnTrack ? 'You’re already on track without extra steps.' : `${inverse.totalDailyStepsNeeded.toLocaleString()} total steps`}</Text>
-        {!inverse.alreadyOnTrack ? <Text style={styles.supporting}>{inverse.remainingSteps.toLocaleString()} steps remaining</Text> : null}
+        {!inverse.alreadyOnTrack ? <Text style={styles.remainingSteps}>{inverse.remainingSteps.toLocaleString()} steps remaining</Text> : null}
         <WalkingTime steps={inverse.remainingSteps} pace={today.steps.walkingPace} />
       </View> : <Text style={styles.detail}>{today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
     </View>
@@ -55,7 +55,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         </View>
         <View style={styles.burnGroup}>
           <Text style={styles.supporting}>Estimated Total Daily Actual Burn</Text>
-          <Text style={styles.actualBurn}>{forward.projectedProviderBurnCalories.toLocaleString()} × {today.burned.adjustmentFactor} = {forward.projectedAdjustedBurnCalories.toLocaleString()} kcal</Text>
+          <Text style={styles.actualBurn}>{forward.projectedProviderBurnCalories.toLocaleString()} × {today.burned.adjustmentFactor} = <Text style={styles.actualBurnResult}>{forward.projectedAdjustedBurnCalories.toLocaleString()} kcal</Text></Text>
         </View>
         <Text style={styles.supporting}>About {forward.additionalSteps.toLocaleString()} more steps</Text>
         <WalkingTime steps={forward.additionalSteps} pace={today.steps.walkingPace} />
@@ -69,6 +69,7 @@ const styles = StyleSheet.create({
   result: { color: colors.primaryDark, fontSize: 26, fontWeight: '800', marginTop: spacing.sm },
   detail: { color: colors.textMuted, fontSize: typography.body },
   supporting: { color: colors.text, fontSize: typography.body, fontWeight: '600' },
+  remainingSteps: { color: colors.text, fontSize: 20, fontWeight: '700' },
   timePlan: { gap: spacing.xs, marginVertical: spacing.sm },
   time: { color: colors.primaryDark, fontSize: 21, fontWeight: '700' },
   sessions: { color: colors.text, fontSize: typography.body, fontWeight: '600' },
@@ -76,6 +77,7 @@ const styles = StyleSheet.create({
   burnGroup: { gap: spacing.sm },
   burnValue: { color: colors.text, fontSize: 21, fontWeight: '700' },
   actualBurn: { color: colors.text, fontSize: 21, fontWeight: '800' },
+  actualBurnResult: { color: colors.primaryDark, fontSize: 21, fontWeight: '800' },
   inputRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   unit: { color: colors.text, fontSize: typography.body },
   input: { width: 132, maxWidth: '100%', minHeight: 48, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.sm, color: colors.text, fontSize: typography.heading, fontWeight: '700' },

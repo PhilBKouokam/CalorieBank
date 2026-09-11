@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { act, create, type ReactTestRenderer, type ReactTestInstance } from 'react-test-renderer';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -45,6 +45,7 @@ async function render(component: React.ReactElement) {
   return screen!;
 }
 const source = (path: string) => readFileSync(resolve(__dirname, '../../mobile', path), 'utf8');
+const textContent = (node: ReactTestInstance): string => node.children.map(child => typeof child === 'string' ? child : textContent(child)).join('');
 
 describe('Phase 1 consumer release invariants', () => {
   it.each([0, 35])('keeps Recovery adjacent to the bank only when active (%s)', async (recovery) => {
@@ -86,7 +87,7 @@ describe('Phase 1 consumer release invariants', () => {
     expect(output).toContain(inverse.totalDailyStepsNeeded.toLocaleString());
     expect(output).toContain(forward.projectedAdjustedBurnCalories.toLocaleString());
     expect(output.includes('min ')).toBe(hasPace);
-    const text = rendered.root.findAll(node => String(node.type) === 'Text').map(node => node.children.join('')).join('|');
+    const text = rendered.root.findAll(node => String(node.type) === 'Text').map(textContent).join('|');
     const burnCard = text.slice(0, text.indexOf('If I walk'));
     const walkCard = text.slice(text.indexOf('If I walk'));
     const ordered = (content: string, pieces: string[]) => {
@@ -101,8 +102,16 @@ describe('Phase 1 consumer release invariants', () => {
       expect(burnCard.indexOf('min walks')).toBeGreaterThan(burnCard.indexOf(' hr'));
       expect(walkCard.indexOf('min walks')).toBeGreaterThan(walkCard.indexOf(' hr'));
     }
-    const primary = rendered.root.findAll(node => String(node.type) === 'Text' && node.props.style?.fontWeight === '800');
-    expect(primary).toHaveLength(2);
+    const total = rendered.root.findAll(node => String(node.type) === 'Text').find(node => textContent(node) === `${inverse.totalDailyStepsNeeded.toLocaleString()} total steps`)!;
+    const remaining = rendered.root.findAll(node => String(node.type) === 'Text').find(node => textContent(node) === `${inverse.remainingSteps.toLocaleString()} steps remaining`)!;
+    expect(remaining.props.style.fontWeight).toBe('700');
+    expect(remaining.props.style.color).toBe('#171717');
+    expect(remaining.props.style.fontSize).toBe(20);
+    expect(remaining.props.style.fontSize).toBeLessThan(total.props.style.fontSize);
+    const actual = rendered.root.findAll(node => String(node.type) === 'Text').find(node => textContent(node) === `${forward.projectedAdjustedBurnCalories.toLocaleString()} kcal`)!;
+    expect(actual.props.style.color).toBe(total.props.style.color);
+    expect(actual.props.style.fontWeight).toBe('800');
+    expect(textContent(actual.parent!)).toBe(`${forward.projectedProviderBurnCalories.toLocaleString()} × 0.8 = ${forward.projectedAdjustedBurnCalories.toLocaleString()} kcal`);
   });
   it.each(['You banked 573 kcal yesterday.', 'You enjoyed 83 kcal yesterday.', 'You were right on target yesterday.'])('keeps contribution emphasis and speech coherent: %s', async (sentence) => {
     const { CompletedContribution } = await import(resolve(__dirname, '../../mobile/components/caloriebank/CompletedContribution.tsx')) as { CompletedContribution: React.ComponentType<{ sentence: string }> };
