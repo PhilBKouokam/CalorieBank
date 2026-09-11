@@ -7,6 +7,7 @@ import {
   createAuthenticationBoundary,
   currentUser,
   resolveRequestUser,
+  isProviderCallback,
   type AuthenticationBoundary,
 } from './auth/current-user';
 import type { ApiEnv } from './env';
@@ -190,6 +191,7 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
   app.use('/v1/me', async (_req, res, next) => {
     try {
       // Security cleanup must remain reachable while deletion is pending.
+      if (isProviderCallback(_req.method, `${_req.baseUrl}${_req.path}`)) return next();
       if (_req.method === 'DELETE' && _req.path === '/morning-bank-update/device') return next();
       const user = resolveRequestUser(currentUser, res);
       const account = await prisma.user.findUnique({ where: { id: user.id }, select: { deletionRequestedAt: true } });

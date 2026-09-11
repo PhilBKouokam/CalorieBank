@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dailyBankTargetInputSchema } from '@caloriebank/schemas';
+import type { TodayResponse } from '@caloriebank/schemas';
+import { calculateBurnToStepPlan, calculateStepToBurnPlan } from '@caloriebank/domain';
 import { completedContributionSentence } from '../../mobile/lib/today/presentation';
 import { foodTrackerGuidance } from '../../mobile/lib/healthkit/food-tracker-guidance';
 
@@ -19,6 +21,7 @@ beforeEach(() => { targetStore.calories = 0; targetStore.writes = []; });
 vi.mock('react-native', () => ({
   Text: 'Text', View: 'View', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView',
   ActivityIndicator: 'ActivityIndicator',
+  useWindowDimensions: () => ({ width: 390, fontScale: 1 }),
   StyleSheet: { create: <T,>(value: T) => value },
   Modal: ({ visible, children }: { visible: boolean; children: React.ReactNode }) => visible ? children : null,
 }));
@@ -33,6 +36,29 @@ async function render(component: React.ReactElement) {
 const source = (path: string) => readFileSync(resolve(__dirname, '../../mobile', path), 'utf8');
 
 describe('Phase 1 consumer release invariants', () => {
+  it.each([true, false])('renders compact planning inputs and unchanged answers; walking evidence=%s', async (hasPace) => {
+    const { StepPlanningCards } = await import(resolve(__dirname, '../../mobile/components/caloriebank/StepPlanningCards.tsx')) as { StepPlanningCards: React.ComponentType<{ today: TodayResponse }> };
+    const today = { burned: { status: 'ready', source: 'Fitbit', adjustmentFactor: .8 }, steps: { status: 'ready', count: 8500, caloriesPerStep: .06, walkingPace: hasPace ? { stepsPerMinute: 100, sampleCount: 3 } : null }, restOfDayProjection: { status: 'ready', projectedProviderBurnCalories: 3600 } } as unknown as TodayResponse;
+    const rendered = await render(React.createElement(StepPlanningCards, { today }));
+    const inputs = rendered.root.findAll(node => String(node.type) === 'TextInput');
+    expect(inputs).toHaveLength(2);
+    for (const input of inputs) {
+      expect(input.props.style[1].width).toBe(132);
+      expect(input.parent!.props.style.flexDirection).toBe('row');
+      expect(input.parent!.props.style.flexWrap).toBe('wrap');
+      expect(input.props.keyboardType).toBe('number-pad');
+    }
+    await act(async () => { inputs[0]!.props.onChangeText('4000'); inputs[1]!.props.onChangeText('30000'); });
+    const shared = { currentSteps: 8500, providerCaloriesPerStep: .06, projectedProviderBurnAtRest: 3600, adjustmentFactor: .8 };
+    const inverse = calculateBurnToStepPlan({ ...shared, targetActualBurnCalories: 4000 });
+    const forward = calculateStepToBurnPlan({ ...shared, targetSteps: 30000 });
+    const output = JSON.stringify(rendered.toJSON());
+    expect(output).toContain(inverse.totalDailyStepsNeeded.toLocaleString());
+    expect(output).toContain(forward.projectedAdjustedBurnCalories.toLocaleString());
+    expect(output.includes('minute walks')).toBe(hasPace);
+    const primary = rendered.root.findAll(node => String(node.type) === 'Text' && node.props.style?.fontWeight === '800');
+    expect(primary).toHaveLength(2);
+  });
   it.each(['You banked 573 kcal yesterday.', 'You enjoyed 83 kcal yesterday.', 'You were right on target yesterday.'])('keeps contribution emphasis and speech coherent: %s', async (sentence) => {
     const { CompletedContribution } = await import(resolve(__dirname, '../../mobile/components/caloriebank/CompletedContribution.tsx')) as { CompletedContribution: React.ComponentType<{ sentence: string }> };
     const rendered = await render(React.createElement(CompletedContribution, { sentence }));

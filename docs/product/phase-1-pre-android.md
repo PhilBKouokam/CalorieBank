@@ -106,6 +106,21 @@ the safe zero default. Target writes have an independent 60-per-15-minute limit.
 
 ### Physical-QA Corrections
 
+Final planning polish restores compact, wrapping number/unit rows. Input width
+scales with system text size; total steps and adjusted burn are the primary
+answers. Walking duration and sessions use stronger typography. All existing
+planning and walking calculations are reused unchanged.
+
+The Fitbit callback regression was caused by the pending-deletion middleware
+resolving a bearer-authenticated user on an intentionally public callback.
+Render recorded GET `/v1/me/integrations/fitbit/callback` returning 401 at
+19:01:12, 19:01:32, and 19:02:09 CDT on September 10. The canonical GET callback
+allowlist is now shared with that guard. Account ownership still comes only from
+the persisted OAuth attempt; an unavailable/deleting owner is rejected. Failed
+callbacks return a fixed CalorieBank deep link without provider error contents,
+and mobile checks the explicit outcome before selecting Fitbit. This failure
+does not establish any Google OAuth test-user configuration problem.
+
 Correction validation: `release:friends-family` passed 55 files / 664 tests
 against the dedicated localhost test database, including persistence, source
 journeys, refresh concurrency, and deletion recovery. Changed component fixtures

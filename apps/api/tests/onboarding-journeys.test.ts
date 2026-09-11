@@ -48,7 +48,7 @@ vi.mock('react-native', () => ({
 vi.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('expo-router', () => ({ useRouter: () => h.router, useLocalSearchParams: () => ({ returnTo: 'onboarding' }), useFocusEffect: (callback: () => void | (() => void)) => React.useEffect(callback, []) }));
-vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: async (url: string) => { connect(url); return { type: 'success' }; } }));
+vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: async (url: string) => { connect(url); return { type: 'success', url: 'caloriebank://integrations?fitbit=connected' }; } }));
 vi.mock('../../mobile/lib/api/client', () => ({
   fetchDailyBankTarget: async () => ({ calories: 0, chosen: h.targetChosen }),
   saveDailyBankTarget: async (calories: number) => { h.targetChosen = true; return { calories, chosen: true }; },

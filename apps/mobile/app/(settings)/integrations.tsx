@@ -148,6 +148,7 @@ export default function IntegrationsScreen() {
       const { authorizationUrl } = await startFitbitAuthorization();
       const result = await WebBrowser.openAuthSessionAsync(authorizationUrl, 'caloriebank://integrations');
       if (result.type !== 'success') { setMessage('Fitbit connection was not completed.'); return; }
+      if (new URL(result.url).searchParams.get('fitbit') !== 'connected') { setMessage('We couldn’t connect Fitbit. Try again.'); return; }
       await syncFitbit(timezone(), true);
       await selectConnectedLabel('burned', 'Fitbit');
       closeSheets(); void load().catch(() => undefined);

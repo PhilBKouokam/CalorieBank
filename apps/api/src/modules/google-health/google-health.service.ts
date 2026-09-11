@@ -448,6 +448,8 @@ export class GoogleHealthFitbitService {
       if (!attempt || attempt.consumedAt || attempt.expiresAt <= this.now()) {
         throw new AppError('Google authorization state is invalid or expired.', 400);
       }
+      const owner = await this.db.user.findUnique({ where: { id: attempt.userId }, select: { deletionRequestedAt: true } });
+      if (!owner || owner.deletionRequestedAt) throw new AppError('This account is unavailable.', 400);
       stage = 'state_validated';
       this.logOAuthStage(stage);
       const verifier = decryptGoogleHealthSecret(attempt.encryptedCodeVerifier, secrets.encryptionKey);

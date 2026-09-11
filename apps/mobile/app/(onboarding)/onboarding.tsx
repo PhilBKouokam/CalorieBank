@@ -271,6 +271,7 @@ export default function OnboardingScreen() {
       const { authorizationUrl } = await startFitbitAuthorization(redirect);
       const result = await WebBrowser.openAuthSessionAsync(authorizationUrl, redirect);
       if (result.type !== 'success') throw cancelledConnectionError();
+      if (new URL(result.url).searchParams.get('fitbit') !== 'connected') throw new Error('Fitbit connection was not completed.');
       await selectProvider({
         authoritativeExpenditureProvider: 'google_health_fitbit',
         authoritativeActivityProvider: 'google_health_fitbit',

@@ -41,6 +41,7 @@ type StoredAttempt = {
 function oauthDb(options: {
   existingRefreshToken?: string;
   persistenceError?: Error;
+  unavailableOwner?: boolean;
 } = {}) {
   let attempt: StoredAttempt | null = null;
   let connection: Record<string, unknown> | null = options.existingRefreshToken
@@ -51,13 +52,13 @@ function oauthDb(options: {
     }
     : null;
   const db = {
-    user: { upsert: async () => user },
+    user: { upsert: async () => user, findUnique: async () => ({ deletionRequestedAt: options.unavailableOwner ? new Date() : null }) },
     googleHealthOAuthAttempt: {
       create: async ({ data }: { data: Omit<StoredAttempt, 'id' | 'consumedAt'> }) => {
         attempt = { ...data, id: randomUUID(), consumedAt: null };
         return attempt;
       },
-      findUnique: async () => attempt,
+      findUnique: async ({ where }: { where: { stateHash: string } }) => attempt?.stateHash === where.stateHash ? attempt : null,
       update: async ({ data }: { data: { consumedAt: Date } }) => {
         if (attempt) attempt.consumedAt = data.consumedAt;
         return attempt;
@@ -156,7 +157,8 @@ describe('Google Health OAuth callback', () => {
     expect(tokenBody.get('client_id')).toBe('client-id');
     expect(tokenBody.get('client_secret')).toBe('client-secret');
     expect(requests[1]?.url).toBe('https://health.googleapis.com/v4/users/me/identity');
-    expect(harness.getConnection()).toMatchObject({ healthUserId: 'health-user', legacyUserId: null });
+    expect(harness.getAttempt()?.userId).toBe(user.id);
+    expect(harness.getConnection()).toMatchObject({ userId: user.id, healthUserId: 'health-user', legacyUserId: null });
     expect(redirect).toBe('caloriebank://integrations');
     expect(events.map(({ event }) => event)).toEqual(expect.arrayContaining([
       'state_found', 'state_validated', 'token_exchange_success', 'identity_lookup_success',
@@ -278,6 +280,17 @@ describe('Google Health OAuth callback', () => {
     expect(invalidKeyEvents.at(-1)?.metadata.stage).toBe('configuration_validation');
   });
 
+  it.each(['invalid state', 'deleting owner'])('rejects %s before exchanging credentials', async (reason) => {
+    const harness = oauthDb({ unavailableOwner: reason === 'deleting owner' });
+    let calls = 0;
+    const service = new GoogleHealthFitbitService(harness.db, {} as TodayAggregateRepository, config(), undefined,
+      async () => { calls++; return tokenResponse(); });
+    const { state } = await authorizationState(service);
+    await expect(service.completeAuthorization('code', reason === 'invalid state' ? 'unrelated-state' : state)).rejects.toThrow();
+    expect(calls).toBe(0);
+    expect(harness.getConnection()).toBeNull();
+  });
+
   it('rejects expired and reused state', async () => {
     const harness = oauthDb();
     let now = new Date('2026-08-16T20:00:00.000Z');
@@ -311,7 +324,8 @@ describe('Google Health OAuth callback', () => {
     app.use('/v1/me/integrations/fitbit', createGoogleHealthFitbitRouter(service, user));
     app.use(errorHandler);
 
-    await request(app).get('/v1/me/integrations/fitbit/callback?state=state-only').expect(400);
+    const failed = await request(app).get('/v1/me/integrations/fitbit/callback?state=state-only').expect(302);
+    expect(failed.headers.location).toBe('caloriebank://integrations?fitbit=failed');
     const response = await request(app)
       .get('/v1/me/integrations/fitbit/callback?state=state&code=code')
       .expect(302);

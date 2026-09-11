@@ -45,8 +45,12 @@ const callbackPaths = new Set([
   '/v1/me/integrations/whoop/callback',
 ]);
 
+export function isProviderCallback(method: string, path: string) {
+  return method === 'GET' && callbackPaths.has(path);
+}
+
 function isPublicRequest(request: Request) {
-  return request.path === '/health' || request.path === '/health/ready' || callbackPaths.has(request.path);
+  return request.path === '/health' || request.path === '/health/ready' || isProviderCallback(request.method, request.path);
 }
 
 function subjectFingerprint(subject: string) {

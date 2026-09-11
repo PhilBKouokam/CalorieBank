@@ -1,7 +1,8 @@
 import type { TodayResponse } from '@caloriebank/schemas';
 import type { PrismaClient } from '@prisma/client';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { GoogleHealthFitbitService } from '../src/modules/google-health/google-health.service';
 
 import { createAuthenticationBoundary, type AuthenticationBoundary } from '../src/auth/current-user';
 import { createApp } from '../src/app';
@@ -127,6 +128,20 @@ describe('beta identity and ownership boundary', () => {
     await request(app).get('/health').expect(200);
     await request(app).get('/health/ready').expect(200);
     await request(app).get('/v1/me/today').expect(401);
+    await request(app).get('/v1/me/integrations/fitbit/authorize').expect(401);
+    const cancelled = await request(app).get('/v1/me/integrations/fitbit/callback?error=access_denied').expect(302);
+    expect(cancelled.headers.location).toBe('caloriebank://integrations?fitbit=failed');
+    const complete = vi.spyOn(GoogleHealthFitbitService.prototype, 'completeAuthorization').mockResolvedValue('caloriebank://integrations');
+    try {
+      const callback = await request(app).get('/v1/me/integrations/fitbit/callback?code=fixture&state=fixture').expect(302);
+      expect(callback.headers.location).toBe('caloriebank://integrations?fitbit=connected');
+      expect(complete).toHaveBeenCalledWith('fixture', 'fixture');
+      complete.mockRejectedValueOnce(new Error('private provider failure'));
+      const failed = await request(app).get('/v1/me/integrations/fitbit/callback?code=fixture&state=fixture&userId=another-account').expect(302);
+      expect(failed.headers.location).toBe('caloriebank://integrations?fitbit=failed');
+      expect(failed.text).not.toContain('private provider failure');
+      expect(complete).toHaveBeenLastCalledWith('fixture', 'fixture');
+    } finally { complete.mockRestore(); }
   });
 
   it('rejects missing and invalid credentials', async () => {

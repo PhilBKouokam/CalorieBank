@@ -25,7 +25,7 @@ export function createGoogleHealthFitbitRouter(service: GoogleHealthFitbitServic
       res.json(googleHealthAuthorizationResponseSchema.parse({ authorizationUrl: await service.createAuthorizationUrl(resolveRequestUser(userSource, res), mobileRedirectUri) }));
     } catch (error) { next(error); }
   });
-  router.get('/callback', async (req, res, next) => {
+  router.get('/callback', async (req, res) => {
     service.logOAuthStage('oauth_callback_received', {
       codePresent: typeof req.query.code === 'string',
       statePresent: typeof req.query.state === 'string',
@@ -40,7 +40,10 @@ export function createGoogleHealthFitbitRouter(service: GoogleHealthFitbitServic
       const redirect = await service.completeAuthorization(req.query.code, req.query.state);
       res.redirect(`${redirect}${redirect.includes('?') ? '&' : '?'}fitbit=connected`);
       service.logOAuthStage('mobile_redirect_success', { scheme: 'caloriebank' });
-    } catch (error) { next(error); }
+    } catch {
+      // Never echo provider errors/codes into a browser page or a mobile URL.
+      res.redirect('caloriebank://integrations?fitbit=failed');
+    }
   });
   router.post('/sync', async (req, res, next) => {
     try {
