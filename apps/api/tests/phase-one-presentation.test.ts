@@ -108,6 +108,14 @@ describe('Phase 1 consumer release invariants', () => {
     expect(remaining.props.style.color).toBe('#171717');
     expect(remaining.props.style.fontSize).toBe(20);
     expect(remaining.props.style.fontSize).toBeLessThan(total.props.style.fontSize);
+    const walkRemaining = rendered.root.findAll(node => String(node.type) === 'Text').find(node => textContent(node) === `About ${forward.additionalSteps.toLocaleString()} more steps`)!;
+    expect(walkRemaining.props.style).toEqual(remaining.props.style);
+    expect(total.props.style.color).toBe('#17483C');
+    if (hasPace) {
+      const times = rendered.root.findAll(node => String(node.type) === 'Text' && textContent(node).startsWith('About ') && textContent(node).includes(' hr'));
+      expect(times).toHaveLength(2);
+      for (const time of times) expect(time.props.style.color).toBe(total.props.style.color);
+    }
     const actual = rendered.root.findAll(node => String(node.type) === 'Text').find(node => textContent(node) === `${forward.projectedAdjustedBurnCalories.toLocaleString()} kcal`)!;
     expect(actual.props.style.color).toBe(total.props.style.color);
     expect(actual.props.style.fontWeight).toBe('800');

@@ -109,6 +109,55 @@ the safe zero default. Target writes have an independent 60-per-15-minute limit.
 
 #### Approved Step Planning Design Lock
 
+Founder-approved presentation is locked: information hierarchy, emphasis,
+spacing, compact input pattern, input behavior, and result ordering must not
+change without explicit product approval. Necessary accessibility wrapping may
+adapt the layout without changing the semantic order. The shared implementation
+is `apps/mobile/components/caloriebank/StepPlanningCards.tsx`.
+
+Canonical burn-card sequence (illustrative values, not calculation fixtures):
+
+```text
+If I want to burn...
+[ 3500 ] calories
+~4,380 Fitbit calories
+I'd need about
+22,100 total steps
+4,157 steps remaining
+About 43 min
+2 × ~22 min walks
+```
+
+Canonical walk-card sequence (illustrative values, not calculation fixtures):
+
+```text
+If I walk...
+[ 20000 ] steps
+Projected Total Daily Fitbit burn
+~4,200 kcal
+Estimated Total Daily Actual Burn
+4,200 × 0.8 = 3,360 kcal
+About 2,057 more steps
+About 21 min
+1 × ~22 min walk
+```
+
+The title is bold; inputs remain compact with inline units and select-all on
+initial focus. Source translations and supporting headings stay readable and
+semibold. Total steps remain the largest green result (26px/800). Only the
+actual-burn result inside the preserved equation uses green (21px/800).
+Both remaining-action lines share `remainingSteps`: dark `colors.text`,
+20px/700, subordinate to the total-step target. Time stays green 21px/700;
+sessions stay dark 16px/600 with natural accessibility wording. Preserve the
+existing card padding, dimensions, result gaps, and input/unit wrapping; do not
+flatten this hierarchy or introduce full-width inputs.
+
+Future explicitly approved activity equivalents use this semantic template:
+question -> compact editable input -> translated/projected outcome -> primary
+result -> remaining action -> time -> sessions. Adapt activity-specific labels
+truthfully rather than mechanically copying Fitbit or walking labels. This
+contract does not authorize new activity cards or Android implementation.
+
 The Step Planning cards ("If I want to burn..." and "If I walk...") have an
 approved consumer hierarchy and must not be visually restructured, reordered,
 or flattened without explicit product approval. This order supersedes earlier

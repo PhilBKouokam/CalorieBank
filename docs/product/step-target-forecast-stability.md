@@ -110,3 +110,15 @@ tests provide evidence without logging health values or account identifiers.
 The step-target forecast may evolve as new activity data arrives, but changes must
 be explainable by coherent new evidence. Do not introduce arbitrary smoothing or
 silent model changes without product approval.
+
+## Presentation Firewall
+
+Step Planning presentation is founder-approved and locked independently of the
+forecast model. Follow the canonical sequences and typography contract in
+`phase-1-pre-android.md` under "Approved Step Planning Design Lock". Do not
+reorder, flatten, resize, or restyle the cards without explicit product approval;
+only necessary accessibility wrapping may adapt the layout. Both remaining-step
+lines use the same dark bold emphasis. Total-step target, actual-burn result
+within its equation, and walking time stay green; session text stays dark.
+Compact inline inputs, initial-focus selection, spacing, and session copy remain
+unchanged. Model maintenance is not authorization to redesign presentation.

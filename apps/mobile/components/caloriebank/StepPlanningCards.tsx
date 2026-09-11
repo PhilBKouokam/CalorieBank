@@ -57,7 +57,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
           <Text style={styles.supporting}>Estimated Total Daily Actual Burn</Text>
           <Text style={styles.actualBurn}>{forward.projectedProviderBurnCalories.toLocaleString()} × {today.burned.adjustmentFactor} = <Text style={styles.actualBurnResult}>{forward.projectedAdjustedBurnCalories.toLocaleString()} kcal</Text></Text>
         </View>
-        <Text style={styles.supporting}>About {forward.additionalSteps.toLocaleString()} more steps</Text>
+        <Text style={styles.remainingSteps}>About {forward.additionalSteps.toLocaleString()} more steps</Text>
         <WalkingTime steps={forward.additionalSteps} pace={today.steps.walkingPace} />
       </View> : <Text style={styles.detail}>{today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
     </View>
