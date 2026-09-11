@@ -11,7 +11,7 @@ export function WalkingTime({ steps, pace }: { steps: number; pace: TodayRespons
   const minutes = Math.max(1, Math.round(estimate.totalMinutes));
   return <View style={styles.timePlan}>
     <Text style={styles.time}>About {minutes >= 60 ? `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`}</Text>
-    <Text style={styles.sessions}>{estimate.sessionCount === 1 ? `One ${estimate.minutesPerSession}-minute walk` : `${estimate.sessionCount} × about ${estimate.minutesPerSession}-minute walks`}</Text>
+    <Text accessibilityLabel={`${estimate.sessionCount} ${estimate.sessionCount === 1 ? 'walk' : 'walks'} of approximately ${estimate.minutesPerSession} minutes each.`} style={styles.sessions}>{estimate.sessionCount} × ~{estimate.minutesPerSession} min {estimate.sessionCount === 1 ? 'walk' : 'walks'}</Text>
   </View>;
 }
 
@@ -31,7 +31,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
   return <>
     <View style={styles.card}>
       <Text style={styles.title}>If I want to burn…</Text>
-      <View style={styles.inputRow}><TextInput accessibilityLabel="Desired estimated actual calories burned today" keyboardType="number-pad" maxLength={6}
+      <View style={styles.inputRow}><TextInput accessibilityLabel="Desired estimated actual calories burned today" keyboardType="number-pad" maxLength={6} selectTextOnFocus
         value={burn} onChangeText={(v) => setBurn(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>calories</Text></View>
       {inverse ? <View accessibilityLiveRegion="polite" style={styles.results}>
@@ -44,7 +44,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
     </View>
     <View style={styles.card}>
       <Text style={styles.title}>If I walk…</Text>
-      <View style={styles.inputRow}><TextInput accessibilityLabel="Target total steps today" keyboardType="number-pad" maxLength={6}
+      <View style={styles.inputRow}><TextInput accessibilityLabel="Target total steps today" keyboardType="number-pad" maxLength={6} selectTextOnFocus
         value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>steps</Text></View>
       {forward ? <View accessibilityLiveRegion="polite" style={styles.results}>

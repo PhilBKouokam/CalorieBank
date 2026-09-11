@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dailyBankTargetInputSchema } from '@caloriebank/schemas';
 import type { TodayResponse } from '@caloriebank/schemas';
-import { calculateBurnToStepPlan, calculateStepToBurnPlan } from '@caloriebank/domain';
+import { calculateBurnToStepPlan, calculateStepToBurnPlan, walkingTimeFromPace } from '@caloriebank/domain';
 import { completedContributionSentence } from '../../mobile/lib/today/presentation';
 import { foodTrackerGuidance } from '../../mobile/lib/healthkit/food-tracker-guidance';
 
@@ -66,6 +66,17 @@ describe('Phase 1 consumer release invariants', () => {
       expect(input.parent!.props.style.flexDirection).toBe('row');
       expect(input.parent!.props.style.flexWrap).toBe('wrap');
       expect(input.props.keyboardType).toBe('number-pad');
+      expect(input.props.selectTextOnFocus).toBe(true);
+      expect(input.props.clearTextOnFocus).toBeUndefined();
+      const original = input.props.value;
+      await act(async () => { input.props.onFocus?.(); input.props.onBlur?.(); });
+      expect(input.props.value).toBe(original);
+      await act(async () => input.props.onChangeText('3'));
+      expect(input.props.value).toBe('3');
+      await act(async () => input.props.onChangeText('3500'));
+      expect(input.props.value).toBe('3500');
+      await act(async () => input.props.onChangeText('35x10'));
+      expect(input.props.value).toBe('3510');
     }
     await act(async () => { inputs[0]!.props.onChangeText('4000'); inputs[1]!.props.onChangeText('30000'); });
     const shared = { currentSteps: 8500, providerCaloriesPerStep: .06, projectedProviderBurnAtRest: 3600, adjustmentFactor: .8 };
@@ -74,7 +85,7 @@ describe('Phase 1 consumer release invariants', () => {
     const output = JSON.stringify(rendered.toJSON());
     expect(output).toContain(inverse.totalDailyStepsNeeded.toLocaleString());
     expect(output).toContain(forward.projectedAdjustedBurnCalories.toLocaleString());
-    expect(output.includes('minute walks')).toBe(hasPace);
+    expect(output.includes('min ')).toBe(hasPace);
     const text = rendered.root.findAll(node => String(node.type) === 'Text').map(node => node.children.join('')).join('|');
     const burnCard = text.slice(0, text.indexOf('If I walk'));
     const walkCard = text.slice(text.indexOf('If I walk'));
@@ -87,8 +98,8 @@ describe('Phase 1 consumer release invariants', () => {
     if (hasPace) {
       expect(burnCard.indexOf(' hr')).toBeGreaterThan(burnCard.indexOf('steps remaining'));
       expect(walkCard.indexOf(' hr')).toBeGreaterThan(walkCard.indexOf('more steps'));
-      expect(burnCard.indexOf('minute walks')).toBeGreaterThan(burnCard.indexOf(' hr'));
-      expect(walkCard.indexOf('minute walks')).toBeGreaterThan(walkCard.indexOf(' hr'));
+      expect(burnCard.indexOf('min walks')).toBeGreaterThan(burnCard.indexOf(' hr'));
+      expect(walkCard.indexOf('min walks')).toBeGreaterThan(walkCard.indexOf(' hr'));
     }
     const primary = rendered.root.findAll(node => String(node.type) === 'Text' && node.props.style?.fontWeight === '800');
     expect(primary).toHaveLength(2);
@@ -114,6 +125,15 @@ describe('Phase 1 consumer release invariants', () => {
     expect(summary.indexOf('>Burned</Text>')).toBeLessThan(summary.indexOf('>Eaten</Text>'));
     expect(summary.indexOf('>Eaten</Text>')).toBeLessThan(summary.indexOf('>Steps</Text>'));
     expect(summary).toContain('adjustmentFactor');
+  });
+  it.each([2000, 2900, 6700, 20000])('formats sessions without changing the estimate for %s steps', async (steps) => {
+    const { WalkingTime } = await import(resolve(__dirname, '../../mobile/components/caloriebank/StepPlanningCards.tsx')) as { WalkingTime: React.ComponentType<{ steps: number; pace: TodayResponse['steps']['walkingPace'] }> };
+    const estimate = walkingTimeFromPace(steps, 100, 3)!;
+    const rendered = await render(React.createElement(WalkingTime, { steps, pace: { stepsPerMinute: 100, sampleCount: 3 } as TodayResponse['steps']['walkingPace'] }));
+    const noun = estimate.sessionCount === 1 ? 'walk' : 'walks';
+    const session = rendered.root.findByProps({ accessibilityLabel: `${estimate.sessionCount} ${noun} of approximately ${estimate.minutesPerSession} minutes each.` });
+    expect(session.children.join('')).toBe(`${estimate.sessionCount} × ~${estimate.minutesPerSession} min ${noun}`);
+    expect(session.props.style.fontWeight).toBe('600');
   });
   it('planning results remain prominent while using unchanged domain functions', () => {
     const planning = source('components/caloriebank/StepPlanningCards.tsx');
