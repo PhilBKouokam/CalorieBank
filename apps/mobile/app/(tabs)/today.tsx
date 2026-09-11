@@ -431,6 +431,16 @@ export default function TodayScreen() {
             {bankStatus === 'loading' ? <ActivityIndicator color={colors.primary} /> : null}
           </Pressable>
 
+        {bankSummary && bankSummary.recoveryCalories > 0 ? (
+          <View accessibilityRole="summary" style={styles.recoverySurface}>
+            <Text style={styles.recoveryLabel}>Recovery</Text>
+            <Text style={styles.recoveryValue}>
+              {bankSummary.recoveryCalories.toLocaleString()} kcal to recover
+            </Text>
+            <Text style={styles.supportingText}>New deposits will restore your bank first.</Text>
+          </View>
+        ) : null}
+
         {(
           <Pressable
             accessibilityHint="Opens Banking Goal setup."
@@ -498,16 +508,6 @@ export default function TodayScreen() {
               )}
           </Pressable>
         )}
-
-        {bankSummary && bankSummary.recoveryCalories > 0 ? (
-          <View accessibilityRole="summary" style={styles.recoverySurface}>
-            <Text style={styles.recoveryLabel}>Recovery</Text>
-            <Text style={styles.recoveryValue}>
-              {bankSummary.recoveryCalories.toLocaleString()} kcal to recover
-            </Text>
-            <Text style={styles.supportingText}>New deposits will restore your bank first.</Text>
-          </View>
-        ) : null}
 
         {visibleCards.showTodaySoFar ? <Pressable
           accessibilityHint="Opens today's burn details."

@@ -85,6 +85,7 @@ Historical-first resting-burn estimation and ledger-neutral rest-of-day forecast
 
 ## AI Workflow
 
+- The Step Planning cards ("If I want to burn..." and "If I walk...") have an approved consumer hierarchy and must not be visually restructured, reordered, or flattened without explicit product approval. Follow the locked order in `docs/product/phase-1-pre-android.md`: burn target -> source-calorie translation -> "I'd need about" -> total steps -> remaining steps -> walking time/session; walk target -> projected source burn -> actual-burn equation -> remaining steps -> walking time/session. Keep compact inline inputs, strong results, and readable semibold supporting text. Cross-platform adaptations must preserve this semantic order; math changes or new activity equivalents require their own applicable approval.
 - Inspect relevant files before editing.
 - Apply the Consumer Visual QA Release Gate in `docs/product/v1-prd.md` to every changed consumer UI: inspect alignment, spacing, hierarchy, clipping, overflow, wrapping, typography, icons, navigation affordances, touch targets, loading/error/empty states, and narrow screens before reporting completion. Functional correctness alone is not consumer readiness; report which visual checks were actually performed.
 - State assumptions.

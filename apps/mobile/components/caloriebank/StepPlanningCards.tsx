@@ -35,8 +35,8 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         value={burn} onChangeText={(v) => setBurn(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>calories</Text></View>
       {inverse ? <View accessibilityLiveRegion="polite" style={styles.results}>
-        <Text style={styles.detail}>About {inverse.requiredProviderBurnCalories.toLocaleString()} {getConsumerSourceName(today.burned.source)} calories</Text>
-        {!inverse.alreadyOnTrack ? <Text style={styles.detail}>I’d need about</Text> : null}
+        <Text accessibilityLabel={`Approximately ${inverse.requiredProviderBurnCalories.toLocaleString()} ${getConsumerSourceName(today.burned.source)} calories`} style={styles.supporting}>~{inverse.requiredProviderBurnCalories.toLocaleString()} {getConsumerSourceName(today.burned.source)} calories</Text>
+        {!inverse.alreadyOnTrack ? <Text style={styles.supporting}>I’d need about</Text> : null}
         <Text style={styles.result}>{inverse.alreadyOnTrack ? 'You’re already on track without extra steps.' : `${inverse.totalDailyStepsNeeded.toLocaleString()} total steps`}</Text>
         {!inverse.alreadyOnTrack ? <Text style={styles.supporting}>{inverse.remainingSteps.toLocaleString()} steps remaining</Text> : null}
         <WalkingTime steps={inverse.remainingSteps} pace={today.steps.walkingPace} />
@@ -48,18 +48,22 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>steps</Text></View>
       {forward ? <View accessibilityLiveRegion="polite" style={styles.results}>
-        <Text style={styles.detail}>Estimated total daily actual burn</Text>
-        <Text style={styles.result}>{forward.projectedAdjustedBurnCalories.toLocaleString()} kcal</Text>
+        <View style={styles.burnGroup}>
+          <Text style={styles.supporting}>Projected Total Daily {getConsumerSourceName(today.burned.source)} burn</Text>
+          <Text accessibilityLabel={`Approximately ${forward.projectedProviderBurnCalories.toLocaleString()} kilocalories`} style={styles.burnValue}>~{forward.projectedProviderBurnCalories.toLocaleString()} kcal</Text>
+        </View>
+        <View style={styles.burnGroup}>
+          <Text style={styles.supporting}>Estimated Total Daily Actual Burn</Text>
+          <Text style={styles.actualBurn}>{forward.projectedProviderBurnCalories.toLocaleString()} × {today.burned.adjustmentFactor} = {forward.projectedAdjustedBurnCalories.toLocaleString()} kcal</Text>
+        </View>
         <Text style={styles.supporting}>About {forward.additionalSteps.toLocaleString()} more steps</Text>
         <WalkingTime steps={forward.additionalSteps} pace={today.steps.walkingPace} />
-        <Text style={styles.detail}>Projected total daily {getConsumerSourceName(today.burned.source)} burn: about {forward.projectedProviderBurnCalories.toLocaleString()} kcal</Text>
-        <Text style={styles.detail}>{forward.projectedProviderBurnCalories.toLocaleString()} × {today.burned.adjustmentFactor} = {forward.projectedAdjustedBurnCalories.toLocaleString()} kcal</Text>
       </View> : <Text style={styles.detail}>This estimate needs recent step and calorie-burn data.</Text>}
     </View>
   </>;
 }
 const styles = StyleSheet.create({
-  card: { gap: spacing.sm, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.surface },
+  card: { gap: spacing.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.surface },
   title: { color: colors.text, fontSize: typography.subheading, fontWeight: '700' },
   result: { color: colors.primaryDark, fontSize: 26, fontWeight: '800', marginTop: spacing.sm },
   detail: { color: colors.textMuted, fontSize: typography.body },
@@ -67,7 +71,10 @@ const styles = StyleSheet.create({
   timePlan: { gap: spacing.xs, marginVertical: spacing.sm },
   time: { color: colors.primaryDark, fontSize: 21, fontWeight: '700' },
   sessions: { color: colors.text, fontSize: typography.body, fontWeight: '600' },
-  results: { gap: spacing.sm },
+  results: { gap: spacing.md },
+  burnGroup: { gap: spacing.sm },
+  burnValue: { color: colors.text, fontSize: 21, fontWeight: '700' },
+  actualBurn: { color: colors.text, fontSize: 21, fontWeight: '800' },
   inputRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   unit: { color: colors.text, fontSize: typography.body },
   input: { width: 132, maxWidth: '100%', minHeight: 48, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.sm, color: colors.text, fontSize: typography.heading, fontWeight: '700' },

@@ -29,7 +29,8 @@ into intake or activity prescriptions. A target is not a medical recommendation.
 
 - Available Bank remains dominant; the latest completed contribution becomes
   supporting banked/enjoyed/on-target copy within that card.
-- Banking Goal follows Available Bank, then Today so far. Banking Goal is the
+- Conditional Recovery immediately follows Available Bank; Banking Goal follows
+  Recovery when active, otherwise Available Bank, then Today so far. Banking Goal is the
   consumer name for existing Planned Treat functionality, not ADR 013 allocation
   implementation. Existing records, amounts, progress, and ledger neutrality stay
   unchanged. Internal Planned Treat names may remain for compatibility.
@@ -106,6 +107,34 @@ the safe zero default. Target writes have an independent 60-per-15-minute limit.
 
 ### Physical-QA Corrections
 
+#### Approved Step Planning Design Lock
+
+The Step Planning cards ("If I want to burn..." and "If I walk...") have an
+approved consumer hierarchy and must not be visually restructured, reordered,
+or flattened without explicit product approval. This order supersedes earlier
+Phase 1 presentation experiments. Future Android adaptations must preserve the
+same semantic hierarchy while using native layout conventions.
+
+"If I want to burn...": compact bold number with inline "calories" -> approximate
+source calories (for example, "~5,000 Fitbit calories") -> "I'd need about" ->
+large bold green total steps -> remaining steps -> green semibold walking time ->
+dark semibold session suggestion. Preserve the existing already-on-track state.
+
+"If I walk...": compact bold number with inline "steps" -> "Projected Total
+Daily [source] burn" -> approximate provider kcal -> "Estimated Total Daily
+Actual Burn" -> provider kcal x adjustment = actual kcal -> remaining steps ->
+walking time -> session suggestion. Never move the source estimate below time,
+or replace the equation with a standalone actual-burn value.
+
+Use readable semibold headings and generous separation between groups. Inputs
+stay compact and the input/unit row may wrap at accessibility text sizes. Time
+and sessions are appended at the bottom, never interleaved with source math.
+Source names must remain truthful, not hard-coded to Fitbit. All calculations,
+insufficient-data behavior, and walking evidence requirements are unchanged.
+
+Home order is Available Bank -> Recovery (only when positive) -> Banking Goal ->
+Today so far -> supporting cards. Recovery copy and calculations are unchanged.
+
 Final planning polish restores compact, wrapping number/unit rows. Input width
 scales with system text size; total steps and adjusted burn are the primary
 answers. Walking duration and sessions use stronger typography. All existing
@@ -163,7 +192,8 @@ The shared StepPlanningCards component calls the existing bidirectional domain
 functions in both Today detail and Steps. Walking pace is a separate read-only
 Today response field, based on the selected activity source. No native dependency
 is added. Existing `showPlannedTreat` persistence is retained for compatibility,
-but the Phase 1 Banking Goal card is always visible and follows Available Bank.
+but the Phase 1 Banking Goal card is always visible and follows the bank's
+conditional Recovery presentation, or Available Bank when Recovery is inactive.
 
 Apple documents that the notification system supplies its app-name and icon
 header: [notification appearance](https://developer.apple.com/documentation/usernotificationsui/customizing-the-appearance-of-notifications).

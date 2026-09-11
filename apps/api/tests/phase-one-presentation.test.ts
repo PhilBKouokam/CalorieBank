@@ -10,7 +10,18 @@ import { completedContributionSentence } from '../../mobile/lib/today/presentati
 import { foodTrackerGuidance } from '../../mobile/lib/healthkit/food-tracker-guidance';
 
 const targetStore = vi.hoisted(() => ({ calories: 0, writes: [] as number[] }));
+const homeStore = vi.hoisted(() => ({ recovery: 0 }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useFocusEffect: (callback: () => void) => React.useEffect(callback, [callback]), Link: 'Link' }));
+vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
+vi.mock('../../mobile/lib/lifecycle/account-lifecycle', () => ({ isAccountLifecycleRunning: () => false, subscribeToAccountLifecycle: () => () => {}, runAccountLifecycle: async () => ({ detail: null }) }));
 vi.mock('../../mobile/lib/api/client', () => ({
+  getApiBaseUrl: () => 'https://fixture.invalid',
+  fetchBankSummary: async () => ({ openingBankStatus: 'initialized', availableBankCalories: homeStore.recovery ? 0 : 2843, recoveryCalories: homeStore.recovery, latestCompletedDate: '2026-09-10', latestDailyBankChange: 547 }),
+  fetchPlannedTreat: async () => ({ status: 'no_plan' }),
+  fetchToday: async () => ({ burned: { status: 'unavailable' }, eaten: { status: 'unavailable' }, steps: { status: 'unavailable' }, workouts: { items: [], status: 'unavailable' }, dashboardVisibility: { showTodaySoFar: false, showSteps: false, showCurrentGoal: false, showWorkouts: false } }),
+  fetchDashboardPreferences: async () => ({ showLatestFinalizedContribution: true, showTodaySoFar: false, showCurrentGoal: false, showSteps: false, showWorkouts: false }),
+  fetchProviderSelection: async () => ({ expenditure: {}, intake: {} }),
+  fetchOnboardingStatus: async () => ({ completed: true, stage: 'complete', preparation: { history: 'complete' }, expenditure: { provider: 'google_health_fitbit' }, intake: { provider: 'apple_health' } }),
   fetchDailyBankTarget: async () => ({ calories: targetStore.calories, chosen: targetStore.writes.length > 0 }),
   saveDailyBankTarget: async (calories: number) => { targetStore.calories = calories; targetStore.writes.push(calories); return { calories, chosen: true }; },
   fetchGoalConfiguration: async () => ({ goalMode: 'maintain', adjustmentSource: 'manual_calories', dailyEnergyAdjustment: 0 }),
@@ -20,7 +31,7 @@ beforeEach(() => { targetStore.calories = 0; targetStore.writes = []; });
 
 vi.mock('react-native', () => ({
   Text: 'Text', View: 'View', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView',
-  ActivityIndicator: 'ActivityIndicator',
+  ActivityIndicator: 'ActivityIndicator', RefreshControl: 'RefreshControl',
   useWindowDimensions: () => ({ width: 390, fontScale: 1 }),
   StyleSheet: { create: <T,>(value: T) => value },
   Modal: ({ visible, children }: { visible: boolean; children: React.ReactNode }) => visible ? children : null,
@@ -36,6 +47,14 @@ async function render(component: React.ReactElement) {
 const source = (path: string) => readFileSync(resolve(__dirname, '../../mobile', path), 'utf8');
 
 describe('Phase 1 consumer release invariants', () => {
+  it.each([0, 35])('keeps Recovery adjacent to the bank only when active (%s)', async (recovery) => {
+    homeStore.recovery = recovery;
+    const { default: Home } = await import(resolve(__dirname, '../../mobile/app/(tabs)/today.tsx')) as { default: React.ComponentType };
+    const rendered = await render(React.createElement(Home));
+    const labels = rendered.root.findAll(node => String(node.type) === 'Text').map(node => node.children.join(''));
+    const ordered = labels.filter(label => ['Available Bank', 'Recovery', 'Banking Goal'].includes(label));
+    expect(ordered).toEqual(recovery ? ['Available Bank', 'Recovery', 'Banking Goal'] : ['Available Bank', 'Banking Goal']);
+  });
   it.each([true, false])('renders compact planning inputs and unchanged answers; walking evidence=%s', async (hasPace) => {
     const { StepPlanningCards } = await import(resolve(__dirname, '../../mobile/components/caloriebank/StepPlanningCards.tsx')) as { StepPlanningCards: React.ComponentType<{ today: TodayResponse }> };
     const today = { burned: { status: 'ready', source: 'Fitbit', adjustmentFactor: .8 }, steps: { status: 'ready', count: 8500, caloriesPerStep: .06, walkingPace: hasPace ? { stepsPerMinute: 100, sampleCount: 3 } : null }, restOfDayProjection: { status: 'ready', projectedProviderBurnCalories: 3600 } } as unknown as TodayResponse;
@@ -56,6 +75,21 @@ describe('Phase 1 consumer release invariants', () => {
     expect(output).toContain(inverse.totalDailyStepsNeeded.toLocaleString());
     expect(output).toContain(forward.projectedAdjustedBurnCalories.toLocaleString());
     expect(output.includes('minute walks')).toBe(hasPace);
+    const text = rendered.root.findAll(node => String(node.type) === 'Text').map(node => node.children.join('')).join('|');
+    const burnCard = text.slice(0, text.indexOf('If I walk'));
+    const walkCard = text.slice(text.indexOf('If I walk'));
+    const ordered = (content: string, pieces: string[]) => {
+      let previous = -1;
+      for (const piece of pieces) { const index = content.indexOf(piece); expect(index, piece).toBeGreaterThan(previous); previous = index; }
+    };
+    ordered(burnCard, ['calories', `~${inverse.requiredProviderBurnCalories.toLocaleString()} Fitbit calories`, 'I’d need about', `${inverse.totalDailyStepsNeeded.toLocaleString()} total steps`, `${inverse.remainingSteps.toLocaleString()} steps remaining`]);
+    ordered(walkCard, ['steps', 'Projected Total Daily Fitbit burn', `~${forward.projectedProviderBurnCalories.toLocaleString()} kcal`, 'Estimated Total Daily Actual Burn', `${forward.projectedProviderBurnCalories.toLocaleString()} × 0.8 = ${forward.projectedAdjustedBurnCalories.toLocaleString()} kcal`, `About ${forward.additionalSteps.toLocaleString()} more steps`]);
+    if (hasPace) {
+      expect(burnCard.indexOf(' hr')).toBeGreaterThan(burnCard.indexOf('steps remaining'));
+      expect(walkCard.indexOf(' hr')).toBeGreaterThan(walkCard.indexOf('more steps'));
+      expect(burnCard.indexOf('minute walks')).toBeGreaterThan(burnCard.indexOf(' hr'));
+      expect(walkCard.indexOf('minute walks')).toBeGreaterThan(walkCard.indexOf(' hr'));
+    }
     const primary = rendered.root.findAll(node => String(node.type) === 'Text' && node.props.style?.fontWeight === '800');
     expect(primary).toHaveLength(2);
   });
@@ -119,6 +153,9 @@ describe('Phase 1 consumer release invariants', () => {
   it('keeps Home bank-first and example content presentation-only', () => {
     const home = source('app/(tabs)/today.tsx');
     expect(home.indexOf('>Available Bank</Text>')).toBeLessThan(home.indexOf('>Banking Goal</Text>'));
+    expect(home.indexOf('>Available Bank</Text>')).toBeLessThan(home.indexOf('>Recovery</Text>'));
+    expect(home.indexOf('>Recovery</Text>')).toBeLessThan(home.indexOf('>Banking Goal</Text>'));
+    expect(home).toContain('bankSummary && bankSummary.recoveryCalories > 0 ? (');
     expect(home.indexOf('>Banking Goal</Text>')).toBeLessThan(home.indexOf('>Today so far</Text>'));
     expect(home.indexOf('<CompletedContribution')).toBeLessThan(home.indexOf('>Banking Goal</Text>'));
     expect(home.indexOf('>Burned</Text>')).toBeLessThan(home.indexOf('>Eaten</Text>'));
