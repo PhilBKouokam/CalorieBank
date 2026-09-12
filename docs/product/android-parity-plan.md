@@ -1,5 +1,11 @@
 # Android Phase A: Platform Parity and Architecture Audit
 
+Latest B3 auth retest: production email-code sign-in and session restoration succeed,
+but the Android hosted callback reproducibly opens Expo Router's Unmatched Route.
+Sign-out succeeds; protected Today loads after relaunch. No code or replacement
+build was created. See the [callback defect record](../deployment/android-preview.md#observed-authenticated-callback-defect--2026-09-12)
+for the narrowly scoped next fix and remaining physical QA.
+
 2026-09-12 auth update: the existing production Clerk instance now registers Android
 `com.caloriebank.mobile` and exact callback `clerk://com.caloriebank.mobile.hosted-callback`.
 iOS registration/callback and production keys are preserved. The existing B3 APK is

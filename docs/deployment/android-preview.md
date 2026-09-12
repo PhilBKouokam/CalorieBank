@@ -273,3 +273,51 @@ matrix. No rebuild is needed for the saved Clerk registration. Current task verd
 **ANDROID B3: BLOCKED — human verification and test-account authentication pending.**
 This supersedes the earlier missing-registration blocker; Android registration itself
 is complete and verified.
+
+
+## Observed authenticated callback defect — 2026-09-12
+
+This later retest supersedes the pending-human-verification status above. The user
+completed browser verification and supplied a controlled existing-account email and
+one-time code. Neither is retained in this document.
+
+Observed on the same signed B3 APK and API 34 Google Play emulator:
+
+- A previously established authenticated session survived force-stop/relaunch and
+  rendered Today. Normal Settings sign-out returned to Sign In.
+- A fresh Sign In opened the CalorieBank hosted page. The existing email was
+  recognized. “Use another method” exposed the unchanged email-code method.
+- Submitting the user-supplied code authenticated successfully and returned from
+  Chrome into the native application, but Expo Router showed **Unmatched Route**.
+- The unmatched path was `com.caloriebank.mobile.hosted-callback`, displayed under
+  the app's `caloriebank://` scheme by Router. Authentication query parameters were
+  present; they are deliberately omitted here and must never be copied to diagnostics.
+- Force-stop/relaunch then restored the new authenticated session and loaded Today
+  and Available Bank without a sign-in or bootstrap error. This is UI-level evidence
+  that the protected onboarding/Today API path accepted the session; no bearer token
+  was extracted and no raw HTTP response/status was instrumented.
+
+The production Clerk registration now matches the compiled callback. The remaining
+failure is app-side routing of the callback as a screen; changing the allowlist again
+is not the remedy. There is no `+native-intent` callback normalization boundary in
+this binary. A narrowly scoped Android callback-routing fix must retain Clerk's
+state/nonce verification and leave iOS/provider callbacks unchanged. Investigate the
+account-keyed navigation remount as part of that fix; do not claim a specific race
+mechanism was proven solely from the screen.
+
+Per the user's stop-before-rebuilding instruction, no product code was edited and
+no replacement build was requested. The existing APK is valid for authentication
+configuration and session restoration, but **does not pass the complete return UX**.
+Fresh sign-up, second-account isolation, deletion, physical provider combinations,
+notification token ownership and delivery remain unqualified. No account was deleted.
+
+One emulator retry also encountered Chrome 113's `CompositorGpuTh` SIGSEGV with the
+software renderer. Restarting this task's emulator with its documented `-gpu auto`
+option allowed the hosted page to load. This is local toolchain evidence, not an app
+code change or physical-device result.
+
+Current verdict: **ANDROID B3: BLOCKED — authenticated Android hosted callback is
+routed to Unmatched Route; a minimal app-side routing fix and subsequent binary
+qualification are required.** Next task: implement and test exact Android hosted-
+callback normalization, preserve iOS and other deep links, then seek the separately
+required replacement-preview decision and repeat the full return/session tests.
