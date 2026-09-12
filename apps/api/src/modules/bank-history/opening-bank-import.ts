@@ -7,11 +7,12 @@ export function openingPreparationSourceKey(selection: {
   authoritativeExpenditureProvider: string;
   authoritativeIntakeProvider: string;
   appleHealthIntakeWriterBundleId: string | null;
+  nativeIntakeSourceId?: string | null;
 }) {
   return JSON.stringify([
     selection.authoritativeExpenditureProvider,
     selection.authoritativeIntakeProvider,
-    selection.authoritativeIntakeProvider === 'apple_health' ? selection.appleHealthIntakeWriterBundleId : null,
+    selection.authoritativeIntakeProvider === 'apple_health' ? selection.appleHealthIntakeWriterBundleId : selection.authoritativeIntakeProvider === 'health_connect' ? selection.nativeIntakeSourceId ?? null : null,
   ]);
 }
 
@@ -64,13 +65,13 @@ export async function readOpeningImportState(
       },
       datesQueried: { hasEvery: dates },
     },
-    orderBy: { completedAt: 'desc' },
+    orderBy: [{ completedAt: 'desc' }, { startedAt: 'desc' }],
   });
   const expenditureSession = sessions.find(
     (session) => session.provider === selection.authoritativeExpenditureProvider,
   );
   const intakeSession = sessions.find(
-    (session) => session.provider === selection.authoritativeIntakeProvider,
+    (session) => session.provider === selection.authoritativeIntakeProvider && (session.provider !== 'health_connect' || session.sourceId === selection.nativeIntakeSourceId),
   );
   const expenditure = roleState(expenditureSession ? {
     completedAt: expenditureSession.completedAt,

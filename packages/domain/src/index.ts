@@ -8,7 +8,7 @@ export const MAX_EXPENDITURE_ADJUSTMENT_RATE = 1;
 export const PROVISIONAL_CORRECTION_WINDOW_CALENDAR_DAYS = 2;
 export const ROLLING_HEALTH_SYNC_CALENDAR_DAYS = 3;
 export const OPENING_BANK_LOOKBACK_CALENDAR_DAYS = 7;
-export const PROVIDER_IDS = ['apple_health', 'google_health_fitbit', 'garmin', 'whoop', 'fatsecret'] as const;
+export const PROVIDER_IDS = ['apple_health', 'google_health_fitbit', 'garmin', 'whoop', 'fatsecret', 'health_connect'] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 export const BANKING_PROVIDER_IDS = ['apple_health', 'google_health_fitbit'] as const;
 export type BankingProviderId = (typeof BANKING_PROVIDER_IDS)[number];
@@ -90,6 +90,12 @@ const PROVIDER_CAPABILITY_CATALOG: Readonly<Record<ProviderId, ProviderCapabilit
     webhooks: true,
     historicalBackfill: true,
     oauth: true,
+  },
+  health_connect: {
+    expenditure: false, expenditureCapability: 'unavailable', intake: true,
+    steps: false, workouts: false, workoutEnergy: false, workoutDuration: false,
+    distance: false, sleep: false, heartRate: false, webhooks: false,
+    historicalBackfill: true, oauth: false,
   },
   fatsecret: {
     expenditure: false,
@@ -270,6 +276,8 @@ export type NormalizedDailyIntakeAggregate = {
   totalCaloriesConsumed: number;
   writerBundleIdentifier?: string;
   writerDisplayName?: string;
+  sourceId?: string;
+  sourceDisplayName?: string;
   importedAt: Date;
   providerUpdatedAt: Date | null;
   syncStatus: IngestionSyncStatus;
@@ -960,6 +968,8 @@ export function normalizeDailyIntakeAggregate({
   totalCaloriesConsumed,
   writerBundleIdentifier,
   writerDisplayName,
+  sourceId,
+  sourceDisplayName,
   importedAt,
   providerUpdatedAt,
   syncStatus,
@@ -974,6 +984,8 @@ export function normalizeDailyIntakeAggregate({
   assertNonNegativeInteger(totalCaloriesConsumed, 'totalCaloriesConsumed');
   if (writerBundleIdentifier !== undefined) assertNonEmptyString(writerBundleIdentifier, 'writerBundleIdentifier');
   if (writerDisplayName !== undefined) assertNonEmptyString(writerDisplayName, 'writerDisplayName');
+  if (sourceId !== undefined) assertNonEmptyString(sourceId, 'sourceId');
+  if (sourceDisplayName !== undefined) assertNonEmptyString(sourceDisplayName, 'sourceDisplayName');
 
   return {
     userId,
@@ -984,6 +996,8 @@ export function normalizeDailyIntakeAggregate({
     totalCaloriesConsumed,
     ...(writerBundleIdentifier ? { writerBundleIdentifier } : {}),
     ...(writerDisplayName ? { writerDisplayName } : {}),
+    ...(sourceId ? { sourceId } : {}),
+    ...(sourceDisplayName ? { sourceDisplayName } : {}),
     importedAt,
     providerUpdatedAt,
     syncStatus,

@@ -1,5 +1,7 @@
 # Android Phase A: Platform Parity and Architecture Audit
 
+B3 implements the Android exact-package nutrition consumer path and additive server source identity. Fitbit remains the qualified Android burn path; direct FatSecret remains available; Health Connect burn stays disabled. The [B3 build and qualification record](../deployment/android-preview.md) is authoritative for build delivery, emulator results, physical QA and deployment status. Earlier phase records below are historical baselines.
+
 Audit date: 2026-09-11. Status: **ANDROID PHASE A AUDIT: READY FOR IMPLEMENTATION**.
 
 This verdict means a bounded foundation phase can begin when authorized. It does not mean Android is built, tested, release-ready, or that every Health Connect writer is qualified. Health Connect burn and estimator support have explicit evidence gates below. This document records proposals, not changes to accepted accounting or permission to deploy.

@@ -1,3 +1,4 @@
+export { nativeIntake } from './intake';
 import type { NativeHealthBridge, NativeHealthCapability } from './types';
 
 export const nativeHealthCapability: NativeHealthCapability = {

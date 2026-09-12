@@ -1,3 +1,4 @@
+import { createNativeIntakeRouter } from './modules/native-intake/native-intake.routes';
 import cors from 'cors';
 import { DailyBankTargetRepository } from './modules/daily-bank-target/daily-bank-target.repository';
 import { createDailyBankTargetRouter } from './modules/daily-bank-target/daily-bank-target.routes';
@@ -256,6 +257,8 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
     '/v1/me/ingestion',
     createTodayIngestionRouter(todayRepository, currentUser),
   );
+
+  app.use('/v1/me/ingestion/native-intake', createNativeIntakeRouter(prisma, currentUser, finalizationScheduler));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

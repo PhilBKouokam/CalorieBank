@@ -38,6 +38,7 @@ import {
 } from '@/lib/api/client';
 import {
   nativeHealthCapability,
+  nativeIntake,
   connectNativeHealth,
   getNativeHealthConnectionStatus,
   refreshNativeHealthForCurrentAccount,
@@ -439,6 +440,7 @@ export default function OnboardingScreen() {
       });
       return;
     }
+    if (selected.provider === 'health_connect' && nativeIntake.supported) { router.push('/native-food'); return; }
     await run(selected.provider === 'fatsecret' ? 'fatsecret' : 'fitbit', async () => {
       if (selected.provider === 'fatsecret') {
         await syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
@@ -480,6 +482,9 @@ export default function OnboardingScreen() {
           }
           return outcome;
         }));
+      }
+      if (nativeIntake.supported && providers.intake.authoritativeProvider === 'health_connect') {
+        requests.push(nativeIntake.refresh().then((result) => { if (!['ready', 'empty'].includes(result)) throw new Error('Your food tracker could not refresh. Check Health Connect access and try again.'); }));
       }
       const results = await Promise.allSettled(requests);
       if (generation === viewGeneration.current) setPreparationAttempted(true);
@@ -612,6 +617,7 @@ export default function OnboardingScreen() {
               />
             ))}
           </> : null}
+          {nativeIntake.supported ? <ProviderOption title="Health Connect food tracker" detail="Choose the app that shares your calories eaten." busy={false} disabled={busy !== null} onPress={() => router.push('/native-food')} /> : null}
           <Text style={styles.sectionLabel}>Direct connection</Text>
           <ProviderOption title="FatSecret" detail="Connect your existing FatSecret food diary directly." busy={busy === 'fatsecret'} disabled={busy !== null} connected={fatSecretConnected} onPress={() => void connectFatSecret()} />
           {fatSecretConnected && status.intake.provider !== 'fatsecret' ? (

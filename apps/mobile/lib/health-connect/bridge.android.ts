@@ -9,14 +9,14 @@ const types: Record<EvidenceCategory, RecordType> = {
 };
 // Lazy loading keeps older binaries safe and never imports this Android SDK on iOS.
 const sdk = () => import('react-native-health-connect');
-const port: HealthEvidencePort = {
+const createPort = (requested: readonly EvidenceCategory[]): HealthEvidencePort => ({
   androidVersion: Number(Platform.Version),
   status: async () => (await sdk()).getSdkStatus(),
   initialize: async () => (await sdk()).initialize(),
   async permissions(request) {
     const native = await sdk();
-    const granted = request ? await native.requestPermission(categories.map((c) => ({ accessType: 'read', recordType: types[c] }))) : await native.getGrantedPermissions();
-    return categories.filter((c) => granted.some((p) => p.accessType === 'read' && p.recordType === types[c]));
+    const granted = request ? await native.requestPermission(requested.map((c) => ({ accessType: 'read', recordType: types[c] }))) : await native.getGrantedPermissions();
+    return requested.filter((c) => granted.some((p) => p.accessType === 'read' && p.recordType === types[c]));
   },
   async read(category, startTime, endTime, pageToken) {
     const response = await (await sdk()).readRecords(types[category], { timeRangeFilter: { operator: 'between', startTime, endTime }, pageSize: 1000, ...(pageToken ? { pageToken } : {}) });
@@ -34,5 +34,7 @@ const port: HealthEvidencePort = {
     } else native.openHealthConnectSettings();
     return true;
   },
-};
-export const nativeHealthQualification = createHealthQualification(port);
+});
+export const nativeHealthQualification = createHealthQualification(createPort(categories));
+// Consumer nutrition reads neither request nor inspect activity/burn records.
+export const nativeNutritionQualification = createHealthQualification(createPort(['nutrition']), undefined, ['nutrition']);

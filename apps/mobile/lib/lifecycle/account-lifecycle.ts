@@ -1,6 +1,7 @@
 import { nativeRefreshFailure } from '@/lib/native-health/copy';
 import { fetchBankSummary, runForegroundLifecycle } from '@/lib/api/client';
 import {
+  nativeIntake,
   getNativeHealthConnectionStatus,
   syncNativeHealthToday,
 } from '@/lib/native-health';
@@ -34,6 +35,7 @@ export function resumeAccountLifecycle() { suspended = false; }
 
 // The root owns this transition; screen mounts only read cached/server models.
 export function refreshOnAppState(next: string) {
+  if (next !== 'active' && nativeIntake.supported) nativeIntake.cancel();
   const entering = next === 'active' && appState !== 'active';
   appState = next;
   return entering ? runAccountLifecycle({ foreground: true }) : Promise.resolve<AccountLifecycleResult>({ status: 'skipped', detail: null });
@@ -71,6 +73,12 @@ export function runAccountLifecycle(options: { force?: boolean; foreground?: boo
         timezone,
         force ? 'manual_refresh' : 'app_foreground',
       );
+      if (generation !== scopeGeneration || suspended) return { status: 'skipped', detail: null };
+      if (nativeIntake.supported) {
+        const intake = await nativeIntake.refresh();
+        if (generation !== scopeGeneration || suspended) return { status: 'skipped', detail: null };
+        return { status: ['access_required', 'retry_required'].includes(intake) ? 'partial' : 'success', detail: intake === 'access_required' ? 'Allow food access in Health Connect to refresh your tracker.' : intake === 'retry_required' ? 'Your food tracker could not refresh. Try again.' : null };
+      }
       if (generation !== scopeGeneration || !server.shouldSyncHealthKit) {
         return { status: 'skipped', detail: null };
       }

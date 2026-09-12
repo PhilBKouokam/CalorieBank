@@ -1,8 +1,15 @@
-const { withAndroidManifest, withDangerousMod, AndroidConfig } = require('@expo/config-plugins');
+const { withAndroidManifest, withDangerousMod, withGradleProperties, AndroidConfig } = require('@expo/config-plugins');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
 module.exports = function withCalorieBankHealthConnect(config) {
+  // connect-client 1.1.0 requires API 26. Do not bypass its manifest requirement.
+  // Health Connect availability itself still requires API 28 at runtime.
+  config = withGradleProperties(config, (mod) => {
+    mod.modResults = mod.modResults.filter((entry) => entry.type !== 'property' || entry.key !== 'android.minSdkVersion');
+    mod.modResults.push({ type: 'property', key: 'android.minSdkVersion', value: '26' });
+    return mod;
+  });
   config = withAndroidManifest(config, (mod) => {
     const app = AndroidConfig.Manifest.getMainApplicationOrThrow(mod.modResults);
     const main = AndroidConfig.Manifest.getMainActivityOrThrow(mod.modResults);
@@ -30,7 +37,7 @@ public class HealthConnectRationaleActivity extends Activity {
   @Override public void onCreate(Bundle state) {
     super.onCreate(state);
     TextView text = new TextView(this);
-    text.setText("CalorieBank — Health Connect access\\n\\nCalorieBank's Android qualification tool reads calories eaten, steps, exercise sessions, distance, active and total calories burned, and resting metabolic rate. It checks source identity and recent history to determine which data can safely support CalorieBank.\\n\\nThis qualification build does not write health data, upload Health Connect records, or change your bank from these records. Data is inspected in memory. Diagnostics display counts, source packages and quality states, not raw health records.\\n\\nYou control access in Health Connect settings and can revoke any permission. No background access or unrelated health categories are requested.");
+    text.setText("CalorieBank — Health Connect access\\n\\nCalorieBank's Android qualification tool reads calories eaten, steps, exercise sessions, distance, active and total calories burned, and resting metabolic rate. It checks source identity and recent history to determine which data can safely support CalorieBank.\\n\\nWhen you select a food tracker, CalorieBank uploads only its normalized daily calorie totals and exact source identity to your account. The server uses completed-day totals with your selected burn source to update your bank. Activity and burn records remain qualification evidence only. Diagnostics display counts, source packages and quality states, not raw health records. CalorieBank never writes to Health Connect.\\n\\nYou control access in Health Connect settings and can revoke any permission. No background access or unrelated health categories are requested.");
     text.setTextSize(18);
     int padding = (int)(24 * getResources().getDisplayMetrics().density);
     text.setPadding(padding, padding, padding, padding);

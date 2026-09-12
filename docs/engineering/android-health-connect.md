@@ -1,4 +1,92 @@
-# Android B2: Health Connect evidence qualification
+# Android Health Connect evidence and nutrition integration
+
+## B3 qualification checkpoint
+
+B3 installed the local Android toolchain, generated the native project and found
+an actual minimum-SDK manifest conflict. The Health Connect config plugin now sets
+API 26, as required by `connect-client:1.1.0`; runtime Health Connect availability
+still requires API 28. Native manifest merging, Health Connect Kotlin/Java and its
+Expo permission-delegate module compile with Expo 54. See the
+[B3 local qualification record](../deployment/android-preview.md) for the full
+build result, environment limits and remaining installation gates.
+
+A separate nutrition-only qualification service now uses the existing bounded
+read/generation/permission/change-token logic. It requests only `READ_NUTRITION`
+and reads only Nutrition even when activity permissions were previously granted.
+The beta diagnostic screen has an explicit nutrition-only switch. The diagnostic screen remains read-only and never uploads. The separate consumer
+`nativeIntake` facade explicitly selects one account-owned package and uploads only
+normalized nutrition evidence after a stable read. Supported Android combinations
+are Fitbit + direct FatSecret and Fitbit + qualified Health Connect nutrition.
+
+Exact package display mappings were verified from publisher Google Play listings:
+
+| Package identity | Display label / source |
+| --- | --- |
+| `com.cronometer.android.gold` | [Cronometer](https://play.google.com/store/apps/details?id=com.cronometer.android.gold) |
+| `com.myfitnesspal.android` | [MyFitnessPal](https://play.google.com/store/apps/details?id=com.myfitnesspal.android) |
+| `com.fitnow.loseit` | [Lose It!](https://play.google.com/store/apps/details?id=com.fitnow.loseit) |
+| `com.sbs.diet` | [MacroFactor](https://play.google.com/store/apps/details?id=com.sbs.diet) |
+| `com.fatsecret.android` | [FatSecret](https://play.google.com/store/apps/details?id=com.fatsecret.android) |
+
+These identify packages, **not verified Health Connect export support**. Unknown
+packages display “Food tracker” while retaining their exact identity. The discovery
+helper accepts only stable nutrition-only reports; healthy direct FatSecret takes
+priority over exactly `com.fatsecret.android`. Failed direct connections do not
+suppress that writer. No fuzzy/prefix/display-name authority matching is used.
+
+No physical writer, permission, revision, empty-diary or preparation evidence is
+claimed. Nutrition remains conditional; burn remains **NOT QUALIFIED / DISABLED**.
+The consumer flow, exact-source persistence and preparation integration are now implemented;
+physical writer qualification remains outstanding. See the build record for actual
+emulator checks and the distinction between native compilation and physical QA.
+
+### B3 source and persistence boundary
+
+- `native-health/intake.android.ts` uses the B2 nutrition-only qualifier. The iOS
+  facade adds only an unavailable intake-service export; its HealthKit aliases stay unchanged.
+- `native-food.android.tsx` is the explicit discovery/selection/recovery screen.
+  Onboarding and Connections offer it only for Calories Eaten. Burn never exposes Health Connect.
+- `health_connect` is an intake-only provider. Banking/expenditure provider schemas
+  reject it. Steps, workout calibration and full-day burn remain diagnostic-only.
+- `nativeIntakeSource` stores `{namespace: android_package, id: exactPackage}`.
+  Source labels never determine authority. Healthy direct FatSecret suppresses its
+  exact Android writer in discovery/alternatives; an already-selected writer remains
+  visible until the user explicitly changes authority.
+- `POST /v1/me/ingestion/native-intake` accepts one exact source, selection revision,
+  observation/query timestamps and exactly today plus seven completed local dates.
+  It rejects stale selection, wrong origin, mismatched date windows and older snapshots.
+  Account ownership comes only from the authenticated request.
+- A transaction persists normalized daily totals and full-window query proof under
+  the existing Opening Bank advisory lock, then invokes the existing finalization
+  scheduler. No local Opening Bank calculation or second accounting engine exists.
+- The additive migration stores source identity on intake aggregates, sync sessions,
+  historical overrides and snapshots. Legacy intake rows retain empty `sourceId`;
+  existing fingerprints omit the new field unless the source is Health Connect.
+- Empty and missing-energy evidence never become zero. Explicit numeric zero is
+  usable. Ambiguous overlaps/day boundaries remain unavailable and preparation
+  retryable. A later refresh can recover; initialized Opening Banks stay immutable.
+- Foreground refresh reads the selected account authority first. Sign-out/account
+  scope changes invalidate local discovery and reads; OS permissions are not selections.
+- Records/revision tokens remain device-local. Uploads contain normalized totals,
+  package identity and timing/provenance only; diagnostics never log raw records.
+
+### B4 requirements and compatibility
+
+Qualify populated nutrition, multiple writers, deletion/revision, foreground races,
+source/account switching and both preparation combinations on a physical phone.
+Verify Android 9–13 standalone Health Connect separately from system-integrated
+Android 14+. Complete notification token/delivery qualification and Step Planning
+keyboard/font-scale visual QA without changing formulas or locked presentation.
+
+A B3 Android account selecting `health_connect` introduces a provider enum unknown
+to older B1/B2 iOS binaries. Existing iOS accounts using their existing sources retain
+the same response shape and behavior, but cross-device use of an Android-selected
+account on that old binary is **not qualified**. Do not distribute this as general
+iOS/Android account parity or silently map Android evidence to Apple Health. An
+explicit backward-compatibility/client-upgrade strategy is required before broader
+rollout; no iOS build or TestFlight change was made here.
+
+## B2 implementation record
 
 Implemented against B1 `aa50cdd7b6c2c486e5a5e0eae1f2a097fbaa8a36` on 2026-09-11.
 

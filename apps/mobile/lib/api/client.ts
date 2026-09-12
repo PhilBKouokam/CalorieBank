@@ -1,3 +1,4 @@
+import { nativeIntakeBatchSchema, type NativeIntakeBatch } from '@caloriebank/schemas';
 import {
   dailyBankTargetInputSchema,
   dailyBankTargetResponseSchema,
@@ -518,7 +519,7 @@ export async function saveProviderSelection(input: ProviderSelectionInput) {
   const response = await apiRequest('/v1/me/provider-selection', {
     method: 'PUT', body: JSON.stringify(providerSelectionInputSchema.parse(input)),
   });
-  if (!response.ok) throw new Error('Unable to update the calorie-burn source.');
+  if (!response.ok) throw new Error(input.authoritativeIntakeProvider === 'health_connect' ? 'Unable to update your food source.' : 'Unable to update the calorie-burn source.');
   return providerSelectionResponseSchema.parse(await response.json());
 }
 
@@ -841,4 +842,9 @@ export async function registerMorningBankUpdateDevice(input: { expoPushToken: st
 export async function unregisterMorningBankUpdateDevice(): Promise<void> {
   const response = await apiRequest('/v1/me/morning-bank-update/device', { method: 'DELETE' });
   if (!response.ok) throw await responseError(response);
+}
+
+export async function uploadNativeIntake(input: NativeIntakeBatch): Promise<void> {
+  const response = await apiRequest('/v1/me/ingestion/native-intake', { method: 'POST', body: JSON.stringify(nativeIntakeBatchSchema.parse(input)) });
+  if (!response.ok) throw new Error('Your food data could not refresh. Try again.');
 }

@@ -17,12 +17,12 @@ const timeout = async <T>(work: Promise<T>): Promise<T> => {
   try { return await Promise.race([work, new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error('query_timeout')), 15000); })]); }
   finally { clearTimeout(timer); }
 };
-export function createHealthQualification(port: HealthEvidencePort, now = () => new Date()): NativeHealthQualification & { setAccountScope(scope: string | null): void } {
+export function createHealthQualification(port: HealthEvidencePort, now = () => new Date(), requiredCategories: readonly EvidenceCategory[] = categories): NativeHealthQualification & { setAccountScope(scope: string | null): void } {
   let scope: string | null = null, generation = 0;
   let permissionRequest: Promise<EvidenceCategory[]> | null = null;
   let previouslyObserved = new Set<string>();
   const access = async (request = false): Promise<NativeAccess> => {
-    const result = (state: NativeAccess['state'], granted: EvidenceCategory[] = []): NativeAccess => ({ state, granted, missing: categories.filter((c) => !granted.includes(c)) });
+    const result = (state: NativeAccess['state'], granted: EvidenceCategory[] = []): NativeAccess => ({ state, granted, missing: requiredCategories.filter((c) => !granted.includes(c)) });
     if (port.androidVersion < 28) return result('unsupported_version');
     try {
       const status = await timeout(port.status());
@@ -33,8 +33,8 @@ export function createHealthQualification(port: HealthEvidencePort, now = () => 
       if (request && !scope) return result('permissions_missing');
       // Do not time out an OS prompt or launch a second prompt while it is visible.
       if (request && !permissionRequest) permissionRequest = port.permissions(true).finally(() => { permissionRequest = null; });
-      const granted = [...new Set(await (request ? permissionRequest! : timeout(port.permissions(false))))].filter((c) => categories.includes(c));
-      return result(!granted.length ? 'permissions_missing' : granted.length < categories.length ? 'partial_permissions' : 'available', granted);
+      const granted = [...new Set(await (request ? permissionRequest! : timeout(port.permissions(false))))].filter((c) => requiredCategories.includes(c));
+      return result(!granted.length ? 'permissions_missing' : granted.length < requiredCategories.length ? 'partial_permissions' : 'available', granted);
     } catch { return result('native_query_failed'); }
   };
   return {
@@ -75,7 +75,7 @@ export function createHealthQualification(port: HealthEvidencePort, now = () => 
         }
         const after = await timeout(port.changes(permissions.granted, baseline.token));
         const latestAccess = await access();
-        const samePermissions = categories.every((c) => permissions.granted.includes(c) === latestAccess.granted.includes(c));
+        const samePermissions = requiredCategories.every((c) => permissions.granted.includes(c) === latestAccess.granted.includes(c));
         permissions = latestAccess;
         if (cancelled()) return report('cancelled');
         if (!samePermissions) return report('access_required');
@@ -89,7 +89,7 @@ export function createHealthQualification(port: HealthEvidencePort, now = () => 
         result.origins = origins.map((id) => ({ namespace: 'android_package', id }));
         result.originState = !origin ? 'not_selected' : origins.includes(origin) ? 'observed' : previouslyObserved.has(origin) ? 'previously_observed_now_absent' : 'not_observed';
         origins.forEach((id) => previouslyObserved.add(id));
-        result.counts = Object.fromEntries(categories.map((c) => [c, unique.records.filter((r) => r.category === c).length]));
+        result.counts = Object.fromEntries(requiredCategories.map((c) => [c, unique.records.filter((r) => r.category === c).length]));
         result.days = origin ? windows.map((w) => normalizeDay(unique.records, w, origin, permissions.granted, invalid)) : [];
         result.readConsistency = 'stable_read';
         return result;

@@ -1,3 +1,4 @@
+import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import {
   V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE,
   calculateOpeningEffectiveBalance,
@@ -59,6 +60,7 @@ export type PostProvisionalDailyBankRecordInput = {
   intakeProviderRecordId?: string;
   intakeSourceDisplayName?: string | null;
   intakeWriterBundleIdentifier?: string | null;
+  intakeSourceId?: string | null;
   triggerSyncSessionId?: string;
 };
 
@@ -88,6 +90,7 @@ type CalculationInputs = {
   intakeProviderRecordId: string;
   intakeSourceDisplayName: string | null;
   intakeWriterBundleIdentifier: string | null;
+  intakeSourceId?: string | null;
   triggerSyncSessionId: string | null;
 };
 
@@ -281,6 +284,7 @@ function inputFingerprint(input: CalculationInputs, previousVersion: number) {
         intakeProviderRecordId: input.intakeProviderRecordId,
         intakeSourceDisplayName: input.intakeSourceDisplayName ?? null,
         intakeWriterBundleIdentifier: input.intakeWriterBundleIdentifier ?? null,
+        ...(input.intakeProvider === 'health_connect' ? { intakeSourceId: input.intakeSourceId ?? null } : {}),
         previousVersion,
       }),
     )
@@ -802,10 +806,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         const dailyIntake = intakeRecords.filter((record) =>
           toDateOnly(record.localDate) === logDate &&
           usableStatuses.has(record.syncStatus) &&
-          (record.provider !== 'apple_health' || (
-            selection.appleHealthIntakeWriterBundleId !== null &&
-            record.writerBundleIdentifier === selection.appleHealthIntakeWriterBundleId
-          )),
+          matchesSelectedIntakeSource(record, selection),
         );
         const syntheticExpenditure =
           this.options.allowSyntheticProviders &&
@@ -861,7 +862,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           expenditureProviderRecordId: resolvedExpenditure.providerRecordId,
           intakeProvider: resolvedIntake.provider,
           intakeProviderRecordId: resolvedIntake.providerRecordId,
-          intakeSourceDisplayName: resolvedIntake.provider === 'apple_health'
+          intakeSourceDisplayName: resolvedIntake.provider === 'health_connect' ? resolvedIntake.sourceDisplayName : resolvedIntake.provider === 'apple_health'
             ? resolvedIntake.writerDisplayName
             : resolvedIntake.provider === 'fatsecret' ? 'FatSecret' : null,
         });
@@ -1136,6 +1137,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         intakeProviderRecordId: input.intakeProviderRecordId ?? `development:intake:${input.logDate}`,
         intakeSourceDisplayName: input.intakeSourceDisplayName ?? null,
         intakeWriterBundleIdentifier: input.intakeWriterBundleIdentifier ?? null,
+        intakeSourceId: input.intakeSourceId ?? null,
           triggerSyncSessionId: input.triggerSyncSessionId ?? null,
         },
         processedAt,
@@ -1208,7 +1210,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
             ? 'development' : selection.authoritativeExpenditureProvider,
           fallbackProvider: 'apple_health', allowFallback: selection.allowExpenditureFallback,
         });
-        intake = resolveAuthoritativeProviderRecord(intakeRecords, {
+        intake = resolveAuthoritativeProviderRecord(intakeRecords.filter((row) => row.provider !== 'health_connect' || matchesSelectedIntakeSource(row, selection)), {
           authoritativeProvider: intakeRecords.every((record) => record.provider === 'development')
             ? 'development' : selection.authoritativeIntakeProvider,
           allowFallback: false,
@@ -1274,9 +1276,10 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           expenditureProviderRecordId: expenditure.providerRecordId,
           intakeProvider: intake.provider,
           intakeProviderRecordId: intake.providerRecordId,
-          intakeSourceDisplayName: intake.provider === 'apple_health'
+          intakeSourceDisplayName: intake.provider === 'health_connect' ? intake.sourceDisplayName : intake.provider === 'apple_health'
             ? intake.writerDisplayName
             : intake.provider === 'fatsecret' ? 'FatSecret' : null,
+          intakeSourceId: intake.provider === 'health_connect' ? intake.sourceId : null,
           intakeWriterBundleIdentifier: intake.provider === 'apple_health'
             ? intake.writerBundleIdentifier
             : null,
@@ -1622,12 +1625,13 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       ?? authority.intake.find((item) =>
         item.provider === latest.intakeProvider
         && item.record.providerRecordId === latest.intakeProviderRecordId
-        && item.writerBundleIdentifier === latest.intakeWriterBundleIdentifier,
+        && item.writerBundleIdentifier === latest.intakeWriterBundleIdentifier
+        && (item.provider !== 'health_connect' || item.sourceId === latest.intakeSourceId),
       );
     const selectedIntake = selectedIntakeCandidate
       ? { id: selectedIntakeCandidate.optionId, label: selectedIntakeCandidate.label }
       : {
-          id: historicalOptionId(userId, logDate, 'INTAKE', latest.intakeProvider, latest.intakeWriterBundleIdentifier),
+          id: historicalOptionId(userId, logDate, 'INTAKE', latest.intakeProvider, latest.intakeProvider === 'health_connect' ? latest.intakeSourceId : latest.intakeWriterBundleIdentifier),
           label: consumerProviderName(latest.intakeProvider, latest.intakeSourceDisplayName),
         };
     const expenditureOptions = authority.expenditure.map((item) => ({ id: item.optionId, label: item.label }));
@@ -1775,8 +1779,8 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       const writer = candidate.kind === 'intake' ? candidate.writerBundleIdentifier : null;
       await transaction.historicalSourceAuthorityOverride.upsert({
         where: { userId_localDate_role: { userId: user.id, localDate: date, role: dbRole } },
-        create: { userId: user.id, localDate: date, role: dbRole, provider: candidate.provider, intakeWriterBundleIdentifier: writer, revision: 1 },
-        update: { provider: candidate.provider, intakeWriterBundleIdentifier: writer, revision: { increment: 1 } },
+        create: { userId: user.id, localDate: date, role: dbRole, provider: candidate.provider, intakeWriterBundleIdentifier: writer, intakeSourceId: candidate.kind === 'intake' ? candidate.sourceId : null, revision: 1 },
+        update: { provider: candidate.provider, intakeWriterBundleIdentifier: writer, intakeSourceId: candidate.kind === 'intake' ? candidate.sourceId : null, revision: { increment: 1 } },
       });
       console.info(JSON.stringify({
         event: 'historical_source_override_persisted',
@@ -1798,7 +1802,8 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           ? resolved.intake.find((item) =>
             item.provider === latestSnapshot?.intakeProvider
             && item.record.providerRecordId === latestSnapshot.intakeProviderRecordId
-            && item.writerBundleIdentifier === latestSnapshot.intakeWriterBundleIdentifier,
+            && item.writerBundleIdentifier === latestSnapshot.intakeWriterBundleIdentifier
+            && (item.provider !== 'health_connect' || item.sourceId === latestSnapshot.intakeSourceId),
           )?.record
           : undefined);
       if (!expenditure || !intake) {
@@ -1825,7 +1830,8 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         expenditureProviderRecordId: expenditure.providerRecordId,
         intakeProvider: intake.provider,
         intakeProviderRecordId: intake.providerRecordId,
-        intakeSourceDisplayName: intake.provider === 'apple_health' ? intake.writerDisplayName : intake.provider === 'fatsecret' ? 'FatSecret' : null,
+        intakeSourceDisplayName: intake.provider === 'health_connect' ? intake.sourceDisplayName : intake.provider === 'apple_health' ? intake.writerDisplayName : intake.provider === 'fatsecret' ? 'FatSecret' : null,
+        intakeSourceId: intake.provider === 'health_connect' ? intake.sourceId : null,
         intakeWriterBundleIdentifier: intake.provider === 'apple_health' ? intake.writerBundleIdentifier : null,
         triggerSyncSessionId: expenditure.syncSessionId ?? intake.syncSessionId ?? null,
       }, this.now(), true);

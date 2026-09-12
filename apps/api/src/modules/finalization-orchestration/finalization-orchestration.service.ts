@@ -1,3 +1,4 @@
+import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import type { BankDayProcessingStatus, PrismaClient } from '@prisma/client';
 import { resolveAuthoritativeProviderRecord } from '@caloriebank/domain';
 
@@ -84,7 +85,8 @@ export class FinalizationOrchestrationService implements FinalizationScheduler {
       allowFallback: selection.allowExpenditureFallback,
     });
     const intake = resolveAuthoritativeProviderRecord(intakeRecords.filter((record) =>
-      record.syncStatus === 'ready' || record.syncStatus === 'stale' || record.syncStatus === 'partial',
+      (record.syncStatus === 'ready' || record.syncStatus === 'stale' || record.syncStatus === 'partial') &&
+      (record.provider !== 'health_connect' || matchesSelectedIntakeSource(record, selection)),
     ), {
       authoritativeProvider: intakeRecords.length > 0 && intakeRecords.every((record) => record.provider === 'development')
         ? 'development' : selection.authoritativeIntakeProvider,

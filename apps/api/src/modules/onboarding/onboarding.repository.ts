@@ -149,6 +149,7 @@ export class PrismaOnboardingRepository implements OnboardingRepository {
             userId: user.id,
             provider: selection.authoritativeIntakeProvider,
             syncStatus: { in: [...usableStatuses] },
+            ...(selection.authoritativeIntakeProvider === 'health_connect' ? { sourceId: selection.nativeIntakeSourceId ?? '__source_required__' } : {}),
             ...(selection.authoritativeIntakeProvider === 'apple_health'
               ? selection.appleHealthIntakeWriterBundleId
                 ? { writerBundleIdentifier: selection.appleHealthIntakeWriterBundleId }

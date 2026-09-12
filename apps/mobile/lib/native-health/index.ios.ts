@@ -1,3 +1,4 @@
+export { nativeIntake } from './intake';
 import type { NativeHealthCapability } from './types';
 
 export const nativeHealthCapability: NativeHealthCapability = { supported: true, provider: 'apple_health' };

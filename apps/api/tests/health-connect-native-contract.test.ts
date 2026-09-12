@@ -15,10 +15,16 @@ const native = vi.hoisted(() => ({
 }));
 vi.mock('react-native', () => ({ Platform: { Version: 34 }, Linking: { openURL: vi.fn() } }));
 vi.mock('react-native-health-connect', () => native);
-import { nativeHealthQualification } from '../../mobile/lib/health-connect/bridge.android';
+import { nativeHealthQualification, nativeNutritionQualification } from '../../mobile/lib/health-connect/bridge.android';
 
 beforeEach(() => { vi.clearAllMocks(); nativeHealthQualification.setAccountScope(null); nativeHealthQualification.setAccountScope('test'); });
 describe('pinned native integration contract', () => {
+  it('requests only nutrition for the food qualification path', async () => {
+    nativeNutritionQualification.setAccountScope('test');
+    await nativeNutritionQualification.access(true);
+    expect(native.requestPermission).toHaveBeenCalledWith([{ accessType: 'read', recordType: 'Nutrition' }]);
+    nativeNutritionQualification.setAccountScope(null);
+  });
   it('requests exactly the seven read categories, never write/history/background', async () => {
     await nativeHealthQualification.access(true);
     expect(native.requestPermission).toHaveBeenCalledWith([

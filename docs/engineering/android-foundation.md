@@ -1,5 +1,7 @@
 # Android B1 foundation
 
+B3 implements the Android exact-package nutrition consumer path and additive server source identity. Fitbit remains the qualified Android burn path; direct FatSecret remains available; Health Connect burn stays disabled. The [B3 build and qualification record](../deployment/android-preview.md) is authoritative for build delivery, emulator results, physical QA and deployment status. Earlier phase records below are historical baselines.
+
 Implemented 2026-09-11. Scope: shared direct-provider path and platform safety. Canonical plan: [Android parity plan](../product/android-parity-plan.md). This is source/configuration qualification, not Android physical certification or release authorization.
 
 ## B2 follow-up — 2026-09-11

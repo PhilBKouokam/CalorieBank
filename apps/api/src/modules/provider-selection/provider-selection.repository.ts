@@ -1,3 +1,4 @@
+import { nativeIntakeSourceName } from '@caloriebank/schemas';
 import type {
   HealthConnectionOption,
   HealthConnectionsResponse,
@@ -27,6 +28,7 @@ export type ProviderSelectionRecord = {
   authoritativeIntakeProvider: string;
   appleHealthIntakeWriterBundleId: string | null;
   appleHealthIntakeWriterDisplayName: string | null;
+  nativeIntakeSourceId: string | null;
   allowExpenditureFallback: boolean;
   allowActivityFallback: boolean;
 };
@@ -44,6 +46,7 @@ export const HEALTH_CONNECTION_OPTION_IDS = {
   burnedFitbit: 'burned-fitbit-v1',
   eatenAppleHealthWriter: 'eaten-apple-health-writer-v1',
   eatenFatSecret: 'eaten-fatsecret-v1',
+  eatenNative: 'eaten-health-connect-v1',
 } as const;
 
 function roleOption(
@@ -82,6 +85,7 @@ export async function readProviderSelection(
       stored?.authoritativeIntakeProvider ?? DEFAULT_INTAKE_PROVIDER,
     appleHealthIntakeWriterBundleId: stored?.appleHealthIntakeWriterBundleId ?? null,
     appleHealthIntakeWriterDisplayName: stored?.appleHealthIntakeWriterDisplayName ?? null,
+    nativeIntakeSourceId: stored?.nativeIntakeSourceId ?? null,
     allowExpenditureFallback: stored?.allowExpenditureFallback ?? false,
     allowActivityFallback: stored?.allowActivityFallback ?? false,
   };
@@ -155,10 +159,15 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         whoop: 'WHOOP',
         garmin: 'Garmin',
         fatsecret: 'FatSecret',
+        health_connect: 'Health Connect',
       }[provider],
       capabilities: getProviderCapabilities(provider),
     });
-    const selectedActivityProvider = selection.authoritativeActivityProvider as Exclude<ProviderId, 'fatsecret'>;
+    const selectedActivityProvider = selection.authoritativeActivityProvider as Exclude<ProviderId, 'fatsecret' | 'health_connect'>;
+    const nativeIntake = selection.nativeIntakeSourceId ? await this.db.dailyIntakeAggregate.findFirst({
+      where: { userId, provider: 'health_connect', sourceId: selection.nativeIntakeSourceId, syncStatus: { in: ['ready', 'stale', 'partial'] } },
+    }) : null;
+    const storedSelection = await this.db.providerSelection.findUnique({ where: { userId } });
     return {
       expenditure: {
         selected: selection.expenditureSelected,
@@ -181,11 +190,15 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       },
       intake: {
         selected: selection.intakeSelected && (selection.authoritativeIntakeProvider !== 'apple_health' || Boolean(selection.appleHealthIntakeWriterBundleId)),
-        authoritativeProvider: selection.authoritativeIntakeProvider as 'apple_health' | 'fatsecret',
-        displayName: selection.authoritativeIntakeProvider === 'fatsecret'
+        authoritativeProvider: selection.authoritativeIntakeProvider as 'apple_health' | 'fatsecret' | 'health_connect',
+        displayName: selection.authoritativeIntakeProvider === 'health_connect'
+          ? nativeIntakeSourceName(selection.nativeIntakeSourceId ?? '')
+          : selection.authoritativeIntakeProvider === 'fatsecret'
           ? 'FatSecret'
           : selection.appleHealthIntakeWriterDisplayName ?? 'Apple Health',
-        status: selection.authoritativeIntakeProvider === 'fatsecret'
+        status: selection.authoritativeIntakeProvider === 'health_connect'
+          ? nativeIntake ? 'ready' : 'unavailable'
+          : selection.authoritativeIntakeProvider === 'fatsecret'
           ? fatSecretIntake
             ? 'ready'
             : externalStatus('fatsecret') === 'connected'
@@ -196,8 +209,10 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
             : 'unavailable',
         writerBundleIdentifier: selection.appleHealthIntakeWriterBundleId,
         writerDisplayName: selection.appleHealthIntakeWriterDisplayName,
+        ...(selection.authoritativeIntakeProvider === 'health_connect' ? { nativeIntakeSource: selection.nativeIntakeSourceId ? { namespace: 'android_package' as const, id: selection.nativeIntakeSourceId } : null, selectionRevision: storedSelection!.updatedAt.toISOString() } : {}),
       },
       connectedProviders: [
+        ...(selection.nativeIntakeSourceId ? [{ ...providerDetails('health_connect'), status: 'connected' as const, lastSyncedAt: nativeIntake?.importedAt.toISOString() ?? null }] : []),
         {
           ...providerDetails('apple_health'),
           status: appleConnected ? 'connected' : 'not_connected',
@@ -329,6 +344,10 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       : selection.authoritativeIntakeProvider === 'apple_health'
         ? eatenOptions[0]!
         : null;
+    const nativeData = selection.nativeIntakeSourceId ? await this.db.dailyIntakeAggregate.findFirst({ where: { userId, provider: 'health_connect', sourceId: selection.nativeIntakeSourceId, syncStatus: { in: ['ready', 'stale', 'partial'] } } }) : null;
+    const nativeOption = selection.nativeIntakeSourceId ? roleOption(HEALTH_CONNECTION_OPTION_IDS.eatenNative, nativeIntakeSourceName(selection.nativeIntakeSourceId), nativeData ? 'connected' : 'no_data', { transportLabel: 'Health Connect', deviceManaged: true, primaryAction: 'check_native_health' }) : null;
+    if (nativeOption && (selection.authoritativeIntakeProvider === 'health_connect' || selection.nativeIntakeSourceId !== 'com.fatsecret.android' || fatSecretStatus !== 'connected')) eatenOptions.push(nativeOption);
+    const effectiveEatenSelected = selection.intakeSelected && selection.authoritativeIntakeProvider === 'health_connect' ? nativeOption : eatenSelected;
     const selectable = (option: HealthConnectionOption) => option.status === 'connected';
 
     const connectedServices: HealthConnectionOption[] = [];
@@ -366,7 +385,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       option.optionId !== burnedSelected?.optionId && option.status !== 'not_connected',
     );
     const eatenAlternatives = eatenOptions.filter((option) =>
-      option.optionId !== eatenSelected?.optionId && option.status !== 'not_connected',
+      option.optionId !== effectiveEatenSelected?.optionId && option.status !== 'not_connected',
     );
     return {
       burned: {
@@ -377,11 +396,11 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
           option.optionId !== burnedSelected?.optionId && option.status !== 'connected'),
       },
       eaten: {
-        selected: eatenSelected,
+        selected: effectiveEatenSelected,
         alternatives: eatenAlternatives,
         canChange: eatenAlternatives.some(selectable),
         canAddSource: eatenOptions.some((option) =>
-          option.optionId !== eatenSelected?.optionId && option.status !== 'connected'),
+          option.optionId !== effectiveEatenSelected?.optionId && option.status !== 'connected'),
       },
       connectedServices,
     };
@@ -405,7 +424,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       selectionRole: 'burned',
       authoritativeExpenditureProvider: provider,
       authoritativeActivityProvider: provider,
-      authoritativeIntakeProvider: current.authoritativeIntakeProvider as 'apple_health' | 'fatsecret',
+      authoritativeIntakeProvider: current.authoritativeIntakeProvider as 'apple_health' | 'fatsecret' | 'health_connect',
     });
     return this.getHealthConnections(user.id);
   }
@@ -414,7 +433,9 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
     const current = await readProviderSelection(this.db, user.id);
     const provider = optionId === HEALTH_CONNECTION_OPTION_IDS.eatenFatSecret
       ? 'fatsecret'
-      : optionId === HEALTH_CONNECTION_OPTION_IDS.eatenAppleHealthWriter
+      : optionId === HEALTH_CONNECTION_OPTION_IDS.eatenNative
+        ? 'health_connect'
+        : optionId === HEALTH_CONNECTION_OPTION_IDS.eatenAppleHealthWriter
         ? 'apple_health'
         : null;
     if (!provider) throw new AppError('That calories eaten source is unavailable.', 400, { code: 'HEALTH_CONNECTION_OPTION_INVALID' });
@@ -519,6 +540,10 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         code: 'APPLE_HEALTH_INTAKE_WRITER_REQUIRED',
       });
     }
+    const nativeSourceId = input.nativeIntakeSource === undefined ? existingSelection?.nativeIntakeSourceId ?? null : input.nativeIntakeSource?.id ?? null;
+    if (changesIntake && input.authoritativeIntakeProvider === 'health_connect' && !nativeSourceId) {
+      throw new AppError('Choose a food tracker first.', 409, { code: 'NATIVE_INTAKE_SOURCE_REQUIRED' });
+    }
     const roleChanges = {
       ...(changesBurn ? {
         expenditureSelected: true,
@@ -528,8 +553,9 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         allowActivityFallback: false,
       } : {}),
       ...(changesIntake ? {
-        intakeSelected: input.authoritativeIntakeProvider === 'fatsecret' || Boolean(selectedWriter),
+        intakeSelected: input.authoritativeIntakeProvider === 'health_connect' ? Boolean(nativeSourceId) : input.authoritativeIntakeProvider === 'fatsecret' || Boolean(selectedWriter),
         authoritativeIntakeProvider: input.authoritativeIntakeProvider,
+        nativeIntakeSourceId: nativeSourceId,
         appleHealthIntakeWriterBundleId: selectedWriter?.bundleIdentifier ?? null,
         appleHealthIntakeWriterDisplayName: selectedWriter?.displayName ?? null,
       } : {}),

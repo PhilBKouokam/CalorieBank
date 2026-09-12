@@ -1,3 +1,4 @@
+export { nativeIntakeSourceName } from './native-intake-source';
 import { z } from 'zod';
 export * from './source-state';
 
@@ -214,7 +215,7 @@ function isIanaTimezone(value: string) {
 export const ingestionProviderSchema = z.enum(['apple_health']);
 export const bankingProviderSchema = z.enum(['apple_health', 'google_health_fitbit']);
 export const wearableProviderSchema = z.enum(['apple_health', 'google_health_fitbit', 'garmin', 'whoop']);
-export const intakeProviderSchema = z.enum(['apple_health', 'fatsecret']);
+export const intakeProviderSchema = z.enum(['apple_health', 'fatsecret', 'health_connect']);
 export const appleHealthIntakeWriterSchema = z.object({
   bundleIdentifier: z.string().trim().min(1).max(255).refine(
     (value) => !['choose a food tracker', 'apple health food tracker'].includes(value.toLowerCase()),
@@ -225,7 +226,27 @@ export const appleHealthIntakeWriterSchema = z.object({
     'Choose a real food tracker.',
   ),
 }).strict();
-export const providerIdSchema = z.enum(['apple_health', 'google_health_fitbit', 'garmin', 'whoop', 'fatsecret']);
+export const providerIdSchema = z.enum(['apple_health', 'google_health_fitbit', 'garmin', 'whoop', 'fatsecret', 'health_connect']);
+
+export const nativeIntakeSourceSchema = z.object({
+  namespace: z.literal('android_package'),
+  id: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/).max(255),
+}).strict();
+
+export const nativeIntakeBatchSchema = z.object({
+  source: nativeIntakeSourceSchema,
+  selectionRevision: z.string().datetime(),
+  queryStartedAt: z.string().datetime(),
+  observedAt: z.string().datetime(),
+  timezone: z.string().refine(isIanaTimezone),
+  days: z.array(z.object({
+    localDate: dateStringSchema,
+    quality: z.enum(['usable_evidence', 'empty', 'no_calorie_records', 'ambiguous_overlap', 'boundary_ambiguous']),
+    totalCaloriesConsumed: z.number().int().nonnegative().max(100000).nullable(),
+    providerUpdatedAt: z.string().datetime().nullable(),
+  }).strict().refine((day) => (day.quality === 'usable_evidence') === (day.totalCaloriesConsumed !== null), 'Energy is required only for usable evidence.')).length(8),
+}).strict();
+export type NativeIntakeBatch = z.infer<typeof nativeIntakeBatchSchema>;
 
 export const providerSelectionInputSchema = z
   .object({
@@ -234,6 +255,7 @@ export const providerSelectionInputSchema = z
     authoritativeActivityProvider: wearableProviderSchema.optional(),
     authoritativeIntakeProvider: intakeProviderSchema,
     appleHealthIntakeWriter: appleHealthIntakeWriterSchema.nullable().optional(),
+    nativeIntakeSource: nativeIntakeSourceSchema.nullable().optional(),
   })
   .strict();
 
@@ -266,6 +288,8 @@ export const providerSelectionResponseSchema = z.object({
     status: providerConnectionStatusSchema,
     writerBundleIdentifier: z.string().min(1).nullable(),
     writerDisplayName: z.string().min(1).nullable(),
+    nativeIntakeSource: nativeIntakeSourceSchema.nullable().optional(),
+    selectionRevision: z.string().datetime().optional(),
   }),
   connectedProviders: z.array(
     z.object({
@@ -303,6 +327,7 @@ export const healthConnectionActionSchema = z.enum([
   'reconnect',
   'refresh_apple_health',
   'check_apple_health',
+  'check_native_health',
   'connect',
 ]).nullable();
 

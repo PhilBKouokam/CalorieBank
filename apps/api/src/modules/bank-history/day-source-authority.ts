@@ -1,3 +1,4 @@
+import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import { createHash } from 'node:crypto';
 import { canProvideAuthoritativeExpenditure, getLocalDateUtcBounds, getProviderCapabilities, type ProviderId } from '@caloriebank/domain';
 import type { Prisma } from '@prisma/client';
@@ -74,6 +75,7 @@ export type IntakeCandidate = {
   label: string;
   optionId: string;
   writerBundleIdentifier: string | null;
+  sourceId: string | null;
   record: Awaited<ReturnType<Prisma.TransactionClient['dailyIntakeAggregate']['findFirstOrThrow']>>;
 };
 
@@ -81,6 +83,7 @@ export function consumerProviderName(provider: string, intakeDisplayName?: strin
   if (intakeDisplayName) return intakeDisplayName;
   if (provider === 'google_health_fitbit') return 'Fitbit';
   if (provider === 'apple_health') return 'Apple Health';
+  if (provider === 'health_connect') return 'Health Connect';
   if (provider === 'fatsecret') return 'FatSecret';
   return 'Connected source';
 }
@@ -130,14 +133,16 @@ export async function resolveDaySourceAuthority(
       usableStatuses.has(record.syncStatus) &&
       record.totalCaloriesConsumed >= 0 &&
       record.timezone === timezone &&
-      (record.provider !== 'apple_health' || Boolean(record.writerBundleIdentifier && record.writerDisplayName)),
+      (record.provider !== 'apple_health' || Boolean(record.writerBundleIdentifier && record.writerDisplayName)) &&
+      (record.provider !== 'health_connect' || Boolean(record.sourceId && record.sourceDisplayName)),
     )
     .map((record): IntakeCandidate => ({
       kind: 'intake',
       provider: record.provider,
-      label: consumerProviderName(record.provider, record.provider === 'apple_health' ? record.writerDisplayName : null),
-      optionId: historicalOptionId(userId, date, 'INTAKE', record.provider, record.writerBundleIdentifier),
+      label: consumerProviderName(record.provider, record.provider === 'health_connect' ? record.sourceDisplayName : record.provider === 'apple_health' ? record.writerDisplayName : null),
+      optionId: historicalOptionId(userId, date, 'INTAKE', record.provider, record.provider === 'health_connect' ? record.sourceId : record.writerBundleIdentifier),
       writerBundleIdentifier: record.writerBundleIdentifier,
+      sourceId: record.provider === 'health_connect' ? record.sourceId : null,
       record,
     }));
 
@@ -149,11 +154,12 @@ export async function resolveDaySourceAuthority(
   const selectedIntake = intakeOverride
     ? intake.find((item) =>
         item.provider === intakeOverride.provider &&
-        item.writerBundleIdentifier === intakeOverride.intakeWriterBundleIdentifier,
+        item.writerBundleIdentifier === intakeOverride.intakeWriterBundleIdentifier &&
+        (item.provider !== 'health_connect' || item.sourceId === intakeOverride.intakeSourceId),
       ) ?? null
     : intake.find((item) =>
         item.provider === selection.authoritativeIntakeProvider &&
-        (item.provider !== 'apple_health' || item.writerBundleIdentifier === selection.appleHealthIntakeWriterBundleId),
+        matchesSelectedIntakeSource(item, selection),
       ) ?? null;
 
   return {

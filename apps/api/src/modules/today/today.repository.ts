@@ -1,3 +1,4 @@
+import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import {
   calculateRestOfDayBurnProjection,
   calculateStepWhatIfProjection,
@@ -243,6 +244,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     user: DevelopmentUser,
     aggregate: NormalizedDailyIntakeAggregate,
   ): Promise<AggregateUpsertResult> {
+    if (aggregate.provider === 'health_connect') throw new AppError('Use the native intake batch endpoint.', 400);
     if (aggregate.provider === 'apple_health') {
       const selection = await readProviderSelection(this.db, user.id);
       if (
@@ -260,9 +262,10 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       userId: user.id,
       localDate: parseLocalDate(aggregate.localDate),
       provider: aggregate.provider,
+      sourceId: aggregate.sourceId ?? '',
     };
     const existing = await this.db.dailyIntakeAggregate.findUnique({
-      where: { userId_localDate_provider: identity },
+      where: { userId_localDate_provider_sourceId: identity },
     });
 
     if (existing && shouldIgnoreIncoming(existing.providerUpdatedAt, aggregate.providerUpdatedAt)) {
@@ -305,6 +308,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
           totalCaloriesConsumed: aggregate.totalCaloriesConsumed,
           writerBundleIdentifier: aggregate.writerBundleIdentifier ?? null,
           writerDisplayName: aggregate.writerDisplayName ?? null,
+          sourceDisplayName: aggregate.sourceDisplayName ?? null,
           providerUpdatedAt: aggregate.providerUpdatedAt,
           syncStatus: aggregate.syncStatus,
           isCurrentDay: aggregate.isCurrentDay,
@@ -324,6 +328,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
           totalCaloriesConsumed: aggregate.totalCaloriesConsumed,
           writerBundleIdentifier: aggregate.writerBundleIdentifier ?? null,
           writerDisplayName: aggregate.writerDisplayName ?? null,
+          sourceDisplayName: aggregate.sourceDisplayName ?? null,
           importedAt: aggregate.importedAt,
           providerUpdatedAt: aggregate.providerUpdatedAt,
           syncStatus: aggregate.syncStatus,
@@ -344,16 +349,18 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     input: {
       localDate: string;
       provider: string;
+      sourceId?: string;
       syncSessionId?: string;
       isCurrentDay: boolean;
     },
   ) {
     const existing = await this.db.dailyIntakeAggregate.findUnique({
       where: {
-        userId_localDate_provider: {
+        userId_localDate_provider_sourceId: {
           userId: user.id,
           localDate: parseLocalDate(input.localDate),
           provider: input.provider,
+          sourceId: input.sourceId ?? '',
         },
       },
     });
@@ -632,10 +639,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     });
     const usableIntakeRecords = intakeRecords.filter((record) =>
       (record.syncStatus === 'ready' || record.syncStatus === 'stale' || record.syncStatus === 'partial') &&
-      (record.provider !== 'apple_health' || (
-        selection.appleHealthIntakeWriterBundleId !== null &&
-        record.writerBundleIdentifier === selection.appleHealthIntakeWriterBundleId
-      )),
+      matchesSelectedIntakeSource(record, selection),
     );
     const intake = resolveAuthoritativeProviderRecord(usableIntakeRecords, {
       authoritativeProvider: syntheticIntake ? 'development' : selection.authoritativeIntakeProvider,
@@ -750,7 +754,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       eaten: {
         calories: intake?.totalCaloriesConsumed ?? null,
         source: intake
-          ? intake.provider === 'apple_health'
+          ? intake.provider === 'health_connect' ? intake.sourceDisplayName ?? 'Food tracker' : intake.provider === 'apple_health'
             ? intake.writerDisplayName
             : getProviderDisplayName(intake.provider)
           : null,

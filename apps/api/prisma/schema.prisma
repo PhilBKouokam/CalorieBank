@@ -282,6 +282,7 @@ model ProviderSelection {
   authoritativeIntakeProvider        String   @default("apple_health") @map("authoritative_intake_provider")
   appleHealthIntakeWriterBundleId    String?  @map("apple_health_intake_writer_bundle_id")
   appleHealthIntakeWriterDisplayName String?  @map("apple_health_intake_writer_display_name")
+  nativeIntakeSourceId                String?  @map("native_intake_source_id")
   allowExpenditureFallback           Boolean  @default(false) @map("allow_expenditure_fallback")
   allowActivityFallback              Boolean  @default(false) @map("allow_activity_fallback")
   selectedAt                         DateTime @default(now()) @map("selected_at") @db.Timestamptz
@@ -299,6 +300,7 @@ model HistoricalSourceAuthorityOverride {
   role                         HistoricalSourceRole
   provider                     String
   intakeWriterBundleIdentifier String?              @map("intake_writer_bundle_identifier")
+  intakeSourceId               String?              @map("intake_source_id")
   revision                     Int                  @default(1)
   createdAt                    DateTime             @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                    DateTime             @updatedAt @map("updated_at") @db.Timestamptz
@@ -486,6 +488,9 @@ model DailyIntakeAggregate {
   totalCaloriesConsumed  Int                   @map("total_calories_consumed")
   writerBundleIdentifier String?               @map("writer_bundle_identifier")
   writerDisplayName      String?               @map("writer_display_name")
+  sourceId               String                @default("") @map("source_id")
+  sourceDisplayName      String?               @map("source_display_name")
+  evidenceObservedAt     DateTime?             @map("evidence_observed_at") @db.Timestamptz
   importedAt             DateTime              @map("imported_at") @db.Timestamptz
   providerUpdatedAt      DateTime?             @map("provider_updated_at") @db.Timestamptz
   syncStatus             AggregateSyncStatus   @map("sync_status")
@@ -497,7 +502,7 @@ model DailyIntakeAggregate {
   syncSession            IngestionSyncSession? @relation(fields: [syncSessionId], references: [id], onDelete: SetNull)
 
   @@unique([userId, provider, providerRecordId])
-  @@unique([userId, localDate, provider])
+  @@unique([userId, localDate, provider, sourceId])
   @@index([userId, localDate])
   @@index([userId, provider, localDate])
   @@map("daily_intake_aggregates")
@@ -577,6 +582,7 @@ model DashboardPreferences {
 model IngestionSyncSession {
   id                       String                      @id @default(uuid()) @db.Uuid
   userId                   String                      @map("user_id") @db.Uuid
+  sourceId                 String?                     @map("source_id")
   provider                 String
   localDate                DateTime                    @map("local_date") @db.Date
   timezone                 String
@@ -694,6 +700,7 @@ model BankCalculationSnapshot {
   intakeProviderRecordId        String                        @map("intake_provider_record_id")
   intakeSourceDisplayName       String?                       @map("intake_source_display_name")
   intakeWriterBundleIdentifier  String?                       @map("intake_writer_bundle_identifier")
+  intakeSourceId                String?                       @map("intake_source_id")
   triggerSyncSessionId          String?                       @map("trigger_sync_session_id") @db.Uuid
   inputFingerprint              String                        @map("input_fingerprint")
   createdAt                     DateTime                      @default(now()) @map("created_at") @db.Timestamptz

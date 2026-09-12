@@ -295,7 +295,8 @@ describe('historical per-day source authority', () => {
     const fatSecret = before.intake.options.find((option) => option.label === 'FatSecret')!;
     await prisma.dailyIntakeAggregate.delete({
       where: {
-        userId_localDate_provider: {
+        userId_localDate_provider_sourceId: {
+          sourceId: '',
           userId: account.id,
           localDate: new Date(`${date}T00:00:00.000Z`),
           provider: 'fatsecret',
@@ -321,7 +322,8 @@ describe('historical per-day source authority', () => {
     const fatSecret = before.intake.options.find((option) => option.label === 'FatSecret')!;
     await prisma.dailyIntakeAggregate.update({
       where: {
-        userId_localDate_provider: {
+        userId_localDate_provider_sourceId: {
+          sourceId: '',
           userId: account.id,
           localDate: new Date(`${date}T00:00:00.000Z`),
           provider: 'fatsecret',
@@ -354,7 +356,8 @@ describe('historical per-day source authority', () => {
     const cronometer = before.intake.options.find((option) => option.label === 'Cronometer')!;
     await prisma.dailyIntakeAggregate.delete({
       where: {
-        userId_localDate_provider: {
+        userId_localDate_provider_sourceId: {
+          sourceId: '',
           userId: account.id,
           localDate: new Date(`${date}T00:00:00.000Z`),
           provider: 'apple_health',
