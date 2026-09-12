@@ -52,7 +52,7 @@ describe('permanent source manager and compact goal selector wiring', () => {
     expect(screen).not.toContain('!appleAvailable ? <SourceAction detail=');
     expect(screen).toContain('onChooseTracker');
     expect(screen).toContain("setServiceRole('eaten')");
-    expect(screen).toContain('discoverAppleHealthIntakeWriters()');
+    expect(screen).toContain('discoverNativeIntakeWriters()');
     expect(screen).toContain('appleHealthIntakeWriter: { bundleIdentifier: writer.bundleIdentifier, displayName: writer.displayName }');
   });
   it('uses equal flexible centered mode choices for both goal directions', () => {

@@ -1,21 +1,19 @@
+import { hostedAuthRedirectForPlatform } from '@/lib/auth/platform-redirect';
 import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import Constants from 'expo-constants';
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import {
-  defaultHostedAuthRedirect,
   hostedAuthErrorMetadata,
   hostedAuthResultMetadata,
 } from '@/lib/auth/hosted-auth-diagnostics';
 
-const hostedAuthRedirect = defaultHostedAuthRedirect(
-  Constants.expoConfig?.ios?.bundleIdentifier ?? 'com.caloriebank.mobile',
-);
+const hostedAuthRedirect = hostedAuthRedirectForPlatform(Platform.OS, Constants.expoConfig ?? {});
 
 export default function SignInScreen() {
   const router = useRouter();

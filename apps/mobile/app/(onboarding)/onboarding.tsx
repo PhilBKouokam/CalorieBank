@@ -1,3 +1,5 @@
+import { nativeSourceRecoveryStage } from '@/lib/native-health/presentation';
+import { preferDirectFoodSources } from '@/lib/providers/intake-writer-policy';
 import type { OnboardingStage, OnboardingStatusResponse, ProviderSelectionInput, ProviderSelectionResponse } from '@caloriebank/schemas';
 import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -35,17 +37,15 @@ import {
   syncFitbit,
 } from '@/lib/api/client';
 import {
-  connectAppleHealth,
-  getAppleHealthConnectionStatus,
-  refreshAppleHealthForCurrentAccount,
-} from '@/lib/healthkit/healthkit-connection';
-import {
-  discoverAppleHealthIntakeWriters,
-  preferDirectFoodSources,
+  nativeHealthCapability,
+  connectNativeHealth,
+  getNativeHealthConnectionStatus,
+  refreshNativeHealthForCurrentAccount,
+  discoverNativeIntakeWriters,
   resolveKnownFoodTracker,
-  type AppleHealthIntakeWriter,
+  type NativeIntakeWriter as AppleHealthIntakeWriter,
   type KnownFoodTracker,
-} from '@/lib/healthkit/apple-health-intake-writers';
+} from '@/lib/native-health';
 import {
   initialImportPlan,
   createOnboardingActionGate,
@@ -116,6 +116,7 @@ export default function OnboardingScreen() {
   const [foodHelpTracker, setFoodHelpTracker] = useState<KnownFoodTracker | null>(null);
   const [discoveredIntakeWriters, setDiscoveredIntakeWriters] =
     useState<AppleHealthIntakeWriter[]>([]);
+  const nativeRecoveryStage = nativeSourceRecoveryStage(status, nativeHealthCapability.supported);
   const actionGate = useRef(createOnboardingActionGate());
   const refreshGeneration = useRef(createRequestGeneration());
   const viewGeneration = useRef(0);
@@ -308,8 +309,8 @@ export default function OnboardingScreen() {
 
   async function connectApple(role: 'expenditure') {
     await run('apple-burn', async () => {
-      if (await getAppleHealthConnectionStatus() !== 'connected') {
-        const connection = await connectAppleHealth();
+      if (await getNativeHealthConnectionStatus() !== 'connected') {
+        const connection = await connectNativeHealth();
         if (connection !== 'connected') {
           throw new OnboardingConsumerError('Apple Health is not available on this device. Choose Fitbit or try again later.');
         }
@@ -319,7 +320,7 @@ export default function OnboardingScreen() {
         authoritativeActivityProvider: 'apple_health',
       });
       await withOnboardingTimeout(
-        refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }),
+        refreshNativeHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }),
       );
       const providers = await fetchProviderSelection();
       if (role === 'expenditure' && providers.expenditure.status !== 'ready') {
@@ -341,7 +342,7 @@ export default function OnboardingScreen() {
       },
     });
     await withOnboardingTimeout(
-      refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }),
+      refreshNativeHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }),
     );
     const providers = await fetchProviderSelection();
     if (providers.intake.status !== 'ready') {
@@ -355,17 +356,17 @@ export default function OnboardingScreen() {
 
   async function connectAppleIntakeTracker(tracker: KnownFoodTracker) {
     await run(`apple-intake:${tracker}`, async () => {
-      if (await getAppleHealthConnectionStatus() !== 'connected') {
-        const connection = await connectAppleHealth();
+      if (await getNativeHealthConnectionStatus() !== 'connected') {
+        const connection = await connectNativeHealth();
         if (connection !== 'connected') {
           throw new OnboardingConsumerError('Apple Health is not available on this device. Choose FatSecret or try again later.');
         }
       }
       await withOnboardingTimeout(
-        refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }),
+        refreshNativeHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }),
       );
       const writers = preferDirectFoodSources(
-        await withOnboardingTimeout(discoverAppleHealthIntakeWriters()),
+        await withOnboardingTimeout(discoverNativeIntakeWriters()),
         (await fetchProviderSelection()).connectedProviders,
       );
       const writer = resolveKnownFoodTracker(tracker, writers);
@@ -387,13 +388,13 @@ export default function OnboardingScreen() {
 
   async function discoverOtherAppleHealthWriters() {
     await run('apple-intake:other', async () => {
-      if (await getAppleHealthConnectionStatus() !== 'connected') {
-        const connection = await connectAppleHealth();
+      if (await getNativeHealthConnectionStatus() !== 'connected') {
+        const connection = await connectNativeHealth();
         if (connection !== 'connected') {
           throw new OnboardingConsumerError('Apple Health is not available on this device. Choose FatSecret or try again later.');
         }
       }
-      const discovered = await withOnboardingTimeout(discoverAppleHealthIntakeWriters());
+      const discovered = await withOnboardingTimeout(discoverNativeIntakeWriters());
       const writers = preferDirectFoodSources(
         discovered,
         (await fetchProviderSelection()).connectedProviders,
@@ -421,7 +422,7 @@ export default function OnboardingScreen() {
     if (selected.provider === 'apple_health') {
       await run(role === 'expenditure' ? 'apple-burn' : 'apple-intake:retry', async () => {
         const outcome = await withOnboardingTimeout(
-          refreshAppleHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 }),
+          refreshNativeHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 }),
         );
         if (!outcome || outcome.syncStatus === 'failure') throw new Error('Apple Health refresh failed.');
         const providers = await fetchProviderSelection();
@@ -459,6 +460,7 @@ export default function OnboardingScreen() {
   async function prepareBank() {
     const generation = viewGeneration.current;
     await run('preparing', async () => {
+      if (nativeRecoveryStage) return { stayOnStage: nativeRecoveryStage };
       const providers = await fetchProviderSelection();
       const plan = initialImportPlan(providers);
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -471,7 +473,7 @@ export default function OnboardingScreen() {
       }
       if (plan.appleHealth) {
         requests.push(withOnboardingTimeout(
-          refreshAppleHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 }),
+          refreshNativeHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 }),
         ).then((outcome) => {
           if (!outcome || outcome.syncStatus === 'failure') {
             throw new Error('Apple Health refresh failed.');
@@ -487,10 +489,10 @@ export default function OnboardingScreen() {
   }
 
   useEffect(() => {
-    if (status?.stage === 'preparing_bank' && dailyTarget?.chosen && !displayStage && busy === null && !preparationAttempted) void prepareBank();
+    if (!nativeRecoveryStage && status?.stage === 'preparing_bank' && dailyTarget?.chosen && !displayStage && busy === null && !preparationAttempted) void prepareBank();
     // Run once when the user enters preparation. Further attempts are explicit refreshes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status?.stage, preparationAttempted, displayStage, dailyTarget?.chosen]);
+  }, [status?.stage, preparationAttempted, displayStage, dailyTarget?.chosen, nativeRecoveryStage]);
 
   useEffect(() => {
     if (status?.stage !== 'preparing_bank' || !preparationAttempted || busy !== null || displayStage) return;
@@ -521,7 +523,7 @@ export default function OnboardingScreen() {
     return <CenteredState title="Loading setup…" detail="Checking your saved progress." />;
   }
 
-  const activeStage = displayStage ?? (!status.completed && !dailyTarget?.chosen && ['preparing_bank', 'ready'].includes(status.stage) ? 'daily_bank_target' : status.stage);
+  const activeStage = nativeRecoveryStage ?? displayStage ?? (!status.completed && !dailyTarget?.chosen && ['preparing_bank', 'ready'].includes(status.stage) ? 'daily_bank_target' : status.stage);
   const progress = stageNumber[activeStage];
   const fitbitConnected = providerIsConnected(providerState, 'google_health_fitbit');
   const fatSecretConnected = providerIsConnected(providerState, 'fatsecret');
@@ -553,8 +555,8 @@ export default function OnboardingScreen() {
       case 'calories_burned':
         return <>
           <Text style={styles.title}>What do you use to track your activity?</Text>
-          <Text style={styles.detail}>Choose the device that tracks your daily calorie burn.</Text>
-          {status.expenditure.connected && editingRole !== 'expenditure' ? <ConnectedSource
+          <Text style={styles.detail}>{nativeRecoveryStage === 'calories_burned' ? 'Your saved source cannot refresh on this phone. Choose Fitbit to continue.' : 'Choose the device that tracks your daily calorie burn.'}</Text>
+          {status.expenditure.connected && nativeRecoveryStage !== 'calories_burned' && editingRole !== 'expenditure' ? <ConnectedSource
             busy={expenditureActionActive}
             canContinue={sourceSelectionSatisfiesOnboarding(status.expenditure)}
             source={status.expenditure.provider === 'apple_health' ? 'Apple Health' : status.expenditure.displayName}
@@ -565,7 +567,7 @@ export default function OnboardingScreen() {
             onContinue={() => showStage(nextStageAfterSource('expenditure'))}
             onRetry={() => void retrySelectedSource('expenditure')}
           /> : <>
-          {Platform.OS === 'ios' ? <ProviderOption title="Apple Watch" detail="CalorieBank securely reads its activity data through Apple Health." busy={sourceActionIsPending(busy, 'apple-burn')} disabled={busy !== null} connected={status.expenditure.provider === 'apple_health' && status.expenditure.connected} onPress={() => void connectApple('expenditure')} /> : null}
+          {nativeHealthCapability.supported ? <ProviderOption title="Apple Watch" detail="CalorieBank securely reads its activity data through Apple Health." busy={sourceActionIsPending(busy, 'apple-burn')} disabled={busy !== null} connected={status.expenditure.provider === 'apple_health' && status.expenditure.connected} onPress={() => void connectApple('expenditure')} /> : null}
           <ProviderOption title="Fitbit" detail="Uses your Fitbit calorie burn, steps, and workouts." busy={sourceActionIsPending(busy, 'fitbit')} disabled={busy !== null} connected={fitbitConnected} onPress={() => void connectFitbit()} />
           {fitbitConnected && status.expenditure.provider !== 'google_health_fitbit' ? (
             <PrimaryButton busy={busy !== null} label="Use connected Fitbit" onPress={() => void run('fitbit', async () => {
@@ -579,8 +581,8 @@ export default function OnboardingScreen() {
       case 'calories_eaten':
         return <>
           <Text style={styles.title}>Where do you track your food?</Text>
-          <Text style={styles.detail}>Choose one source for your daily calorie total.</Text>
-          {status.intake.connected && editingRole !== 'intake' ? <ConnectedSource
+          <Text style={styles.detail}>{nativeRecoveryStage === 'calories_eaten' ? 'Your saved source cannot refresh on this phone. Choose FatSecret to continue.' : 'Choose one source for your daily calorie total.'}</Text>
+          {status.intake.connected && nativeRecoveryStage !== 'calories_eaten' && editingRole !== 'intake' ? <ConnectedSource
             busy={intakeActionActive}
             canContinue={sourceSelectionSatisfiesOnboarding(status.intake)}
             source={status.intake.displayName}
@@ -591,7 +593,7 @@ export default function OnboardingScreen() {
             onContinue={() => showStage(nextStageAfterSource('intake'))}
             onRetry={() => void retrySelectedSource('intake')}
           /> : <>
-          {Platform.OS === 'ios' ? <>
+          {nativeHealthCapability.supported ? <>
             <Text style={styles.sectionLabel}>Apps that share through Apple Health</Text>
             <ProviderOption title="MyFitnessPal" detail="Connect through Apple Health." busy={busy === 'apple-intake:myfitnesspal'} disabled={busy !== null} connected={selectedAppleHealthWriter(providerState, 'MyFitnessPal')} onPress={() => void connectAppleIntakeTracker('myfitnesspal')} />
             <ProviderOption title="Cronometer" detail="Connect through Apple Health." busy={busy === 'apple-intake:cronometer'} disabled={busy !== null} connected={selectedAppleHealthWriter(providerState, 'Cronometer')} onPress={() => void connectAppleIntakeTracker('cronometer')} />
@@ -691,8 +693,8 @@ export default function OnboardingScreen() {
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           {progress > 0 && progress < 6 ? <Text accessibilityLabel={`Setup step ${progress} of 5`} style={styles.progress}>Step {progress} of 5</Text> : null}
           {stageContent}
-          {activeStage === 'calories_eaten' && (editingRole === 'intake' || !status.intake.connected) && foodHelpTracker ? <FoodTrackerHelp provider="apple_health" chosenTracker={foodHelpTracker} /> : null}
-          {activeStage === 'calories_eaten' && status.intake.provider === 'apple_health' && status.intake.readiness === 'connected_waiting_for_data' ? <FoodTrackerHelp provider="apple_health" bundleId={providerState?.intake.writerBundleIdentifier} /> : null}
+          {nativeHealthCapability.supported && activeStage === 'calories_eaten' && (editingRole === 'intake' || !status.intake.connected) && foodHelpTracker ? <FoodTrackerHelp provider="apple_health" chosenTracker={foodHelpTracker} /> : null}
+          {nativeHealthCapability.supported && activeStage === 'calories_eaten' && status.intake.provider === 'apple_health' && status.intake.readiness === 'connected_waiting_for_data' ? <FoodTrackerHelp provider="apple_health" bundleId={providerState?.intake.writerBundleIdentifier} /> : null}
           {message && messageStage === activeStage && !(setupIsReady(status) && (messageAction === 'preparing' || messageAction === 'loading')) ? <Text accessibilityLiveRegion="polite" style={messageTone === 'attention' ? styles.attention : styles.error}>{message}</Text> : null}
         </ScrollView>
       </KeyboardAvoidingView>

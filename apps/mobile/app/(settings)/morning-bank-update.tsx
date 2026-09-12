@@ -1,3 +1,4 @@
+import { notificationSettingsName } from '@/lib/native-health/copy';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
@@ -54,7 +55,7 @@ export default function MorningBankUpdateSettingsScreen() {
       if (!request.isCurrent()) return;
       setPermission(result.state.permission);
       setEnabled(result.state.settings.enabled && result.state.permission === 'granted' && result.state.settings.deviceActive);
-      setMessage(result.message ?? (next && result.state.permission !== 'granted' ? 'Turn on notifications for CalorieBank in iOS Settings.' : null));
+      setMessage(result.message ?? (next && result.state.permission !== 'granted' ? `Turn on notifications for CalorieBank in ${notificationSettingsName}.` : null));
     } catch { if (request.isCurrent()) setMessage("We couldn't confirm your change. Try again."); }
     finally { if (request.isCurrent()) setLoading(false); request.finish(); }
   }
@@ -68,7 +69,7 @@ export default function MorningBankUpdateSettingsScreen() {
         </View>
         <Switch disabled={loading} accessibilityLabel="Morning Bank Update" accessibilityState={{ busy: loading, disabled: loading }} onValueChange={(value) => void change(value)} value={enabled} />
       </View>
-      {loading ? <ActivityIndicator accessibilityLabel="Updating notification settings" color={colors.primary} /> : <Text style={styles.status}>{permission === 'denied' ? 'Notifications are off in iOS Settings' : enabled ? 'On' : 'Off'}</Text>}
+      {loading ? <ActivityIndicator accessibilityLabel="Updating notification settings" color={colors.primary} /> : <Text style={styles.status}>{permission === 'denied' ? `Notifications are off in ${notificationSettingsName}` : enabled ? 'On' : 'Off'}</Text>}
       {permission === 'denied' ? <Pressable accessibilityRole="button" onPress={() => void openNotificationSettings().then((opened) => { if (!opened) setMessage('Open Settings on your iPhone, then choose CalorieBank and Notifications.'); })} style={styles.button}><Text style={styles.buttonText}>Open Notification Settings</Text></Pressable> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
       {message && !loading ? <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.button}><Text style={styles.buttonText}>Try again</Text></Pressable> : null}

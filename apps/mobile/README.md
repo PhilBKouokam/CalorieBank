@@ -2,6 +2,10 @@
 
 Expo React Native foundation for CalorieBank V1.
 
+Android implementation planning is recorded in the canonical
+[Android parity plan](../../docs/product/android-parity-plan.md). Phase A is an
+audit only; iOS remains the product reference and Android is not yet released.
+
 ## Product Direction
 
 The mobile app should follow the repository-level V1 source of truth:
@@ -40,7 +44,7 @@ Manual food entry belongs only as fallback, correction, supplementary input, or 
 
 ## Current Scope
 
-The app includes coordinated foreground rolling-window ingestion from Apple Health, Fitbit through Google Health, and FatSecret; a provider-neutral Today read model; authoritative provider selection; Clerk-hosted beta authentication; and persistent fixed-order card visibility preferences. FatSecret imports only existing diary daily totals and never creates food entries. Available Bank remains mandatory and first. Existing implementation visibility may require a later ADR 011 migration; this documentation change does not add discovery logic. Today's Forecast and Projected Daily Burn remain V1 estimates but must not be represented as Projected Bank data. Time-aware forecasting is documentation-planned and implementation-blocked under ADR 015. Broad historical ingestion, background HealthKit delivery, exact-time scheduling, and notifications remain deferred.
+The app includes coordinated foreground rolling-window ingestion from Apple Health, Fitbit through Google Health, and FatSecret; a provider-neutral Today read model; authoritative provider selection; Clerk-hosted beta authentication; and persistent fixed-order card visibility preferences. FatSecret imports only existing diary daily totals and never creates food entries. Available Bank remains mandatory and first. Existing implementation visibility may require a later ADR 011 migration; this documentation change does not add discovery logic. Today's Forecast and Projected Daily Burn remain V1 estimates but must not be represented as Projected Bank data. Time-aware forecasting is documentation-planned and implementation-blocked under ADR 015. Broad historical ingestion, background HealthKit delivery, and exact-time scheduling remain deferred. Morning Bank Update is implemented under the [accepted notification contract](../../docs/product/adr-024-morning-bank-update.md); Android notification configuration and physical validation remain planned.
 
 ## Development
 
@@ -60,3 +64,5 @@ Clerk authentication uses the hosted Account Portal and `expo-secure-store`. Set
 The EAS `development` profile enables iOS local-network HTTP only for communication with the Mac development API. Preview and production configurations retain normal ATS HTTPS enforcement. Set `EXPO_PUBLIC_API_URL` in the local `.env` to the Mac's current LAN address, restart Metro after changing it, and use the development-only HealthKit diagnostics screen to verify the resolved URL and API reachability.
 
 Before completing implementation tasks, run the relevant lint, typecheck, and test commands from the root package scripts.
+
+Android B1 implementation and validation: [Android foundation](../../docs/engineering/android-foundation.md). Native Health Connect ingestion and physical Android qualification remain deferred.

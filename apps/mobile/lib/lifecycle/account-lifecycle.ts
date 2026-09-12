@@ -1,8 +1,9 @@
+import { nativeRefreshFailure } from '@/lib/native-health/copy';
 import { fetchBankSummary, runForegroundLifecycle } from '@/lib/api/client';
 import {
-  getAppleHealthConnectionStatus,
-  syncAppleHealthToday,
-} from '@/lib/healthkit/healthkit-connection';
+  getNativeHealthConnectionStatus,
+  syncNativeHealthToday,
+} from '@/lib/native-health';
 
 let accountScope: string | null = null;
 let activeRun: Promise<AccountLifecycleResult> | null = null;
@@ -73,12 +74,12 @@ export function runAccountLifecycle(options: { force?: boolean; foreground?: boo
       if (generation !== scopeGeneration || !server.shouldSyncHealthKit) {
         return { status: 'skipped', detail: null };
       }
-      const appleStatus = await getAppleHealthConnectionStatus();
+      const appleStatus = await getNativeHealthConnectionStatus();
       if (generation !== scopeGeneration || suspended) return { status: 'skipped', detail: null };
       let appleFailed = false;
       if (appleStatus === 'connected') {
         try {
-          await syncAppleHealthToday({
+          await syncNativeHealthToday({
             force: force || options.foreground === true,
             trigger: force ? 'manual_refresh' : 'app_foreground',
             dayCount: server.historyDayCount,
@@ -93,7 +94,7 @@ export function runAccountLifecycle(options: { force?: boolean; foreground?: boo
       return {
         status: appleFailed || hasServerErrors ? 'partial' : 'success',
         detail: appleFailed
-          ? 'Apple Health couldn’t refresh. Try again.'
+          ? nativeRefreshFailure
           : reconnectProvider === 'google_health_fitbit'
             ? 'Fitbit needs attention. Reconnect it in Health Connections.'
             : reconnectProvider === 'fatsecret'

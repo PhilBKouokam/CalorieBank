@@ -1,3 +1,5 @@
+import { connectionsForNativeCapability } from '@/lib/native-health/presentation';
+import { preferDirectFoodSources } from '@/lib/providers/intake-writer-policy';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FoodTrackerHelp } from '@/components/caloriebank/FoodTrackerHelp';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -7,14 +9,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
-import { connectAppleHealth, getAppleHealthDiagnostics, getAppleHealthConnectionStatus, refreshAppleHealthForCurrentAccount, syncAppleHealthToday } from '@/lib/healthkit/healthkit-connection';
+import { nativeHealthCapability, connectNativeHealth, getNativeHealthDiagnostics, discoverNativeIntakeWriters, type NativeIntakeWriter as AppleHealthIntakeWriter, getNativeHealthConnectionStatus, refreshNativeHealthForCurrentAccount, syncNativeHealthToday } from '@/lib/native-health';
 import { deriveAppleHealthBurnState, deriveAppleHealthPresentationState, type AppleHealthBurnState, type AppleHealthPresentationState } from '@/lib/healthkit/healthkit-diagnostics';
 import { composeAppleHealthConnections } from '@/lib/healthkit/health-connections-presentation';
 import { appleHealthIntakeRefreshMessage } from '@/lib/healthkit/connection-feedback';
 import { refreshFatSecretWithFeedback } from '@/lib/healthkit/fatsecret-feedback';
 import { createSourceOperationGate } from '@/lib/healthkit/source-operation';
 import { ApiHttpError, disconnectFatSecret, disconnectFitbit, fetchHealthConnections, fetchProviderSelection, saveProviderSelection, selectHealthConnectionRole, startFatSecretAuthorization, startFitbitAuthorization, syncFatSecret, syncFitbit } from '@/lib/api/client';
-import { discoverAppleHealthIntakeWriters, preferDirectFoodSources, type AppleHealthIntakeWriter } from '@/lib/healthkit/apple-health-intake-writers';
 import { retryIncompleteOpeningAfterSourceChange } from '@/lib/lifecycle/account-lifecycle';
 import type { HealthConnectionOption, HealthConnectionsResponse } from '@caloriebank/schemas';
 
@@ -79,7 +80,7 @@ export default function IntegrationsScreen() {
     const generation = ++loadGeneration.current;
     if (showLoading) setLoading(true);
     const [healthConnections, localStatus, diagnostics, selection] = await Promise.all([
-      fetchHealthConnections(), getAppleHealthConnectionStatus().catch(() => 'not_connected' as const), getAppleHealthDiagnostics().catch(() => null),
+      fetchHealthConnections(), getNativeHealthConnectionStatus().catch(() => 'not_connected' as const), getNativeHealthDiagnostics().catch(() => null),
       fetchProviderSelection(),
     ]);
     if (generation !== loadGeneration.current) return;
@@ -100,7 +101,7 @@ export default function IntegrationsScreen() {
 
   const appleUsable = appleState === 'connected' || appleState === 'connected_partial' || appleState === 'syncing';
   const displayConnections = useMemo(() => {
-    return connections ? composeAppleHealthConnections(connections, appleState, appleBurnState) : null;
+    return connections ? connectionsForNativeCapability(composeAppleHealthConnections(connections, appleState, appleBurnState), nativeHealthCapability.supported) : null;
   }, [appleBurnState, appleState, connections]);
   const burnSources = useMemo(() => buildInventory('burned', displayConnections), [displayConnections]);
   const intakeSources = useMemo(() => buildInventory('eaten', displayConnections), [displayConnections]);
@@ -175,14 +176,14 @@ export default function IntegrationsScreen() {
     finally { operations.current.end(); setBusy(null); }
   }
 
-  async function connectAppleHealthForBurn() {
+  async function connectNativeHealthForBurn() {
     if (!operations.current.begin('connect:burned:apple_health')) return;
     setBusy('connect-apple-burned'); setAppleState('syncing'); setMessage(null);
     try {
-      const outcome = await refreshAppleHealthForCurrentAccount({ trigger: 'provider_reconnect' });
+      const outcome = await refreshNativeHealthForCurrentAccount({ trigger: 'provider_reconnect' });
       if (!outcome) throw new Error('Health access unavailable.');
       const [localStatus, diagnostics] = await Promise.all([
-        getAppleHealthConnectionStatus(), getAppleHealthDiagnostics(),
+        getNativeHealthConnectionStatus(), getNativeHealthDiagnostics(),
       ]);
       const burnState = deriveAppleHealthBurnState(localStatus, diagnostics);
       setAppleBurnState(burnState);
@@ -206,10 +207,10 @@ export default function IntegrationsScreen() {
     setBusy('discover-writers'); setMessage(null);
     try {
       if (!appleUsable) {
-        const next = await connectAppleHealth();
+        const next = await connectNativeHealth();
         if (next !== 'connected') throw new Error('Health access unavailable.');
       }
-      const discovered = await discoverAppleHealthIntakeWriters();
+      const discovered = await discoverNativeIntakeWriters();
       const writers = preferDirectFoodSources(discovered,
         (await fetchProviderSelection()).connectedProviders);
       if (!operations.current.current()) return;
@@ -236,7 +237,7 @@ export default function IntegrationsScreen() {
       });
       saved = true;
       void retryIncompleteOpeningAfterSourceChange();
-      await syncAppleHealthToday({ force: true, trigger: 'provider_reconnect' });
+      await syncNativeHealthToday({ force: true, trigger: 'provider_reconnect' });
       setConnections(await fetchHealthConnections());
       closeSheets(); void load().catch(() => undefined);
     } catch { setMessage(saved ? `${writer.displayName} is selected, but we couldn't refresh your food data. Try again.` : `${writer.displayName} couldn’t be selected. Refresh Apple Health and try again.`); }
@@ -257,10 +258,10 @@ export default function IntegrationsScreen() {
       }
       if (name === 'FatSecret') await syncFatSecret(timezone(), true);
       if (name === 'Apple Health') {
-        const outcome = await refreshAppleHealthForCurrentAccount({ trigger: 'manual_refresh' });
+        const outcome = await refreshNativeHealthForCurrentAccount({ trigger: 'manual_refresh' });
         if (!outcome) throw new Error('Apple Health refresh failed.');
         if (role === 'eaten') {
-          const [providers, diagnostics] = await Promise.all([fetchProviderSelection(), getAppleHealthDiagnostics()]);
+          const [providers, diagnostics] = await Promise.all([fetchProviderSelection(), getNativeHealthDiagnostics()]);
           setMessageTone('attention');
           setMessage(appleHealthIntakeRefreshMessage(diagnostics, Boolean(providers.intake.writerBundleIdentifier)));
           await load();
@@ -268,7 +269,7 @@ export default function IntegrationsScreen() {
         }
         if (outcome.syncStatus === 'failure') throw new Error('Apple Health refresh failed.');
         const [localStatus, diagnostics] = await Promise.all([
-          getAppleHealthConnectionStatus(), getAppleHealthDiagnostics(),
+          getNativeHealthConnectionStatus(), getNativeHealthDiagnostics(),
         ]);
         const burnState = deriveAppleHealthBurnState(localStatus, diagnostics);
         setAppleBurnState(burnState);
@@ -387,7 +388,7 @@ export default function IntegrationsScreen() {
         {message && !roleSheet && !addRole && !service ? <Text style={messageTone === 'success' ? styles.successText : messageTone === 'attention' ? styles.attentionText : styles.errorText}>{message}</Text> : null}
       </ScrollView>
       <RoleSelector onReconnect={(name) => void reconnectService(name)} appleBurnState={appleBurnState} busy={busy !== null} data={roleSheet ? displayConnections?.[roleSheet] ?? null : null} message={message} messageTone={messageTone} onAdd={() => { setAddRole(roleSheet); setRoleSheet(null); setMessage(null); }} onAppleDetails={() => { operations.current.invalidate(); setMessage(null); setRoleSheet(null); setService('Apple Health'); }} onClose={dismissSheets} onRefreshApple={() => void refreshService('Apple Health')} onSelect={(option) => roleSheet ? void selectRole(roleSheet, option) : undefined} role={roleSheet} />
-      <AddSourceSheet busy={busy} connections={displayConnections} intakeWriters={intakeWriters} message={message} messageTone={messageTone} onAppleBurn={() => void connectAppleHealthForBurn()} onAppleIntake={() => void discoverFoodTrackers()} onClose={dismissSheets} onFatSecret={() => void connectFatSecretForEaten()} onFitbit={() => void connectFitbitForBurn()} onWriter={(writer) => void selectFoodTracker(writer)} role={addRole} />
+      <AddSourceSheet busy={busy} connections={displayConnections} intakeWriters={intakeWriters} message={message} messageTone={messageTone} onAppleBurn={() => void connectNativeHealthForBurn()} onAppleIntake={() => void discoverFoodTrackers()} onClose={dismissSheets} onFatSecret={() => void connectFatSecretForEaten()} onFitbit={() => void connectFitbitForBurn()} onWriter={(writer) => void selectFoodTracker(writer)} role={addRole} />
       <ServiceSheet role={serviceRole} onChooseTracker={() => { operations.current.invalidate(); setService(null); setRoleSheet(null); setAddRole('eaten'); setMessage(null); void discoverFoodTrackers(); }} appleBurnState={appleBurnState} busy={busy} connections={displayConnections} message={message} messageTone={messageTone} name={service} onChange={(role) => { setService(null); openRole(role); }} onClose={dismissSheets} onDiagnostics={openAppleHealthDiagnostics} onDisconnect={(name) => void disconnectService(name)} onReconnect={(name) => void reconnectService(name)} onRefresh={(name) => void refreshService(name)} />
     </SafeAreaView>
   );
@@ -397,7 +398,7 @@ function buildInventory(role: Role, connections: HealthConnectionsResponse | nul
   if (!connections) return [];
   const roleState = connections[role];
   const roleOptions = [roleState.selected, ...roleState.alternatives]
-    .filter((option): option is HealthConnectionOption => option !== null);
+    .filter((option): option is HealthConnectionOption => option !== null && (nativeHealthCapability.supported || !option.deviceManaged));
   const serviceLabels = role === 'burned' ? ['Apple Health', 'Fitbit'] : ['FatSecret'];
   for (const label of serviceLabels) {
     const serviceOption = connections.connectedServices.find((option) => option.label === label);
@@ -493,7 +494,9 @@ function RoleSelector({ onReconnect, appleBurnState, busy, data, message, messag
       const selected = option.optionId === data?.selected?.optionId;
       const usable = option.status === 'connected';
       const noBurnData = role === 'burned' && option.deviceManaged && appleBurnState === 'no_burn_data';
-      const unavailableCopy = noBurnData
+      const unavailableCopy = option.deviceManaged && !nativeHealthCapability.supported
+        ? 'Choose a source available on this phone'
+        : noBurnData
         ? 'No burn data yet'
         : appleBurnState === 'refresh_failed' && role === 'burned' && option.deviceManaged
           ? 'Refresh failed'
@@ -507,9 +510,9 @@ function RoleSelector({ onReconnect, appleBurnState, busy, data, message, messag
         </Pressable>
         {option.primaryAction === 'reconnect' && (option.label === 'Fitbit' || option.label === 'FatSecret') ?
           <Pressable accessibilityRole="button" disabled={busy} onPress={() => onReconnect(option.label as 'Fitbit' | 'FatSecret')} style={styles.inlineAction}><Text style={styles.actionText}>Reconnect</Text></Pressable> :
-          noBurnData || (role === 'eaten' && option.deviceManaged) ?
+          nativeHealthCapability.supported && (noBurnData || (role === 'eaten' && option.deviceManaged)) ?
             <Pressable accessibilityRole="button" disabled={busy} onPress={onAppleDetails} style={styles.inlineAction}><Text style={styles.actionText}>Manage</Text></Pressable> :
-            option.deviceManaged && !usable && option.primaryAction === 'refresh_apple_health' ?
+            nativeHealthCapability.supported && option.deviceManaged && !usable && option.primaryAction === 'refresh_apple_health' ?
               <Pressable accessibilityRole="button" disabled={busy} onPress={onRefreshApple} style={styles.inlineAction}><Text style={styles.actionText}>Refresh</Text></Pressable> : busy && !selected ? <ActivityIndicator color={colors.primary} /> : null}
       </View>;
     })}
@@ -524,10 +527,10 @@ function AddSourceSheet({ busy, connections, intakeWriters, message, messageTone
   const appleAvailable = role ? [connections?.[role].selected, ...(connections?.[role].alternatives ?? [])]
     .some((option) => option?.deviceManaged) : false;
   const choosingWriters = intakeWriters.length > 0;
-  const hasAddChoice = role === 'burned' ? !fitbitConnected || !appleAvailable : true;
+  const hasAddChoice = role === 'burned' ? !fitbitConnected || (nativeHealthCapability.supported && !appleAvailable) : !fatSecretConnected || nativeHealthCapability.supported;
   return <Sheet onClose={onClose} visible={role !== null}>
     <SheetHeader onClose={onClose} title={choosingWriters ? 'Choose your food tracker' : role === 'burned' ? 'Add calories burned source' : 'Add calories eaten source'} />
-    {choosingWriters ? intakeWriters.map((writer) => <SourceAction detail="via Apple Health" disabled={busy !== null} key={writer.bundleIdentifier} label={writer.displayName} onPress={() => onWriter(writer)} />) : role === 'burned' ? <>{!fitbitConnected ? <SourceAction disabled={busy !== null} label="Fitbit" onPress={onFitbit} /> : null}{!appleAvailable ? <SourceAction disabled={busy !== null} label="Apple Health" onPress={onAppleBurn} /> : null}</> : <>{!fatSecretConnected ? <SourceAction disabled={busy !== null} label="FatSecret" onPress={onFatSecret} /> : null}<SourceAction detail="Choose the food app you use with Apple Health" disabled={busy !== null} label="Apple Health food tracker" onPress={onAppleIntake} /></>}
+    {choosingWriters ? intakeWriters.map((writer) => <SourceAction detail="via Apple Health" disabled={busy !== null} key={writer.bundleIdentifier} label={writer.displayName} onPress={() => onWriter(writer)} />) : role === 'burned' ? <>{!fitbitConnected ? <SourceAction disabled={busy !== null} label="Fitbit" onPress={onFitbit} /> : null}{nativeHealthCapability.supported && !appleAvailable ? <SourceAction disabled={busy !== null} label="Apple Health" onPress={onAppleBurn} /> : null}</> : <>{!fatSecretConnected ? <SourceAction disabled={busy !== null} label="FatSecret" onPress={onFatSecret} /> : null}{nativeHealthCapability.supported ? <SourceAction detail="Choose the food app you use with Apple Health" disabled={busy !== null} label="Apple Health food tracker" onPress={onAppleIntake} /> : null}</>}
     {!choosingWriters && !hasAddChoice ? <Text style={styles.emptyText}>All supported sources are connected.</Text> : null}
     {busy ? <ActivityIndicator color={colors.primary} style={styles.sheetSpinner} /> : null}{message ? <Text style={messageTone === 'success' ? styles.successText : messageTone === 'attention' ? styles.attentionText : styles.errorText}>{message}</Text> : null}<Pressable accessibilityRole="button" onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Cancel</Text></Pressable>
   </Sheet>;

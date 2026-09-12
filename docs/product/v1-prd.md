@@ -8,6 +8,11 @@ This PRD is the authoritative V1 product document. It supersedes prior food-logg
 
 ## Private Beta Milestones
 
+- **Android Phase A — audit and implementation plan complete.**
+  [Android parity plan](android-parity-plan.md) records the current mobile audit,
+  verified platform capabilities, staged implementation and physical release
+  gates. It does not authorize accounting changes or declare Android released.
+
 - **Phase 1 pre-Android coherence — approved, implementation in progress.**
   [The Phase 1 contract](phase-1-pre-android.md) defines Daily Bank Target as
   zero-default planning metadata, the limited Banking Goal consumer rename,

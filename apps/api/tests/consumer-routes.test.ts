@@ -208,7 +208,7 @@ describe('consumer routes', () => {
 
   it('opens beta HealthKit diagnostics once outside the Apple Health modal', () => {
     const integrations = mobileFile('app/(settings)/integrations.tsx');
-    const diagnostics = mobileFile('app/(settings)/health-diagnostics.tsx');
+    const diagnostics = mobileFile('screens/health-diagnostics.ios.tsx');
     expect(integrations).toContain("requestAnimationFrame(() => router.push('/health-diagnostics'))");
     expect(integrations).toContain('if (diagnosticsOpening.current) return');
     expect(integrations).toContain("setService(null)");
@@ -310,8 +310,8 @@ describe('consumer routes', () => {
     expect(source).toContain('formatBankBalance(history.availableBankCalories)');
     expect(source).toContain('Estimated actual burn');
     expect(source).toContain('value={`× ${Number(selectedDay.expenditureAdjustmentRate.toFixed(2))}');
-    expect(source).toContain('Calories burned · {sourceOptions?.expenditure.selected.label');
-    expect(source).toContain('Calories eaten · {sourceOptions?.intake.selected.label');
+    expect(source).toContain('Calories burned · {sourceLabel(sourceOptions?.expenditure.selected.label');
+    expect(source).toContain('Calories eaten · {sourceLabel(sourceOptions?.intake.selected.label');
     expect(source).toContain("openSourcePicker('expenditure')");
     expect(source).toContain("openSourcePicker('intake')");
     expect(source).toContain("if (value < 0) return 'Enjoyed'");

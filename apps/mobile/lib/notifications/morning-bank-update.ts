@@ -1,3 +1,4 @@
+import { ensureMorningUpdateChannel } from './android-channel';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -44,6 +45,7 @@ export function notificationPermissionState(settings: Notifications.Notification
 }
 
 async function expoPushToken() {
+  await ensureMorningUpdateChannel();
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
   if (!projectId) throw new Error('EAS project ID is unavailable.');
   return (await withNotificationTokenTimeout(Notifications.getExpoPushTokenAsync({ projectId }))).data;
@@ -58,6 +60,8 @@ async function registerCurrentDevice(check: () => void) {
 
 export async function enableMorningBankUpdate() {
   return operations.run(async (check) => {
+    await ensureMorningUpdateChannel();
+    check();
     const existing = await Notifications.getPermissionsAsync();
     const permission = notificationPermissionState(existing) === 'not_determined'
       ? notificationPermissionState(await Notifications.requestPermissionsAsync())

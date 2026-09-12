@@ -1,3 +1,4 @@
+import { sourceLabel } from '@/lib/native-health/copy';
 import type {
   BankHistoryDayDetailResponse,
   BankHistoryMissingDay,
@@ -23,7 +24,7 @@ import {
   syncFitbit,
 } from '@/lib/api/client';
 import { historicalSourceChangeMessage } from '@/lib/history/source-change-errors';
-import { refreshAppleHealthForCurrentAccount } from '@/lib/healthkit/healthkit-connection';
+import { refreshNativeHealthForCurrentAccount } from '@/lib/native-health';
 import { getConsumerSourceName } from '@/lib/providers/presentation';
 
 const ranges: { label: string; value: BankHistoryRange }[] = [
@@ -102,7 +103,7 @@ async function refreshHistoricalSources() {
     selection.expenditure.authoritativeProvider === 'apple_health'
     || selection.intake.authoritativeProvider === 'apple_health'
   ) {
-    tasks.push(refreshAppleHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 }));
+    tasks.push(refreshNativeHealthForCurrentAccount({ trigger: 'manual_refresh', dayCount: 8 }));
   }
   await Promise.all(tasks);
 }
@@ -222,10 +223,10 @@ export default function BankHistoryScreen() {
       setHistory(await fetchBankHistory(selectedRange).catch(() => history));
     } catch (error) {
       setSourceMutationStatus('error');
-      setSourceMutationMessage(historicalSourceChangeMessage(
+      setSourceMutationMessage(sourceLabel(historicalSourceChangeMessage(
         error instanceof ApiHttpError ? error.code : null,
         selectedOption?.label ?? 'That source',
-      ));
+      )));
     }
   }
 
@@ -407,8 +408,8 @@ export default function BankHistoryScreen() {
                 <>
                   <View style={styles.sourceRow}>
                     <Text style={styles.mutedText}>
-                      Calories burned · {sourceOptions?.expenditure.selected.label
-                        ?? getConsumerSourceName(selectedDay.versions.at(-1)!.expenditureProvider)}
+                      Calories burned · {sourceLabel(sourceOptions?.expenditure.selected.label
+                        ?? getConsumerSourceName(selectedDay.versions.at(-1)!.expenditureProvider))}
                     </Text>
                     {sourceOptions?.expenditure.canChange ? (
                       <Pressable accessibilityRole="button" onPress={() => openSourcePicker('expenditure')}>
@@ -418,9 +419,9 @@ export default function BankHistoryScreen() {
                   </View>
                   <View style={styles.sourceRow}>
                     <Text style={styles.mutedText}>
-                      Calories eaten · {sourceOptions?.intake.selected.label
+                      Calories eaten · {sourceLabel(sourceOptions?.intake.selected.label
                         ?? selectedDay.versions.at(-1)!.intakeSourceDisplayName
-                        ?? getConsumerSourceName(selectedDay.versions.at(-1)!.intakeProvider)}
+                        ?? getConsumerSourceName(selectedDay.versions.at(-1)!.intakeProvider))}
                     </Text>
                     {sourceOptions?.intake.canChange ? (
                       <Pressable accessibilityRole="button" onPress={() => openSourcePicker('intake')}>
@@ -458,7 +459,7 @@ export default function BankHistoryScreen() {
                   style={styles.sourceOption}
                 >
                   <Text style={styles.sourceOptionMark}>{selected ? '✓' : ''}</Text>
-                  <Text style={styles.sourceOptionText}>{option.label}</Text>
+                  <Text style={styles.sourceOptionText}>{sourceLabel(option.label)}</Text>
                   {sourceMutationStatus === 'saving' && !selected ? <ActivityIndicator color={colors.primary} /> : null}
                 </Pressable>
               );

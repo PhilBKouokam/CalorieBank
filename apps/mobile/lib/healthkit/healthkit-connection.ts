@@ -23,7 +23,7 @@ import {
   syncCurrentDaySteps,
   syncCurrentDayWorkouts,
   syncRestingBurnEstimate,
-} from '@/lib/api/client';
+} from '../api/client';
 import {
   APPLE_HEALTH_READ_TYPES,
   AppleHealthExpenditureProvider,

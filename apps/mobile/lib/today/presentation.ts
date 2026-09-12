@@ -1,3 +1,4 @@
+import { sourceLabel } from '../native-health/copy';
 import type { BankSummaryResponse, TodaySoFarDataFreshnessStatus } from '@caloriebank/schemas';
 
 import { getConsumerSourceName } from '../providers/presentation';
@@ -16,7 +17,7 @@ export function emptyTodayDetail(
   source: string | null,
   noun: string,
 ) {
-  const provider = source ?? 'Your selected source';
+  const provider = sourceLabel(source ?? 'Your selected source');
   if (status === 'not_connected') return `Connect a source for ${noun}`;
   if (status === 'syncing') return `${provider} is refreshing`;
   if (status === 'stale') return `${provider} has not refreshed recently`;
@@ -30,7 +31,7 @@ export function firstRunTodayEmptyState(input: {
   noun: 'intake' | 'burn data';
 }) {
   if (!input.checking) return null;
-  const provider = input.source ?? 'your source';
+  const provider = sourceLabel(input.source ?? 'your source');
   return {
     value: input.noun === 'intake' ? 'Loading today’s calories…' : 'Loading today’s burn…',
     detail: `Checking ${provider}`,

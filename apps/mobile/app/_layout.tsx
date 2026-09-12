@@ -9,7 +9,7 @@ import 'react-native-reanimated';
 
 import { colors } from '@/constants/caloriebank-theme';
 import { logMobileClerkConfiguration, setApiAccessTokenProvider } from '@/lib/api/client';
-import { setAppleHealthAccountScope } from '@/lib/healthkit/healthkit-connection';
+import { setNativeHealthAccountScope } from '@/lib/native-health';
 import { resetAccountLifecycle, refreshOnAppState } from '@/lib/lifecycle/account-lifecycle';
 import { setNotificationAccountScope, syncMorningBankUpdateDevice } from '@/lib/notifications/morning-bank-update';
 
@@ -43,7 +43,7 @@ function AuthenticatedAppStack() {
     ready: isLoaded && isSignedIn && Boolean(sessionId),
     activeSessionPresent: Boolean(sessionId),
   }, userId ?? null);
-  setAppleHealthAccountScope(userId ?? null);
+  setNativeHealthAccountScope(userId ?? null);
   setNotificationAccountScope(userId ?? null);
   useEffect(() => {
     resetAccountLifecycle(isLoaded && isSignedIn && sessionId ? userId ?? null : null);
@@ -75,7 +75,7 @@ export default function RootLayout() {
     throw new Error('Beta and production builds require Clerk authentication and an HTTPS API URL.');
   }
   if (authMode !== 'clerk') {
-    setAppleHealthAccountScope('local-development');
+    setNativeHealthAccountScope('local-development');
     setNotificationAccountScope('local-development');
     resetAccountLifecycle('local-development');
     return <AppStack />;

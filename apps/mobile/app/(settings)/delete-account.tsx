@@ -1,3 +1,4 @@
+import { deletionHealthNote } from '@/lib/native-health/copy';
 import { useClerk } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -30,7 +31,7 @@ export default function DeleteAccountScreen() {
   return <SafeAreaView edges={['bottom']} style={styles.safeArea}>
     <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.container}>
       <Text style={styles.title}>Delete your CalorieBank account?</Text>
-      <Text style={styles.body}>This permanently removes your CalorieBank history, imported health data, goals, preferences, and connected services. You can manage Apple Health permissions separately in iOS.</Text>
+      <Text style={styles.body}>This permanently removes your CalorieBank history, imported health data, goals, preferences, and connected services.{deletionHealthNote}</Text>
       <Text style={styles.label}>Type DELETE to confirm</Text>
       <TextInput accessibilityLabel="Type DELETE to confirm" autoCapitalize="characters" autoCorrect={false} editable={status !== 'deleting'} onChangeText={setConfirmation} style={styles.input} value={confirmation} />
       {status === 'failed' ? <Text accessibilityRole="alert" style={styles.error}>Deletion hasn’t finished yet. Please try again. If it already started, we’ll keep working to finish it safely.</Text> : null}

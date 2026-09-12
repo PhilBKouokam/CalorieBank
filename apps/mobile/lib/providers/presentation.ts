@@ -1,3 +1,5 @@
+import { sourceLabel } from '../native-health/copy';
+
 const consumerSourceNames: Readonly<Record<string, string>> = {
   apple_health: 'Apple Health',
   'Apple Health': 'Apple Health',
@@ -19,5 +21,5 @@ const consumerSourceNames: Readonly<Record<string, string>> = {
 
 export function getConsumerSourceName(source: string | null | undefined) {
   if (!source) return 'Connected source';
-  return consumerSourceNames[source] ?? 'Connected source';
+  return sourceLabel(consumerSourceNames[source] ?? 'Connected source');
 }
