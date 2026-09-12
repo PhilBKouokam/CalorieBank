@@ -371,3 +371,42 @@ Pre-build validation passed: full `release:friends-family`, 788 tests / 67 files
 pre-existing warning), API/domain builds, dedicated local test Prisma gate, Expo
 Android export/configuration, iOS configuration and dependency validation. No backend
 implementation changed. Autolinking retains the platform-specific health boundaries.
+
+
+### Replacement APK delivery and current retest
+
+Exactly one replacement preview was created:
+`99a064c9-d1ce-4a38-a879-22a898fd4bae`, source commit
+`d8ab32810575b327085ab6c0b32a9d35682c01d5`.
+[Build/install page](https://expo.dev/accounts/philbk/projects/caloriebank/builds/99a064c9-d1ce-4a38-a879-22a898fd4bae).
+[APK artifact](https://expo.dev/artifacts/eas/RNBGyvf9ah7OMD_T3naoqONfe3x02PraioXpVvj-ncs.apk).
+The existing project, preview environment and Android keystore were reused. No Clerk
+registration change, iOS build, AAB, Play submission or Render deployment was made.
+
+EAS status **FINISHED**, 2026-09-12 20:24:07 UTC. Native Gradle build:
+**BUILD SUCCESSFUL in 20m 30s; 962 actionable tasks, 962 executed**. This is cloud
+native compilation; local compilation was not rerun due to disk headroom. The
+Android Hermes export also passed before submission. Signed APK downloaded through
+`eas build:run`, installed over the previous binary and launched successfully.
+
+Local artifact: `apps/mobile/build/caloriebank-b3-callback-fixed.apk` (ignored),
+128,296,589 bytes, SHA-256
+`769c4b209a2f0ebc044b485a0db4bdb53b1032a32dcdca6c4ac4eb8422441fcc`.
+APK signature verified; certificate fingerprint matches the registered B3 keystore.
+
+Actually exercised on the replacement, Google Play API 34 ARM64 emulator:
+
+- Installation preserved the existing session and loaded Today/Available Bank.
+- Normal Settings sign-out returned to Sign In.
+- Sent duplicate warm synthetic cancelled callbacks, then a cold cancelled callback;
+  the resulting signed-out app showed Sign In, no unmatched route and no session.
+  These are synthetic routing checks, not successful-auth evidence.
+- A fresh real Sign In opened the hosted site but encountered another Cloudflare
+  human-verification challenge. User completion is required before the fresh code
+  and immediate return can be qualified. Do not automate/bypass the challenge.
+
+No physical Android phone was used. Fresh successful callback, second sign-in,
+post-auth relaunch and Account A/B switching on this replacement remain pending
+at this checkpoint. Previous-binary auth successes are not replacement qualification.
+A second controlled email was requested for Account B; no account was deleted or
+provider authority changed. Health Connect burn remains disabled.
