@@ -321,3 +321,53 @@ routed to Unmatched Route; a minimal app-side routing fix and subsequent binary
 qualification are required.** Next task: implement and test exact Android hosted-
 callback normalization, preserve iOS and other deep links, then seek the separately
 required replacement-preview decision and repeat the full return/session tests.
+
+
+## Android callback routing fix — 2026-09-12
+
+The incoming SDK callback contract is scheme `clerk`, host
+`com.caloriebank.mobile.hosted-callback`, empty path (a trailing slash is accepted),
+and query keys `created_session_id`, `rotating_token_nonce`, `state`. Values are
+credentials/session-bound evidence and are never documented or logged. The Router
+error displayed a reconstructed `caloriebank://` URL; that is not a different Clerk
+registration requirement.
+
+Root cause was reproduced against installed Expo Router 6's
+`extractExpoPathFromURL`: for custom schemes it concatenates host and pathname,
+so the Clerk callback becomes the nonexistent screen
+`com.caloriebank.mobile.hosted-callback`. Router and Expo WebBrowser both subscribe
+to the native URL event. Clerk verifies the callback and activates its session, but
+ordinary Router navigation also receives that authentication transport URL.
+
+The minimal fix adds `app/+native-intent.ts` and a pure Android-only normalizer.
+Only `clerk://com.caloriebank.mobile.hosted-callback` with no additional path is
+intercepted. A warm callback returns an empty Router destination: Router 6's
+subscription deliberately dispatches only truthy destinations, keeping the screen
+awaiting Clerk mounted. Clerk's existing state/PKCE/nonce checks and completion
+navigation remain responsible for success. A cold callback maps to `/`, where the
+existing gate waits for Clerk hydration and uses only the restored active session.
+A cold process without that session must sign in again; URL parameters never grant
+access or reconstruct a lost PKCE exchange. Duplicate/stale callbacks carry no
+navigation/auth ownership state in this hook. Current Clerk/account-generation
+protections are unchanged.
+
+This is not a callback screen, wildcard route or auth redesign. iOS/web links pass
+through byte-for-byte. Fitbit/FatSecret `caloriebank://integrations` callbacks,
+notification destinations, ordinary routes and normal launch remain untouched.
+The hook does not mutate the original URL received by Clerk, call session APIs,
+cache callback parameters or add timeouts. Cancelled/invalid callbacks cannot confer
+authentication and never become a technical callback screen.
+
+Validation and replacement-build results will be recorded below. Both Expo platform
+configurations compare equal to B3. No native dependency/config change is needed.
+The local machine has insufficient free disk to safely reconstruct the cleared
+Gradle/native caches while preserving the test emulator. Android native compilation
+for this replacement is therefore to be verified by the one authorized EAS preview
+build, not claimed from a skipped local compile. Production Clerk, backend, Render,
+iOS/TestFlight and all health/accounting/source logic are unchanged.
+
+Pre-build validation passed: full `release:friends-family`, 788 tests / 67 files
+(28 new callback cases), workspace/mobile/API TypeScript, API/mobile lint (one
+pre-existing warning), API/domain builds, dedicated local test Prisma gate, Expo
+Android export/configuration, iOS configuration and dependency validation. No backend
+implementation changed. Autolinking retains the platform-specific health boundaries.

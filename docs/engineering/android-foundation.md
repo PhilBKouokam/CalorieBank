@@ -1,5 +1,10 @@
 # Android B1 foundation
 
+Android callback fix: an exact-match `+native-intent` hook now excludes the Android
+Clerk hosted callback from ordinary Router navigation. Warm returns stay with the
+existing Clerk completion flow; cold returns use the hydrated-session application
+gate. iOS and all other links pass through unchanged. See the [fix and build record](../deployment/android-preview.md#android-callback-routing-fix--2026-09-12).
+
 Latest B3 auth retest: production email-code sign-in and session restoration succeed,
 but the Android hosted callback reproducibly opens Expo Router's Unmatched Route.
 Sign-out succeeds; protected Today loads after relaunch. No code or replacement
