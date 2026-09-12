@@ -88,6 +88,10 @@ rollout; no iOS build or TestFlight change was made here.
 
 ## B2 implementation record
 
+The sections below preserve the historical B2 record. B3 additions above and the
+[preview delivery record](../deployment/android-preview.md) supersede B2-only
+statements about unavailable consumer flows, native compilation and build counts.
+
 Implemented against B1 `aa50cdd7b6c2c486e5a5e0eae1f2a097fbaa8a36` on 2026-09-11.
 
 **ANDROID PHASE B2: PASS — HEALTH CONNECT BURN REMAINS UNQUALIFIED**
@@ -199,7 +203,7 @@ Pinned Node 20; full release gate, workspace/API/mobile TypeScript, mobile lint,
 
 The online Expo dependency validator reports dependencies up to date. Native project generation passes. Native compilation/startup cannot be attempted without JDK/SDK/ADB. Therefore the user's conditions for exactly one remote preview are **not met**: **zero EAS Android builds**, no AAB, no Play submission and no iOS/TestFlight build. Configure a local Android toolchain and prove compile/startup first; only then consider the explicitly authorized single preview APK for real-device qualification.
 
-## Exact B3 work
+## B2 handoff to B3 (historical)
 
 Start B3 with native compile/startup and the physical script above. Keep burn disabled until writer-specific proof exists. Then implement the Android Connections/onboarding path for qualified exact-origin nutrition: persisted provider-neutral identity and source selection, origin-aware per-day storage/revisions, normalized ingestion API validation, account isolation, deliberate bounded preparation and truthful permission/empty/revoked states. These require separately reviewed additive server contracts; never upload Android evidence as `apple_health`. Keep direct Fitbit burn + Health Connect nutrition as the first candidate combination.
 
@@ -231,3 +235,15 @@ Resolve nutrition overlap semantics per verified writer before exposing it. Keep
 - `docs/product/android-parity-plan.md`
 - `package-lock.json`
 - `package.json`
+
+
+## B3 delivery qualification status
+
+Native compilation and signed EAS APK startup passed. Nutrition permission grant,
+empty discovery and revocation recovery were exercised on an emulator only. Populated
+origins, physical nutrition records and complete account flows remain pending.
+The signed preview's hosted sign-in fails; production Clerk has no Android registration
+and only the iOS redirect allowlisted. No production Clerk setting was changed.
+See the [delivery record and concrete auth prerequisite](../deployment/android-preview.md#blocking-hosted-auth-configuration-finding).
+Health Connect burn remains disabled. B3 is blocked on authentication rather than
+certified for Friends & Family distribution.

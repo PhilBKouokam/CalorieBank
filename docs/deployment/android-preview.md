@@ -2,8 +2,9 @@
 
 Work started from `df792a9017eaf3a5d30f27f7ee0103926e5818cd` on 2026-09-11.
 B3 implements the nutrition consumer path and has passed native compilation and
-emulator startup. Physical QA remains pending. Health Connect burn remains disabled.
-The preview build delivery record will be appended after the single authorized build.
+emulator startup. **B3 is blocked on production Clerk Android registration:** hosted
+sign-in fails in the signed APK. Physical QA remains pending. Health Connect burn remains disabled.
+The single signed preview is complete; see the delivery record below.
 
 ## Local toolchain
 
@@ -67,11 +68,13 @@ The final local native rebuild also **passed** in 7m 51s: 543 tasks (28 executed
 515 up-to-date), including the updated permission-rationale text. An intermediate
 attempt exhausted disk space, and another encountered stale transforms after cleanup.
 Stopping the daemon, recovering only task-created emulator/cache files and rebuilding
-the cache resolved both. No compiler incompatibility was bypassed. The final debug APK
-is generated under `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`.
+the cache resolved both. No compiler incompatibility was bypassed. The debug APK was generated under
+`apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`. Generated local native
+outputs and task Gradle caches were subsequently removed to recover disk space; the
+signed EAS APK is retained separately below.
 The final APK was compiled after the emulator tests; the nutrition JavaScript flow
 was exercised through Metro on the earlier successful native binary. No physical
-startup or installation of the eventual remote preview is claimed.
+startup is claimed. The signed remote preview was subsequently installed on both emulators.
 
 Actually exercised in the emulator:
 
@@ -91,8 +94,9 @@ Actually exercised in the emulator:
   readable wrapping, spacing, buttons and navigation; no clipping observed. No
   populated tracker rows or Step Planning cards were visually certified.
 - Emulator version 37.1.11.0 (build 15917651). The disposable emulator/image/AVD
-  was removed after these checks to recover disk space for native compilation;
-  JDK, SDK platform/build tools, NDK and adb remain in the isolated toolchain.
+  was removed temporarily to recover compilation space, then restored after
+  stopping the build daemon and clearing task transforms for signed-APK testing.
+  All tooling remains isolated; no global shell files were edited.
 
 A development-only hot reload from Clerk to local auth briefly left an old Sign In
 route mounted without its Clerk provider. A fresh local app navigation resolved it;
@@ -111,10 +115,11 @@ and calls the existing server finalization engine. Accounting formulas, the 80% 
 Opening Bank selection, Recovery and Step Planning math were not changed.
 
 This is **not mobile-only**. The additive migration/API must be deployed before a hosted
-preview can select/upload native nutrition. Only the dedicated local test database has
-been migrated during validation. A push to the existing release branch may trigger the
-existing Render auto-deployment; do not claim Render is untouched after that push without
-checking delivery. No manual Render deployment has been performed during implementation.
+preview can select/upload native nutrition. Validation used only the dedicated local test database. The implementation commit
+was subsequently pushed and Render auto-deployed it, including the configured
+pre-deploy migration step. The dashboard confirms `89a80ce` as the live API commit
+and latest successful lifecycle build; public API readiness returned HTTP 200.
+No manual deployment or cron run was triggered.
 
 Older iOS binaries do not recognize the new intake provider enum when the same account
 selects Android nutrition. Existing iOS accounts/sources retain their behavior, but that
@@ -129,6 +134,7 @@ build. New tests cover exact origins, direct FatSecret deduplication, native con
 normalization, denial/revocation, empty versus zero, source/account isolation, stale reads,
 eight-date preparation, server Opening Bank use and the food selection/recovery screen.
 Existing iOS, direct-provider and locked Step Planning regressions remain in the gate.
+The existing Today hook-dependency lint warning remains (zero lint errors).
 
 No physical device has been tested. Pending: populated/multiple writers, real revision
 changes, exact-origin switching, account switching/deletion, both full onboarding paths,
@@ -148,8 +154,76 @@ iOS build or TestFlight operation. The build must use hosted preview environment
 never the temporary local test override. When available, testers install from the EAS page,
 allow browser APK installation when Android asks, and use their own beta accounts.
 
-Next task: qualify the APK on a physical Android 14+ phone with Fitbit + FatSecret and
+Next task: resolve the Clerk registration blocker below using the existing APK, then
+qualify it on a physical Android 14+ phone with Fitbit + FatSecret and
 Fitbit + a verified exact-origin nutrition writer; exercise the complete account/source/
 preparation matrix, locked Step Planning visuals and notification delivery. Resolve old
 iOS-binary cross-device compatibility before widening distribution. Keep Health Connect
 burn disabled and use the [physical script](../engineering/android-health-connect.md#ui-and-physical-script).
+
+## Delivery record
+
+- Implementation commit: `89a80cebe313bc1493b98e18a55b3455da4d026f`, pushed to
+  `codex/private-beta-release`; 47 files changed.
+- Exactly one Android EAS preview was requested: `c37e57fb-2031-41b1-8ccf-c4d88ad62110`.
+- [Build/install page](https://expo.dev/accounts/philbk/projects/caloriebank/builds/c37e57fb-2031-41b1-8ccf-c4d88ad62110).
+- Existing project `85fa9667-67bb-4d6c-bbcf-8f4e492ae5f5`, profile `preview`, internal
+  distribution, APK, app version `1.0.0`, Android version code `1`.
+- Android signing keystore generated and held by EAS; no signing secret was committed.
+- Build status: **FINISHED**, completed 2026-09-12 at 04:04:01 UTC.
+- [APK artifact](https://expo.dev/artifacts/eas/s6BAdavNQWi9LWmzxLMcHKQdGkT0YzX4qMcHMqoWRnk.apk).
+  An unauthenticated raw download returned 403; authenticated `eas build:run --id
+  c37e57fb-2031-41b1-8ccf-c4d88ad62110 --platform android` downloaded, installed
+  and launched it successfully. Installer access may require the project’s Expo login.
+- Local signed APK copy: `apps/mobile/build/caloriebank-b3-preview.apk` (ignored
+  build artifact, not committed). Size: 128,295,889 bytes. APK signature verification passed.
+- SHA-256: `642d147ed47c75b5d493a8f81dc3aa0f43e4b9518dc426d708f3d9abaa5666a3`.
+- Signed-APK metadata verifies package `com.caloriebank.mobile`, minimum SDK 26,
+  target SDK 36 and CalorieBank label. The seven Health Connect declarations are read-only.
+- Signed-APK startup passed on AOSP and Google Play API 34 ARM64 emulators.
+  Hosted sign-in failed on both; see the blocker below. No successful authenticated
+  preview session or direct-provider OAuth completion is claimed.
+- [Render API auto-deploy](https://dashboard.render.com/web/srv-dabhml4s728c739ut0k0/deploys/dep-daicjp2jnfac73e5ahk0)
+  is live. [Lifecycle build](https://dashboard.render.com/cron/crn-dabhml4s728c739ut0l0/builds/bld-daicjpajnfac73e5ahvg)
+  also succeeded at the implementation commit. The hourly schedule is unchanged.
+- GitHub's unrelated Vercel status reports failure on both B2 and B3 commits.
+  No Vercel configuration/deployment action was taken; it is not an Android gate result.
+- No iOS EAS build, TestFlight operation, AAB or Play submission occurred.
+- Until old-client compatibility is qualified, use an Android test account for
+  Health Connect source selection rather than reusing it in the older iOS binary.
+
+## Blocking hosted-auth configuration finding
+
+Read-only production Clerk inspection on 2026-09-12 confirmed Native API enabled,
+**no Android applications registered**, and only `com.caloriebank.mobile://callback`
+in the mobile SSO redirect allowlist. The signed APK contains the production Clerk
+frontend domain. The installed Clerk Expo SDK uses
+`clerk://com.caloriebank.mobile.hosted-callback` on Android; its config plugin is present.
+[Clerk's hosted-auth requirements](https://clerk.com/docs/android/guides/account-portal/hosted-auth)
+require native application registration in production. This is a concrete missing
+prerequisite; the exact failing SDK response was not captured in the release binary.
+Do not claim it is the only possible auth issue until a retry succeeds.
+
+The second emulator uses `system-images;android-34;google_apis_playstore;arm64-v8a`
+revision 14 and AVD `CalorieBank_B3_Google_API34`. Chrome's Custom Tabs service was
+verified, Chrome first-run completed without an account, and the public Clerk HTTPS
+endpoint loaded in Chrome. Sign in still returned “Sign-in could not be completed.
+Please try again.” Therefore absence of an AOSP browser is not the complete explanation.
+No credentials were entered, no account was created, and no production Clerk settings
+were changed. The earlier B1 instruction explicitly prohibits production Clerk changes.
+
+Concrete configuration needed for an authorized follow-up:
+
+- Android namespace/package: `com.caloriebank.mobile`.
+- Signed preview certificate SHA-256 (public certificate fingerprint, not a secret):
+  `F2:EE:9D:25:B3:E5:E5:54:74:72:50:B1:43:FC:42:2D:96:5A:CD:8D:08:BB:AD:59:87:FB:9B:B4:CC:9C:17:5C`.
+- Android Expo hosted callback: `clerk://com.caloriebank.mobile.hosted-callback`.
+- Add only the Android registration/required redirect; preserve the existing iOS entry.
+- Retry sign-in/sign-up, callback/session restoration and sign-out on this same APK.
+  Do not create another preview merely to change server-side registration.
+
+**Verdict: ANDROID PHASE B3: BLOCKED — production Clerk Android registration is
+missing and signed-preview hosted authentication fails.** The APK is available for
+qualification, but is not yet certified for Friends & Family use. After authentication
+is unblocked, perform the physical B4 matrix and resolve older iOS-client cross-device
+compatibility before broadening distribution.
