@@ -1,5 +1,18 @@
 # Android B1 foundation
 
+**Current callback status: PASS — AUTH FLOW READY on the API 34 emulator.**
+Replacement `99a064c9-d1ce-4a38-a879-22a898fd4bae` passed two distinct existing-
+account email-code returns directly to Today, sign-out, session restoration and
+invalid callback routing checks. No physical-phone certification is implied.
+See [final callback qualification](../deployment/android-preview.md#final-callback-qualification--pass).
+Earlier blocker/checkpoint entries below are historical.
+
+Replacement APK `99a064c9-d1ce-4a38-a879-22a898fd4bae` now passes the real
+email-code browser return for Account A: direct Today landing without relaunch,
+followed by successful session restore and sign-out. The previous callback failure
+is resolved in this retest. See the [current verification record](../deployment/android-preview.md#successful-replacement-callback-retest)
+for Account B and remaining physical-device qualification.
+
 Android callback fix: an exact-match `+native-intent` hook now excludes the Android
 Clerk hosted callback from ordinary Router navigation. Warm returns stay with the
 existing Clerk completion flow; cold returns use the hydrated-session application

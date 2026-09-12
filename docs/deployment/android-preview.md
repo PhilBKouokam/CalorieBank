@@ -3,7 +3,9 @@
 Work started from `df792a9017eaf3a5d30f27f7ee0103926e5818cd` on 2026-09-11.
 B3 implements the nutrition consumer path and has passed native compilation and
 emulator startup. The production Clerk Android registration was added on 2026-09-12;
-see the auth-unblock verification record below. End-to-end authentication is still being qualified. Physical QA remains pending. Health Connect burn remains disabled.
+the replacement callback fix now passes two existing-account email-code returns on
+the emulator. See the latest callback qualification below. Physical QA remains pending.
+Health Connect burn remains disabled.
 The single signed preview is complete; see the delivery record below.
 
 ## Local toolchain
@@ -410,3 +412,70 @@ post-auth relaunch and Account A/B switching on this replacement remain pending
 at this checkpoint. Previous-binary auth successes are not replacement qualification.
 A second controlled email was requested for Account B; no account was deleted or
 provider authority changed. Health Connect burn remains disabled.
+
+
+### Successful replacement callback retest
+
+After the user completed Cloudflare and entered a fresh email code for controlled
+Account A, the replacement returned directly into `com.caloriebank.mobile` and
+rendered Today/Available Bank. No manual relaunch occurred before this observation;
+no Unmatched Route, email prompt or sign-in screen remained. A subsequent explicit
+force-stop/relaunch restored the authenticated session and Today successfully.
+Normal Settings sign-out then returned to Sign In with no Today state visible.
+
+While Account A was authenticated, duplicate warm callback intents carrying a
+synthetic invalid `created_session_id` left the current Today screen intact with
+no unmatched route or sign-in transition. No real authentication parameters were
+replayed or logged. This is invalid-link routing evidence, not proof of accepting
+an old valid nonce. Clerk's existing verification remains authoritative.
+
+A second user-controlled existing account was then entered from the signed-out
+state. Its existing email-code method was selected; Account B verification is
+pending at this checkpoint. Both accounts already existed; no fresh sign-up or
+account deletion is claimed. No provider connection/authority or health data was
+manually changed.
+
+
+### Final callback qualification — PASS
+
+**ANDROID B3 CALLBACK FIX: PASS — AUTH FLOW READY** (emulator-qualified, not full
+physical Friends & Family certification).
+
+Replacement build `99a064c9-d1ce-4a38-a879-22a898fd4bae` / source
+`d8ab32810575b327085ab6c0b32a9d35682c01d5` completed these actual tests:
+
+| Test | Result |
+| --- | --- |
+| Existing session retained across APK update | Passed; Today rendered |
+| Account A fresh email-code sign-in | Passed; browser returned directly to native Today, no relaunch/unmatched route |
+| Account A session restore | Passed after force-stop/relaunch |
+| Account A normal sign-out | Passed; Sign In displayed, Today absent |
+| Account B sign-in after Account A sign-out | Passed with separately supplied email/code; direct native Today, no unmatched route |
+| Account B session restore | Passed after force-stop/relaunch |
+| Duplicate invalid warm callback | Passed; no route/session transition observed |
+| Cold cancelled callback while signed out | Passed; Sign In, no authenticated access/unmatched route |
+| Invalid stale-account callback fixture after B sign-in | Passed; current app remained on Today |
+
+The two real hosted flows used distinct user-controlled existing accounts. The
+account-switch result is an end-to-end UI check, backed by the unchanged account-
+generation/ownership regression suite; no raw token, internal account ID or private
+API response was extracted. This does not claim a replay of an old valid nonce,
+exhaustive data-leak instrumentation, fresh-account signup, physical-phone testing
+or real provider OAuth/notification delivery. Both real flows used Clerk's normal
+email-code verification. No production Clerk settings were altered for this fix.
+
+All source validation remains the successful 788-test / 67-file release gate and
+native EAS build recorded above. Subsequent changes are documentation only; link
+checks and `git diff --check` pass. iOS configuration and URL behavior are unchanged;
+iOS physical auth was not rerun. Fitbit/FatSecret callbacks and notification links
+pass through unchanged in regression tests; their real external OAuth/delivery was
+not repeated. HealthKit, Health Connect, burn qualification, accounting, Opening
+Bank, ledger and notification implementation remain untouched. No additional APK,
+iOS build, Play submission, Render deployment or TestFlight operation occurred.
+
+Next phase: use this replacement APK for physical Android B3/B4 qualification of
+Fitbit + direct FatSecret and Fitbit + exact-origin Health Connect nutrition,
+including permissions/history/source switching, onboarding, locked Step Planning,
+notification ownership/delivery and deletion on a separately confirmed disposable
+account. Keep Health Connect burn disabled. Preserve the documented older-iOS-client
+cross-device compatibility gate before broad distribution.
