@@ -4,6 +4,20 @@ Audit date: 2026-09-11. Status: **ANDROID PHASE A AUDIT: READY FOR IMPLEMENTATIO
 
 This verdict means a bounded foundation phase can begin when authorized. It does not mean Android is built, tested, release-ready, or that every Health Connect writer is qualified. Health Connect burn and estimator support have explicit evidence gates below. This document records proposals, not changes to accepted accounting or permission to deploy.
 
+## B2 implementation update — 2026-09-11
+
+**ANDROID PHASE B2: PASS — HEALTH CONNECT BURN REMAINS UNQUALIFIED**.
+
+The Android facade now includes a read-only Health Connect qualification service using pinned `react-native-health-connect` 4.1.3. Seven read permissions, exact-package discovery/isolation, revision-aware pagination, an eight-date window, mutation/permission/account-generation checks and beta diagnostics are implemented. A checked Android-only patch preserves nullable nutrition energy. The app-specific permission-rationale activity is generated correctly. Normal provider selection, production ingestion, accounting and forecast use remain disabled for Health Connect.
+
+See [Android Health Connect qualification](../engineering/android-health-connect.md) for the dependency assessment, native patch, record/permission matrix, normalization policies, **NOT QUALIFIED** burn verdict, physical script and exact B3 work. Nutrition/steps are conditionally usable evidence; walking calibration is withheld because session energy/step association is unproven. Empty or ambiguous evidence never becomes a manufactured zero.
+
+Android prebuild succeeds in an isolated temporary project; Android/iOS JavaScript exports and autolinking resolve. iOS generated configuration remains identical to B1, and no direct-provider, backend, schema or bank logic changed. There is no local JDK/SDK/ADB, so native compilation, Android startup and physical qualification remain unperformed. The conditional preview milestone is therefore unmet: **no EAS Android build**, no Play release, no iOS/TestFlight build and no Render deployment.
+
+Validation: the complete release gate passed with **732 tests in 62 files**, workspace/API/mobile TypeScript, lint (one existing Today warning), Prisma checks against the dedicated local test database and API build. Both platform exports, dependency validation, autolinking, isolated prebuild, iOS baseline comparison and local documentation links passed. Native compile/physical QA were not performed.
+
+B3 must begin with native compile/startup and physical evidence validation, then add qualified exact-origin intake Connections/onboarding and additive server ingestion/source contracts. Do not infer production readiness from a successful prebuild, test fixture or populated total-energy interval.
+
 ## B1 implementation update — 2026-09-11
 
 **ANDROID PHASE B1: PASS — READY FOR HEALTH CONNECT IMPLEMENTATION** (source/configuration qualification; physical release gate outstanding).
@@ -268,7 +282,7 @@ Sources for manifest and distribution requirements: [Health Connect setup](https
 
 ## Fastest safe implementation sequence
 
-B1 is complete as recorded above; B2–B7 remain future tasks. Each implementation phase runs repository-pinned Node 20, root lint/typecheck/tests and diff checks, plus its listed tests. Each UI phase applies the PRD visual/copy gate and the locked Step Planning contract. Separate deploy/build authorization remains required where not included in the future task.
+B1 and B2 source implementation are complete as recorded above; B2 native/physical qualification and B3–B7 remain outstanding. Each implementation phase runs repository-pinned Node 20, root lint/typecheck/tests and diff checks, plus its listed tests. Each UI phase applies the PRD visual/copy gate and the locked Step Planning contract. Separate deploy/build authorization remains required where not included in the future task.
 
 | Phase | Exact objective and likely files/modules | Dependencies | Tests and completion criteria | EAS build? |
 | --- | --- | --- | --- | --- |

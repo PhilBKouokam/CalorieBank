@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "release:friends-family": "tsx apps/api/src/scripts/release-friends-family.ts",
-    "postinstall": "npm --workspace @caloriebank/domain run build && npm --workspace @caloriebank/schemas run build",
+    "postinstall": "npm --workspace @caloriebank/domain run build && npm --workspace @caloriebank/schemas run build && node apps/mobile/scripts/patch-health-connect.cjs",
     "api:dev": "npm --workspace @caloriebank/api run dev",
     "api:build": "npm --workspace @caloriebank/api run build",
     "api:start": "npm --workspace @caloriebank/api run start",

@@ -2,6 +2,10 @@
 
 Implemented 2026-09-11. Scope: shared direct-provider path and platform safety. Canonical plan: [Android parity plan](../product/android-parity-plan.md). This is source/configuration qualification, not Android physical certification or release authorization.
 
+## B2 follow-up — 2026-09-11
+
+B2 adds the read-only qualification bridge described in [Android Health Connect](android-health-connect.md). The B1 findings below remain the baseline: native source selection is still disabled, now explicitly because it is **not qualified**. Android has seven read-only Health Connect permissions and a beta diagnostic path; iOS/direct providers/accounting remain unchanged. Burn and walking calibration remain unqualified. Isolated native project generation passes, but no native compile/startup or real-device qualification was possible, so no remote preview was created. See the new guide for the pinned dependency patch, validations, physical script and exact B3 work.
+
 ## Platform boundary
 
 `apps/mobile/lib/native-health/index.ios.ts` directly aliases the existing Apple Health functions. Querying, account scope, persistence, sync windows, retry policy and normalized ingestion remain unchanged. `index.android.ts` and the non-native fallback expose a typed `not_implemented` capability, unavailable connection state, no writers, null refresh/diagnostics, and a rejecting sync method. No fabricated zeros, success, permissions or Health Connect connection exist.

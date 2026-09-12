@@ -5,3 +5,5 @@ export const nativeRefreshFailure = 'Your saved health source cannot refresh on 
 export function sourceLabel(label: string) {
   return label.replace(/Apple Health|Apple Watch|apple_health|apple_watch/g, 'Source on another device');
 }
+
+export const nativeDiagnosticsTitle = 'Health Connect qualification';

@@ -9,6 +9,8 @@ import { hostedAuthRedirectForPlatform } from '../../mobile/lib/auth/platform-re
 import { preferDirectFoodSources } from '../../mobile/lib/providers/intake-writer-policy';
 import type { HealthConnectionsResponse } from '@caloriebank/schemas';
 
+vi.mock('react-native', () => ({ Platform: { Version: 34 } }));
+
 const apple = vi.hoisted(() => ({
   setAppleHealthAccountScope: vi.fn(), getAppleHealthConnectionStatus: vi.fn(),
   connectAppleHealth: vi.fn(), refreshAppleHealthForCurrentAccount: vi.fn(),
@@ -21,7 +23,7 @@ const config = JSON.parse(readFileSync(resolve(__dirname, '../../mobile/app.json
 
 describe('Android B1 platform boundary', () => {
   it('exposes no health capability or data and cannot report a successful import', async () => {
-    expect(android.nativeHealthCapability).toEqual({ supported: false, provider: null, reason: 'not_implemented' });
+    expect(android.nativeHealthCapability).toEqual({ supported: false, provider: null, reason: 'not_qualified' });
     android.setNativeHealthAccountScope('A');
     expect(await android.getNativeHealthConnectionStatus()).toBe('unavailable');
     expect(await android.connectNativeHealth()).toBe('unavailable');
@@ -55,8 +57,9 @@ describe('Android B1 platform boundary', () => {
     expect(config.android.intentFilters).toContainEqual({ action: 'VIEW', category: ['BROWSABLE', 'DEFAULT'], data: [{ scheme: 'caloriebank', host: 'integrations' }] });
     expect(hostedAuthRedirectForPlatform('android', config).nativeRedirectUrl).toBe('clerk://com.caloriebank.mobile.hosted-callback');
     expect(hostedAuthRedirectForPlatform('ios', config).nativeRedirectUrl).toBe('com.caloriebank.mobile://callback');
-    expect(config.android.permissions ?? []).toEqual([]);
-    expect(JSON.stringify(config.android)).not.toContain('android.permission.health.');
+    expect(config.android.permissions).toHaveLength(7);
+    expect(config.android.permissions.every((permission: string) => permission.startsWith('android.permission.health.READ_'))).toBe(true);
+    expect(config.android.permissions).not.toContain('android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND');
   });
   it('retains selected authority but removes unusable native alternatives', () => {
     const native = { optionId: 'apple', label: 'Apple Health', deviceManaged: true, status: 'connected' as const, transportLabel: null, primaryAction: null };
