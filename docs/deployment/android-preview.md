@@ -2,8 +2,8 @@
 
 Work started from `df792a9017eaf3a5d30f27f7ee0103926e5818cd` on 2026-09-11.
 B3 implements the nutrition consumer path and has passed native compilation and
-emulator startup. **B3 is blocked on production Clerk Android registration:** hosted
-sign-in fails in the signed APK. Physical QA remains pending. Health Connect burn remains disabled.
+emulator startup. The production Clerk Android registration was added on 2026-09-12;
+see the auth-unblock verification record below. End-to-end authentication is still being qualified. Physical QA remains pending. Health Connect burn remains disabled.
 The single signed preview is complete; see the delivery record below.
 
 ## Local toolchain
@@ -194,6 +194,8 @@ burn disabled and use the [physical script](../engineering/android-health-connec
 
 ## Blocking hosted-auth configuration finding
 
+Historical finding: registration is resolved by the authorized update below.
+
 Read-only production Clerk inspection on 2026-09-12 confirmed Native API enabled,
 **no Android applications registered**, and only `com.caloriebank.mobile://callback`
 in the mobile SSO redirect allowlist. The signed APK contains the production Clerk
@@ -222,8 +224,52 @@ Concrete configuration needed for an authorized follow-up:
 - Retry sign-in/sign-up, callback/session restoration and sign-out on this same APK.
   Do not create another preview merely to change server-side registration.
 
-**Verdict: ANDROID PHASE B3: BLOCKED — production Clerk Android registration is
+**Original B3 verdict (before the authorized registration below): BLOCKED — production Clerk Android registration is
 missing and signed-preview hosted authentication fails.** The APK is available for
 qualification, but is not yet certified for Friends & Family use. After authentication
 is unblocked, perform the physical B4 matrix and resolve older iOS-client cross-device
 compatibility before broadening distribution.
+
+
+## Production Clerk Android registration — 2026-09-12
+
+The user explicitly authorized the Android-only production Clerk configuration change.
+Used existing CalorieBank production instance `ins_3IvHinkRrGUSICIJGXNKNlg8V61`
+in application `app_3I9crm3sapi9U7WbUXpbd0o0DI9`; no second instance was created.
+Frontend API remains `clerk.caloriebank.philbk.dev`. Native API was already enabled.
+
+Registered Android namespace `android_app`, package `com.caloriebank.mobile`, with
+the existing signed APK certificate fingerprint recorded above. Verified the saved
+registration in the dashboard and its public `/.well-known/assetlinks.json` output.
+Added the exact Expo SDK callback `clerk://com.caloriebank.mobile.hosted-callback`.
+Clerk automatically added `clerk://com.caloriebank.mobile.callback` when registering
+Android; both are exact URLs, with no wildcard. The existing iOS registration
+`5HQ8A8X5Z8` / `com.caloriebank.mobile` and `com.caloriebank.mobile://callback`
+were rechecked and preserved. No keys were regenerated, no email authentication
+settings or existing user records were manually changed.
+
+Existing B3 APK remains valid. No replacement Android build was created. Retested
+build `c37e57fb-2031-41b1-8ccf-c4d88ad62110` on the existing Google Play API 34
+ARM64 emulator. The former immediate hosted-auth error is gone: Sign in opens
+`accounts.caloriebank.philbk.dev` in the browser. Initially it displayed Cloudflare
+security verification. Full email verification, return/session, protected API and
+account-switch qualification require completion of that page and controlled test
+account access; do not infer those results from browser launch alone.
+
+
+Current verification limit: the page progressed to an explicit “Verify you are human”
+Cloudflare challenge. No attempt was made to automate or bypass that challenge. The
+emulator was made visible for user completion, and disposable test-email access was
+requested. Sign-up, sign-in completion, callback return, sign-out, restore, protected
+`/v1/me` requests, Account A/B isolation and deletion remain **pending**, not passed.
+No physical Android phone was available. Neither provider combination nor push
+registration/delivery was newly qualified in this configuration-only task. Health
+Connect burn remains disabled. Render, PostgreSQL, migrations, accounting, Fitbit,
+FatSecret, notifications, Apple Health and TestFlight were untouched.
+
+Next: complete the human check and controlled email-code authentication on the same
+APK, then test session/API/account isolation and the existing physical qualification
+matrix. No rebuild is needed for the saved Clerk registration. Current task verdict:
+**ANDROID B3: BLOCKED — human verification and test-account authentication pending.**
+This supersedes the earlier missing-registration blocker; Android registration itself
+is complete and verified.

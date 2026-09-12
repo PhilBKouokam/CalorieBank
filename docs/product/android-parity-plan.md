@@ -1,5 +1,11 @@
 # Android Phase A: Platform Parity and Architecture Audit
 
+2026-09-12 auth update: the existing production Clerk instance now registers Android
+`com.caloriebank.mobile` and exact callback `clerk://com.caloriebank.mobile.hosted-callback`.
+iOS registration/callback and production keys are preserved. The existing B3 APK is
+reused; no replacement build or product-code change. See the [auth verification record](../deployment/android-preview.md#production-clerk-android-registration--2026-09-12)
+for actual test results and remaining account/physical qualification.
+
 B3 implements the Android exact-package nutrition consumer path and additive server source identity. Fitbit remains the qualified Android burn path; direct FatSecret remains available; Health Connect burn stays disabled. The [B3 build and qualification record](../deployment/android-preview.md) is authoritative for build delivery, emulator results, physical QA and deployment status. Earlier phase records below are historical baselines.
 
 Audit date: 2026-09-11. Status: **ANDROID PHASE A AUDIT: READY FOR IMPLEMENTATION**.
