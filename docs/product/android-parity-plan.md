@@ -417,3 +417,15 @@ remains pending. Health Connect burn stays
 FCM/token/delivery qualification remains B4. No Render or TestFlight operation.
 See the [physical evidence and build record](../deployment/android-preview.md#pixel-9a-physical-qualification--2026-09-12)
 for exact coverage, limitations, source-switch/account checks and remaining work.
+
+### B4 FCM setup in progress — 2026-09-13
+
+The missing Android Firebase client configuration was identified in the installed
+APK. Firebase is now attached to the existing `caloriebank-505623` project, with
+`com.caloriebank.mobile` registered and a dedicated FCM-only credential stored in
+Expo. The temporary private-key download was removed. Android prebuild now
+includes the non-secret Firebase client configuration; iOS remains unchanged.
+This is infrastructure evidence, not physical push qualification. B4 notification
+registration/delivery and the remaining physical release checks are still pending.
+See [the preview record](../deployment/android-preview.md#b4-notification-infrastructure--2026-09-13-qualification-in-progress).
+Health Connect burn remains disabled.

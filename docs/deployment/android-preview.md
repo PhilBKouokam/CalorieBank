@@ -569,3 +569,45 @@ The exact next task is B4: resolve Android notification registration using verif
 FCM configuration, then complete the outstanding physical matrix on this APK where
 possible. Do not enable Health Connect burn or reopen initialized Opening Banks.
 No additional replacement build was submitted.
+
+## B4 notification infrastructure — 2026-09-13 (qualification in progress)
+
+The installed B3 APK `6175d2d0-a0d5-4ee5-9230-e3f283fbaa60` has no compiled
+`google_app_id` or `gcm_defaultSenderId` resources. Its Expo Android configuration
+had no `googleServicesFile`. This is a native FCM initialization prerequisite
+failure before obtaining the Expo token and registering it with the API; physical
+registration/delivery are not yet claimed successful.
+
+With explicit account-holder authorization, Firebase was attached to the existing
+Google Cloud project `caloriebank-505623` (no new project), and Android package
+`com.caloriebank.mobile` was registered. Optional Google Analytics was disabled.
+Existing OAuth configuration and unrelated credentials were not edited.
+
+The dedicated `caloriebank-expo-fcm` service account was assigned only Firebase
+Cloud Messaging API Admin. EAS confirmed upload and FCM V1 assignment for
+`com.caloriebank.mobile` in the existing CalorieBank Expo project
+`85fa9667-67bb-4d6c-bbcf-8f4e492ae5f5`. The temporary downloaded private-key file was
+deleted immediately after that confirmation. No private key was placed in the
+repository, application configuration, environment files, or application bundle.
+
+`apps/mobile/google-services.json` is the separate Android client configuration,
+not a service-account credential. Expo's `android.googleServicesFile` now points
+to it. Android prebuild copies it and applies the Google Services Gradle plugin.
+No additional SDK dependency or iOS configuration change is needed.
+See [Expo's FCM setup](https://docs.expo.dev/push-notifications/fcm-credentials/).
+
+Physical B4 push-token, account ownership, delivery/tap, revocation, and deletion
+checks remain pending. The Pixel was not connected to ADB during this setup.
+No B4 EAS build has yet been created; group remaining necessary fixes and validate
+before using the single permitted replacement APK. Render and TestFlight remain
+untouched. Health Connect burn remains disabled.
+
+Setup validation: `release:friends-family` passed with 791 tests across 67 files,
+workspace/API/mobile TypeScript, API/mobile lint (one pre-existing Today hook
+warning), localhost Prisma generation/validation/migrations, and production
+API/domain builds. Expo public config resolved both unchanged application IDs;
+Expo dependency validation, autolinking verification, Android prebuild, and
+`git diff --check` passed. The Firebase configuration regression checks exact
+Android package/project matching and excludes server private-key material.
+Native compilation and physical FCM registration remain pending for the grouped
+B4 replacement build; prebuild is not a native compile.

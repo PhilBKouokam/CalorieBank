@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "153142155251",
+    "project_id": "caloriebank-505623",
+    "storage_bucket": "caloriebank-505623.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:153142155251:android:63c7d7bed88dddf2e6a486",
+        "android_client_info": {
+          "package_name": "com.caloriebank.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "153142155251-kardt7j0o0ufc8litkfdeg8clfb90tda.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAmIXoWnBsQoAZBvhF90fTMV2teI_33iUA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "153142155251-kardt7j0o0ufc8litkfdeg8clfb90tda.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

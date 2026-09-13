@@ -61,6 +61,18 @@ describe('Android B1 platform boundary', () => {
     expect(config.android.permissions.every((permission: string) => permission.startsWith('android.permission.health.READ_'))).toBe(true);
     expect(config.android.permissions).not.toContain('android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND');
   });
+  it('bundles the matching Android Firebase client configuration without server credentials', () => {
+    const raw = readFileSync(resolve(__dirname, '../../mobile', config.android.googleServicesFile), 'utf8');
+    const firebase = JSON.parse(raw);
+    expect(firebase.project_info.project_id).toBe('caloriebank-505623');
+    expect(firebase.client).toHaveLength(1);
+    expect(firebase.client[0].client_info.android_client_info.package_name).toBe(config.android.package);
+    expect(firebase.client[0].client_info.mobilesdk_app_id).toBeTruthy();
+    expect(firebase.project_info.project_number).toBeTruthy();
+    expect(raw).not.toMatch(/private_key|BEGIN PRIVATE KEY|service_account/);
+    expect(config.ios.googleServicesFile).toBeUndefined();
+    expect(config.extra.eas.projectId).toBe('85fa9667-67bb-4d6c-bbcf-8f4e492ae5f5');
+  });
   it('retains selected authority but removes unusable native alternatives', () => {
     const native = { optionId: 'apple', label: 'Apple Health', deviceManaged: true, status: 'connected' as const, transportLabel: null, primaryAction: null };
     const fitbit = { ...native, optionId: 'fitbit', label: 'Fitbit', deviceManaged: false };
