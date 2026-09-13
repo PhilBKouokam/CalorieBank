@@ -41,9 +41,13 @@ function intersects(r: RecordEvidence, w: EvidenceWindow) {
   const start = Date.parse(r.start), end = Date.parse(r.end);
   return start === end ? start >= Date.parse(w.start) && start < Date.parse(w.end) : start < Date.parse(w.end) && end > Date.parse(w.start);
 }
-function quality(records: RecordEvidence[], w: EvidenceWindow): EvidenceQuality {
+function quality(records: RecordEvidence[], w: EvidenceWindow, additiveFoodItems = false): EvidenceQuality {
   if (!records.length) return 'empty';
   if (records.some((r) => Date.parse(r.start) < Date.parse(w.start) || Date.parse(r.end) > Date.parse(w.end))) return 'boundary_ambiguous';
+  // NutritionRecord represents a meal OR food item. Distinct foods can share a
+  // timestamp; identity/revision deduplication happens before this normalization.
+  // Keep interval overlap rejection for activity and energy coverage.
+  if (additiveFoodItems) return 'usable_evidence';
   const ordered = [...records].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   for (let i = 1; i < ordered.length; i++) {
     const a = ordered[i - 1]!, b = ordered[i]!;
@@ -55,7 +59,7 @@ export function normalizeDay(records: RecordEvidence[], window: EvidenceWindow, 
   const selected = (category: EvidenceCategory) => records.filter((r) => r.origin === origin && r.category === category && intersects(r, window));
   const total = (category: EvidenceCategory) => {
     const rows = selected(category);
-    const state = !granted.includes(category) ? 'permission_missing' : invalid.includes(category) ? 'invalid_records' : quality(rows, window);
+    const state = !granted.includes(category) ? 'permission_missing' : invalid.includes(category) ? 'invalid_records' : quality(rows, window, category === 'nutrition');
     const complete = state === 'usable_evidence' && rows.every((r) => r.value !== null);
     const sum = complete ? rows.reduce((n, r) => n + r.value!, 0) : null;
     const usable = sum !== null && Number.isFinite(sum) && (category !== 'steps' || Number.isSafeInteger(sum));

@@ -247,3 +247,63 @@ and only the iOS redirect allowlisted. No production Clerk setting was changed.
 See the [delivery record and concrete auth prerequisite](../deployment/android-preview.md#blocking-hosted-auth-configuration-finding).
 Health Connect burn remains disabled. B3 is blocked on authentication rather than
 certified for Friends & Family distribution.
+
+
+### Physical qualification update — 2026-09-12
+
+The existing B3 callback-fixed APK now passes production email-code return and
+session restore on a real Pixel 9a (Android 16 / API 36). System Health Connect
+and Google Play Services are present; physical Health Connect permission and
+populated-record qualification remain pending. Fitbit reauthorization is currently
+blocked by Google's testing-mode approved-tester restriction, before the provider
+callback. The founder-approved tester addition has since been saved in the existing
+OAuth project. Physical reauthorization then returned to CalorieBank with Fitbit
+Connected and Selected for Calories Burned. No application defect was established. Health Connect
+burn remains disabled. See the [physical evidence record](../deployment/android-preview.md#pixel-9a-physical-qualification--2026-09-12-in-progress)
+for actual results and outstanding checks; earlier emulator evidence is separate.
+
+Pixel physical consumer permission evidence: Nutrition was the only requested
+category. Android's prompt stated new data plus the past 30 days. Denial and
+subsequent re-request/grant worked. Discovery produced the explicit no-trackers
+state after grant. This qualifies permission handling and empty discovery only,
+not populated exact-origin ingestion. FatSecret remained selected. Cronometer's
+[official integration guide](https://support.cronometer.com/hc/en-us/articles/22731903751316-Health-Connect)
+documents nutrition export; installation/account setup and physical export evidence
+are the next prerequisite. No Health Connect burn was enabled.
+
+
+### Physical Cronometer evidence blocker
+
+On the Pixel, Cronometer (`com.cronometer.android.gold`) was linked with only
+`WRITE_NUTRITION` granted; unrelated read/write categories remained off. CalorieBank
+discovered the exact mapped origin. Nutrition-only diagnostics reported available,
+no missing permissions, complete query, observed origin, stable read, and 17 nutrition
+records across September 5–12. September 12 was `ambiguous_overlap`; the other seven
+dates were empty. Consumer selection persisted but initial refresh and one retry
+truthfully returned retry-required. Populated intake is **not yet qualified**.
+
+The existing shared interval-quality helper rejects distinct nutrition IDs with
+overlapping/equal timestamps. Android defines NutritionRecord as a meal or individual
+food item, so interval overlap alone does not establish duplication. The founder is
+checking exported daily-total agreement and separate-food identity on-device before
+a correction is qualified. No raw records, food details, or amounts are retained in
+this report. No implementation change or replacement build has been made.
+
+
+### Nutrition overlap correction after physical reproduction
+
+The founder confirmed on-device that Health Connect's daily nutrition total matched
+Cronometer and the entries were separate foods, not duplicate copies. The Android
+normalizer now permits additive nutrition intervals after exact-origin ID/revision
+deduplication. It still rejects cross-date intervals, conflicting same-ID revisions
+and incomplete energy evidence. Steps, workouts, burn qualification, iOS, provider
+callbacks, shared API contracts and server accounting are unchanged.
+
+This follows Android's [NutritionRecord contract](https://developer.android.com/reference/androidx/health/connect/client/records/NutritionRecord):
+a record may represent a meal or food item, so equal/overlapping times alone cannot
+determine duplication. Distinct IDs are retained; writer-created duplicate exports
+with different IDs remain a writer-quality limitation requiring physical comparison.
+Synthetic regressions cover overlapping separate foods, repeated IDs, newer revisions,
+other-package exclusion, conflicting revisions and missing energy. The targeted
+qualification/client suites passed 35 tests. Replacement validation and physical
+retest are pending; the old APK must not be described as passing populated nutrition.

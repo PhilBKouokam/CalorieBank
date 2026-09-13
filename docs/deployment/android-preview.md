@@ -479,3 +479,115 @@ including permissions/history/source switching, onboarding, locked Step Planning
 notification ownership/delivery and deletion on a separately confirmed disposable
 account. Keep Health Connect burn disabled. Preserve the documented older-iOS-client
 cross-device compatibility gate before broad distribution.
+
+
+## Pixel 9a physical qualification — 2026-09-12 (in progress)
+
+The existing preview `99a064c9-d1ce-4a38-a879-22a898fd4bae` was installed
+on a real Google Pixel 9a running Android 16 / API 36. Google Play Services
+and the system Health Connect component are present. Default font scale is 1.0.
+No device identifiers or health records were retained in this record.
+
+Physical production email-code sign-in passed: the hosted browser returned directly
+to CalorieBank and Today displayed without Unmatched Route or manual relaunch.
+Force-stop/relaunch restored the authenticated session. Initial sign-in layout was
+readable without observed clipping. Launcher artwork, splash, enlarged text and
+other consumer screens remain to be visually qualified.
+
+The selected account already had Fitbit authority requiring attention and an intake
+source on another device; this is not evidence of fresh onboarding or Opening Bank
+preparation. Fitbit Reconnect opened the browser, but Google blocked authorization
+with its testing-mode developer-approved-testers message. The provider callback and
+Fitbit connection are therefore not yet physically qualified. Follow the existing
+[Google OAuth tester checklist](render-private-beta.md#external-console-checklist)
+after confirming the Google account used. With explicit founder approval, the
+selected test account was added to the existing project `caloriebank-505623`;
+the console confirmed five test users and preserved Testing status. Fresh physical
+reauthorization subsequently passed: the browser returned to CalorieBank Health
+Connections, with Fitbit shown as Connected and Selected for Calories Burned.
+No application defect was established.
+
+FatSecret, populated Health Connect intake, exact-origin switching, preparation,
+Step Planning, notifications, account switching and disposable-account deletion
+remain pending. Health Connect burn remains disabled. No replacement build, code
+change, Render deployment, Clerk configuration change or TestFlight operation was
+performed during these checks.
+
+Physical direct FatSecret authorization also returned directly to Today. Health
+Connections showed Fitbit Connected for Calories Burned and FatSecret Connected
+for Calories Eaten simultaneously. Today showed the explicit FatSecret no-intake
+state. The founder reported diary entries approximately four and five days earlier;
+History currently displayed Not calculated / Waiting for a complete day, with no
+completed-day rows visible. Matching Fitbit history and historical import coverage
+remain to be verified; this is neither a proven import defect nor a preparation pass.
+Android Back returned from Health Connections to Settings. Morning Bank Update
+settings opened and showed Off; token generation and delivery were not tested.
+
+After the historical refresh settled, the same physical History screen displayed
+calculated entries for September 8 and 9 (and an additional September 7 row), a
+calculated Available Bank, and truthful food-unavailable rows for September 10 and
+11. The initially uncalculated view was transient, not a confirmed import failure.
+The founder confirmed overlapping Fitbit history. Per-day source labels and Opening
+Bank provenance still require inspection; this existing account does not qualify
+fresh-account onboarding. No amounts were recorded.
+
+The September 8 day detail physically showed Calories burned · Fitbit and Calories
+eaten · FatSecret. Default-font History detail was visually inspected: source labels
+and calculation rows were readable without observed overlap. Both Step Planning
+card result sequences were present. Typing into the walking-step input replaced the
+existing value rather than appending; the original value was restored and verified.
+Keyboard dismissal and Android Back to Today worked. Enlarged-font and full keyboard
+visibility checks remain pending.
+
+Health Connect's physical system prompt requested Nutrition only and described
+30-day prior read access. Denial returned to an actionable Allow food access screen;
+reopening and granting succeeded. Discovery then showed No food trackers were found,
+without claiming a connection failure. No Health Connect origin was selected;
+FatSecret authority was not changed by this permission test. Populated nutrition
+and permission revocation remain pending.
+
+
+### Physical Cronometer evidence blocker
+
+On the Pixel, Cronometer (`com.cronometer.android.gold`) was linked with only
+`WRITE_NUTRITION` granted; unrelated read/write categories remained off. CalorieBank
+discovered the exact mapped origin. Nutrition-only diagnostics reported available,
+no missing permissions, complete query, observed origin, stable read, and 17 nutrition
+records across September 5–12. September 12 was `ambiguous_overlap`; the other seven
+dates were empty. Consumer selection persisted but initial refresh and one retry
+truthfully returned retry-required. Populated intake is **not yet qualified**.
+
+The existing shared interval-quality helper rejects distinct nutrition IDs with
+overlapping/equal timestamps. Android defines NutritionRecord as a meal or individual
+food item, so interval overlap alone does not establish duplication. The founder is
+checking exported daily-total agreement and separate-food identity on-device before
+a correction is qualified. No raw records, food details, or amounts are retained in
+this report. No implementation change or replacement build has been made.
+
+
+### Nutrition overlap correction after physical reproduction
+
+The founder confirmed on-device that Health Connect's daily nutrition total matched
+Cronometer and the entries were separate foods, not duplicate copies. The Android
+normalizer now permits additive nutrition intervals after exact-origin ID/revision
+deduplication. It still rejects cross-date intervals, conflicting same-ID revisions
+and incomplete energy evidence. Steps, workouts, burn qualification, iOS, provider
+callbacks, shared API contracts and server accounting are unchanged.
+
+This follows Android's [NutritionRecord contract](https://developer.android.com/reference/androidx/health/connect/client/records/NutritionRecord):
+a record may represent a meal or food item, so equal/overlapping times alone cannot
+determine duplication. Distinct IDs are retained; writer-created duplicate exports
+with different IDs remain a writer-quality limitation requiring physical comparison.
+Synthetic regressions cover overlapping separate foods, repeated IDs, newer revisions,
+other-package exclusion, conflicting revisions and missing energy. The targeted
+qualification/client suites passed 35 tests. Replacement validation and physical
+retest are pending; the old APK must not be described as passing populated nutrition.
+
+Validation after the nutrition correction: release:friends-family passed (790 tests
+in 67 suites, workspace/API/mobile typechecks, API/mobile lint with one existing
+Today hook warning, localhost Prisma generation/validation/migrations, API/domain
+build). Expo public config resolved both platforms with unchanged package identities;
+online dependency validation, autolinking verification and Android prebuild passed.
+`git diff --check` passed. With about 5.5 GB free locally, native compilation is
+deferred to the one authorized replacement EAS APK rather than claiming a local
+compile result. No API implementation, schema, accounting or iOS file changed.

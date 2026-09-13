@@ -97,12 +97,29 @@ describe('provider-neutral evidence, never accounting', () => {
     const zero = decodeRecord('nutrition', record(undefined, undefined, { energy: { inKilocalories: 0 } }))!;
     expect(normalizeDay([zero], window, zero.origin, categories, []).intake.value?.totalCaloriesConsumed).toBe(0);
   });
-  it('deduplicates IDs/revisions, refuses ambiguous distinct records', () => {
+  it('deduplicates IDs/revisions while preserving distinct same-time food items', () => {
     const one = decodeRecord('nutrition', record())!; const two = { ...one, id: 'two' };
     expect(uniqueRecords([one, one]).records).toHaveLength(1);
     expect(uniqueRecords([one, { ...one, value: 300 }]).conflict).toBe(true);
     const newer = { ...one, version: 2, value: 300 }; expect(uniqueRecords([one, newer]).records[0]!.value).toBe(300);
-    expect(normalizeDay([one, two], window, one.origin, categories, []).intake.quality).toBe('ambiguous_overlap');
+    expect(normalizeDay([one, two], window, one.origin, categories, []).intake).toMatchObject({ quality: 'usable_evidence', value: { totalCaloriesConsumed: 400 } });
+  });
+  it('sums overlapping food items only from the exact origin after pagination and revision deduplication', async () => {
+    const origin = 'com.cronometer.android.gold';
+    const first = record(origin, 'food-a');
+    const revised = record(origin, 'food-a', { metadata: { ...first.metadata, clientRecordVersion: 2 }, energy: { inKilocalories: 250 } });
+    records.nutrition = [first, first, revised, record(origin, 'food-b', { startTime: '2026-09-10T12:00:30Z' }), record('com.other.food', 'food-b')];
+    const result = await bridge().inspect(origin);
+    expect(result.readConsistency).toBe('stable_read');
+    expect(result.days.find((d) => d.window.localDate === window.localDate)?.intake).toMatchObject({ quality: 'usable_evidence', value: { totalCaloriesConsumed: 450 } });
+    expect(result.days.every((d) => d.caloriesBurned === null)).toBe(true);
+  });
+  it('still rejects conflicting same-ID food revisions and missing energy in overlapping items', async () => {
+    records.nutrition = [record(), record(undefined, undefined, { energy: { inKilocalories: 300 } })];
+    expect((await bridge().inspect('com.example.food')).state).toBe('query_failed');
+    const one = decodeRecord('nutrition', record())!;
+    const missing = decodeRecord('nutrition', record(undefined, 'missing', { energy: undefined }))!;
+    expect(normalizeDay([one, missing], window, one.origin, categories, []).intake).toEqual({ quality: 'no_calorie_records', value: null });
   });
   it('never prorates an interval spanning a local midnight', () => {
     const r = decodeRecord('nutrition', record(undefined, undefined, { startTime: '2026-09-09T23:59:00Z' }))!;
