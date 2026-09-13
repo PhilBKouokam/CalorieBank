@@ -429,3 +429,9 @@ This is infrastructure evidence, not physical push qualification. B4 notificatio
 registration/delivery and the remaining physical release checks are still pending.
 See [the preview record](../deployment/android-preview.md#b4-notification-infrastructure--2026-09-13-qualification-in-progress).
 Health Connect burn remains disabled.
+
+B4 follow-up physical evidence: the single Firebase-enabled APK compiled and
+installed on Pixel 9a. Fresh Fitbit + Cronometer onboarding reached bank-ready;
+notification registration, cold-relaunch On state, denial, and OS permission
+recovery passed. Real delivery/tap, multi-account token transfer and token-aware
+deletion remain pending; Android Friends & Family release is not yet qualified.

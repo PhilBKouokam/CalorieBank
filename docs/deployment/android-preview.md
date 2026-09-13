@@ -611,3 +611,55 @@ Expo dependency validation, autolinking verification, Android prebuild, and
 Android package/project matching and excludes server private-key material.
 Native compilation and physical FCM registration remain pending for the grouped
 B4 replacement build; prebuild is not a native compile.
+
+### B4 fresh-account physical progress — 2026-09-13
+
+On the reconnected Pixel 9a, a newly recreated disposable CalorieBank/Clerk
+identity completed production email verification and returned to the welcome
+screen. The underlying Google/Gmail identity was not changed. The five-step
+journey exposed Fitbit only for burn, then direct FatSecret or Health Connect
+food for intake. Fitbit connected; the callback opened Health Connections, and
+Android Back resumed the food step (an extra navigation step, not a blocked
+journey). Cronometer was explicitly selected for this new account. Maintain was
+selected for the disposable test goal, and Daily Bank Target was configured.
+
+Preparation first truthfully showed Fitbit waiting and Cronometer checked, then
+completed without a manual retry, showing “Your bank is ready” and a starting
+balance. This proves fresh physical journey completion; independent verification
+of all persisted historical dates and the Opening Bank calculation is still
+pending. No on-device accounting was introduced. Notification enablement is held
+until installing the Firebase-enabled APK.
+
+The one B4 preview build is `72fa526a-f335-4fd8-b88c-65067b1a0911`, source
+`c2ab1657af7d5355693a9f7168fa5f84fdc4b59f`, submitted after the 791-test release
+gate passed. Native Gradle compilation passed (`BUILD SUCCESSFUL`, `:app:assembleRelease`),
+and the APK was downloaded through EAS and installed over the existing app on the
+Pixel (`adb install -r`: Success), preserving the disposable account session.
+
+
+### B4 physical notification registration — 2026-09-13
+
+On B4 build `72fa526a-f335-4fd8-b88c-65067b1a0911`, the recreated disposable
+account enabled Morning Bank Update from setup. The UI showed ENABLED; the normal
+implementation only returns that success after Expo-token generation,
+authenticated device registration, and preference persistence. After full
+force-stop/relaunch, authenticated Today loaded and notification Settings fetched
+On. This qualifies the client/API registration path, without logging the token
+or claiming independent database inspection or push delivery.
+
+Android notification permission was then revoked through system UI. Android
+recreated the app, which retained the disposable session. Attempting enablement
+showed the OS permission prompt; choosing Don't allow produced truthful Android
+Settings copy and an Open Notification Settings action. That action opened the
+CalorieBank app-info page, with Notifications one additional tap away. After
+restoring permission, app retry refreshed the state; enabling again succeeded
+and showed On. Three rapid background/foreground cycles preserved the screen and
+On state with no observed crash. This is not proof of every stale-response or
+manual-refresh race; automated coverage remains separate.
+
+Real delivery, notification tap, cross-account token ownership and deletion with
+an active token remain pending. At this test it was 13:22 America/Chicago, outside
+the unchanged morning window. No clock/timezone/eligibility override or test bypass
+was introduced. Keep the disposable identity available for real morning delivery
+before deleting it. No primary-account settings, Google/Gmail identity, Render,
+TestFlight, Health Connect burn authority, or accounting code were changed.

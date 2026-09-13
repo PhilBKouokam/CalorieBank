@@ -278,3 +278,13 @@ remains pending. Health Connect burn stays
 FCM/token/delivery qualification remains B4. No Render or TestFlight operation.
 See the [physical evidence and build record](../deployment/android-preview.md#pixel-9a-physical-qualification--2026-09-12)
 for exact coverage, limitations, source-switch/account checks and remaining work.
+
+### B4 fresh-account evidence — 2026-09-13
+
+A recreated disposable CalorieBank account on Pixel 9a explicitly selected the
+already-discovered Cronometer origin during five-step onboarding, independently
+of the previous account's authority. Fitbit was the only offered burn source.
+Preparation showed Cronometer checked, waited for Fitbit, then reached bank-ready
+without a manual retry. This is consumer-journey evidence, not an independent
+audit of every persisted historical date. Historical backfill/DST and a second
+real populated nutrition writer remain pending. Health Connect burn stays disabled.
