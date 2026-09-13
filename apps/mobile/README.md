@@ -42,6 +42,12 @@ Banking Goals is approved for progressive V1 discovery but is not part of the cu
 
 Manual food entry belongs only as fallback, correction, supplementary input, or future expansion unless the PRD changes.
 
+## Future Social
+
+The [Social specification](../../docs/product/social-system-spec.md), focused ADRs 025–028 and [implementation plan](../../docs/product/social-implementation-plan.md) describe approved future behavior, not shipped screens. Current tabs remain Today, History and Settings. The future Social tab, people dashboard, Shared Home, Activity, Stories, Moments and badges require separately sequenced implementation after core beta readiness. No Followers, Close Connections, current Feed or special Founder/Creator privacy mode is approved.
+
+Shared Home eventually uses viewer-authorized canonical resources in the viewer's familiar arrangement, falling back to canonical order. Existing card visibility preferences are not a custom-layout engine. Unauthorized fields must be omitted by the server; hiding a card is not authorization. This direction does not redesign current Today or the locked Step Planning cards.
+
 ## Current Scope
 
 The app includes coordinated foreground rolling-window ingestion from Apple Health, Fitbit through Google Health, and FatSecret; a provider-neutral Today read model; authoritative provider selection; Clerk-hosted beta authentication; and persistent fixed-order card visibility preferences. FatSecret imports only existing diary daily totals and never creates food entries. Available Bank remains mandatory and first. Existing implementation visibility may require a later ADR 011 migration; this documentation change does not add discovery logic. Today's Forecast and Projected Daily Burn remain V1 estimates but must not be represented as Projected Bank data. Time-aware forecasting is documentation-planned and implementation-blocked under ADR 015. Broad historical ingestion, background HealthKit delivery, and exact-time scheduling remain deferred. Morning Bank Update is implemented under the [accepted notification contract](../../docs/product/adr-024-morning-bank-update.md); Android notification configuration and physical validation remain planned.

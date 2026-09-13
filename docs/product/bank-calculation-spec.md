@@ -28,6 +28,10 @@ It governs:
 
 Other product documents may describe the broader V1 experience, but they must not define conflicting bank-calculation behavior. If another document conflicts with this specification, this specification governs bank-calculation behavior.
 
+## Future Social boundary
+
+The [Social specification](social-system-spec.md) governs future sharing, not calculation. Shared Home displays only authorized canonical values; Stories/Moments capture intentional snapshots and badges read eligible evidence. None creates a Social Bank formula, Projected Bank, intake/workout record, transfer, allocation or ledger mutation. Preserve the once-only `0.80` policy, immutable Opening Bank, provisional corrections, locking and the single effective-balance/Recovery model. Social examples do not resolve open Eating Budget, Emergency Bank or Banking Goal policies.
+
 ## Reviewed Context
 
 This specification preserves the current V1 direction from:

@@ -143,21 +143,28 @@ The sections below preserve the repository implementation guidance, product sour
 
 CalorieBank is moving from a web prototype into an iPhone-first mobile V1. The current source-of-truth hierarchy is:
 
-1. `AGENTS.md` defines repository implementation guardrails.
-2. `docs/product/v1-prd.md` defines authoritative V1 product scope and experience.
-3. `docs/product/bank-calculation-spec.md` governs all bank-calculation behavior.
-4. `docs/product/adr-011-progressive-feature-discovery.md` governs V1 availability, first-use visibility, recommendation, and contextual activation.
-5. `docs/product/adr-012-todays-eating-budget.md` governs Today's Eating Budget product boundaries and unresolved calculation requirements.
-6. `docs/product/adr-013-banking-goals.md` governs Banking Goals, one-bank conservation, allocation concepts, and unresolved withdrawal policy.
-7. `docs/product/adr-014-progressive-familiarity.md` governs recommendation readiness, complementarity, and pacing.
-8. `docs/product/adr-015-time-aware-activity-forecasting.md` governs advanced time-aware forecasting, forecast confidence, and burn-target feasibility.
-9. `docs/product/adr-016-authoritative-provider-selection-and-multi-provider-resolution.md` governs authoritative provider roles and the Fitbit/Google Health transport.
-10. `docs/product/adr-017-multi-provider-wearable-integration-strategy.md` governs wearable capability qualification and Garmin, WHOOP, and Apple Health expansion.
-11. `docs/product/adr-018-direct-nutrition-provider-strategy-and-fatsecret-integration.md` governs direct nutrition providers, FatSecret delegated diary access, and authoritative intake resolution.
-12. `docs/product/adr-019-beta-identity-and-environment-boundary.md` and `docs/product/adr-020-opening-bank-and-recovery-presentation.md` govern identity ownership and the opening/recovery accounting boundary.
-13. `docs/product/adr-021-personalized-step-contribution-and-initial-visibility.md` governs ledger-neutral walking estimates and the one-time Steps visibility default.
-14. `docs/product/adr-001-connection-first-v1.md` through `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md` govern their focused accepted decisions.
-15. `docs/architecture/current-state-audit.md` records implementation state and planning but cannot override the product documents above.
+1. `docs/product/v1-prd.md` defines authoritative V1 product scope and experience.
+2. `docs/product/bank-calculation-spec.md` governs all bank-calculation behavior.
+3. `docs/product/adr-011-progressive-feature-discovery.md` governs V1 availability, first-use visibility, recommendation, and contextual activation.
+4. `docs/product/adr-012-todays-eating-budget.md` governs Today's Eating Budget product boundaries and unresolved calculation requirements.
+5. `docs/product/adr-013-banking-goals.md` governs Banking Goals, one-bank conservation, allocation concepts, and unresolved withdrawal policy.
+6. `docs/product/adr-014-progressive-familiarity.md` governs recommendation readiness, complementarity, and pacing.
+7. `docs/product/adr-015-time-aware-activity-forecasting.md` governs advanced time-aware forecasting, forecast confidence, and burn-target feasibility.
+8. `docs/product/adr-016-authoritative-provider-selection-and-multi-provider-resolution.md` governs authoritative provider roles and the Fitbit/Google Health transport.
+9. `docs/product/adr-017-multi-provider-wearable-integration-strategy.md` governs wearable capability qualification and Garmin, WHOOP, and Apple Health expansion.
+10. `docs/product/adr-018-direct-nutrition-provider-strategy-and-fatsecret-integration.md` governs direct nutrition providers, FatSecret delegated diary access, and authoritative intake resolution.
+11. `docs/product/adr-019-beta-identity-and-environment-boundary.md` and `docs/product/adr-020-opening-bank-and-recovery-presentation.md` govern identity ownership and the opening/recovery accounting boundary.
+12. `docs/product/adr-021-personalized-step-contribution-and-initial-visibility.md` governs ledger-neutral walking estimates and the one-time Steps visibility default.
+13. `docs/product/adr-001-connection-first-v1.md` through `docs/product/adr-010-reliable-historical-sync-and-finalization-orchestration.md` govern their focused accepted decisions.
+14. `docs/architecture/current-state-audit.md` records implementation state and planning but cannot override the product documents above.
+
+Future Social product authority is the [Social specification](docs/product/social-system-spec.md), supported by ADRs [025](docs/product/adr-025-caloriebank-social-foundation.md), [026](docs/product/adr-026-social-authorization.md), [027](docs/product/adr-027-cb-stories-and-moments.md), and [028](docs/product/adr-028-cb-badges.md). These do not override canonical calculation specifications or put Social in the current beta. `AGENTS.md` supplies implementation guardrails derived from product authority; README summaries do not override it.
+
+### Future Social — designed, not implemented
+
+Social is opt-in and people-first: private mutual Connections, one-way Pins and My Order, deliberate sharing through authorized Shared Home, temporary Stories, direct Moments and meaningful badges. Followers, Close Connections, privacy presets, a public Connection graph and special Founder/Creator authorization are rejected. A Feed, comments and DMs remain deferred.
+
+See the [implementation plan and open decisions](docs/product/social-implementation-plan.md) and [repository Social audit](docs/architecture/social-design-audit.md). Continue core friends-and-family release readiness first; the Social design is not a launch blocker or an instruction to build all Social now.
 
 ## V1 Mission
 

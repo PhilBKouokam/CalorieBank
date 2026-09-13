@@ -44,6 +44,12 @@ ADR 013 adds Banking Goals as a post-foundation V1 Planning capability. Banking 
 
 ADR 015 adds an advanced layer within Today's Forecast. The current ingestion architecture supplies cumulative active-plus-basal expenditure, steps, normalized workouts, source timestamps, and local-calendar dates, but it does not provide an approved hourly baseline model, familiar-activity recognition policy, burn-target contract, forecast-confidence method, or active-day boundary. Time-aware numerical guidance is therefore architecture-planned but implementation-blocked. Forecast confidence and user familiarity remain independent readiness gates.
 
+## Future Social design audit — 2026-09-12
+
+The [dedicated Social audit](social-design-audit.md) records the inspected code, documentation conflicts, missing prerequisites and proposed sequence. The [Social specification](../product/social-system-spec.md) and ADRs 025–028 are approved future product/architecture direction, **not implemented functionality**. No Social schemas, graph, routes, screens, media pipeline, Activity or badge engine were found in the active application. Existing authenticated profiles, provider connections and Morning Bank Update are not Social activation, interpersonal Connections or a Social event bus.
+
+Current mobile navigation remains Today, History and Settings; Home preferences are fixed-order visibility controls. Shared Home's future viewer-relative layout uses canonical ordering until a separately approved viewer arrangement exists. Core beta physical regression certification remains outstanding in the release documentation and must precede a Social milestone. Product specifications and applicable ADRs outrank this implementation audit and derived AGENTS/README guidance.
+
 ## 1. Current Architecture
 
 CalorieBank is currently a deployed web prototype split into two independent npm projects:
