@@ -663,3 +663,21 @@ the unchanged morning window. No clock/timezone/eligibility override or test byp
 was introduced. Keep the disposable identity available for real morning delivery
 before deleting it. No primary-account settings, Google/Gmail identity, Render,
 TestFlight, Health Connect burn authority, or accounting code were changed.
+
+### B4 return sign-in and native history check — 2026-09-13
+
+Following the authorized account-switch sequence, the user completed the return
+sign-in on the Pixel. Today loaded and Morning Bank Update fetched On. Both
+preceding normal sign-outs returned to authentication successfully. This is UI/API
+registration evidence, not independent database token-owner inspection or proof
+that an old account cannot receive a push. Real delivery/tap and token-aware
+disposable-account deletion remain pending; retain the disposable identity for
+that qualification. No primary-account provider selections were changed.
+
+Nutrition-only read-only diagnostics reported available with no missing required
+permissions. Explicit diagnostic selection of `com.cronometer.android.gold`
+returned complete, origin observed, stable_read for September 6–13: 17 nutrition
+records, usable evidence on September 12, and empty on the other seven dates.
+This diagnostic does not upload records or change server selections. Persisted
+aggregate matching, physical multiple-writer isolation, and DST remain separate
+checks. Forecast use stayed disabled and full-day burn NOT QUALIFIED.

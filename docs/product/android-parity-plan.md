@@ -435,3 +435,14 @@ installed on Pixel 9a. Fresh Fitbit + Cronometer onboarding reached bank-ready;
 notification registration, cold-relaunch On state, denial, and OS permission
 recovery passed. Real delivery/tap, multi-account token transfer and token-aware
 deletion remain pending; Android Friends & Family release is not yet qualified.
+
+### B4 additional physical evidence — 2026-09-13
+
+Return sign-in reached Today and Morning Bank Update On on the Pixel. Independent
+token ownership inspection, real delivery/tap, and token-aware deletion remain
+pending. Exact Cronometer nutrition diagnostics completed today plus seven dates
+(September 6–13), with usable evidence on September 12 and truthful empty states
+on the other dates. Server-total comparison and physical multiple writers remain
+unqualified. Health Connect burn remains disabled. See the deployment and native
+health documents for evidence boundaries; this does not establish the full B4
+Friends & Family release gate.

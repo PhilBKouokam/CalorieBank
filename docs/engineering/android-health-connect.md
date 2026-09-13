@@ -288,3 +288,14 @@ Preparation showed Cronometer checked, waited for Fitbit, then reached bank-read
 without a manual retry. This is consumer-journey evidence, not an independent
 audit of every persisted historical date. Historical backfill/DST and a second
 real populated nutrition writer remain pending. Health Connect burn stays disabled.
+
+### B4 Pixel historical read evidence — 2026-09-13
+
+On the Firebase-enabled B4 APK, nutrition-only diagnostics with exact origin
+`com.cronometer.android.gold` completed the September 6–13 preparation window:
+17 records; September 12 usable, all other dates empty; `stable_read`, origin
+`observed`, no missing nutrition permission. No raw records or calorie amounts
+were logged. This qualifies physical bounded native querying, not independently
+verified persisted server totals, DST behavior, or multiple populated writers.
+The diagnostic makes no upload or accounting changes. Burn remained
+NOT QUALIFIED and forecast use disabled.
