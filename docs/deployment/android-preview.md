@@ -696,3 +696,35 @@ founder confirmed the total matches. No reinstall, reconnect, source change, cod
 fix or build was needed. Historical server readback and remaining forensic checks
 are separate from this native recovery evidence; overall B4 remains incomplete.
 See android-health-connect.md for the controlled sequence and limitations.
+
+### B4 remote push transport physically confirmed — September 16 (Chicago)
+
+A single founder-authorized test used the deployed `ExpoPushTransport` from a
+one-time Render shell command, with title CalorieBank and test-specific body
+Android notification test. No scheduled delivery service, eligibility bypass,
+public endpoint, database mutation, deployment or application change was used.
+A create-exclusive attempt marker prevented accidental command replay; exactly
+one token and one send attempt were reported. The token remained server-side.
+
+Ownership was verified by a scoped database read and correlation: the same active,
+non-invalidated Android registration under the previously authorized disposable
+account advanced from 00:27:48.981Z to 00:30:47.157Z on September 17 UTC when the
+Pixel was explicitly foregrounded. This differed from the founder's initially
+reported primary email; no primary-account registration was selected. The send
+rechecked the account/token fingerprints, recent registration and global token
+uniqueness before delivery. No other recipient was targeted. This verifies the
+current registration, not every account-transfer race or former-owner cleanup.
+
+Expo accepted ticket `01a0acc7-389b-75fa-ab15-c9180e6fc7c3`; subsequent receipt
+was `ok`. The founder confirmed the notification appeared on the physical Pixel
+and tapping it opened CalorieBank normally. Post-tap account identity and absence
+of duplicate physical notifications were not separately confirmed. No second
+send was made. This qualifies real Expo/FCM transport and normal tap opening,
+not scheduled morning eligibility, finalized-day copy, or exactly-once delivery.
+The planned emoji was not visible in shell accessibility output; exact emoji
+rendering on the phone was not independently recorded.
+
+No APK, EAS build, Render deployment, TestFlight change, or permanent config/code
+change occurred. Health Connect burn remains disabled. Remaining B4 gates include
+token-aware deletion, account-transfer safety, physical refresh races, accessibility
+and outstanding multi-writer coverage.

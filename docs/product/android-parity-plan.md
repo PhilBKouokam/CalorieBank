@@ -461,3 +461,14 @@ founder confirmed the total matches. No reinstall, reconnect, source change, cod
 fix or build was needed. Historical server readback and remaining forensic checks
 are separate from this native recovery evidence; overall B4 remains incomplete.
 See android-health-connect.md for the controlled sequence and limitations.
+
+### B4 immediate remote push qualification — September 16
+
+The existing APK received one test through the deployed Expo push transport;
+Expo accepted the ticket and returned an `ok` receipt. The founder physically
+confirmed receipt and that tapping opened CalorieBank normally. Current Android
+registration ownership was correlated with a Pixel foreground registration event.
+No application/config change, build, deploy or scheduled delivery-record mutation
+was needed. This qualifies transport and tap opening only; scheduled delivery,
+post-tap identity, physical duplicate absence, account-transfer safety and remaining
+B4 gates must not be inferred from it. See android-preview.md for detailed evidence.
