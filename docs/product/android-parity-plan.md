@@ -472,3 +472,33 @@ No application/config change, build, deploy or scheduled delivery-record mutatio
 was needed. This qualifies transport and tap opening only; scheduled delivery,
 post-tap identity, physical duplicate absence, account-transfer safety and remaining
 B4 gates must not be inferred from it. See android-preview.md for detailed evidence.
+
+### Android notification account ownership — physical PASS
+
+On the same Pixel 9a, Account A (the authorized disposable account) owned the
+active Android token before sign-out. A fresh authenticated foreground event
+updated that same account/token registration, also confirming the account retained
+after the first notification tap. The founder confirmed one prior notification
+and no delayed duplicate. Normal Android Sign Out succeeded and a scoped server
+read returned no Account A device registration before Account B signed in.
+
+Account B (the separately authorized beta account) registered the same token under
+a different internal authenticated account. A one-time guarded command using the
+deployed ExpoPushTransport rechecked A had zero registrations, B had one active
+Android registration, and the token had exactly one owner; it sent only one
+“Account B notification test”. Ticket `01a0acd6-faf2-7009-a2ab-bb92f158e222` was
+accepted and its subsequent Expo receipt was `ok`. The founder confirmed arrival
+and tap opening Account B with none of Account A's data, in response to the
+single-notification confirmation request. No duplicate was reported and no resend
+was performed.
+
+Post-tap independent server verification: A registrations 0; B active registrations
+1; same Pixel token true; global token owners 1; Android registration active and
+not invalidated. B's authenticated registration timestamp advanced to September
+17 00:50:33.179 UTC after the tap. No message was sent back to A. Account/provider
+data was preserved; only normal authentication/registration operations occurred.
+
+Verdict: ANDROID NOTIFICATION OWNERSHIP: PASS. This does not qualify scheduled
+morning eligibility or untested refresh/sign-out races. No code/config change,
+APK, EAS build, Render deployment, TestFlight change or debug endpoint. Health
+Connect burn remains disabled. Remaining overall B4 checks stay separate.
