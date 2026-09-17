@@ -20,7 +20,7 @@ import {
   updatePlannedTreat,
 } from '@/lib/api/client';
 
-type FormStatus = 'loading' | 'idle' | 'saving' | 'deleting' | 'success' | 'error';
+type FormStatus = 'loading' | 'idle' | 'saving' | 'deleting' | 'success' | 'error' | 'load_error';
 
 function isActivePlannedTreat(
   plannedTreat: PlannedTreatGetResponse | null,
@@ -35,6 +35,7 @@ export default function PlannedTreatScreen() {
   const [requiredCalories, setRequiredCalories] = useState('');
   const [status, setStatus] = useState<FormStatus>('loading');
   const [message, setMessage] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const nameInputRef = useRef<TextInput>(null);
   const caloriesInputRef = useRef<TextInput>(null);
@@ -60,8 +61,8 @@ export default function PlannedTreatScreen() {
         setStatus('idle');
       } catch {
         if (!isMounted) return;
-        setStatus('error');
-        setMessage('Your Banking Goal could not be loaded. Try again later.');
+        setStatus('load_error');
+        setMessage('Couldn’t load your Banking Goal. Check your internet connection and try again.');
       }
     }
 
@@ -70,7 +71,7 @@ export default function PlannedTreatScreen() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [loadAttempt]);
 
   async function handleSave() {
     setMessage('');
@@ -141,6 +142,13 @@ export default function PlannedTreatScreen() {
           <View style={styles.loadingPanel}>
             <ActivityIndicator color={colors.primary} size="large" />
             <Text style={styles.help}>Loading your plan.</Text>
+          </View>
+        ) : status === 'load_error' ? (
+          <View style={styles.form}>
+            <Text accessibilityRole="alert" style={styles.error}>{message}</Text>
+            <Pressable accessibilityRole="button" onPress={() => setLoadAttempt((attempt) => attempt + 1)} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>Try again</Text>
+            </Pressable>
           </View>
         ) : (
           <View style={styles.form}>

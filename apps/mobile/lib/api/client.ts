@@ -274,8 +274,15 @@ async function apiRequest(path: string, init?: RequestInit, timeoutMs = 20000) {
 
   const controller = new AbortController();
   let timeoutTriggered = false;
+  // Aborting fetch alone cannot settle a pending Clerk token lookup. The same
+  // deadline bounds both stages, and a late token must never start a request.
+  let rejectDeadline!: (error: Error) => void;
+  const deadline = new Promise<never>((_, reject) => { rejectDeadline = reject; });
   const timeoutId = setTimeout(() => {
     timeoutTriggered = true;
+    const error = new Error('Request timed out');
+    error.name = 'AbortError';
+    rejectDeadline(error);
     controller.abort();
   }, timeoutMs);
 
@@ -286,7 +293,9 @@ async function apiRequest(path: string, init?: RequestInit, timeoutMs = 20000) {
     if (!isApiAuthenticationReady(authMode)) {
       throw new ApiAuthenticationPendingError();
     }
-    const token = authMode === 'clerk' ? await requestTokenProvider?.() ?? null : null;
+    const token = authMode === 'clerk'
+      ? await Promise.race([Promise.resolve(requestTokenProvider?.()), deadline]) ?? null
+      : null;
     if (requestAuthGeneration !== accessTokenGeneration) {
       throw new ApiAuthenticationPendingError();
     }
@@ -301,7 +310,7 @@ async function apiRequest(path: string, init?: RequestInit, timeoutMs = 20000) {
         authorizationHeaderAttached: Boolean(token),
       });
     }
-    const response = await fetch(`${apiBaseUrl}${path}`, {
+    const response = await Promise.race([fetch(`${apiBaseUrl}${path}`, {
       ...init,
       headers: {
         Accept: 'application/json',
@@ -310,7 +319,7 @@ async function apiRequest(path: string, init?: RequestInit, timeoutMs = 20000) {
         ...init?.headers,
       },
       signal: controller.signal,
-    });
+    }), deadline]);
     if (requestAuthGeneration !== accessTokenGeneration) throw new ApiAuthenticationPendingError();
     apiNetworkDiagnostics = {
       baseUrl: apiBaseUrl,

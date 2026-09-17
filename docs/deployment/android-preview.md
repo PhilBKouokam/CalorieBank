@@ -799,3 +799,63 @@ already-absent internal identity. No production failure was artificially induced
 No code/config changes, build, deploy, TestFlight change or new notification.
 Health Connect burn remains disabled. Verdict: ANDROID TOKEN-AWARE DELETION: PASS.
 This closes deletion qualification, not the remaining overall B4 physical gates.
+
+### Foreground/race qualification — September 17: in progress
+
+Pixel 9a / Android 16, existing APK unchanged. The baseline account's Fitbit
+connection reported `needs_reconnect` / `access_revoked`; the founder reconnected
+through the normal UI. Read-only server verification then showed connected with
+no error. Subsequent foreground Fitbit and Health Connect sessions completed.
+The founder performed manual-refresh/background overlap and short rapid returns
+and reported no stuck spinner, blank values, error or crash. Two observed manual
+Fitbit sessions ran serially at 17:43:08.826–17:43:23.134Z and
+17:43:25.911–17:43:39.005Z, both completed without error. This is session evidence,
+not a complete count of client logical refreshes or proof of every race.
+
+During these checks Today showed no intake despite food logged on the iPhone.
+Before opening Android Cronometer, the existing nutrition-only diagnostic queried
+September 10–17: availability available, missing permissions none, exact selected
+package `com.cronometer.android.gold`, origin observed, stable_read, 85 nutrition
+records in the window. September 17 was empty; September 12–16 had usable evidence.
+The founder then opened/refreshed today's diary in Android Cronometer and returned
+to CalorieBank, confirming Eaten matched. This repeats the observed cross-device
+export gap and empty-to-populated recovery; it is not evidence of failed reading
+of existing Health Connect records. No diary contents or calorie amounts recorded.
+
+Existing foreground coordinator and Health Connect qualification suites passed:
+36 tests across 2 files under Node 20. Physical offline recovery, sign-out around
+refresh, new account-switch race and final Step Planning checks remain pending.
+No overall foreground/race PASS yet. No code/config change, build or deployment.
+Health Connect burn remains disabled.
+
+#### Offline Banking Goal detail defect — reproduced September 17
+
+The founder confirmed established Burned/Eaten/Steps remain visible offline.
+Inside Banking Goal (after tapping the Today card), however, the spinner remained
+for more than 30 seconds with no error, and recovered only when internet returned.
+A deterministic request test reproduced the deadline gap: the existing 20-second
+AbortController deadline aborted fetch but did not settle a pending Clerk token
+lookup. The exact native Clerk internal wait was not instrumented on the phone.
+
+The shared request now races both token lookup and fetch against the existing
+deadline, preserves account-generation checks, and cannot send a late token after
+timeout. Banking Goal has a separate load-error state: “Couldn’t load your Banking
+Goal. Check your internet connection and try again.” / “Try again”. It does not
+show an editable blank plan when loading fails. No accounting, provider, native
+permission, notification, or iOS-specific configuration change. Both platforms
+receive the bounded-request/error-recovery safety fix; successful flows remain
+unchanged. Five regressions cover pending token, late token/retry, stalled fetch,
+account switch, and rendered failure/retry without a write.
+
+Replacement-APK visual/physical checks of this fix remain pending, including
+offline timeout, retry after restoring internet, narrow/enlarged-text layout and
+existing-account goal rendering. Do not treat source-level or renderer tests as
+physical qualification. No replacement build has been created for this fix.
+
+Fix validation: `release:friends-family` passed with 796 tests across 69 files,
+workspace/API/mobile TypeScript, API/mobile lint (one existing Today hook warning),
+dedicated localhost Prisma generation/validation/migrations, API/domain builds,
+and diff checks. Expo public configuration retains both package/bundle IDs;
+autolinking verification passed. Expo dependency check used its local SDK map
+because network access was disabled, reporting up to date; online verification
+was not claimed. Native compilation and updated-APK visual QA were not run.

@@ -1,0 +1,26 @@
+import React from 'react';
+import { resolve } from 'node:path';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { expect, it, vi } from 'vitest';
+const api = vi.hoisted(() => ({ load: vi.fn(), save: vi.fn() }));
+vi.mock('react-native', () => ({ ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: <T,>(x: T) => x } }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn() }) }));
+vi.mock('../../mobile/components/caloriebank/PlaceholderScreen', () => ({ PlaceholderScreen: ({ children }: { children: React.ReactNode }) => React.createElement('screen', null, children) }));
+vi.mock('../../mobile/lib/api/client', () => ({ fetchPlannedTreat: api.load, createOrReplacePlannedTreat: api.save, updatePlannedTreat: api.save, deletePlannedTreat: api.save }));
+it('shows a retryable load failure instead of a spinner or an editable empty plan, then recovers', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  api.load.mockRejectedValueOnce(new Error('offline'));
+  const Screen = (await import(resolve(__dirname, '../../mobile/app/(settings)/planned-treat.tsx'))).default;
+  let view!: ReactTestRenderer;
+  await act(async () => { view = create(React.createElement(Screen)); });
+  expect(JSON.stringify(view.toJSON())).toContain('Check your internet connection');
+  expect(view.root.findAll((node) => String(node.type) === 'ActivityIndicator')).toHaveLength(0);
+  expect(view.root.findAll((node) => String(node.type) === 'TextInput')).toHaveLength(0);
+  expect(api.save).not.toHaveBeenCalled();
+  api.load.mockResolvedValueOnce({ status: 'no_plan', plannedTreat: null, availableBankCalories: 0 });
+  await act(async () => { view.root.find((node) => String(node.type) === 'Pressable').props.onPress(); });
+  expect(view.root.findAll((node) => String(node.type) === 'TextInput')).toHaveLength(2);
+  expect(JSON.stringify(view.toJSON())).not.toContain('Check your internet connection');
+  expect(api.load).toHaveBeenCalledTimes(2);
+  await act(async () => view.unmount());
+});
