@@ -681,3 +681,18 @@ records, usable evidence on September 12, and empty on the other seven dates.
 This diagnostic does not upload records or change server selections. Persisted
 aggregate matching, physical multiple-writer isolation, and DST remain separate
 checks. Forecast use stayed disabled and full-day burn NOT QUALIFIED.
+
+### September 16 Cronometer upstream export recovery
+
+On the Pixel 9a, iPhone-created Cronometer diary entries for September 13–16 were
+visible in Cronometer but absent from Health Connect. Nutrition write permission
+was granted and the integration active. Approved September 12–present Backfill
+reported success but left native records unchanged. Opening/pull-refreshing each
+affected date in Android Cronometer made them available: the unchanged APK's
+exact `com.cronometer.android.gold` diagnostic increased from 17 to 34 to 85
+Nutrition records, with September 12–16 ultimately usable under a stable read.
+Today changed to Imported from Cronometer on normal foreground return, and the
+founder confirmed the total matches. No reinstall, reconnect, source change, code
+fix or build was needed. Historical server readback and remaining forensic checks
+are separate from this native recovery evidence; overall B4 remains incomplete.
+See android-health-connect.md for the controlled sequence and limitations.

@@ -299,3 +299,137 @@ were logged. This qualifies physical bounded native querying, not independently
 verified persisted server totals, DST behavior, or multiple populated writers.
 The diagnostic makes no upload or accounting changes. Burn remained
 NOT QUALIFIED and forecast use disabled.
+
+## Cronometer gap investigation — 2026-09-16 (open)
+
+Founder-reported physical screenshot evidence, preserved before implementation
+changes: Pixel 9a, Android 16/API 36, Cronometer selected through Health Connect.
+September 12 shows Cronometer Nutrition records with Energy. Inspected September
+13, September 14, Yesterday, and Today screens show No data. The latter relative
+labels are reported as September 15 and 16 for this investigation; capture-time
+verification remains pending. Screenshots were described by the founder in the
+task; they have not been independently inspected in this session. No diary names
+or calorie amounts are reproduced here. These observations do not establish a
+CalorieBank ingestion failure.
+
+Prior physical evidence identified exact origin `com.cronometer.android.gold`.
+The current server selection and September 12–16 native API results must be
+reverified on the connected phone. At investigation start ADB reported no device;
+no new physical query, permission test, or root-cause verdict is claimed.
+
+Initial code trace at `dafdb67`: the Android bridge requests all Nutrition records
+for the frozen eight-date interval, paginates, and normalization selects exact
+package equality. Each inspect obtains a fresh change-token baseline and rereads
+the interval; tokens are not persisted as a cursor that skips previously empty
+days. The current-day end is frozen at observation time (completed dates end at
+next local midnight). Distinct nutrition IDs retain legitimate overlaps; duplicate
+identity includes category, origin and record ID, with revision selection.
+These are code findings, not substitutes for the requested physical recovery test.
+
+[Official Cronometer Health Connect guidance](https://cronometer.com/blog/health-connect/)
+confirms nutrition export and the mobile More → Connect Apps & Devices → Health
+Connect setup path. It does not specify an Android nutrition export backfill
+window, midnight timestamp convention, or guarantees for revision/deletion export.
+Do not infer those behaviors from Apple Health or from Cronometer importing data.
+No code, permissions, diary data, or build has been changed for this investigation.
+
+### Fresh physical read — September 16
+
+The reconnected Pixel reports `America/Chicago`. Existing APK nutrition-only
+diagnostics report availability `available`, no missing required permission,
+`complete`, `stable_read`, exact selected diagnostic origin
+`com.cronometer.android.gold` observed, and 17 Nutrition records across September
+9–16. September 12 is `usable_evidence`; September 13, 14, 15 and 16 are `empty`
+(as are September 9–11). This agrees with the founder-described Health Connect
+UI. Per-origin/day Energy counts and normalized amounts are not exposed by this
+existing diagnostic screen and were not independently captured. Diagnostic
+selection is not proof of current server authority.
+
+| Date | Founder-reported HC UI | Fresh API-derived exact-origin result |
+| --- | --- | --- |
+| September 12 | Cronometer Nutrition with Energy | Usable evidence |
+| September 13 | No data | Empty |
+| September 14 | No data | Empty |
+| September 15 | Yesterday: No data | Empty |
+| September 16 | Today: No data | Empty |
+
+No query failure or missing nutrition permission was observed. The missing newer
+records are consistent with an upstream sharing gap; its cause and the later-write
+recovery case remain unqualified. Opening Cronometer and inspecting its connection
+settings began without editing any diary contents. Full-day burn remains
+NOT QUALIFIED and forecast use disabled. No application change or build was made.
+
+### Cronometer-side confirmation — September 16
+
+The founder confirms Cronometer's diary is populated on all September 13–16
+dates. On-device Cronometer 4.58.3 exposes “Stop Sync with Health Connect”,
+indicating the integration is active. Android package permission metadata reports
+`android.permission.health.WRITE_NUTRITION: granted=true`. Thus populated diary,
+active integration and granted write permission coexist with the fresh native
+query's empty selected-origin results for those dates. This locates the observed
+missing evidence upstream of CalorieBank normalization; the reason Cronometer has
+not exported it is still unresolved. The visible Backfill action has not been
+invoked, and its nutrition-export semantics are not yet established. No diary
+edits, reconnect, data deletion or new build has occurred.
+
+### Controlled Backfill attempt — September 16
+
+With explicit founder approval, opened Cronometer Backfill. Its dialog states
+that all data will sync between the selected date and now. Selected September
+12, 2026 and confirmed once. Cronometer displayed “Your data has been successfully
+synchronized”. Returned to CalorieBank normally, then repeated nutrition-only
+discovery and exact `com.cronometer.android.gold` inspection. Result remained
+`complete`, `stable_read`, 17 Nutrition records in September 9–16; September 12
+usable, September 13–16 empty. This Backfill attempt did not make the missing
+nutrition available. The success message is not evidence of nutrition export,
+and does not establish that Backfill generally exports historical nutrition.
+No reconnect, diary edit, record deletion or permission expansion was performed.
+Physical empty-to-populated recovery remains unproven.
+
+### Empty-to-populated physical recovery — September 16
+
+The founder clarified that September 13–16 food entries were created on an
+iPhone and visible in the Pixel's Cronometer diary. After the founder opened
+September 16 in the Android Cronometer diary and pulled to refresh (without
+editing or re-adding food), the same existing APK's fresh exact-origin diagnostic
+returned 34 Nutrition records rather than 17. September 16 changed from `empty`
+to `usable_evidence`; September 12 remained usable; September 13–15 remained
+empty. Read consistency was `stable_read`, origin observed, burn NOT QUALIFIED.
+
+Returning from Cronometer triggered the normal CalorieBank foreground path.
+After read-only diagnostics, normal Today displayed “Imported from Cronometer”
+instead of the earlier missing-intake state. No reinstall, reconnect, source
+change or manual CalorieBank refresh was used. This physically proves discovery
+of evidence after an empty result and consumer read-path recovery. Independent
+server aggregate/revision inspection and founder total comparison remain pending.
+The observed cross-device export gap recovered after viewing/refreshing today's
+Android diary; this is an empirical result, not a claim of Cronometer's general
+export policy or proof that viewing alone versus pull-to-refresh was sufficient.
+Historical September 13–15 recovery still needs the corresponding controlled
+Android diary workflow and a subsequent exact-origin query.
+
+The founder subsequently confirmed Today Eaten matches Cronometer, allowing
+rounding, and completed the same Android diary open/pull-refresh workflow for
+September 13–15. The following ADB check returned no devices found, so historical
+post-refresh recovery is not yet independently verified. Do not record those
+three dates as recovered until the Pixel is reconnected and queried.
+
+### Historical recovery verified — September 16
+
+After reconnection, the existing APK returned `complete`, `stable_read`, origin
+`observed`, and 85 Nutrition records for September 9–16. Exact Cronometer
+normalization showed usable evidence on September 12, 13, 14, 15 and 16. Thus the
+three historical dates changed from empty to usable after the founder opened and
+pull-refreshed each corresponding Android Cronometer diary date. No diary edits,
+reinstall, account reconnect, source change, application fix or new build occurred.
+Today Eaten had already been confirmed by the founder to match Cronometer.
+
+Observed boundary: iPhone-created entries visible in Android Cronometer had not
+been exported to Health Connect. Active integration and Nutrition write permission
+were insufficient; Backfill reported success without exporting those dates.
+Visiting/pull-refreshing individual Android diary dates recovered export in this
+installation. This does not establish a universal Cronometer export guarantee.
+The existing reader preserved legitimate records and discovered previously empty
+dates. Exact per-date counts/amounts, independent persistence/revision inspection,
+and historical consumer readback comparison remain unverified. Health Connect
+burn remained NOT QUALIFIED.
