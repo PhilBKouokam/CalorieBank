@@ -758,3 +758,44 @@ Verdict: ANDROID NOTIFICATION OWNERSHIP: PASS. This does not qualify scheduled
 morning eligibility or untested refresh/sign-out races. No code/config change,
 APK, EAS build, Render deployment, TestFlight change or debug endpoint. Health
 Connect burn remains disabled. Remaining overall B4 checks stay separate.
+
+### Token-aware Android account deletion — September 17: PASS
+
+Used the previously authorized disposable CalorieBank/Clerk identity (safe account
+reference `4d61d0722c76`), not the non-disposable account used as B in the preceding
+ownership test. The underlying Google/Gmail identity was untouched. Before
+deletion: Clerk and internal identity existed, Morning Bank Update was On in UI
+and server, one active Android registration, one global owner of the Pixel token,
+Fitbit connected, Health Connect intake selected, no direct provider connection,
+and zero scheduled delivery records. Raw credentials/tokens were never output.
+
+Deletion ran exclusively through Settings → Delete Account → typed DELETE →
+Delete Account. Scrolling and keyboard-open confirmation worked. The app returned
+to Sign In and remained there after force-stop/relaunch, without stale Today or
+History. Server read-only verification found Clerk 404, internal account count 0,
+and zero rows for every Prisma model with this userId, including notification
+registration/preference/delivery, provider credentials/connections/attempts, source
+selection, aggregates, Opening Bank provenance and ledger. The Pixel token had
+zero owners immediately after deletion. No manual database or Clerk deletion was
+used. Successful completion passed the existing provider-revocation stage; an
+independent provider-console revocation check was not performed. FatSecret was
+not connected in this disposable account, so physical FatSecret cleanup was not
+exercised. Scheduled delivery rows were already zero, so nonempty delivery cascade
+was not physically exercised. Health Connect OS permission remains device-managed.
+
+The authorized beta account (safe reference `221471ba80d3`, labeled C for reclaim)
+then signed in normally. Morning Bank Update showed On. Server verification:
+same Pixel token true, C active registrations 1, token owners 1, preference enabled,
+deleted account 0, deleted registrations 0. Registration timestamp was
+2026-09-17T17:21:35.420Z. No notification send was needed and no reclaim conflict
+was observed. C's account and provider data were preserved.
+
+Existing deletion sequence inspected: persist intent → disable push registration
+→ provider revocation → Clerk deletion → idempotent internal cascade. Deterministic
+`account-deletion-recovery.test.ts` and `pb2-account-safety.test.ts` were run under
+Node 20: 12 tests passed across 2 files. Coverage includes transient revocation
+retry, identity already absent, cascade retry, failed-revocation ordering and
+already-absent internal identity. No production failure was artificially induced.
+No code/config changes, build, deploy, TestFlight change or new notification.
+Health Connect burn remains disabled. Verdict: ANDROID TOKEN-AWARE DELETION: PASS.
+This closes deletion qualification, not the remaining overall B4 physical gates.
