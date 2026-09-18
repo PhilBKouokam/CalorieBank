@@ -491,3 +491,21 @@ Official capability references checked for the existing named choices:
 Only Cronometer has physical populated-export evidence in this qualification.
 Other named choices have official capability/verified package mapping and exact-origin
 regressions; they are not claimed physically qualified on the Pixel.
+
+### September 18 replacement physical regression
+
+Replacement `7de86e07-019b-45b3-8e21-33edd6e94e23` installed on Pixel 9a/API 36.
+Fresh onboarding selected exact `com.cronometer.android.gold` explicitly through
+the consumer chooser, with existing Nutrition permission. Server selection and
+ready intake dates Sep 12–17 were verified for the fresh disposable account;
+canonical preparation initialized six eligible days. Current-day intake was absent,
+so this run does not claim a populated current-day comparison or permission-denial
+recovery. Previously qualified permission/export behavior was not changed.
+
+Read-only existing-account regression confirms September 16 aggregate 3,149 and
+immutable Opening Bank snapshot 2,716 after replacement startup. No historical
+rewrite, cross-writer substitution or ingestion change was performed. Physical
+canonical cards correctly displayed Fitbit and Cronometer via Health Connect.
+Health Connect burn remained absent from both onboarding and Settings choices.
+Full journey evidence and scoped PASS are in
+[Android preview qualification](../deployment/android-preview.md#september-18--physical-product-coherence-pass).

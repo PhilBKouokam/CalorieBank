@@ -945,3 +945,57 @@ Burn → Food, remaining setup, post-setup canonical cards, historical-authority
 basic smoke checks remain pending. No application code/configuration, production
 account data, Render deployment, iOS/TestFlight, or accounting behavior was changed.
 Do not resume final race/accessibility QA or distribution under this task.
+
+### September 18 — physical product coherence PASS
+
+The pending journey above completed on the same replacement APK and physical
+Pixel. Fresh disposable account safe reference `403e4b2085c7` was created at
+2026-09-18T17:01:00.328Z, with onboarding completion persisted at
+17:12:10.505Z. Existing accounts were preserved; no account was deleted.
+
+| Physical check | Observed result |
+| --- | --- |
+| Production sign-up / return | Founder completed private password and email verification; app returned to fresh welcome, then Step 1 |
+| Fitbit callback | Returned to Step 1, Fitbit Connected and ready; explicit Continue opened Step 2, never Health Connections |
+| Food chooser | Cronometer, MyFitnessPal, Lose It!, MacroFactor, Another app using Health Connect; separate direct FatSecret section; scroll and Back accessible |
+| Cronometer selection | Exact observed package selected; remained on Step 2 with Connected and ready and full-width Continue; existing OS read permission sufficient |
+| Back navigation | Food → Burn retained Fitbit; Fitness Goal → Food retained Cronometer; forward navigation remained in setup |
+| Fitness Goal | Step 3, default Maintain saved with zero adjustment for this disposable account |
+| Daily Bank Target | Step 4, default 0 saved as planning-only target |
+| Preparation | Step 5 observed; Cronometer Checked and Fitbit checking, then Your bank is ready |
+| Canonical initialization | Server INITIALIZED at 17:10:37.499Z; window Sep 11–17; six eligible dates; accounting starts Sep 18; timezone America/Chicago |
+| Today / history | Today opened; Fitbit current burn populated; History showed imported completed dates |
+| Current Cronometer intake | Settled No intake today, not a stuck loader; populated current-day export was unavailable in this run, so no claim of a populated-current-day comparison |
+| Post-setup canonical cards | Fitbit Connected for Burn; Cronometer via Health Connect Connected for Eaten; no contradictory Not connected authority card |
+| Exact server authority | expenditure google_health_fitbit; intake health_connect; package com.cronometer.android.gold; both roles explicitly selected |
+| Banking Goal | Detail loaded its unsaved form normally; no goal created/edited |
+| Step Planning | Both founder-locked cards rendered with compact inputs, source translation, green primary results/time, dark bold remaining steps and session hierarchy; no formula/input changes |
+| Notification setting | Enable reported ENABLED, Settings showed On; server preference true and one active Android registration; no notification sent |
+| Health Connect burn | No option in fresh Burn step or normal Settings burn-source flow; Add source reported all supported burn sources connected |
+
+September 16 regression was checked read-only for the **existing forensic account**
+`48395ab5a97c` after replacement startup: exact-package aggregate remains 3,149,
+OpeningBankCalculationDay remains 2,716 with its original September 17 creation
+stamp. It was not reopened or rewritten. Do not conflate that immutable snapshot
+with a fresh account's later Opening Bank initialization using newer evidence.
+
+No physical product defect was found. One transient Android UI-inspection command
+failed; inspection recovered on retry while the app remained functional. It was
+not an app crash, and no implementation change was made. This qualification changed
+only documentation. The prior implementation release gate remains 813 passing tests;
+no code changed and no test suite was rerun solely for evidence text. Documentation
+validation: git diff --check.
+
+Build count for the coherence fix remains **one**; additional builds during physical
+requalification **zero**. Render was used only for scoped read-only evidence, with
+no deployment/data edit. iOS, TestFlight, accounting, notifications, source authority
+and Health Connect burn restrictions remain unchanged. Pixel was left on Today in
+the fresh account.
+
+**ANDROID B4 PRODUCT COHERENCE: PASS — READY FOR FINAL RACE/ACCESSIBILITY QA**
+
+Stop here. Remaining separately authorized work includes final foreground/race
+qualification (including the earlier bounded offline Banking Goal recovery fix),
+accessibility/enlarged-text/TalkBack qualification, and any outstanding physical
+multi-writer/older-device coverage. This is not overall B4 distribution approval.
+No Google Play distribution or post-Android work was started.

@@ -560,3 +560,21 @@ See [forensics](../engineering/android-health-connect.md#september-16-intake-dis
 and [replacement qualification](../deployment/android-preview.md#september-17--android-product-coherence-qualification).
 Automated release gate: 813 tests pass. Replacement native build and Pixel UI
 requalification remain pending before final B4 race/accessibility work resumes.
+
+### September 18 — product coherence physically requalified
+
+The single replacement APK completed native cloud compilation and was installed
+on Pixel 9a, Android 16/API 36. A genuinely fresh disposable account physically
+completed Fitbit → Cronometer → Fitness Goal → Daily Bank Target → Preparation →
+Today with coherent Back navigation and no Health Connections callback detour.
+Post-setup canonical cards, server exact-package selection, historical preparation,
+notification setting/registration, Today/History/Banking Goal and locked Step Planning
+smoke checks passed. Existing September 16 immutable Opening Bank evidence remained
+unchanged. Current-day Cronometer intake was absent during this pass; no populated
+current-day claim is made. No implementation changes or additional APK were needed.
+
+**ANDROID B4 PRODUCT COHERENCE: PASS — READY FOR FINAL RACE/ACCESSIBILITY QA**
+
+See [physical evidence](../deployment/android-preview.md#september-18--physical-product-coherence-pass).
+Final race/accessibility work requires separate founder authorization. This is not
+Google Play or overall B4 distribution sign-off. Health Connect burn stays disabled.
