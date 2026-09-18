@@ -906,3 +906,13 @@ Replacement build, install and physical requalification: pending. This replaceme
 also includes the previously committed bounded offline Banking Goal load/retry fix.
 No Render deployment, iOS build, TestFlight change or Play submission is required.
 Health Connect burn remains disabled.
+
+Replacement submission: exactly one internal Android preview APK request,
+[7de86e07-019b-45b3-8e21-33edd6e94e23](https://expo.dev/accounts/philbk/projects/caloriebank/builds/7de86e07-019b-45b3-8e21-33edd6e94e23),
+source `5231b3de11aea6df230688963782a5e09d1f99b0`, pushed to
+`codex/private-beta-release`. At 2026-09-18T00:39Z EAS reports IN_PROGRESS; native
+compile success and installation are not yet claimed. ADB currently reports no
+physical device connected. Pixel reconnection and an unused disposable account
+for the fresh setup pass have been requested. The existing forensic account is
+preserved. The actual Fitness Goal form also passed a 320px rendered check;
+physical/native accessibility remains pending. No additional APK was requested.
