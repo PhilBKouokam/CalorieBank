@@ -999,3 +999,54 @@ qualification (including the earlier bounded offline Banking Goal recovery fix),
 accessibility/enlarged-text/TalkBack qualification, and any outstanding physical
 multi-writer/older-device coverage. This is not overall B4 distribution approval.
 No Google Play distribution or post-Android work was started.
+
+### September 18 — final foreground/race and offline physical qualification
+
+Existing APK `7de86e07-019b-45b3-8e21-33edd6e94e23` on the same Pixel 9a,
+Android 16/API 36. No implementation/configuration changes or replacement build.
+Account A safe reference `403e4b2085c7`; Account B `48395ab5a97c`.
+Both accounts and provider connections were preserved.
+
+| Check | Physical/server evidence (UTC, September 18) |
+| --- | --- |
+| Normal foreground, twice | Automatic Fitbit sessions 21:53:50.666–55.629 and 21:54:15.267–20.028, each completed without error; corresponding native intake passes completed; Today remained visible and settled |
+| Manual + foreground overlap | Manual Fitbit 21:54:38.096–43.260, then queued foreground 21:54:45.421–50.604; sequential, not overlapping; spinner cleared |
+| Three rapid app returns | Two bounded Fitbit sessions 21:55:09.608–14.934 and 21:55:15.718–20.515; completed without error, no unbounded burst/stuck UI |
+| Offline | Founder disabled phone internet. One manual refresh settled with “CalorieBank couldn’t update. Try again.” Founder confirmed Burned/Steps unchanged; no false disconnect observed. Eaten remained the existing No intake today state; populated-intake offline preservation is not claimed |
+| Online recovery | Founder restored internet; foreground Fitbit 22:04:59.523–22:05:05.080 completed, native intake followed; Updated just now appeared and offline error cleared without reconnect/reinstall |
+| Sign-out around refresh | Normal Settings sign-out returned to Sign In during the run begun 22:07:05.497; server run completed 22:07:11.055. No subsequent Account A native ingestion occurred; A registration count was zero at 22:07:49.977 |
+| Account B return | Founder authenticated B and confirmed B stayed correct throughout, with no A values. B Fitbit 22:09:51.517–56.751 and native intake completed without errors; no stale offline error/spinner |
+| Notification ownership | A active Android registrations 0; B 1; B token global active-owner count 1; last registration 22:09:51.514. No test notification sent |
+| Source authority | Both independently persisted account selections remained Fitbit burn + exact Health Connect Cronometer package `com.cronometer.android.gold`; no source changes |
+
+Evidence limits: server sessions count ingestion operations, not every HTTP request.
+The production client does not expose a live rejection counter; no fabricated
+stale-generation log is claimed. The physical run covers sign-out during work and
+normal B authentication; it did not hold an A response artificially until after B
+login. Existing deterministic regressions cover that adversarial ordering and
+queued-work cancellation. Re-ran foreground-refresh and today-read-model-refresh:
+**8 tests passed in 2 files**. Initial invocation from the repository root found no
+tests; rerun from apps/api passed. Prior full implementation gate remains 813 tests;
+it was not rerun for documentation-only physical qualification.
+
+A grouped UI hash initially included neighboring fields and incorrectly suggested
+populated intake; individual-field inspection corrected this before qualification.
+Founder confirmation is the preservation evidence for Burned/Steps. No calorie
+amounts, diary payloads, credentials or raw push tokens were recorded. A proposed
+full-screen capture was rejected by automatic review; filtered UI checks were used.
+An immediate transition-time sign-out tap did not activate the control; repeating
+with the freshly observed normal button succeeded. Neither was an application defect.
+
+Step Planning: both locked cards, two compact inputs, Fitbit translation, remaining
+steps, walking time and session treatment were observed without changing inputs.
+Founder confirmed both cards look normal and coherent, including the unchanged
+green results/dark bold remaining-step hierarchy. No new code defect found.
+
+No deployment, EAS build, iOS/TestFlight change, accounting or source-authority
+change. Health Connect burn remains disabled. Accessibility and distribution were
+not started; they require separate authorization.
+
+**ANDROID FOREGROUND RACE/OFFLINE RECOVERY: PASS**
+
+Documentation validation: `git diff --check` passed. Stop after recording this
+evidence; final accessibility and distribution remain separately gated.
