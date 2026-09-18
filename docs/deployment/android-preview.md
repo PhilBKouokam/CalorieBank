@@ -916,3 +916,32 @@ physical device connected. Pixel reconnection and an unused disposable account
 for the fresh setup pass have been requested. The existing forensic account is
 preserved. The actual Fitness Goal form also passed a 320px rendered check;
 physical/native accessibility remains pending. No additional APK was requested.
+
+### September 18 — replacement physical requalification (in progress)
+
+The existing replacement build `7de86e07-019b-45b3-8e21-33edd6e94e23` completed
+successfully at 2026-09-18T00:45:39.574Z from implementation commit
+`5231b3de11aea6df230688963782a5e09d1f99b0`. This is the same single submission;
+no additional build was created. APK SHA-256:
+`6013956e349e4d02d56b70dada40e8f6b9d523d0b345ac56b46aa10fe1e9517d`.
+
+Installed successfully with data preserved on the physically connected Google
+Pixel 9a, Android 16/API 36. Startup restored the existing session and Today loaded
+with Fitbit burn. Today reported no current Cronometer intake; this alone does
+not establish an ingestion defect or qualify populated current-day intake.
+Before sign-out, canonical Health Connections physically showed Fitbit Connected
+and Cronometer via Health Connect Connected, with Fitbit selected in inventory.
+Normal UI sign-out completed.
+
+Physical Sign In: both requested copy lines are present, Sign in is a clear green
+primary button, Create account is clear, and neither text nor actions clip/overflow
+at the phone's current setting. This is default physical layout evidence, not the
+separately deferred enlarged-font/TalkBack accessibility qualification.
+
+The founder designated a new unused disposable email for fresh onboarding. The
+production Clerk Create account screen requires a password; email was entered and
+password creation/email verification handed to the founder privately. Fresh-account
+Burn → Food, remaining setup, post-setup canonical cards, historical-authority and
+basic smoke checks remain pending. No application code/configuration, production
+account data, Render deployment, iOS/TestFlight, or accounting behavior was changed.
+Do not resume final race/accessibility QA or distribution under this task.
