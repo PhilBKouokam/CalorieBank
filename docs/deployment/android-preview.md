@@ -859,3 +859,50 @@ and diff checks. Expo public configuration retains both package/bundle IDs;
 autolinking verification passed. Expo dependency check used its local SDK map
 because network access was disabled, reporting up to date; online verification
 was not claimed. Native compilation and updated-APK visual QA were not run.
+
+## September 17 — Android product coherence qualification
+
+Implementation changes are mobile-only:
+
+- Android sign-in uses “Your calorie bank is waiting.” and the requested supporting
+  copy. iOS text and Clerk flow remain unchanged.
+- A live Android onboarding provider callback no longer navigates into Health
+  Connections while the explicit selection operation is running. WebBrowser still
+  validates the original callback. Cold returns reaching Connections check canonical
+  setup completion and return incomplete accounts to setup without selecting a role.
+- Android source steps keep an explicit full-width Continue action. Food choices
+  are recognizable exact-origin trackers with permission/discovery behind the choice;
+  direct FatSecret remains independent. Advanced Settings functionality is retained.
+- A connected inventory with no selected role now says “No source selected” on
+  Android, rather than “Not connected.” It never infers authority from connectivity.
+  Current physical server responses already show selected Fitbit and Cronometer
+  correctly; the earlier screenshot's exact timing cannot be reconstructed.
+- Narrow/enlarged-text Android direct-provider rows wrap the action instead of
+  squeezing the provider name. iOS layout is unchanged.
+
+September 16 intake was traced through a normal Android Cronometer date export:
+Health Connect UI and persisted exact-origin aggregate changed from 2,716 to 3,149,
+matching the founder's iPhone total. History is an immutable Opening Bank snapshot
+at 2,716 and correctly remains unchanged. See the
+[physical forensic table](../engineering/android-health-connect.md#september-16-intake-discrepancy--september-17-physical-trace).
+No intake/accounting fix or production data edit was needed.
+
+Validation: release gate passed 813 tests in 72 files using only the dedicated
+localhost test database; Prisma generation/validation/migrations, workspace/API/mobile
+TypeScript, API/mobile lint, API/domain builds and diff checks passed. One pre-existing
+Today hook dependency lint warning remains. Expo config resolves both package IDs
+as `com.caloriebank.mobile`; online Expo dependency validation, autolinking and Android
+prebuild passed. No local JDK currently exists; native compile must be verified by
+the one replacement EAS preview build, not claimed from prebuild.
+
+Rendered QA used actual component trees with React Native Web and mocked service
+state, not a physical-device claim: 320px/1.5× sign-in and food choices, 390px selected
+food/Continue, 412px burn step, 320px/1.5× Daily Bank Target, 390px/1.5× canonical
+Connections. The narrow direct-provider wrapping issue found here was corrected and
+re-inspected. Native font/keyboard behavior and Fitness Goal require the replacement
+Pixel pass. Full B4 race/accessibility sign-off remains paused.
+
+Replacement build, install and physical requalification: pending. This replacement
+also includes the previously committed bounded offline Banking Goal load/retry fix.
+No Render deployment, iOS build, TestFlight change or Play submission is required.
+Health Connect burn remains disabled.

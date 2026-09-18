@@ -2,7 +2,7 @@ import { connectionsForNativeCapability } from '@/lib/native-health/presentation
 import { preferDirectFoodSources } from '@/lib/providers/intake-writer-policy';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FoodTrackerHelp } from '@/components/caloriebank/FoodTrackerHelp';
-import { ActivityIndicator, AppState, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,7 +15,7 @@ import { composeAppleHealthConnections } from '@/lib/healthkit/health-connection
 import { appleHealthIntakeRefreshMessage } from '@/lib/healthkit/connection-feedback';
 import { refreshFatSecretWithFeedback } from '@/lib/healthkit/fatsecret-feedback';
 import { createSourceOperationGate } from '@/lib/healthkit/source-operation';
-import { ApiHttpError, disconnectFatSecret, disconnectFitbit, fetchHealthConnections, fetchProviderSelection, saveProviderSelection, selectHealthConnectionRole, startFatSecretAuthorization, startFitbitAuthorization, syncFatSecret, syncFitbit } from '@/lib/api/client';
+import { ApiHttpError, disconnectFatSecret, disconnectFitbit, fetchHealthConnections, fetchOnboardingStatus, fetchProviderSelection, saveProviderSelection, selectHealthConnectionRole, startFatSecretAuthorization, startFitbitAuthorization, syncFatSecret, syncFitbit } from '@/lib/api/client';
 import { retryIncompleteOpeningAfterSourceChange } from '@/lib/lifecycle/account-lifecycle';
 import type { HealthConnectionOption, HealthConnectionsResponse } from '@caloriebank/schemas';
 
@@ -45,7 +45,8 @@ function roleError(option?: HealthConnectionOption) {
 
 export default function IntegrationsScreen() {
   const router = useRouter();
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnTo, fitbit, fatsecret } = useLocalSearchParams<{ returnTo?: string; fitbit?: string; fatsecret?: string }>();
+  const androidProviderReturn = Platform.OS === 'android' && (typeof fitbit === 'string' || typeof fatsecret === 'string');
   const [connections, setConnections] = useState<HealthConnectionsResponse | null>(null);
   const [helpBundleId, setHelpBundleId] = useState<string | null>(null);
   const [appleState, setAppleState] = useState<AppleState>('loading');
@@ -80,6 +81,11 @@ export default function IntegrationsScreen() {
   const load = useCallback(async (showLoading = false) => {
     const generation = ++loadGeneration.current;
     if (showLoading) setLoading(true);
+    if (androidProviderReturn) {
+      const setup = await fetchOnboardingStatus();
+      if (generation !== loadGeneration.current) return;
+      if (!setup.completed) { router.replace('/onboarding'); return; }
+    }
     const [healthConnections, localStatus, diagnostics, selection, nativeAccess] = await Promise.all([
       fetchHealthConnections(), getNativeHealthConnectionStatus().catch(() => 'not_connected' as const), getNativeHealthDiagnostics().catch(() => null),
       fetchProviderSelection(), nativeIntake.supported ? nativeIntake.access() : null,
@@ -91,7 +97,7 @@ export default function IntegrationsScreen() {
     setAppleState(deriveAppleHealthPresentationState(localStatus, diagnostics));
     setAppleBurnState(deriveAppleHealthBurnState(localStatus, diagnostics));
     setLoading(false);
-  }, []);
+  }, [androidProviderReturn, router]);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -481,12 +487,13 @@ function InventorySection({ addLabel, appleBurnState, items, onAdd, onManage, on
 
 function RoleCard({ role, data, onPress }: { role: Role; data: HealthConnectionsResponse[Role] | null; onPress: () => void }) {
   const selected = data?.selected;
-  const action = selected ? 'Manage sources' : 'Connect source';
+  const unselected = Platform.OS === 'android' && !selected && data?.alternatives.some((option) => option.status === 'connected');
+  const action = selected ? 'Manage sources' : unselected ? 'Choose source' : 'Connect source';
   return <View style={styles.roleCard}>
     <Text style={styles.roleLabel}>{role === 'burned' ? 'Calories Burned' : 'Calories Eaten'}</Text>
-    <Text style={styles.roleValue}>{selected?.label ?? 'Not connected'}</Text>
+    <Text style={styles.roleValue}>{selected?.label ?? (unselected ? 'No source selected' : 'Not connected')}</Text>
     {selected?.transportLabel ? <Text style={styles.transport}>via {selected.transportLabel}</Text> : null}
-    <Text style={[styles.status, selected?.status === 'needs_attention' && styles.attention]}>{selected ? statusCopy(selected.status) : 'Not connected'}</Text>
+    <Text style={[styles.status, selected?.status === 'needs_attention' && styles.attention]}>{selected ? statusCopy(selected.status) : unselected ? 'Choose a connected source to use here.' : 'Not connected'}</Text>
     <Pressable accessibilityLabel={`${action} for calories ${role}`} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}><Text style={styles.actionText}>{action}</Text></Pressable>
   </View>;
 }

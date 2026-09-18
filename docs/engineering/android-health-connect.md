@@ -433,3 +433,61 @@ The existing reader preserved legitimate records and discovered previously empty
 dates. Exact per-date counts/amounts, independent persistence/revision inspection,
 and historical consumer readback comparison remain unverified. Health Connect
 burn remained NOT QUALIFIED.
+
+## September 16 intake discrepancy — September 17 physical trace
+
+Pixel 9a, Android 16/API 36, America/Chicago. The founder confirmed the iPhone
+Cronometer consumed total was **3,149 kcal**, replacing the initial approximate
+3,100 report. The gap from History was **433 kcal**, not 384. Inspection was scoped
+to the authorized recreated disposable account (safe reference `48395ab5a97c`).
+No food names, meal descriptions, tokens or private nutrient details were recorded.
+
+| Layer | Before Android Cronometer date refresh | After normal Android date refresh/export |
+| --- | --- | --- |
+| Cronometer iPhone, founder-confirmed | 3,149 kcal | No diary edit requested |
+| Health Connect system Nutrition UI | Energy labels sum 2,716 Cal; 17 distinct visible entry texts | Energy labels sum 3,149 Cal; 21 distinct visible entry texts |
+| CalorieBank selected-origin normalized/uploaded evidence | Persisted exact-origin aggregate 2,716 kcal | Persisted exact-origin aggregate 3,149 kcal |
+| Provider aggregate | ready; imported 22:13:04.208Z; provider update 00:00:28.706Z | ready; imported 22:28:31.149Z; observed 22:28:31.121Z; provider update 22:28:09.335Z |
+| History / Opening Bank snapshot | 2,716 kcal, created 18:22:27.346Z | 2,716 kcal, unchanged |
+| FinalizedDailyBankRecord | None for this date | None for this date |
+
+All timestamps are September 17, 2026 UTC. Exact selected Android package remains
+`com.cronometer.android.gold`; Fitbit remains the selected expenditure provider.
+The UI counts use in-memory text fingerprints to avoid scroll overlap. They are
+**not native record-ID counts** or a raw API duplicate/missing-Energy audit. The
+post-export scan was bounded to 14 pages. The server aggregate independently
+confirms that the existing exact-origin reader normalized and uploaded 3,149.
+No new per-record diagnostic instrumentation was needed to establish this boundary.
+
+**Root cause:** incomplete Cronometer-to-Health-Connect export of iPhone-created
+diary evidence. Visiting/refreshing the affected Android diary date exported the
+additional 433 kcal. The existing APK then imported it without reinstalling,
+changing source, editing diary contents, or modifying ingestion code. This matches
+the earlier cross-device export qualification; it is not a promise that Cronometer
+always backfills automatically.
+
+**Historical policy:** this is immutable Opening Bank provenance, not a provisional
+completed-day ledger record. The initial 2,716 evidence was snapshotted before the
+additional export. Under ADR 020, the later provider aggregate must not reopen or
+rewrite Opening Bank. Read-only post-export inspection confirmed it stayed 2,716.
+No accounting, reconciliation, normalization, date-boundary, overlap or duplicate
+policy was changed. Health Connect burn remains disabled.
+
+## Android onboarding tracker choices — September 17
+
+The consumer chooser uses the existing exact-package allowlist and only selects
+an actually observed source. Names are not selection keys. Permissions/discovery
+happen after choosing a tracker; a missing selected tracker offers check-again/help
+without selecting another populated writer. Settings retains advanced controls.
+The choices are conditional on real exported Nutrition evidence, not installation.
+
+Official capability references checked for the existing named choices:
+
+- [Cronometer Health Connect](https://cronometer.com/blog/health-connect/).
+- [MyFitnessPal Health Connect FAQ](https://support.myfitnesspal.com/hc/en-us/articles/10553948248973-Health-Connect-FAQ-and-Troubleshooting): food export and synchronization limitations.
+- [Lose It! Health Connect](https://loseit.zendesk.com/hc/en-us/articles/47650100219028-Using-Health-Connect-With-Lose-It): Nutrition write access.
+- [MacroFactor Health Connect migration/troubleshooting](https://help.macrofactorapp.com/en/articles/227-google-fit-to-health-connect): Nutrition export, write permissions and diary refresh.
+
+Only Cronometer has physical populated-export evidence in this qualification.
+Other named choices have official capability/verified package mapping and exact-origin
+regressions; they are not claimed physically qualified on the Pixel.

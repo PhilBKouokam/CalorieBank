@@ -543,3 +543,20 @@ already-absent internal identity. No production failure was artificially induced
 No code/config changes, build, deploy, TestFlight change or new notification.
 Health Connect burn remains disabled. Verdict: ANDROID TOKEN-AWARE DELETION: PASS.
 This closes deletion qualification, not the remaining overall B4 physical gates.
+
+### September 17 product coherence and historical intake qualification
+
+Android onboarding now keeps provider returns within the canonical Burn → Food →
+Fitness Goal → Daily Bank Target → Preparation journey. Recognizable food choices
+use exact observed Health Connect packages, with full-width Continue and separate
+FatSecret direct connection. Canonical selection remains independent of connection
+inventory. iOS behavior and Health Connect burn restrictions remain unchanged.
+
+The September 16 discrepancy was an upstream Cronometer export gap: normal Android
+diary refresh exposed 3,149 kcal instead of 2,716, and the existing ingestion path
+persisted the complete amount. The History row is immutable Opening Bank provenance
+and retains its original 2,716. No new retroactive accounting policy was introduced.
+See [forensics](../engineering/android-health-connect.md#september-16-intake-discrepancy--september-17-physical-trace)
+and [replacement qualification](../deployment/android-preview.md#september-17--android-product-coherence-qualification).
+Automated release gate: 813 tests pass. Replacement native build and Pixel UI
+requalification remain pending before final B4 race/accessibility work resumes.

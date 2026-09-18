@@ -6,7 +6,7 @@ import type { BankSummaryResponse, HealthConnectionOption, HealthConnectionsResp
 import { deriveOnboardingStatus } from '../src/modules/onboarding/onboarding.repository';
 
 const h = vi.hoisted(() => ({
-  os: 'ios', providers: null as ProviderSelectionResponse | null, goal: false, empty: false, fail: false, writers: true,
+  params: {} as Record<string, string>, os: 'ios', providers: null as ProviderSelectionResponse | null, goal: false, empty: false, fail: false, writers: true,
   pause: null as Promise<void> | null, healthUnavailable: false,
   targetChosen: false, nativeRefresh: vi.fn(async () => 'ready'),
   router: { push: vi.fn(), replace: vi.fn() }, saves: [] as ProviderSelectionInput[],
@@ -24,9 +24,10 @@ function connections(): HealthConnectionsResponse {
   const burn = option(data().expenditure.authoritativeProvider, data().expenditure.displayName, data().expenditure.authoritativeProvider === 'apple_health');
   const apple = data().intake.writerBundleIdentifier ? option('apple_health', data().intake.writerDisplayName!, true) : null;
   const fat = option('fatsecret', 'FatSecret');
-  const eaten = data().intake.authoritativeProvider === 'fatsecret' ? fat : apple;
+  const native = data().intake.nativeIntakeSource ? { ...option('health_connect', data().intake.displayName), transportLabel: 'Health Connect', deviceManaged: true } : null;
+  const eaten = data().intake.authoritativeProvider === 'fatsecret' ? fat : data().intake.authoritativeProvider === 'health_connect' ? native : apple;
   return {
-    burned: { selected: data().expenditure.selected ? burn : null, alternatives: [], canChange: false, canAddSource: true },
+    burned: { selected: data().expenditure.selected ? burn : null, alternatives: data().expenditure.selected ? [] : [option('google_health_fitbit', 'Fitbit')], canChange: !data().expenditure.selected, canAddSource: true },
     eaten: { selected: data().intake.selected ? eaten : null, alternatives: [apple, fat].filter((p): p is HealthConnectionOption => p !== null && p.optionId !== eaten?.optionId), canChange: true, canAddSource: true },
     connectedServices: [option('service-apple', 'Apple Health', true), fat, option('service-fitbit', 'Fitbit')],
   };
@@ -48,7 +49,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
-vi.mock('expo-router', () => ({ useRouter: () => h.router, useLocalSearchParams: () => ({ returnTo: 'onboarding' }), useFocusEffect: (callback: () => void | (() => void)) => React.useEffect(callback, []) }));
+vi.mock('expo-router', () => ({ useRouter: () => h.router, useLocalSearchParams: () => ({ returnTo: 'onboarding', ...h.params }), useFocusEffect: (callback: () => void | (() => void)) => React.useEffect(callback, []) }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: async (url: string) => { connect(url); return { type: 'success', url: 'caloriebank://integrations?fitbit=connected' }; } }));
 vi.mock('../../mobile/lib/api/client', () => ({
   fetchDailyBankTarget: async () => ({ calories: 0, chosen: h.targetChosen }),
@@ -81,7 +82,16 @@ vi.mock('@/lib/native-health', async (importOriginal) => {
   const ios = await importOriginal<typeof import('../../mobile/lib/native-health/index.ios')>();
   const android = await import('../../mobile/lib/native-health/index.android');
   return {
-    get nativeIntake() { return h.os === 'android' ? { ...android.nativeIntake, refresh: h.nativeRefresh, access: async () => ({ state: 'permissions_missing', granted: [], missing: ['nutrition'] }) } : ios.nativeIntake; },
+    get nativeIntake() { return h.os === 'android' ? { ...android.nativeIntake, refresh: h.nativeRefresh,
+      discover: async () => ({ access: { state: 'available', granted: ['nutrition'], missing: [] }, sources: [
+        { source: { namespace: 'android_package', id: 'com.cronometer.android.gold' }, displayName: 'Cronometer' },
+        { source: { namespace: 'android_package', id: 'com.sbs.diet' }, displayName: 'MacroFactor' },
+      ] }),
+      select: async (source: { namespace: 'android_package'; id: string }) => {
+        if (!data().connectedProviders.some((p) => p.provider === 'health_connect')) data().connectedProviders.push({ ...data().connectedProviders[0]!, provider: 'health_connect', displayName: 'Health Connect', status: 'connected' });
+        data().intake = { ...data().intake, selected: true, authoritativeProvider: 'health_connect', displayName: source.id === 'com.sbs.diet' ? 'MacroFactor' : 'Cronometer', status: 'ready', nativeIntakeSource: source, selectionRevision: '2026-09-17T12:00:00.000Z' };
+        return 'ready';
+      }, access: async () => ({ state: 'permissions_missing', granted: [], missing: ['nutrition'] }) } : ios.nativeIntake; },
     get nativeHealthCapability() { return h.os === 'android' ? android.nativeHealthCapability : ios.nativeHealthCapability; },
     connectNativeHealth: (...args: Parameters<typeof ios.connectNativeHealth>) => (h.os === 'android' ? android : ios).connectNativeHealth(...args),
     getNativeHealthConnectionStatus: (...args: Parameters<typeof ios.getNativeHealthConnectionStatus>) => (h.os === 'android' ? android : ios).getNativeHealthConnectionStatus(...args),
@@ -129,8 +139,8 @@ async function mountSettings() {
 }
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: false });
-  h.nativeRefresh.mockClear();
-  h.os = 'ios'; h.goal = false; h.targetChosen = false; h.empty = false; h.fail = false; h.writers = true; h.saves = []; h.pause = null; h.healthUnavailable = false;
+  h.nativeRefresh.mockClear(); h.router.push.mockClear(); h.router.replace.mockClear();
+  h.params = {}; h.os = 'ios'; h.goal = false; h.targetChosen = false; h.empty = false; h.fail = false; h.writers = true; h.saves = []; h.pause = null; h.healthUnavailable = false;
   h.providers = {
     expenditure: { selected: false, authoritativeProvider: 'apple_health', displayName: 'Apple Health', status: 'unavailable', fallbackActive: false },
     activityContext: { authoritativeProvider: 'apple_health', displayName: 'Apple Health', status: 'unavailable', fallbackActive: false },
@@ -228,22 +238,66 @@ describe('actual onboarding component journeys', () => {
 
 
 describe('Android qualified direct-provider journeys', () => {
+  it('returns a cold provider callback to canonical incomplete setup without selecting a role', async () => {
+    h.os = 'android'; h.params = { fitbit: 'connected' }; connect('google_health_fitbit');
+    const before = structuredClone(data()); await mountSettings();
+    expect(h.router.replace).toHaveBeenCalledWith('/onboarding'); expect(data()).toEqual(before);
+  });
+  it('navigates backward through both source steps without changing authority', async () => {
+    h.os = 'android'; await mount(); await press('Connect Fitbit'); await press('Continue');
+    await press('Back'); expect(text(screen!.root)).toContain('Step  1');
+    await press('Continue'); await press('Choose Cronometer'); await press('Continue');
+    const before = structuredClone(data()); await press('Back'); expect(text(screen!.root)).toContain('Step  2');
+    expect(data()).toEqual(before); expect(h.router.push).not.toHaveBeenCalled();
+  });
+  it('distinguishes a connected inventory from an unselected canonical burn role', async () => {
+    h.os = 'android'; connect('google_health_fitbit'); await mountSettings();
+    expect(text(screen!.root)).toContain('No source selected');
+    expect(text(screen!.root)).toContain('Choose a connected source to use here.');
+    expect(data().expenditure.selected).toBe(false);
+  });
+  it('renders canonical Fitbit and exact Cronometer authority independently of nutrition permission', async () => {
+    h.os = 'android'; await mount(); await press('Connect Fitbit'); await press('Continue'); await press('Choose Cronometer');
+    const before = structuredClone(data());
+    await act(async () => screen!.unmount()); await mountSettings();
+    expect(text(screen!.root)).toContain('Fitbit');
+    expect(text(screen!.root)).toContain('Cronometer');
+    expect(text(screen!.root)).toContain('via  Health Connect');
+    expect(text(screen!.root)).toContain('Needs attention');
+    expect(text(screen!.root)).not.toContain('No source selected');
+    expect(data()).toEqual(before);
+  });
+
+  it.each(['Cronometer', 'MacroFactor'])('runs Fitbit → %s through explicit source Continue buttons', async (name) => {
+    h.os = 'android'; await mount(); await press('Connect Fitbit');
+    expect(text(screen!.root)).toContain('Step  1');
+    expect(data().intake.selected).toBe(false);
+    await press('Continue'); expect(text(screen!.root)).toContain('Step  2');
+    await press(`Choose ${name}`);
+    expect(text(screen!.root)).toContain('Step  2');
+    expect(text(screen!.root)).toContain(name);
+    await press('Continue'); expect(text(screen!.root)).toContain('Choose your goal');
+    await press('Save goal'); await press('Continue');
+    expect(text(screen!.root)).toContain('Preparing your bank');
+    expect(h.router.push).not.toHaveBeenCalled();
+  });
+
   it('connects Fitbit and direct FatSecret while native health remains food-only', async () => {
     h.os = 'android';
     await mount();
     expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch|Health Connect/);
-    await press('Connect Fitbit');
+    await press('Connect Fitbit'); await press('Continue');
     expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch/);
-    expect(text(screen!.root)).toContain('Health Connect food tracker');
-    await press('Connect FatSecret');
+    expect(text(screen!.root)).toContain('Another app using Health Connect');
+    await press('Connect FatSecret'); await press('Continue');
     expect(data().expenditure.authoritativeProvider).toBe('google_health_fitbit');
     expect(data().intake.authoritativeProvider).toBe('fatsecret');
     await press('Save goal'); await press('Continue');
     expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch/);
   });
   it('resumes Fitbit plus exact Health Connect intake through goal and preparation', async () => {
-    h.os = 'android'; await mount(); await press('Connect Fitbit');
-    await press('Connect Health Connect food tracker'); expect(h.router.push).toHaveBeenCalledWith('/native-food');
+    h.os = 'android'; await mount(); await press('Connect Fitbit'); await press('Continue');
+    expect(text(screen!.root)).toContain('Cronometer'); expect(h.router.push).not.toHaveBeenCalledWith('/native-food');
     const burn = structuredClone(data().expenditure);
     data().connectedProviders.push({ ...data().connectedProviders[0]!, provider: 'health_connect', displayName: 'Health Connect', status: 'connected' });
     data().intake = { ...data().intake, selected: true, authoritativeProvider: 'health_connect', displayName: 'MacroFactor', status: 'ready', nativeIntakeSource: { namespace: 'android_package', id: 'com.sbs.diet' }, selectionRevision: '2026-09-11T12:00:00.000Z' };
@@ -257,7 +311,7 @@ describe('Android qualified direct-provider journeys', () => {
   });
   it('keeps empty direct diary recovery independent of native health', async () => {
     h.os = 'android'; h.empty = true;
-    await mount(); await press('Connect Fitbit'); await press('Connect FatSecret');
+    await mount(); await press('Connect Fitbit'); await press('Continue'); await press('Connect FatSecret');
     expect(text(screen!.root)).toContain('FatSecret');
     expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch/);
   });

@@ -89,8 +89,8 @@ export default function SignInScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.eyebrow}>CALORIEBANK</Text>
-        <Text style={styles.title}>Your calorie bank, private to you</Text>
-        <Text style={styles.detail}>Sign in to access your bank and connected health services.</Text>
+        <Text style={styles.title}>{Platform.OS === 'android' ? 'Your calorie bank is waiting.' : 'Your calorie bank, private to you'}</Text>
+        <Text style={styles.detail}>{Platform.OS === 'android' ? 'Sign in to see your bank and keep planning your day.' : 'Sign in to access your bank and connected health services.'}</Text>
         {message ? <Text style={styles.error}>{message}</Text> : null}
         <Pressable accessibilityRole="button" accessibilityLabel="Sign in" accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => void authenticate('sign-in')} style={styles.primary}>
           {busy ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>Sign in</Text>}

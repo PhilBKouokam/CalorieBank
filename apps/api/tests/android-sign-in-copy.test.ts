@@ -1,0 +1,22 @@
+import React from 'react';
+import { resolve } from 'node:path';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { expect, it, vi } from 'vitest';
+const state = vi.hoisted(() => ({ os: 'android' }));
+vi.mock('react-native', () => ({ Platform: { get OS() { return state.os; } }, ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', StyleSheet: { create: <T,>(x: T) => x } }));
+vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
+vi.mock('@clerk/expo', () => ({ useAuth: () => ({ isLoaded: true, isSignedIn: false }) }));
+vi.mock('@clerk/expo/hosted-auth', () => ({ useHostedAuth: () => ({ startHostedAuth: vi.fn() }) }));
+vi.mock('expo-constants', () => ({ default: { expoConfig: {} } }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn() }), Redirect: () => null }));
+it.each(['android', 'ios'])('preserves platform-specific sign-in copy on %s', async (os) => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); state.os = os;
+  const Screen = (await import(resolve(__dirname, '../../mobile/app/(auth)/sign-in.tsx'))).default;
+  let view!: ReactTestRenderer; await act(async () => { view = create(React.createElement(Screen)); });
+  const json = JSON.stringify(view.toJSON());
+  expect(json).toContain(os === 'android' ? 'Your calorie bank is waiting.' : 'Your calorie bank, private to you');
+  expect(json).toContain(os === 'android' ? 'Sign in to see your bank and keep planning your day.' : 'Sign in to access your bank and connected health services.');
+  expect(view.root.findByProps({ accessibilityLabel: 'Sign in' })).toBeDefined();
+  expect(view.root.findByProps({ accessibilityLabel: 'Create account' })).toBeDefined();
+  await act(async () => view.unmount());
+});

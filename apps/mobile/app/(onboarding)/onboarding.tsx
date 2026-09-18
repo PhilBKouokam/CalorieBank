@@ -1,3 +1,5 @@
+import { AndroidFoodChoices } from '@/components/caloriebank/AndroidFoodChoices';
+import { beginOnboardingProviderReturn } from '@/lib/auth/native-intent';
 import { nativeSourceRecoveryStage } from '@/lib/native-health/presentation';
 import { preferDirectFoodSources } from '@/lib/providers/intake-writer-policy';
 import type { OnboardingStage, OnboardingStatusResponse, ProviderSelectionInput, ProviderSelectionResponse } from '@caloriebank/schemas';
@@ -68,7 +70,7 @@ import { runFirstRunBootstrap } from '@/lib/onboarding/first-run-bootstrap';
 import { enableMorningBankUpdate } from '@/lib/notifications/morning-bank-update';
 
 type AppleIntakeAction = `apple-intake:${KnownFoodTracker | 'other' | string}`;
-type BusyAction = 'loading' | 'fitbit' | 'fatsecret' | 'apple-burn' | AppleIntakeAction | 'preparing' | 'complete' | null;
+type BusyAction = 'loading' | 'native-intake' | 'fitbit' | 'fatsecret' | 'apple-burn' | AppleIntakeAction | 'preparing' | 'complete' | null;
 type SourceRole = 'expenditure' | 'intake';
 type SetupStage = OnboardingStage | 'daily_bank_target';
 type ActionOutcome = {
@@ -163,6 +165,8 @@ export default function OnboardingScreen() {
   async function run(action: Exclude<BusyAction, 'loading' | null>, work: () => Promise<ActionOutcome>) {
     if (!actionGate.current.begin(action)) return;
     const generation = viewGeneration.current;
+    const finishProviderReturn = action === 'fitbit' || action === 'fatsecret'
+      ? beginOnboardingProviderReturn(action) : () => undefined;
     setMessageStage(displayStage ?? latestStatus.current?.stage ?? null);
     setBusy(action);
     setMessage(null);
@@ -236,6 +240,7 @@ export default function OnboardingScreen() {
             : recoveryMessage,
       );
     } finally {
+      finishProviderReturn();
       actionGate.current.end(action);
       if (generation === viewGeneration.current) setBusy(null);
     }
@@ -287,6 +292,7 @@ export default function OnboardingScreen() {
           message: 'Fitbit is connected. Calorie-burn data is not ready yet, but you can continue setup.',
         };
       }
+      if (nativeIntake.supported) return { stayOnStage: 'calories_burned' };
     });
   }
 
@@ -305,6 +311,7 @@ export default function OnboardingScreen() {
           message: feedback.message,
         };
       }
+      if (nativeIntake.supported) return { stayOnStage: 'calories_eaten' };
     });
   }
 
@@ -440,7 +447,21 @@ export default function OnboardingScreen() {
       });
       return;
     }
-    if (selected.provider === 'health_connect' && nativeIntake.supported) { router.push('/native-food'); return; }
+    if (selected.provider === 'health_connect' && nativeIntake.supported) {
+      await run('native-intake', async () => {
+        const result = await nativeIntake.refresh();
+        return {
+          stayOnStage: 'calories_eaten',
+          tone: 'attention',
+          message: result === 'ready' ? undefined : result === 'empty'
+            ? `No ${selected.displayName} calories were found in Health Connect yet. Make sure your tracker is sharing nutrition, then check again.`
+            : result === 'access_required'
+              ? 'CalorieBank needs permission to read nutrition from Health Connect. Choose your food tracker again to allow access.'
+              : 'We couldn’t refresh Health Connect. Try again.',
+        };
+      });
+      return;
+    }
     await run(selected.provider === 'fatsecret' ? 'fatsecret' : 'fitbit', async () => {
       if (selected.provider === 'fatsecret') {
         await syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
@@ -533,7 +554,7 @@ export default function OnboardingScreen() {
   const fitbitConnected = providerIsConnected(providerState, 'google_health_fitbit');
   const fatSecretConnected = providerIsConnected(providerState, 'fatsecret');
   const expenditureActionActive = busy === 'apple-burn' || busy === 'fitbit';
-  const intakeActionActive = busy === 'fatsecret' || busy?.startsWith('apple-intake:') === true;
+  const intakeActionActive = busy === 'native-intake' || busy === 'fatsecret' || busy?.startsWith('apple-intake:') === true;
   const expenditureState = onboardingSourceState({
     source: status.expenditure,
     operation: expenditureActionActive
@@ -578,6 +599,7 @@ export default function OnboardingScreen() {
             <PrimaryButton busy={busy !== null} label="Use connected Fitbit" onPress={() => void run('fitbit', async () => {
               await selectProvider({ authoritativeExpenditureProvider: 'google_health_fitbit', authoritativeActivityProvider: 'google_health_fitbit' });
               await syncFitbit(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
+              if (nativeIntake.supported) return { stayOnStage: 'calories_burned' };
             })} />
           ) : null}
           <BackButton onPress={() => showStage(previousSetupStage(activeStage))} />
@@ -586,7 +608,7 @@ export default function OnboardingScreen() {
       case 'calories_eaten':
         return <>
           <Text style={styles.title}>Where do you track your food?</Text>
-          <Text style={styles.detail}>{nativeRecoveryStage === 'calories_eaten' ? 'Your saved source cannot refresh on this phone. Choose FatSecret to continue.' : 'Choose one source for your daily calorie total.'}</Text>
+          <Text style={styles.detail}>{nativeRecoveryStage === 'calories_eaten' ? 'Your saved source cannot refresh on this phone. Choose a food source to continue.' : 'Choose one source for your daily calorie total.'}</Text>
           {status.intake.connected && nativeRecoveryStage !== 'calories_eaten' && editingRole !== 'intake' ? <ConnectedSource
             busy={intakeActionActive}
             canContinue={sourceSelectionSatisfiesOnboarding(status.intake)}
@@ -617,13 +639,14 @@ export default function OnboardingScreen() {
               />
             ))}
           </> : null}
-          {nativeIntake.supported ? <ProviderOption title="Health Connect food tracker" detail="Choose the app that shares your calories eaten." busy={false} disabled={busy !== null} onPress={() => router.push('/native-food')} /> : null}
+          {nativeIntake.supported ? <AndroidFoodChoices onBusyChange={(active) => setBusy((current) => active ? 'native-intake' : current === 'native-intake' ? null : current)} onSelected={async () => { await refresh(); showStage('calories_eaten'); }} /> : null}
           <Text style={styles.sectionLabel}>Direct connection</Text>
           <ProviderOption title="FatSecret" detail="Connect your existing FatSecret food diary directly." busy={busy === 'fatsecret'} disabled={busy !== null} connected={fatSecretConnected} onPress={() => void connectFatSecret()} />
           {fatSecretConnected && status.intake.provider !== 'fatsecret' ? (
             <PrimaryButton busy={busy !== null} label="Use connected FatSecret" onPress={() => void run('fatsecret', async () => {
               await selectProvider({ authoritativeIntakeProvider: 'fatsecret' });
               await syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
+              if (nativeIntake.supported) return { stayOnStage: 'calories_eaten' };
             })} />
           ) : null}
           <BackButton onPress={() => showStage(previousSetupStage(activeStage))} />
@@ -721,7 +744,7 @@ function PrimaryButton({ label, busy, onPress }: { label: string; busy: boolean;
 }
 
 function ProviderOption({ title, detail, busy, disabled, connected = false, onPress }: { title: string; detail: string; busy: boolean; disabled: boolean; connected?: boolean; onPress: () => void }) {
-  return <View style={[styles.providerCard, connected && styles.connectedCard]}><View style={styles.providerCopy}><Text style={styles.providerTitle}>{title}</Text><Text style={styles.note}>{connected ? 'Connected' : detail}</Text></View><Pressable accessibilityLabel={connected ? `${title} connected` : `Connect ${title}`} accessibilityRole="button" disabled={disabled || connected} onPress={onPress} style={({ pressed }) => [styles.connectButton, connected && styles.connectedButton, pressed && styles.pressed, disabled && !busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.surface} /> : <Text style={[styles.connectButtonText, connected && styles.connectedButtonText]}>{connected ? 'Connected' : 'Connect'}</Text>}</Pressable></View>;
+  return <View style={[styles.providerCard, Platform.OS === 'android' && styles.androidProviderCard, connected && styles.connectedCard]}><View style={[styles.providerCopy, Platform.OS === 'android' && styles.androidProviderCopy]}><Text style={styles.providerTitle}>{title}</Text><Text style={styles.note}>{connected ? 'Connected' : detail}</Text></View><Pressable accessibilityLabel={connected ? `${title} connected` : `Connect ${title}`} accessibilityRole="button" disabled={disabled || connected} onPress={onPress} style={({ pressed }) => [styles.connectButton, connected && styles.connectedButton, pressed && styles.pressed, disabled && !busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.surface} /> : <Text style={[styles.connectButtonText, connected && styles.connectedButtonText]}>{connected ? 'Connected' : 'Connect'}</Text>}</Pressable></View>;
 }
 
 function ConnectedSource({
@@ -797,6 +820,8 @@ const styles = StyleSheet.create({
   detail: { color: colors.textMuted, fontSize: typography.body, lineHeight: 24 },
   note: { color: colors.textMuted, flexShrink: 1, fontSize: typography.caption, lineHeight: 19 },
   providerCard: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, flexDirection: 'row', gap: spacing.md, minHeight: 88, padding: spacing.md },
+  androidProviderCard: { flexWrap: 'wrap' },
+  androidProviderCopy: { minWidth: 160 },
   connectedCard: { borderColor: colors.primary },
   providerCopy: { flex: 1, gap: spacing.xs }, providerTitle: { color: colors.text, fontSize: typography.subheading, fontWeight: '800' },
   connectButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radii.sm, justifyContent: 'center', minHeight: 48, minWidth: 92, paddingHorizontal: spacing.md },
