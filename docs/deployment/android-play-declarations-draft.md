@@ -75,23 +75,15 @@ history permission, HC steps/exercise/distance/active/total energy/BMR. Fitbit r
 the qualified burn path. Do not justify diagnostic-only reads in a consumer declaration.
 See [health permissions guidance](https://support.google.com/googleplay/android-developer/answer/12991134?hl=en).
 
-## Hosting proposal — no publication or DNS changes
+## Published legal resources — September 19, 2026
 
-Proposed durable URLs (not claimed live):
+- Privacy Policy: https://caloriebank.philbk.dev/privacy
+- Account Deletion: https://caloriebank.philbk.dev/delete-account
 
-- `https://caloriebank.philbk.dev/privacy`
-- `https://caloriebank.philbk.dev/delete-account`
-
-Use an isolated static subdomain on the founder's existing hosting/DNS provider,
-with HTTPS and no app/account dependencies. Keep the portfolio and its routing
-unchanged. The founder has identified philbk.dev as a candidate; DNS/hosting control
-and legal-entity linkage have not been verified in this task. If subdomain hosting
-is impractical, use clearly scoped `/caloriebank/privacy` and
-`/caloriebank/delete-account` paths only after inspecting the existing site.
-Do not replace the portfolio, create a new Firebase project or deploy the API for
-static legal pages. Founder approval of content/operator/request handling precedes
-any publication. Organization website verification is separate from publishing a
-privacy page and must accurately represent the legal organization.
+Founder approved final publication. Isolated static Vercel project `caloriebank-legal`
+preserves the portfolio and app services. Support mailbox send/receive was verified.
+See [deployment evidence](legal-pages.md). Publication is not submission of any Google
+form or approval of unresolved form-specific legal classifications.
 
 ## Founder-review cross-check — September 18, 2026
 
@@ -106,10 +98,11 @@ persisted email/auth subject. No CalorieBank password database or DOB field foun
 No factual conflict with Nutrition-only Play declarations: internal diagnostic builds
 have broader read scope and are explicitly distinguished in the cross-platform policy.
 Health Connect burn remains disabled. September 19 resolves no-sale/current-advertising and current non-child-directed wording.
-Explicit age ranges, processor classifications, retention review, contact activation
-and external deletion operations remain founder/legal decisions.
+Explicit age ranges and processor classifications remain founder/legal decisions.
+Support contact is verified and founder approved the external deletion procedure;
+retention wording preserves documented backup/log/provider uncertainty.
 Google's non-medical health-app description disclaimer is a separate release review
-item, not added Terms language in the privacy policy. Nothing submitted or published.
+item, not added Terms language in the privacy policy. No declarations submitted.
 
 ## September 19 publication-candidate alignment — NOT SUBMITTED
 
@@ -124,8 +117,8 @@ item, not added Terms language in the privacy policy. Nothing submitted or publi
   requires founder approval before actual age-range selection.
 - Health Apps remains Nutrition and Weight Management + Activity and Fitness;
   READ_NUTRITION only in Play, Fitbit direct burn/activity/steps; HC burn disabled.
-- Public contact approved but not operationally verified. Clean candidates are proposed
-  text, not live resources. [Publication holds](../legal/publication-readiness.md).
+- Public contact verified; founder authorized the published legal resources above.
+  [Publication evidence and operations](../legal/publication-readiness.md).
 - [Retention findings](../legal/retention-resolution.md) distinguish live account
   cascades from backup/log/provider/installation-ID retention. Do not mark all data
   ephemeral or promise deletion of every provider copy on CalorieBank deletion.

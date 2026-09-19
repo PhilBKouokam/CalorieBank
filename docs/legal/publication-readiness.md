@@ -1,8 +1,8 @@
 # Privacy publication candidate — approval and operations holds
 
-September 19,2026. Candidates are ready for final founder review, **not publication**.
-Clean text is proposed future published copy; it is not proof that the support channel
-is live. [Privacy](privacy-policy-draft.md), [deletion](account-deletion-draft.md),
+September 19, 2026. Founder approved final publication; support send/receive verified.
+Earlier review holds below are historical; see final publication authorization and
+[deployment evidence](../deployment/legal-pages.md) for current status. [Privacy](privacy-policy-draft.md), [deletion](account-deletion-draft.md),
 [retention findings](retention-resolution.md), [evidence](privacy-policy-evidence.md).
 
 ## Resolved founder decisions
@@ -55,11 +55,11 @@ and successful inbox delivery are the evidence obtained. Monitoring cadence, bac
 coverage, MFA/recovery review and correspondence retention remain operational follow-up
 items. Founder should monitor this mailbox for support, privacy and deletion requests.
 
-The legal pages remain unpublished. Future web hosting must preserve valid MX/TXT
+The legal pages were subsequently authorized for publication. Web hosting must preserve valid MX/TXT
 coexistence at `caloriebank.philbk.dev`; do not replace that hostname with a conflicting
 CNAME. This task did not deploy a website or modify application services.
 
-## External deletion-request process — proposed for approval/rehearsal
+## External deletion-request process — founder approved September 19, 2026
 
 - Requester emails support, preferably from account email. Do not require app
   reinstallation. Collect only account email and explicit request to delete.
@@ -80,8 +80,9 @@ CNAME. This task did not deploy a website or modify application services.
 - After verification, use an authorized restricted administrative invocation of the
   **existing AccountSafetyService.deleteAccount** with the verified internal identity.
   No public endpoint, direct SQL purge or Clerk-first delete. A reviewed one-time
-  admin runbook and disposable-account rehearsal are required before offering this
-  support route. This audit does not create or execute an admin deletion tool.
+  admin runbook must preserve this sequence. No second deletion implementation or
+  manual database-row deletion is authorized. This publication task does not execute
+  a deletion or claim a new support-runbook rehearsal.
 - Confirm live deletion and notification/provider cleanup via minimal safe evidence;
   retry through existing ordered/resumable service if needed. Communicate completion
   only to the verified channel. Keep minimal request/result records under an approved
@@ -99,8 +100,17 @@ CNAME. This task did not deploy a website or modify application services.
 4. Approve actual Play target-age ranges and separately required health-app description
    disclaimer. No declarations submitted. Set actual last-updated date at publication.
 
-Proposed public URLs remain `https://caloriebank.philbk.dev/privacy` and
-`https://caloriebank.philbk.dev/delete-account`. Candidate links point there but are
-not tested/live resources. Mail setup was separately authorized and completed as recorded
-above. No legal-page publication, website deployment, Play account, D-U-N-S entry,
-Google legal acceptance, declaration submission or AAB was performed.
+Approved public URLs are `https://caloriebank.philbk.dev/privacy` and
+`https://caloriebank.philbk.dev/delete-account`. Links point to the
+now published resources (see deployment evidence). Mail setup was separately authorized
+and completed as recorded above. No Play account, D-U-N-S entry, Google legal acceptance,
+declaration submission or AAB was performed.
+
+## Final publication authorization — September 19, 2026
+
+Founder authorized publication of exactly `/privacy` and `/delete-account` using the
+approved text and verified support mailbox. The historical holds above record earlier
+review work; content and external request procedure are now approved for publication.
+Remaining vendor-retention uncertainty is disclosed without an invented deadline.
+Deployment and public verification are tracked in
+[legal pages deployment](../deployment/legal-pages.md). Play submissions remain forbidden.

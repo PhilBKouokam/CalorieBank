@@ -26,13 +26,13 @@ practices; deletion does not recall notifications already accepted for delivery.
 
 ## If you cannot access the app
 
-Request deletion at:
+Request deletion from CalorieBank Support at:
 
 support@caloriebank.philbk.dev
 
 If possible, write from the email associated with your CalorieBank account. We need
 to verify that the request is yours before deleting the account. Do not send your
-password, sign-in verification codes or food diary. You do not need to reinstall
+password, sign-in verification codes, food diary or unnecessary health information. You do not need to reinstall
 the app to request deletion.
 
 See the [CalorieBank Privacy Policy](https://caloriebank.philbk.dev/privacy).
