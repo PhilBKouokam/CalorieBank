@@ -92,3 +92,20 @@ Do not replace the portfolio, create a new Firebase project or deploy the API fo
 static legal pages. Founder approval of content/operator/request handling precedes
 any publication. Organization website verification is separate from publishing a
 privacy page and must accurately represent the legal organization.
+
+## Founder-review cross-check — September 18, 2026
+
+Founder identifies **Near Future I-X** as publishing organization and reports D-U-N-S
+issuance pending. No enrollment continued. See the [claim/evidence audit](../legal/privacy-policy-evidence.md)
+and linked clean/annotated drafts. The audit additionally identifies persisted
+timezone, onboarding state, Banking Goal name/target and derived bank/forecast records;
+include them with product/health information rather than implying only imported data
+is retained. Clerk verification/session processing is separate from CalorieBank's
+persisted email/auth subject. No CalorieBank password database or DOB field found.
+
+No factual conflict with Nutrition-only Play declarations: internal diagnostic builds
+have broader read scope and are explicitly distinguished in the cross-platform policy.
+Health Connect burn remains disabled. No-sale, age/audience, processor classifications,
+retention, public contact and external deletion handling remain founder/legal decisions.
+Google's non-medical health-app description disclaimer is a separate release review
+item, not added Terms language in the privacy policy. Nothing submitted or published.
