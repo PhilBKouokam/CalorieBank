@@ -9,50 +9,55 @@ is live. [Privacy](privacy-policy-draft.md), [deletion](account-deletion-draft.m
 
 Near Future I-X is publisher. D-U-N-S issued/available to founder; never request,
 enter or retain number in chat/repo. Approved public contact spelling:
-`support@caloriebank.philbk.dev`; not yet operationally verified.
+`support@caloriebank.philbk.dev`; inbound and outbound delivery verified September 19, 2026.
 Approved no-sale commitment is limited to **personal health information**. Advertising
 wording is **current-state**, not permanent. Approved current V1 audience is not
 child-directed; no numeric minimum-age or permanent 18+ product identity adopted.
 Approved policy-change wording is incorporated exactly.
 
-## Mail infrastructure and setup proposal — nothing created
+## Support mailbox — delivery verified September 19, 2026
 
-Read-only authoritative DNS on September 19:
-`philbk.dev` NS = ns1.vercel-dns.com/ns2.vercel-dns.com.
-Both apex and `caloriebank.philbk.dev` MX responses: NOERROR, zero answers.
-No established mail provider is evidenced. Lack of MX alone is not proof no mailbox
-could exist elsewhere, but the approved address is **not verified receiving mail**.
-Vercel DNS supports MX/TXT; that does not provide an inbox by itself.
-[Official DNS documentation](https://vercel.com/docs/domains/working-with-dns).
+Provider: Zoho Mail Lite (5 GB), one mailbox, founder-approved price of US$12/year
+plus applicable taxes. Founder completed account ownership and purchase. The mailbox
+is `support@caloriebank.philbk.dev`, with outgoing display name **CalorieBank Support**
+saved successfully in Zoho's Send Mail As settings. Founder has authenticated webmail
+access at [Zoho Mail](https://mail.zoho.com/). No catch-all was configured.
 
-Recommended setup after founder selects provider/approves any cost:
+Only additive mail records were configured in the existing Vercel DNS zone:
 
-1. Use an existing organization-controlled mail provider if it supports a custom
-   subdomain; otherwise choose a hosted mailbox provider offering inbound and
-   authenticated outbound mail. A forwarding-only address is insufficient without
-   a tested send-as route. No paid plan/provider selected in this task.
-2. Add `caloriebank.philbk.dev` as mail domain in that provider. Create support
-   mailbox/alias with founder access, recovery and MFA. Do not forward health/support
-   messages into an unapproved shared/personal distribution list.
-3. Obtain exact provider verification TXT, MX priorities/targets, SPF and DKIM values.
-   In existing Vercel zone, MX name is `caloriebank`; SPF TXT same name; DKIM name is
-   provider selector + `._domainkey.caloriebank`; DMARC is `_dmarc.caloriebank`.
-   Do not invent MX values or publish duplicate SPF records. Review DMARC policy
-   with the provider and verify alignment before enforcement.
-4. Preserve portfolio/apex records and existing Clerk/service DNS. If proposed web
-   hosting puts a CNAME at the exact mail-domain name, resolve the CNAME/MX coexistence
-   conflict with supported A/AAAA or alternative hosting configuration before changes.
-   Mail and web can share a hostname only with valid DNS record composition.
-5. Test external sender → support inbox → founder reply from the support address →
-   external receipt. Check spam placement, Reply-To, SPF/DKIM/DMARC alignment and
-   both desktop/mobile access. Use neutral test text, no account or health details.
-6. Name monitoring owner/backup, notifications and support-mail retention/access.
-   Record test date/results without private headers or credentials. Only then mark live.
+| Relative name under philbk.dev | Type | Value / purpose |
+| --- | --- | --- |
+| caloriebank | TXT | Zoho domain-ownership verification |
+| caloriebank | MX | mx.zoho.com, priority 10 |
+| caloriebank | MX | mx2.zoho.com, priority 20 |
+| caloriebank | MX | mx3.zoho.com, priority 50 |
+| caloriebank | TXT | `v=spf1 include:zohomail.com ~all` |
+| zmail._domainkey.caloriebank | TXT | Zoho-generated public DKIM key |
+| _dmarc.caloriebank | TXT | `v=DMARC1; p=none` |
 
-No simpler currently operational branded address is evidenced. `support@philbk.dev`
-is shorter but also has no evidenced MX and changes the approved identity; not an
-automatic substitute. Keep the approved CalorieBank-specific address unless founder
-chooses otherwise.
+TTL: 60 seconds. No pre-existing SPF or root/subdomain DMARC record was found.
+DMARC is monitoring-only; it does not enforce quarantine/rejection or request aggregate
+reports. Zoho verified all three MX records, SPF and DKIM. Authoritative DNS also
+confirmed DMARC. Optional ZeptoMail/transactional-email records were not configured.
+Existing website, apex and Clerk DNS records were not modified.
+
+| Delivery check | Evidence / result |
+| --- | --- |
+| External inbound | PASS — founder sent neutral test from Gmail; arrived in Zoho Inbox at 12:00 PM America/Chicago. |
+| Reply outbound | PASS — reply sent through Zoho at 12:01 PM; founder confirmed receipt. |
+| Sender identity | Configured as `CalorieBank Support <support@caloriebank.philbk.dev>`; Zoho confirmed saved setting. Gmail conversation list abbreviates the name to CalorieBank; full received header was not independently inspected. |
+| Spam placement | PASS for this test — founder screenshot shows reply in Gmail Primary inbox. No general deliverability guarantee. |
+
+**Public support contact: VERIFIED for send/receive.** Raw message headers, private
+credentials and the founder's external test address are not retained in this document.
+SPF/DKIM/DMARC receipt-header alignment was not independently inspected; DNS verification
+and successful inbox delivery are the evidence obtained. Monitoring cadence, backup
+coverage, MFA/recovery review and correspondence retention remain operational follow-up
+items. Founder should monitor this mailbox for support, privacy and deletion requests.
+
+The legal pages remain unpublished. Future web hosting must preserve valid MX/TXT
+coexistence at `caloriebank.philbk.dev`; do not replace that hostname with a conflicting
+CNAME. This task did not deploy a website or modify application services.
 
 ## External deletion-request process — proposed for approval/rehearsal
 
@@ -84,7 +89,7 @@ chooses otherwise.
 
 ## Publication holds (outside clean text)
 
-1. Inbox creation/cost/provider choice and end-to-end receiving/reply test.
+1. Mailbox delivery hold resolved: Zoho send/receive verified above. Publication still requires founder approval and the remaining holds below.
 2. Monitoring, secure deletion verification/execution runbook rehearsal and support
    correspondence retention approved. Candidate wording assumes this future operation.
 3. Approve concise retention wording with known limits; resolve operational exports,
@@ -96,5 +101,6 @@ chooses otherwise.
 
 Proposed public URLs remain `https://caloriebank.philbk.dev/privacy` and
 `https://caloriebank.philbk.dev/delete-account`. Candidate links point there but are
-not tested/live resources. No DNS/mail creation, deploy, Play account, D-U-N-S entry,
-terms acceptance or AAB authorized/performed.
+not tested/live resources. Mail setup was separately authorized and completed as recorded
+above. No legal-page publication, website deployment, Play account, D-U-N-S entry,
+Google legal acceptance, declaration submission or AAB was performed.
