@@ -2,8 +2,10 @@
 
 Audit: September 18, 2026 against preparation commit fb0cdb1 and current source.
 Documentation-only audit; no production data queried and no new physical tests run.
-Founder supplies publishing organization **Near Future I-X** and reports D-U-N-S
-issuance pending. Exact legal styling/jurisdiction still requires review.
+Founder supplies publishing organization **Near Future I-X**. September 19 update:
+D-U-N-S issued/available to founder; no number requested or stored.
+See [retention resolution](retention-resolution.md) and [publication holds](publication-readiness.md)
+for current status, superseding September 18 unresolved entries below.
 
 ## Review package
 
@@ -13,8 +15,8 @@ issuance pending. Exact legal styling/jurisdiction still requires review.
 - [Annotated deletion page](account-deletion-review.md)
 - [Play declarations worksheet](../deployment/android-play-declarations-draft.md)
 
-“Clean” means no inline audit commentary; unresolved publication fields intentionally
-remain. Neither draft is publishable until those fields and decisions are resolved.
+“Clean” means no inline audit commentary or unresolved placeholders. Publication
+holds are recorded separately in publication-readiness.md; candidates are not live.
 Review copies reproduce the clean text with added blockquote annotations.
 
 ## Material claim matrix
@@ -24,7 +26,7 @@ anchors, not a claim that every deployed setting was inspected live.
 
 | ID / claim in policy or deletion page | Evidence | Boundary / decision |
 | --- | --- | --- |
-| P1 Operator is Near Future I-X | Founder instruction in this task | Confirm legal spelling/jurisdiction; D-U-N-S pending, not verified |
+| P1 Operator is Near Future I-X | Founder instruction in this task | Confirm legal spelling/jurisdiction; D-U-N-S issued per founder, not entered or stored |
 | P2 Email and verified account identifiers; Clerk authentication/session | `apps/api/src/auth/current-user.ts` VerifiedIdentity, requireUser; `apps/api/prisma/schema.prisma` User; `apps/mobile/app/_layout.tsx` ClerkProvider/tokenCache | Internal DB stores auth subject/email, not its own password or session-ID table. Clerk processes verification/session credentials; mobile retains session credential. Extra Clerk telemetry/retention not audited live |
 | P3 Imported calorie totals, activity summaries, source/date/update metadata | schema DailyIntakeAggregate, DailyExpenditureAggregate, DailyStepAggregate, CurrentDayWorkout; `apps/mobile/lib/healthkit/apple-health-provider.ts`; `apps/mobile/lib/native-health/intake.android.ts`; `apps/api/src/modules/fatsecret/fatsecret.service.ts`; `apps/api/src/modules/google-health/google-health.service.ts` | Workout type/display label, timestamps, duration and available energy/steps/distance persisted. No claim all metrics exist for every source |
 | P4 Goals, preferences and derived bank/history | schema GoalConfiguration, UserProfile, PlannedTreat, DashboardPreferences, BankAccountInitialization, OpeningBankCalculationDay, FinalizedDailyBankRecord, BankCalculationSnapshot, CalorieLedgerTransaction, RestingBurnEstimate; `docs/product/bank-calculation-spec.md` | Available Bank/Recovery derived, not separate health uploads; Banking Goal name/target may contain user-entered text. Daily Bank Target planning-only. No new accounting behavior |
@@ -43,8 +45,8 @@ anchors, not a claim that every deployed setting was inspected live.
 | P17 Physical deletion evidence and limits | `docs/deployment/android-preview.md` “Token-aware Android account deletion — September 17: PASS”; `apps/api/tests/account-deletion-recovery.test.ts`; `apps/api/tests/pb2-account-safety.test.ts` | Prior physical Clerk404/user0/all user-linked rows0/token0 and reclaim1. That account had no FatSecret connection and zero scheduled deliveries; nonempty delivery cascade/physical FatSecret revocation not claimed. Founder reports prior iOS physical pass; shared code supports both, no new iOS test here |
 | P18 Security | `apps/mobile/app.config.ts` assertHostedBuildEnvironment; `apps/api/src/auth/current-user.ts`; both provider token-crypto files; logger.ts | HTTPS API build guard; verified ownership; AES-256-GCM provider credentials; specified key redaction. Database TLS, backups, access controls and processor operations need confirmation; no blanket certification |
 | P19 External request/contact | Current official Google account-deletion/User Data guidance below; founder must supply channel | No inbox/form created. No request handling SLA or verification flow invented |
-| P20 Policy date/changes | Founder policy decision, not code | Publication date and notice process unresolved. No promise to email changes |
-| P21 Sale/ads, age, jurisdiction commitments intentionally omitted | Dependencies/source search and schema review; decisions below | Negative code finding is not a business-policy guarantee |
+| P20 Policy date/changes | Founder policy decision, not code | Founder-approved material-change notice wording; candidate date September 19,2026, reset at publication if needed |
+| P21 Sale/current-ads/audience commitments approved September 19; jurisdiction review remains | Dependencies/source search and schema review; decisions below | Negative code finding is not a business-policy guarantee |
 
 ## Data lifecycle inventory
 
@@ -120,3 +122,19 @@ and Activity and Fitness. No HC burn support implied. No declarations submitted.
 Proposed URLs, still unpublished: `https://caloriebank.philbk.dev/privacy` and
 `https://caloriebank.philbk.dev/delete-account`. Replace draft-relative links at
 publication. No DNS/website changes authorized here.
+
+## September 19 founder resolution and consistency check
+
+Current approved statements replace earlier approval gaps: no sale of personal health
+information; no **current** third-party advertising or health-information advertising;
+current app not designed for children/no supervised accounts; approved policy-change
+notice. No permanent no-ad or18+ identity inferred. Public contact spelling approved,
+operational status unverified. See [future review boundary](future-child-and-commerce-review.md).
+P13/P19/P20/P21 must be read with the newer retention and operations documents.
+
+Service descriptions remain factual, not legal classifications. Nutrition-only Play,
+Fitbit direct activity and cross-platform HealthKit descriptions remain consistent.
+FCM installation-ID retention is distinct from CalorieBank's server token deletion;
+no complete third-party identifier purge promised. Clean drafts have no placeholders,
+review copies reproduce them with explicit external publication holds. No new product
+code or physical QA in this documentation task.

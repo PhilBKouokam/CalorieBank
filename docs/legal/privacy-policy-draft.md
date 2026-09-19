@@ -1,6 +1,6 @@
 # CalorieBank Privacy Policy
 
-Last updated: [PUBLICATION DATE]
+Last updated: September 19, 2026
 
 ## 1. Who operates CalorieBank
 
@@ -81,7 +81,13 @@ requests associated with the connections you choose.
 Expo/EAS also builds and distributes app binaries. Building the app is separate from
 sending your imported health records to the CalorieBank backend.
 
-## 6. Notifications
+## 6. Advertising and sale of health information
+
+CalorieBank does not sell personal health information. CalorieBank does not
+currently show third-party advertising or use health information for
+advertising.
+
+## 7. Notifications
 
 Morning Bank Update is optional. Its notification can contain your Available Bank
 and a completed day's contribution. Expo and the platform push service receive the
@@ -89,17 +95,21 @@ notification content and delivery identifiers. Depending on your device settings
 this information may appear on your lock screen. You can turn updates off in
 CalorieBank and control notification permission in your device settings.
 
-## 7. Data retention
+## 8. Data retention
 
 CalorieBank keeps account-linked records to provide your account, history and
 features. Successful account deletion removes the associated records from its live
 database and deletes the CalorieBank sign-in identity in Clerk. Disconnecting a
 source or signing out does not delete previously imported account history.
 
-[RETENTION DETAILS REQUIRED BEFORE PUBLICATION: specify verified log, backup and
-service-provider retention, any retained data and reasons, and deletion handling.]
+Copies can remain in database backups and operational or security logs after live
+account deletion. Backup copies support recovery, and logs support operation and
+troubleshooting. Hosting, authentication and notification services have separate
+retention practices; deleting the live account does not instantly erase every
+backup, log or notification already accepted for delivery. Original health records
+held by your connected services remain subject to those services’ controls.
 
-## 8. Your choices and controls
+## 9. Your choices and controls
 
 In Settings → Health Connections, you can manage your selected sources and direct
 connections. You can manage Apple Health access through Apple's health/privacy
@@ -107,7 +117,7 @@ settings and Health Connect access through Android's Health Connect permissions.
 Revoking access does not itself erase information already imported into CalorieBank.
 You can change Morning Bank Update, sign out, or delete your account in Settings.
 
-## 9. Account deletion
+## 10. Account deletion
 
 Open Settings → Delete Account, type DELETE and confirm with Delete Account.
 Successful deletion removes your CalorieBank account, imported records, bank history,
@@ -120,22 +130,28 @@ Cronometer or other external services. Apple Health and Health Connect records a
 permissions remain controlled through those platforms.
 
 If you cannot access the app, use the contact on the
-[account-deletion page](account-deletion-draft.md) to request deletion.
+[account-deletion page](https://caloriebank.philbk.dev/delete-account) to request deletion.
 
-## 10. Security
+## 11. Security
 
 Hosted CalorieBank app connections to its API use HTTPS. API requests use verified
 account identity, and stored direct-provider credentials are encrypted. The service
 applies account ownership checks and filters specified sensitive fields from its
 structured logs. These measures do not guarantee absolute security.
 
-## 11. Changes to this policy
+## 12. Current audience
 
-The date above identifies this version of the policy.
-[POLICY-CHANGE NOTICE PROCESS REQUIRED BEFORE PUBLICATION.]
+The current version of CalorieBank is not designed for children. It does not
+currently offer child or supervised accounts.
 
-## 12. Contact
+## 13. Changes to this policy
+
+We may update this Privacy Policy as CalorieBank changes. When we do, we'll
+update the date at the top of this page. If a change materially affects how we
+use your information, we'll provide additional notice when appropriate.
+
+## 14. Contact
 
 Near Future I-X
 
-[FOUNDER: PUBLIC SUPPORT/PRIVACY EMAIL REQUIRED]
+support@caloriebank.philbk.dev

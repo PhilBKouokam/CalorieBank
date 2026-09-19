@@ -95,8 +95,8 @@ privacy page and must accurately represent the legal organization.
 
 ## Founder-review cross-check — September 18, 2026
 
-Founder identifies **Near Future I-X** as publishing organization and reports D-U-N-S
-issuance pending. No enrollment continued. See the [claim/evidence audit](../legal/privacy-policy-evidence.md)
+Founder identifies **Near Future I-X** as publishing organization; September 19 update:
+D-U-N-S issued/available to founder (no number requested/stored). No enrollment continued. See the [claim/evidence audit](../legal/privacy-policy-evidence.md)
 and linked clean/annotated drafts. The audit additionally identifies persisted
 timezone, onboarding state, Banking Goal name/target and derived bank/forecast records;
 include them with product/health information rather than implying only imported data
@@ -105,7 +105,29 @@ persisted email/auth subject. No CalorieBank password database or DOB field foun
 
 No factual conflict with Nutrition-only Play declarations: internal diagnostic builds
 have broader read scope and are explicitly distinguished in the cross-platform policy.
-Health Connect burn remains disabled. No-sale, age/audience, processor classifications,
-retention, public contact and external deletion handling remain founder/legal decisions.
+Health Connect burn remains disabled. September 19 resolves no-sale/current-advertising and current non-child-directed wording.
+Explicit age ranges, processor classifications, retention review, contact activation
+and external deletion operations remain founder/legal decisions.
 Google's non-medical health-app description disclaimer is a separate release review
 item, not added Terms language in the privacy policy. Nothing submitted or published.
+
+## September 19 publication-candidate alignment — NOT SUBMITTED
+
+- Founder approves: “CalorieBank does not sell personal health information.” This is
+  not a blanket Google Data Safety “no sharing” classification. Service-provider
+  transfers/exceptions and contracts remain separately reviewed.
+- Current V1 shows no third-party ads and does not use health information for ads.
+  Proposed Contains ads: No for current build; no advertising purpose selected for
+  health records. No permanent no-ad commitment or unreleased Commerce claim.
+- Current audience not child-directed; no child/supervised system or numeric age gate.
+  [Release-age recommendation and future review](../legal/future-child-and-commerce-review.md)
+  requires founder approval before actual age-range selection.
+- Health Apps remains Nutrition and Weight Management + Activity and Fitness;
+  READ_NUTRITION only in Play, Fitbit direct burn/activity/steps; HC burn disabled.
+- Public contact approved but not operationally verified. Clean candidates are proposed
+  text, not live resources. [Publication holds](../legal/publication-readiness.md).
+- [Retention findings](../legal/retention-resolution.md) distinguish live account
+  cascades from backup/log/provider/installation-ID retention. Do not mark all data
+  ephemeral or promise deletion of every provider copy on CalorieBank deletion.
+- Existing worksheet rows are otherwise unchanged; security/contract uncertainties
+  are not converted into affirmative attestations. No declarations submitted.

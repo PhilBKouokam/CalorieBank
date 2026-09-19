@@ -20,17 +20,19 @@ or other external account. It does not erase the original data in those services
 Apple Health or Health Connect. Manage Apple Health and Health Connect permissions
 separately through your device's health/privacy settings.
 
-[RETENTION DETAILS REQUIRED BEFORE PUBLICATION: disclose verified backup/log and
-service-provider retention and any exceptions.]
+Copies may remain in backups or operational and security logs after live account
+deletion. Hosting, authentication and notification services have separate retention
+practices; deletion does not recall notifications already accepted for delivery.
 
 ## If you cannot access the app
 
 Request deletion at:
 
-[FOUNDER: PUBLIC SUPPORT/PRIVACY EMAIL REQUIRED]
+support@caloriebank.philbk.dev
 
-[REQUEST-HANDLING DETAILS REQUIRED BEFORE PUBLICATION: approved ownership-verification
-and response process. Do not request passwords, email verification codes or food
-diaries through ordinary support email.]
+If possible, write from the email associated with your CalorieBank account. We need
+to verify that the request is yours before deleting the account. Do not send your
+password, sign-in verification codes or food diary. You do not need to reinstall
+the app to request deletion.
 
-See the [CalorieBank Privacy Policy](privacy-policy-draft.md).
+See the [CalorieBank Privacy Policy](https://caloriebank.philbk.dev/privacy).
