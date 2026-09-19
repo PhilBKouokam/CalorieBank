@@ -1,10 +1,12 @@
 # Android Google Play testing distribution
 
-Status: technical preparation complete; organization/legal/public-resource input
-remains pending. No developer enrollment, app creation, signing enrollment, AAB build,
-upload or release submission has occurred. Inspected September
-18, 2026 (America/Chicago). Frozen product qualification: `37dfad4`; implementation
-`5231b3d`; existing qualified APK `7de86e07-019b-45b3-8e21-33edd6e94e23` retained.
+Status (September 19, 2026): Organization enrollment ACTIVE / ready to create an app.
+Setup warning cleared and Create app enabled; website, contact email/phone and public
+developer email/phone verified. No app was created.
+No Play app, AAB, upload or release submission. Historical preparation findings below
+are superseded by the dated enrollment evidence at the end of this document.
+Frozen product qualification: `37dfad4`; implementation `5231b3d`; qualified APK
+`7de86e07-019b-45b3-8e21-33edd6e94e23` retained.
 
 ## Observed account state and immediate gates
 
@@ -223,3 +225,84 @@ Founder must approve legal content and select a real monitored outside-app delet
 channel. No invented API, service email, legal entity or retention guarantee.
 
 **ANDROID PHASE C PREPARATION: READY FOR FOUNDER ORGANIZATION/LEGAL INPUT**
+
+## Organization enrollment — September 19, 2026
+
+- Founder explicitly confirmed the existing Google account as the permanent owner.
+  No new Google account was created; private credentials/contact details are omitted.
+- Play Console displays **Near Future I-X**, **Organization account**. Organization
+  details resolve to **Near Future I-X, Inc.**; founder confirmed legal name/address
+  match the organization's records. D-U-N-S match is founder-confirmed; no number
+  was requested, copied or retained.
+- Founder personally completed organization/Payments profile screens, legal terms
+  and registration payment. Google displayed a one-time USD25 fee; completion is
+  founder-confirmed. Payments profile step is complete; no independent financial
+  verification status is inferred from that step alone.
+- Founder supplied identity/organization evidence directly. Final approval is not
+  established by account creation. Console requires completing verification before
+  creating apps; no ACTIVE/publishing-ready verdict yet.
+- Organization website recorded by founder: `https://philbk.dev`. Founder separately
+  authorized adding Google's DNS TXT ownership record and establishing Search
+  Console domain ownership for the same Google account. Search Console showed
+  **Ownership verified**; Play Console subsequently showed **Website verified**.
+  Only an additive apex verification TXT was created; website, legal-page, Clerk and
+  Zoho records were not edited. Retain this TXT to maintain ownership verification.
+- Public support email remains `support@caloriebank.philbk.dev`; mailbox previously
+  verified. The public profile's saved email was not independently re-inspected here.
+- Remaining visible task: verify both private Google contact and public developer
+  phone numbers. Founder asked to handle SMS/call codes directly. Google states
+  identity-document approval must precede phone verification. Actual document-review
+  status requires confirmation; no documents/numbers saved in evidence.
+- Official requirements rechecked: organization legal name/address and developer
+  email/phone are public; private contact details are distinct. The 12-testers/14-day
+  rule is documented for newly created **personal** accounts. No organization-specific
+  testing restriction is shown in the inaccessible app-creation flow; inspect actual
+  account capabilities only after activation, without creating an app.
+- Legal resources published separately in `9696904`: privacy and deletion pages at
+  `https://caloriebank.philbk.dev/privacy` and `/delete-account`.
+- No app/AAB created, no public release, no Render/TestFlight/product changes.
+
+Sources checked September 19:
+[Required account information](https://support.google.com/googleplay/android-developer/answer/13628312?hl=en),
+[Identity verification](https://support.google.com/googleplay/android-developer/answer/10841920?hl=en),
+[Personal-account testing](https://support.google.com/googleplay/android-developer/answer/14151465?hl=en).
+
+Next: founder completes phone verification or reports Google's identity-review hold;
+then inspect account status. Do not create CalorieBank until separately authorized.
+
+## Enrollment completion — September 19, 2026
+
+**GOOGLE PLAY ORGANIZATION ENROLLMENT: ACTIVE — READY TO CREATE CALORIEBANK**
+
+This completion supersedes the intermediate pending observations above.
+
+- Existing founder-approved Google owner used; no new Google account or credentials.
+- Type: Organization. Developer name: Near Future I-X. Resolved legal entity:
+  Near Future I-X, Inc. Founder confirmed D&B legal name/address match. No sensitive
+  identifier, private phone/address, identity document or payment data retained here.
+- Founder confirmed personally completing terms and the displayed USD25 registration
+  payment. Organization Payments profile enrollment step completed; no merchant or
+  monetization setup performed.
+- Google notification explicitly stated **Your identity has been verified successfully**.
+- Search Console domain ownership and Play organization website `https://philbk.dev/`
+  verified using the separately founder-approved additive apex TXT record.
+- Developer account summary shows **Website verified**, **Contact email address
+  verified**, **Contact phone number verified**, **Developer email address verified**,
+  and **Developer phone number verified**. Public developer email is the approved
+  `support@caloriebank.philbk.dev`.
+- Home no longer shows the finish-setup warning. **Create app** is enabled, and the
+  account has no apps. This is the evidence for account activation/readiness; it is
+  not app approval or public-release authorization.
+- Official 12-testers/14-days requirement is scoped to new personal developer
+  accounts, not this Organization account. No personal-account production-access
+  gate is displayed. Testing tracks are app-level and were not opened because the
+  founder expressly forbids app creation in this task. Internal/closed-track setup
+  remains the next separately authorized phase; no universal review exemption is
+  claimed for organizations.
+- No Play app, AAB, upload, testing release or public release created. No Android/iOS
+  build, Render deployment, TestFlight, Firebase, Clerk, accounting or product change.
+  Health Connect burn remains disabled. Legal-page and Zoho mail DNS were unchanged;
+  the sole DNS addition was the explicitly approved Search Console ownership TXT.
+
+Next: await explicit founder authorization to create the CalorieBank Play application.
+Then inspect app-level testing/declaration requirements before any AAB or release.
