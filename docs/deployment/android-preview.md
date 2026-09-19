@@ -1134,3 +1134,8 @@ Health Connect burn remains disabled; Fitbit is the qualified Android burn path.
 Stop. This is app-readiness qualification, not authorization to start Google Play
 or post-Android implementation. Physical coverage remains Pixel-only; additional
 OEM/older-device/multi-writer combinations are not claimed by this pass.
+
+
+### Phase C distribution preflight
+
+Google Play testing is not live. See [current requirements and release gates](../deployment/android-google-play.md). Account enrollment/identity, public privacy/deletion resources and the nutrition-only permission-minimization gate must be resolved before the single testing AAB. B4 product qualification remains unchanged.

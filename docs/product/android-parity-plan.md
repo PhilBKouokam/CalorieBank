@@ -594,3 +594,8 @@ still disabled. No implementation/build/deployment changes were required.
 See [physical evidence and limits](../deployment/android-preview.md#september-18--final-accessibility-and-same-device-cronometer-pass).
 Android B4 is ready for Friends & Family distribution; Google Play work still
 requires explicit authorization. No broader OEM or formal WCAG coverage is claimed.
+
+
+### Phase C distribution preflight
+
+Google Play testing is not live. See [current requirements and release gates](../deployment/android-google-play.md). Account enrollment/identity, public privacy/deletion resources and the nutrition-only permission-minimization gate must be resolved before the single testing AAB. B4 product qualification remains unchanged.
