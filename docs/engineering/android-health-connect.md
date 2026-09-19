@@ -509,3 +509,19 @@ canonical cards correctly displayed Fitbit and Cronometer via Health Connect.
 Health Connect burn remained absent from both onboarding and Settings choices.
 Full journey evidence and scoped PASS are in
 [Android preview qualification](../deployment/android-preview.md#september-18--physical-product-coherence-pass).
+
+
+### September 18 final B4 physical qualification
+
+Existing APK `7de86e07-019b-45b3-8e21-33edd6e94e23` passed the Pixel 9a
+Android 16/API 36 accessibility smoke test (200% text and founder-confirmed TalkBack)
+and same-device Cronometer test. A +50 kcal entry created directly in Android
+Cronometer appeared through normal CalorieBank foreground refresh without another
+Cronometer open/sync action (Case A). Exact-package server evidence matched both
+controlled additions (+95 total). Cross-device iPhone-to-Android Cronometer export
+latency remains a separate documented upstream limitation. Health Connect burn is
+still disabled. No implementation/build/deployment changes were required.
+
+See [physical evidence and limits](../deployment/android-preview.md#september-18--final-accessibility-and-same-device-cronometer-pass).
+Android B4 is ready for Friends & Family distribution; Google Play work still
+requires explicit authorization. No broader OEM or formal WCAG coverage is claimed.

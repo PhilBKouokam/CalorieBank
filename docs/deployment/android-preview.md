@@ -1050,3 +1050,87 @@ not started; they require separate authorization.
 
 Documentation validation: `git diff --check` passed. Stop after recording this
 evidence; final accessibility and distribution remain separately gated.
+
+
+### September 18 — final accessibility and same-device Cronometer PASS
+
+Qualified the existing APK `7de86e07-019b-45b3-8e21-33edd6e94e23` on Pixel 9a,
+Android 16/API 36. Findings combine device UI inspection, founder physical visual/
+spoken-feedback checks, and scoped read-only server evidence. No code/config fix.
+
+**Accessibility smoke test (not a formal WCAG audit):**
+
+- System font scale 2.0 applied after app relaunch. Founder confirmed Home bank
+  values and Today/History/Settings labels readable without clipping.
+- Founder completed the remaining large-text screen checks: Today detail, both
+  Step Planning cards, History, Settings, Health Connections, Morning Bank Update,
+  Banking Goal, Daily Bank Target and deletion confirmation. Critical content and
+  actions remained usable with scrolling/wrapping; no release blocker reported.
+- Step Planning inputs selected existing values, typing replaced them, units and
+  locked result/remaining-step/time/session hierarchy stayed readable, and the
+  keyboard was dismissible. Planning values do not change accounting.
+- Device inspection confirmed scroll containers and reachable deletion field/action;
+  no deletion was performed. Back returned from inspected detail/settings surfaces.
+- TalkBack was physically enabled. Founder traversed the requested authenticated
+  screens and reported everything worked: meaningful labels/numbers, logical focus
+  order, usable controls and no focus trap. Sign-out, spoken Sign in/Create account
+  controls and sign-in were separately completed. This is founder-confirmed spoken
+  evidence; no audio recording or invented automated speech transcript.
+- No touch-target, keyboard, Android Back or numeric-label blocker was reported.
+  Fresh onboarding was not recreated in this final pass; its prior physical journey
+  remains the evidence for setup navigation, not a new TalkBack onboarding claim.
+- Original settings restored and verified: font_scale=1.0, accessibility_enabled=0,
+  enabled_accessibility_services=null. App operated normally afterward.
+
+**Same-device Cronometer experiment — Case A:**
+
+Account safe reference `48395ab5a97c`; September 18 local date (America/Chicago).
+Baseline Eaten matched Android Cronometer, confirmed by founder. Exact persisted
+selection remained health_connect / `com.cronometer.android.gold`, with ready intake.
+Android package diagnostics included a granted Nutrition permission entry; successful
+exact-origin read/upload demonstrates access in the tested session. No permission
+change was made.
+
+1. Founder added +45 kcal directly in Pixel Cronometer at about 19:30 local.
+   On first CalorieBank return, founder pulled immediately. Intake increased +45.
+   This proves same-device export/read but does not isolate automatic foreground.
+2. Founder added +50 kcal directly in Pixel Cronometer and returned normally,
+   without pulling or reopening/specially syncing Cronometer. Eaten updated
+   automatically. This is the qualifying automatic foreground case.
+3. Read-only server verification at 00:36:13Z September 19 found the selected exact
+   origin ready and total equal to the captured baseline plus 95 (verified by hash
+   comparison without printing diary totals). providerUpdatedAt=00:35:03.443Z;
+   importedAt=00:35:17.985Z; evidenceObservedAt=00:35:18.936Z. About 15 seconds separate
+   provider revision and persistence; exact save/app-open/render latency was not
+   instrumented and must not be claimed. HC presence is supported by successful
+   exact-origin device ingestion, not an independent pre-return HC UI capture.
+
+No additional Cronometer reopen/manual sync, source change, reconnect, Health
+Connect UI manipulation or reinstall was needed for the qualifying second entry.
+Test entries were left untouched; removal/revision propagation was not tested.
+No food names, diary details, raw tokens or credentials are recorded here.
+
+The independently reproduced cross-device limitation remains: food logged on iPhone
+may require Android Cronometer to synchronize/export before it exists in Android
+Health Connect. Opening Android Cronometer recovered that data without CalorieBank
+reconnection. This is distinct from the passing same-device workflow; one Pixel test
+is not a guarantee for every writer/version/OEM. Do not label absent upstream records
+as a CalorieBank connection failure. Further recovery-copy refinement may be tracked
+as post-Android polish, not implemented in this qualification.
+
+No accessibility/data defect reproduced. Documentation-only validation:
+`git diff --check`. No new tests or full gate rerun for this evidence-only change;
+prior implementation release gate remains 813 passing tests, with 8 refresh tests
+rerun in the preceding race task. No APK, deployment, Play submission or iOS/TestFlight
+change. Accounting, immutable history, source authority and notifications unchanged.
+Health Connect burn remains disabled; Fitbit is the qualified Android burn path.
+
+**ANDROID ACCESSIBILITY: PASS**
+
+**SAME-DEVICE CRONOMETER SYNC: PASS**
+
+**ANDROID B4: PASS — READY FOR ANDROID FRIENDS & FAMILY DISTRIBUTION**
+
+Stop. This is app-readiness qualification, not authorization to start Google Play
+or post-Android implementation. Physical coverage remains Pixel-only; additional
+OEM/older-device/multi-writer combinations are not claimed by this pass.
