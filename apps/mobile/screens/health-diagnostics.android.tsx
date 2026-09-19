@@ -1,3 +1,4 @@
+import { healthConnectQualificationEnabled } from '../lib/health-connect/capabilities';
 import { useCallback, useState } from 'react';
 import { AppState, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { Redirect, useFocusEffect } from 'expo-router';
@@ -8,7 +9,7 @@ import type { NativeAccess, QualificationReport } from '../lib/native-health/evi
 import { colors, spacing } from '../constants/caloriebank-theme';
 
 export default function AndroidHealthDiagnostics() {
-  if (!__DEV__ && process.env.EXPO_PUBLIC_APP_ENV !== 'beta') return <Redirect href="/integrations" />;
+  if (!healthConnectQualificationEnabled()) return <Redirect href="/integrations" />;
   return <QualificationDiagnostics />;
 }
 

@@ -1,7 +1,8 @@
 # Android Google Play testing distribution
 
-Status: Phase C preflight blocked; no developer enrollment, app creation, signing
-enrollment, AAB build, upload or release submission has occurred. Inspected September
+Status: technical preparation complete; organization/legal/public-resource input
+remains pending. No developer enrollment, app creation, signing enrollment, AAB build,
+upload or release submission has occurred. Inspected September
 18, 2026 (America/Chicago). Frozen product qualification: `37dfad4`; implementation
 `5231b3d`; existing qualified APK `7de86e07-019b-45b3-8e21-33edd6e94e23` retained.
 
@@ -68,7 +69,7 @@ for a public policy. No legal policy language was invented or published.
   policy must identify the app/developer and accurately describe practices. Founder
   review required; do not promise unverified retention, security or third-party terms.
 
-## Permission-minimization gate — no changes made
+## Original permission-minimization finding (resolved by preparation below)
 
 `apps/mobile/app.json` currently declares these Health Connect reads:
 
@@ -160,3 +161,65 @@ Pending: founder account/organization clarification, reviewed public privacy/del
 URLs, reported permission-minimization decision, actual tester emails, signing and
 reviewer-access preparation. No new full gate/build is claimed at this preflight
 block. B4 app qualification remains valid; Phase C distribution is not live.
+
+
+## September 18 — authorized release preparation completed
+
+The subsequent preparation request authorized the bounded permission/config changes:
+
+- `app.json` defaults to READ_NUTRITION. `app.config.ts` derives permissions from an
+  explicit qualification flag; six diagnostic permissions are blocked with manifest
+  removal directives in consumer builds, including transitive library declarations.
+- `play-testing` extends the qualified beta/Clerk preview environment, uses store
+  distribution + app-bundle, auto-incremented remote versioning, and forces
+  `EXPO_PUBLIC_HEALTH_CONNECT_QUALIFICATION=0`. Hosted HTTPS/Clerk checks include this
+  profile. This is a prepared profile, not a built/submitted AAB or allocated version.
+- Development/preview explicitly set the flag to 1 to retain seven-category testing.
+  Production/testflight force 0. Unknown/store profiles reject an attempted flag=1;
+  local qualification must explicitly opt in. Merely being beta or __DEV__ does not
+  unlock diagnostic reads. This intentionally separates distribution from API/account
+  environment and preserves the qualified beta backend.
+- Settings entry and direct diagnostic route are gated. Even a direct broad bridge
+  call in a Play bundle requests/queries only Nutrition, ignoring old broader OS grants.
+- Generated Health Connect rationale accurately describes the selected build.
+  There is still no public policy URL; reviewed publication remains a legal gate.
+- Fitbit/FatSecret adapters, nutrition normalization/upload/history, accounting,
+  consumer onboarding and Step Planning files were not changed. iOS native facade,
+  permissions and notification behavior remain unchanged.
+
+Validation: release:friends-family passed on dedicated localhost
+`caloriebank_rc_20260907` (Prisma generation/validation/migrations, workspace/API/mobile
+TypeScript, API/mobile lint, 827 tests/73 files, API/domain/schema builds). Full workspace
+`npm test` also passed 827 tests. Fourteen new permission/profile regressions cover
+safe defaults, store escalation rejection, retained explicit qualification, profile
+configuration and runtime request/read narrowing. Existing rendered diagnostics test
+now verifies direct-route denial even under the beta API environment. Existing source,
+onboarding, exact-origin/history and iOS suites passed. One pre-existing Today hook
+lint warning remains; no lint errors.
+
+Expo Play/preview/production/iOS configurations resolved using non-secret validation
+placeholders (not changed production keys). Android prebuild completed in an isolated
+/tmp copy, preserving the repository's native directories. Generated application
+manifest has **READ_NUTRITION as its sole positive Health Connect permission**; six
+other health entries have tools:node="remove". Generated rationale matches consumer
+Nutrition. Preview config retains seven explicit qualification reads. Android Expo
+module autolinking resolved. No final AAB merged manifest/native compile is claimed;
+that is a gate on the future single AAB. Online Expo dependency validation reports
+“Dependencies are up to date”; git diff --check passed. No tests accessed a production
+database.
+
+Artifacts for founder review:
+
+- [Organization enrollment checklist](android-organization-enrollment.md)
+- [Privacy policy draft](../legal/privacy-policy-draft.md)
+- [Account deletion page draft](../legal/account-deletion-draft.md)
+- [Data Safety, Health Apps and hosting worksheet](android-play-declarations-draft.md)
+
+Recommended categories: Nutrition and Weight Management **and** Activity and Fitness
+(the latter reflects direct Fitbit functionality, not Health Connect burn). D-U-N-S
+and organization identity remain UNKNOWN. Proposed URLs are not live or verified:
+`https://caloriebank.philbk.dev/privacy` and `/delete-account`; no portfolio/DNS change.
+Founder must approve legal content and select a real monitored outside-app deletion
+channel. No invented API, service email, legal entity or retention guarantee.
+
+**ANDROID PHASE C PREPARATION: READY FOR FOUNDER ORGANIZATION/LEGAL INPUT**

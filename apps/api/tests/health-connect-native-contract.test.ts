@@ -15,6 +15,7 @@ const native = vi.hoisted(() => ({
 }));
 vi.mock('react-native', () => ({ Platform: { Version: 34 }, Linking: { openURL: vi.fn() } }));
 vi.mock('react-native-health-connect', () => native);
+vi.mock('../../mobile/lib/health-connect/capabilities', () => ({ healthConnectQualificationEnabled: () => true }));
 import { nativeHealthQualification, nativeNutritionQualification } from '../../mobile/lib/health-connect/bridge.android';
 
 beforeEach(() => { vi.clearAllMocks(); nativeHealthQualification.setAccountScope(null); nativeHealthQualification.setAccountScope('test'); });

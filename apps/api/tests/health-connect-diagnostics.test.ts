@@ -22,6 +22,7 @@ const report: QualificationReport = {
   origins: [{ namespace: 'android_package', id: 'com.example.very.long.food.tracker.package' }], originState: 'not_selected', counts: { nutrition: 12, steps: 0 }, days: [], readConsistency: 'stable_read', forecastEligible: false, authoritative: false,
 };
 beforeEach(() => {
+  vi.stubEnv('EXPO_PUBLIC_HEALTH_CONNECT_QUALIFICATION', '1');
   Object.assign(globalThis, { __DEV__: true, IS_REACT_ACT_ENVIRONMENT: true });
   h.access.mockReset().mockResolvedValue(report.access); h.inspect.mockReset().mockResolvedValue(report); h.cancel.mockClear();
   n.access.mockReset().mockResolvedValue(report.access); n.inspect.mockReset().mockResolvedValue(report); n.cancel.mockClear();
@@ -57,9 +58,12 @@ describe('Android developer qualification UI', () => {
     expect(JSON.stringify(screen!.toJSON())).toContain('does not upload data or change your bank');
   });
   it('does not request permissions automatically', async () => { await mount(); expect(h.access).toHaveBeenCalledWith(); expect(h.access).not.toHaveBeenCalledWith(true); await press('Request read permissions'); expect(h.access).toHaveBeenCalledWith(true); });
-  it('hides the tool in production without accessing Health Connect', async () => {
-    const previous = process.env.EXPO_PUBLIC_APP_ENV; process.env.EXPO_PUBLIC_APP_ENV = 'production'; Object.assign(globalThis, { __DEV__: false });
+  it('blocks a direct diagnostic route in beta Play builds without accessing Health Connect', async () => {
+    vi.stubEnv('EXPO_PUBLIC_HEALTH_CONNECT_QUALIFICATION', '0');
+    const previous = process.env.EXPO_PUBLIC_APP_ENV; process.env.EXPO_PUBLIC_APP_ENV = 'beta'; Object.assign(globalThis, { __DEV__: false });
     try { await mount(); expect(screen!.root.find((n) => String(n.type) === 'Redirect').props.href).toBe('/integrations'); expect(h.access).not.toHaveBeenCalled(); }
     finally { if (previous === undefined) delete process.env.EXPO_PUBLIC_APP_ENV; else process.env.EXPO_PUBLIC_APP_ENV = previous; }
   });
 });
+
+afterEach(() => vi.unstubAllEnvs());

@@ -1,3 +1,4 @@
+import { healthConnectQualificationEnabled } from '@/lib/health-connect/capabilities';
 import { useClerk } from '@clerk/expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
@@ -49,7 +50,7 @@ export default function SettingsScreen() {
           ))}
         </View>
 
-        {Platform.OS === 'android' && (__DEV__ || process.env.EXPO_PUBLIC_APP_ENV === 'beta') ? <SettingsRow title="Health Connect qualification" description="Read-only Android data checks." icon="construct-outline" onPress={() => router.push('/health-diagnostics')} /> : null}
+        {Platform.OS === 'android' && healthConnectQualificationEnabled() ? <SettingsRow title="Health Connect qualification" description="Read-only Android data checks." icon="construct-outline" onPress={() => router.push('/health-diagnostics')} /> : null}
 
         {usesClerk ? <>
           <Text style={styles.sectionLabel}>Account</Text>

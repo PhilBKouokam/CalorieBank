@@ -57,7 +57,7 @@ describe('Android B1 platform boundary', () => {
     expect(config.android.intentFilters).toContainEqual({ action: 'VIEW', category: ['BROWSABLE', 'DEFAULT'], data: [{ scheme: 'caloriebank', host: 'integrations' }] });
     expect(hostedAuthRedirectForPlatform('android', config).nativeRedirectUrl).toBe('clerk://com.caloriebank.mobile.hosted-callback');
     expect(hostedAuthRedirectForPlatform('ios', config).nativeRedirectUrl).toBe('com.caloriebank.mobile://callback');
-    expect(config.android.permissions).toHaveLength(7);
+    expect(config.android.permissions).toEqual(['android.permission.health.READ_NUTRITION']);
     expect(config.android.permissions.every((permission: string) => permission.startsWith('android.permission.health.READ_'))).toBe(true);
     expect(config.android.permissions).not.toContain('android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND');
   });

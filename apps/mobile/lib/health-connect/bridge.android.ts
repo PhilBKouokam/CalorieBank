@@ -1,3 +1,4 @@
+import { healthConnectQualificationEnabled } from './capabilities';
 import { Linking, Platform } from 'react-native';
 import type { EvidenceCategory } from '../native-health/evidence';
 import { categories, createHealthQualification, type HealthEvidencePort } from './qualification';
@@ -35,6 +36,7 @@ const createPort = (requested: readonly EvidenceCategory[]): HealthEvidencePort 
     return true;
   },
 });
-export const nativeHealthQualification = createHealthQualification(createPort(categories));
+const diagnosticCategories = healthConnectQualificationEnabled() ? categories : ['nutrition'] as const;
+export const nativeHealthQualification = createHealthQualification(createPort(diagnosticCategories), undefined, diagnosticCategories);
 // Consumer nutrition reads neither request nor inspect activity/burn records.
 export const nativeNutritionQualification = createHealthQualification(createPort(['nutrition']), undefined, ['nutrition']);

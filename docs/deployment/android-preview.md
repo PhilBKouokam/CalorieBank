@@ -1139,3 +1139,15 @@ OEM/older-device/multi-writer combinations are not claimed by this pass.
 ### Phase C distribution preflight
 
 Google Play testing is not live. See [current requirements and release gates](../deployment/android-google-play.md). Account enrollment/identity, public privacy/deletion resources and the nutrition-only permission-minimization gate must be resolved before the single testing AAB. B4 product qualification remains unchanged.
+
+
+### Phase C preparation — nutrition-only Play profile
+
+Authorized preparation now supplies a `play-testing` AAB profile with only Health
+Connect READ_NUTRITION, explicit diagnostic gating at navigation and native bridge,
+and retained opt-in internal qualification. No AAB was created. Draft legal pages,
+organization checklist and declaration worksheets are linked from
+[Google Play preparation](../deployment/android-google-play.md#september-18--authorized-release-preparation-completed).
+Full release gate and all workspace tests: 827 passing tests. This is automated/config
+qualification, not a new physical Play-install claim. Health Connect burn remains
+disabled; organization/legal input and approved public hosting remain required.
