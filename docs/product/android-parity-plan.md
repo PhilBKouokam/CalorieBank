@@ -611,3 +611,15 @@ organization checklist and declaration worksheets are linked from
 Full release gate and all workspace tests: 827 passing tests. This is automated/config
 qualification, not a new physical Play-install claim. Health Connect burn remains
 disabled; organization/legal input and approved public hosting remain required.
+
+
+### Phase C active organization and Play setup — September 19
+
+Organization enrollment and public legal resources are complete. The canonical
+CalorieBank Play app exists with saved declarations, including founder-approved
+18-and-over targeting for current V1 only. Internal Testing is not live yet.
+An authorized Android-only Settings Privacy Policy link closes the in-app policy
+requirement; 830 tests pass and Nutrition-only store configuration/prebuild checks
+pass. Store assets, signing, the single AAB and Pixel Play installation remain.
+See [current distribution evidence](../deployment/android-google-play.md).
+B4 functionality and Health Connect burn-disabled status are preserved.

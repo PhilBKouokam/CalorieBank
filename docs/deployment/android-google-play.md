@@ -306,3 +306,172 @@ This completion supersedes the intermediate pending observations above.
 
 Next: await explicit founder authorization to create the CalorieBank Play application.
 Then inspect app-level testing/declaration requirements before any AAB or release.
+
+## Play application and reviewer-access preparation — September 19, 2026
+
+Status: **in progress; no AAB or testing release created**. This supersedes the
+previous instruction to await app-creation authorization: the founder subsequently
+explicitly authorized app creation and Internal Testing preparation.
+
+- Canonical CalorieBank Play application created, default language English (United
+  States), App, Free. Play application ID: `4972476114053951321`. Intended Android
+  package remains `com.caloriebank.mobile`; binary/package upload is still pending.
+- Founder personally completed the app-creation declarations. Privacy URL saved:
+  `https://caloriebank.philbk.dev/privacy`. Current ads declaration saved as No ads.
+  Remaining declarations, target audience, signing and store assets are not complete.
+- Dedicated reviewer identity uses the organization-controlled support mailbox.
+  Founder privately established its password. Android production sign-in succeeded.
+  Founder explicitly approved Clerk's **per-user Bypass Device Trust** for this
+  reviewer only. A subsequent fresh-browser password sign-in did not require email
+  verification. Global Device Trust and other accounts were unchanged. Credentials
+  are not stored in this repository.
+- Hosted web sign-in without an Android callback reached the website root's 404;
+  this does not describe the Android callback result. Android sign-in was separately
+  confirmed successful. No website/auth routing change was made.
+- Founder created dedicated FatSecret and Google/Fitbit accounts for review, using
+  the support identity, and completed the provider authorizations in CalorieBank.
+  No founder diary or wearable account was attached for review.
+- On the physical Pixel, normal onboarding continued through FatSecret, Maintain,
+  Daily Bank Target 0, bounded preparation, and Today. With no completed-day paired
+  history, Today truthfully showed an uncalculated bank. No database seeding,
+  accounting bypass, invented wearable measurements or new app code was used.
+- Founder authorized test diary fixtures in the dedicated FatSecret account. A
+  clearly labeled review fixture totaling 72 kcal was saved for September 19,
+  matching the Pixel's local date. FatSecret's website called this date Yesterday
+  while the Pixel was still September 19 CDT; the explicit date was preserved.
+  After unlocking, the physical Pixel displayed Eaten 72 kcal and Imported from
+  FatSecret through the normal application flow. Current Fitbit burn was also
+  present; Available Bank correctly remained uncalculated without completed-day
+  evidence. This verifies the test fixture was ingested without direct database edits.
+- Fitbit documents manual activity logging, but this is not equivalent to
+  sensor-recorded paired steps/workout evidence. No fabricated Fitbit activity or
+  steps were added. No supported provider sandbox/sample-data path was established.
+- Founder completed the Play App access full-access confirmation. Saved the
+  reviewer details; Google displayed Change saved and the dashboard marked Sign in
+  details complete (3 of 11 setup tasks complete). This is saved configuration, not
+  a submission for review. Instructions disclose limited completed-day history and
+  device-dependent Health Connect evidence.
+- Target audience now exposes 13–15, 16–17, and 18 and over. No range selected;
+  current-release 18-and-over recommendation awaits explicit founder approval.
+  This does not establish a permanent product age policy.
+- No AAB, preview APK, iOS build, Render deployment, TestFlight change, Production
+  release or Open Testing release. Health Connect burn remains disabled.
+
+Relevant official guidance:
+[Play reviewer access](https://support.google.com/googleplay/android-developer/answer/15748846?hl=en),
+[Clerk Device Trust](https://clerk.com/docs/guides/secure/device-trust),
+[Fitbit manual activity logging](https://support.google.com/googlehealth/answer/14236402?hl=en).
+
+### Declaration progress — September 19 evening
+
+- Founder approved **18 and over** for this V1 release only; saved. Optional separate
+  Google minor-blocking restriction was not selected. This is not a permanent age
+  policy or a change to published privacy wording.
+- Founder completed the IARC terms step and questionnaire. Corrected the current
+  release's user-to-user sharing answer to No (future Social is not implemented).
+  Saved questionnaire and summary: ESRB Everyone, PEGI 3; content ratings are
+  separate from intended audience. No submission/publication performed.
+- Health saved: Activity and fitness; Nutrition and weight management. Google
+  requested no additional regional documentation. No medical category selected.
+- Government apps saved No. Financial features saved None; calorie banking is not
+  financial banking. Dashboard then showed 8 of 11 setup tasks complete.
+- Store category saved Health & Fitness. Public listing support email saved as
+  `support@caloriebank.philbk.dev`. No private phone published; optional website
+  left blank rather than pointing users at the currently unavailable product root.
+- Data safety draft saved with collection Yes, observed password/verification
+  authentication methods and the published deletion URL. Encryption-in-transit
+  and transfer-exception classifications remain pending evidence resolution; not
+  submitted. Expo documents HTTPS forwarding to Apple/Google. Render documentation
+  distinguishes mandatory external TLS from optional internal database TLS; do not
+  infer live internal TLS solely from the Blueprint private connection URL.
+- Founder asked to review Google's service-provider/user-initiated transfer
+  exceptions; no approval recorded yet. This is separate from the published
+  no-sale commitment and does not imply absence of third-party processing.
+
+Sources checked: [Google Data safety definitions](https://support.google.com/googleplay/android-developer/answer/10787469?hl=en-AE),
+[Expo notification transport](https://docs.expo.dev/push-notifications/faq/),
+[Render database connection encryption](https://render.com/docs/postgresql-creating-connecting).
+
+### Data safety saved; in-app policy-link blocker — September 19
+
+Founder approved applying Google's service-provider and qualifying user-initiated
+transfer exceptions only where supported. Data safety was completed and saved in
+Publishing overview, not sent for review. Dashboard shows **10 of 11 complete**.
+
+Collected, retained categories: email, user IDs, health information, fitness
+information, diagnostics, app interactions, optional other user-generated content
+(planning labels/content), and device/other identifiers. No advertising purposes.
+Health/fitness purposes: app functionality. Identity purposes: functionality,
+security/account management. Diagnostics/interactions include debugging analytics
+and security. Optional push preference does not make every device identifier
+optional: authentication/device identification also occurs. No independent security
+certification claimed. Published privacy/deletion URLs are included.
+
+Encryption answer Yes is scoped to Google's documented device-to-server transport
+question, supported by the hosted-build HTTPS guard, Clerk encrypted transport,
+Expo HTTPS delivery and Firebase HTTPS/TLS. It is not a blanket claim about live
+internal PostgreSQL TLS; that separate operational uncertainty remains unresolved.
+Sources: [Google definitions](https://support.google.com/googleplay/android-developer/answer/10787469?hl=en-AE),
+[Clerk security](https://clerk.com/security),
+[Firebase disclosures](https://firebase.google.com/docs/android/play-data-disclosure),
+[FCM TLS](https://firebase.google.com/docs/cloud-messaging/encryption).
+
+**Stop before AAB:** current Google Health Content and Services policy requires a
+privacy-policy link or text inside the app in addition to the Play Console URL.
+Repository audit found no consumer privacy-policy link/text in `apps/mobile`; the
+Settings screen has no policy row. Proposed minimal change: Android Settings row
+opening the already-published `https://caloriebank.philbk.dev/privacy`, preserving iOS
+and frozen behavior. Founder subsequently authorized this exact minimal change; implementation and validation
+are recorded below. No AAB has been created.
+
+[Official health-app requirement](https://support.google.com/googleplay/android-developer/answer/16679511?hl=en)
+also requires a non-medical disclaimer and healthcare-professional reminder in the
+store description. Store listing remains unfinished; no assets submitted.
+
+
+### Android privacy link and release preparation — September 19
+
+Founder authorized the minimal Android-only Settings Privacy Policy row. It opens
+the existing public HTTPS policy in the system browser, prevents repeat taps while
+opening, and offers a calm retry message if launching the browser fails. iOS renders
+no new row. Authentication, providers, accounting and notification logic are unchanged.
+
+Validation on the final implementation:
+
+- `release:friends-family`: PASS, 830 tests in 74 files; Prisma generation, validation
+  and localhost-only test migrations, workspace TypeScript, API/mobile lint and
+  API/domain/schema builds. One existing Today hook lint warning; no lint errors.
+- Three new rendered component regressions cover the exact HTTPS URL, retry after
+  failure and iOS absence. One intermediate full run hit an existing persistence-test
+  five-second timeout; the final unmodified full rerun passed. No test limit was raised.
+- Local RN-web rendering of the actual row at 320px and 390px, including enlarged
+  text and browser-failure state: readable, wrapping, reachable control, no clipping.
+  This is a component layout check, not physical verification of the new row.
+- Public policy GET returned HTTP 200.
+- Expo store/preview/iOS config resolved. Store package `com.caloriebank.mobile`,
+  marketing version `1.0.0`. Store has READ_NUTRITION only; preview retains explicit
+  qualification reads. Isolated Android prebuild passed; generated manifest includes
+  only READ_NUTRITION positively and removal directives for the six diagnostic reads.
+- Expo dependency compatibility check passed; Android module autolinking resolved.
+  EAS remote Android versionCode read back as 1 (no mutation); the auto-incrementing
+  build will allocate the next version. Final AAB merged manifest, signing and native cloud
+  compile remain future gates, not claimed here.
+
+Store description is saved as an unpublished draft, including current source
+behavior, the non-medical disclaimer and professional-advice reminder. No unreleased
+features are advertised. Founder reviewed the feature graphic and requested the exact replacement message
+“Save calories for your favorite meals.” The revision is prepared. Asset upload is
+blocked by the Chrome extension file-URL permission; no asset was uploaded. Real
+Pixel screenshots await an unlocked device and approval. No store assets or declarations have been sent for review.
+
+No AAB/APK/iOS build, Render deployment, TestFlight change or public release.
+Health Connect burn remains disabled.
+
+Full workspace `npm test` also passed 830 tests with DATABASE_URL and TEST_DATABASE_URL
+explicitly set to the same dedicated localhost release database. An initial standalone
+workspace invocation omitted the DATABASE_URL override and encountered the older
+local development schema; no production database was contacted and no migration was
+run there. The release gate itself always pins DATABASE_URL to its validated test URL.
+
+Commit uses Render's documented `[skip render]` directive to preserve the backend
+([official guidance](https://render.com/docs/deploys#skipping-an-auto-deploy)).

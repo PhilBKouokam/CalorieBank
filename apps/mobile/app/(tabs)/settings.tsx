@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import { SettingsRow } from '@/components/caloriebank/SettingsRow';
+import { PrivacyPolicyRow } from '@/components/caloriebank/PrivacyPolicyRow';
 import { detachMorningBankUpdateDevice } from '@/lib/notifications/morning-bank-update';
 
 const settingsRows: { href: Href; icon: keyof typeof Ionicons.glyphMap; label: string; detail: string }[] = [
@@ -60,6 +61,7 @@ export default function SettingsScreen() {
           </View>
           {signOutError ? <Text accessibilityLiveRegion="assertive" style={styles.signOutError}>We couldn’t finish signing you out. Please try again.</Text> : null}
         </> : null}
+        {Platform.OS === 'android' ? <View style={styles.group}><PrivacyPolicyRow /></View> : null}
       </ScrollView>
     </SafeAreaView>
   );

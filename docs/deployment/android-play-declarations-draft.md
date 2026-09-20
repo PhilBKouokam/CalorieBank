@@ -124,3 +124,24 @@ item, not added Terms language in the privacy policy. No declarations submitted.
   ephemeral or promise deletion of every provider copy on CalorieBank deletion.
 - Existing worksheet rows are otherwise unchanged; security/contract uncertainties
   are not converted into affirmative attestations. No declarations submitted.
+
+## September 19 Play Console status (supersedes earlier NOT SUBMITTED headings)
+
+Founder approved service-provider/user-initiated-transfer exceptions where supported.
+Data safety is **saved in Publishing overview, not sent for Google review**. Collected
+categories: email, user IDs, health/fitness, diagnostics, app interactions, optional
+planning/user-generated content, device identifiers. Retained rather than ephemeral;
+no advertising purposes. Encryption Yes follows Google's device-to-server scope,
+HTTPS build enforcement and official Clerk/Expo/Firebase transport evidence; no
+blanket internal-database TLS claim. Published privacy/deletion URLs supplied.
+
+Saved Health categories: Activity and fitness + Nutrition and weight management.
+Audience saved 18 and over for current V1 with explicit founder approval only; no
+permanent age-policy change. Ads No, government No, financial features None. Content
+ratings saved ESRB Everyone / PEGI 3, separate from intended audience.
+
+The founder authorized the missing in-app privacy-policy link required by Google's
+health-app policy. The minimal Android Settings row is implemented and the full
+830-test release gate passed. Physical link verification on the Play binary remains
+pending. Store text is saved as a draft; the feature graphic has the founder-requested revised message and
+actual screenshots remain pending. Asset upload awaits Chrome file-URL permission. No AAB or Google review submission yet.
