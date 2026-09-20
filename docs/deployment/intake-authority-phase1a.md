@@ -65,6 +65,43 @@ Testers update through TestFlight or Google Play. No account recreation or blank
 provider reconnection is required. Actual version floors and the mixed-device error
 qualification remain release evidence to collect; do not enable Phase 1B beforehand.
 
+## Final physical qualification follow-up — September 20, 2026
+
+The focused qualification rerun passed **62 tests across five files**:
+`intake-authority.persistence`, `intake-forward-compatibility`,
+`native-intake-client`, `onboarding-journeys`, and `foreground-refresh`.
+It used the dedicated localhost test database, not production. API `/health`
+returned `ok` and `/health/ready` returned `ok` / `database: ready`.
+
+Evidence limits remain material: future-source Today/History coverage is schema
+and read-model coverage; Settings is rendered with mocked platform/API state;
+native refresh and account isolation use mocked dependencies. These results do
+not demonstrate installed-binary relaunch, native accessibility, or physical
+source switching. No physical-device control surface was available in this
+follow-up. Device operation and account identification were requested so persisted
+before-state can be captured before a switch. No physical acceptance is claimed.
+
+Inspection confirms mobile application/schema logic is unchanged from `16e76c7`
+(the subsequent mobile diff is submission configuration only). The request client
+in these builds sends no future-authority capability header. Therefore iOS build
+4 and Android versionCode 3 are candidate **parsing compatibility floors**, not
+proof of an already implemented manual-enablement protocol.
+
+The recommended Phase 1B protocol is a strictly parsed, allowlisted request header
+such as `X-CalorieBank-Intake-Protocol: 1`, introduced in the separately authorized
+Phase 1B client. Absent/invalid capability selects the legacy protocol. Before
+serializing an unsupported authority anywhere (including historical snapshots),
+the server must return a non-success update-required response without the unknown
+source payload. Legacy requests must also be prevented from replacing/clearing
+unsupported authority or uploading conflicting evidence. The same guard must cover
+source selection, native uploads, and asynchronous provider connection completion;
+checking enrollment alone is insufficient. Normal known-only accounts retain the
+legacy contract. Capability is protocol negotiation, never account authorization
+or proof of binary authenticity; verified Clerk ownership and source validation
+remain mandatory. The exact error status/body and old-client recovery behavior
+must be tested before enablement. This is a proposed gate, not implemented or
+qualified functionality, and no manual authority has been enabled.
+
 ## Privacy decision
 
 NO PUBLIC LEGAL PAGE UPDATE REQUIRED FOR PHASE 1A, based on the published source in

@@ -76,6 +76,14 @@ A capability declaration selects a protocol; it is not authentication or permiss
 Clerk ownership and strict server-side mutation validation remain mandatory. Do not
 rely on a user-agent or unverified version claim as a security boundary.
 
+The distributed Phase 1A clients do not yet declare that protocol capability.
+Their candidate floors (iOS build 4, Android versionCode 3) establish parsing
+compatibility only, subject to physical qualification. Phase 1B must introduce
+and qualify the per-request negotiation and legacy read/write rejection paths;
+it must cover unknown historical snapshots as well as current authority. See the
+[deployment qualification record](../deployment/intake-authority-phase1a.md)
+for the proposed protocol scope and remaining evidence limits.
+
 Sequence: qualify Phase 1A backend and both compatibility binaries, distribute via
 TestFlight/Play private testing, record their actual version floors, then stop.
 Phase 1B needs separate founder authorization and a qualified mixed-device gate.
