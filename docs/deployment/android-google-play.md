@@ -475,3 +475,7 @@ run there. The release gate itself always pins DATABASE_URL to its validated tes
 
 Commit uses Render's documented `[skip render]` directive to preserve the backend
 ([official guidance](https://render.com/docs/deploys#skipping-an-auto-deploy)).
+
+
+September 20: founder revised the feature-graphic message to “Enjoy your favorite
+treats guilt free”. SVG/PNG updated; no app code, build or deployment changed.
