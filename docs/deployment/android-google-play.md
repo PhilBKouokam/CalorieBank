@@ -500,3 +500,21 @@ Draft saved; nothing sent for review. No AAB, signing enrollment, testing releas
 Production/Open Testing release, Render deployment or TestFlight change. Next: resolve
 this declaration, complete listing, inspect Internal Testing signing, then create the
 one authorized AAB from the validated product.
+
+
+### September 20 — listing completed and signing inspected
+
+Founder confirmed the original CB icon was AI-generated and explicitly approved
+labeling both icon and feature graphic. Those two assets were selected; actual Pixel
+screenshots remained unselected. Saved listing status: **Ready to send for review**.
+No review submission or public release performed.
+
+Created the first empty Internal Testing release draft. Its enhancements say releases
+are signed by Google Play. App signing page reports an existing app signing key **In
+use**; no key enrollment/change action was taken. Upload certificate is not yet
+registered: Google says it will appear after first bundle upload. Signing compatibility
+with the existing preview must be checked before Pixel installation.
+
+The single `play-testing` AAB is next; final code remains the validated privacy-link
+implementation (830 passing tests). Tester email requested for the Pixel's actual
+Play Store account. Health Connect burn remains disabled.
