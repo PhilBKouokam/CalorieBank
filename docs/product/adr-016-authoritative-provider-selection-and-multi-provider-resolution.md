@@ -87,9 +87,9 @@ The pre-launch legacy Fitbit transport, OAuth endpoints, `summary.caloriesOut` p
 ## Phase 1A supersession (ADR 029)
 
 [ADR 029](./adr-029-effective-dated-intake-authority.md) supersedes this ADR's
-ordinary global **intake** switch reconciliation behavior once Phase 1A is qualified.
+ordinary global **intake** switch reconciliation behavior in the Phase 1A backend deployed September 20, 2026.
 Intake changes apply to the current unposted local date and prospective dates;
 prior completed dates retain their exact authority. Same-source provisional evidence
 corrections and explicit existing historical override operations remain supported.
-Expenditure selection behavior is unchanged. Qualification is pending; this note
-must not be read as production deployment evidence.
+Expenditure selection behavior is unchanged. Full mobile/physical qualification remains pending;
+see the [deployment record](../deployment/intake-authority-phase1a.md) for actual release evidence.

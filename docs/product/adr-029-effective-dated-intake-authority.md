@@ -1,6 +1,6 @@
 # ADR 029: Effective-dated intake authority and compatibility bridge
 
-Status: implementation contract; qualification pending (Phase 1A).
+Status: implemented and backend deployed September 20, 2026; mobile/physical Phase 1A qualification pending.
 
 ## Scope and supersession
 
