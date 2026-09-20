@@ -1,3 +1,4 @@
+import { lockIntakeAuthority } from '../provider-selection/intake-authority';
 import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import {
   V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE,
@@ -305,6 +306,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
   }
 
   private async lockDay(transaction: Prisma.TransactionClient, userId: string, logDate: string) {
+    await lockIntakeAuthority(transaction, userId);
     await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}), hashtext(${logDate}))`;
   }
 
@@ -368,7 +370,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       const expenditureProvider = authority.expenditureOverride?.provider
         ?? selection.authoritativeExpenditureProvider;
       const intakeProvider = authority.intakeOverride?.provider
-        ?? selection.authoritativeIntakeProvider;
+        ?? authority.intakeIdentity.provider;
       const burnSessions = sessions.filter((session) =>
         session.provider === expenditureProvider && session.datesQueried.includes(logDate));
       const foodSessions = sessions.filter((session) =>

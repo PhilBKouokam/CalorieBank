@@ -25,7 +25,7 @@ function connections(): HealthConnectionsResponse {
   const apple = data().intake.writerBundleIdentifier ? option('apple_health', data().intake.writerDisplayName!, true) : null;
   const fat = option('fatsecret', 'FatSecret');
   const native = data().intake.nativeIntakeSource ? { ...option('health_connect', data().intake.displayName), transportLabel: 'Health Connect', deviceManaged: true } : null;
-  const eaten = data().intake.authoritativeProvider === 'fatsecret' ? fat : data().intake.authoritativeProvider === 'health_connect' ? native : apple;
+  const eaten = data().intake.authoritativeProvider === 'fatsecret' ? fat : data().intake.authoritativeProvider === 'health_connect' ? native : data().intake.authoritativeProvider === 'apple_health' ? apple : { ...option('future-source-v1', 'Calorie source'), status: 'available' as const };
   return {
     burned: { selected: data().expenditure.selected ? burn : null, alternatives: data().expenditure.selected ? [] : [option('google_health_fitbit', 'Fitbit')], canChange: !data().expenditure.selected, canAddSource: true },
     eaten: { selected: data().intake.selected ? eaten : null, alternatives: [apple, fat].filter((p): p is HealthConnectionOption => p !== null && p.optionId !== eaten?.optionId), canChange: true, canAddSource: true },
@@ -334,5 +334,20 @@ describe('Android qualified direct-provider journeys', () => {
     await press('Add food source');
     expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch/);
     expect(data()).toEqual(before);
+  });
+});
+
+
+describe('future intake authority presentation', () => {
+  it.each(['ios', 'android'])('keeps %s Settings neutral without automatic source writes', async (platform) => {
+    h.os = platform;
+    data().intake = { ...data().intake, selected: true, authoritativeProvider: 'manual_estimate', displayName: 'Calorie source', status: 'ready', writerBundleIdentifier: null, writerDisplayName: null };
+    const before = structuredClone(data());
+    await mountSettings();
+    expect(text(screen!.root)).toContain('Calorie source');
+    expect(text(screen!.root)).toContain('Selected');
+    expect(text(screen!.root)).not.toContain('manual_estimate');
+    expect(data()).toEqual(before);
+    expect(h.saves).toEqual([]);
   });
 });

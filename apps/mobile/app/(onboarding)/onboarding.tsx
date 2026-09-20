@@ -1,3 +1,4 @@
+import { isKnownIntakeProvider } from '@caloriebank/schemas';
 import { AndroidFoodChoices } from '@/components/caloriebank/AndroidFoodChoices';
 import { beginOnboardingProviderReturn } from '@/lib/auth/native-intent';
 import { nativeSourceRecoveryStage } from '@/lib/native-health/presentation';
@@ -30,6 +31,7 @@ import {
   fetchDailyBankTarget,
   fetchProviderSelection,
   saveProviderSelection,
+  selectHealthConnectionRole,
   startFatSecretAuthorization,
   startFitbitAuthorization,
   MOBILE_INTEGRATION_REDIRECT_URI,
@@ -258,6 +260,16 @@ export default function OnboardingScreen() {
 
   async function selectProvider(input: Partial<ProviderSelectionInput>) {
     const current = await fetchProviderSelection();
+    const intakeProvider = input.authoritativeIntakeProvider ?? current.intake.authoritativeProvider;
+    if (!isKnownIntakeProvider(intakeProvider)) {
+      // Explicit burn changes use the role-only endpoint: never substitute an
+      // intake default simply to satisfy the legacy multi-role request shape.
+      if (input.authoritativeExpenditureProvider) {
+        await selectHealthConnectionRole('burned', input.authoritativeExpenditureProvider === 'google_health_fitbit' ? 'burned-fitbit-v1' : 'burned-apple-health-v1');
+        return;
+      }
+      throw new Error('Choose a supported source to change calories eaten.');
+    }
     await saveProviderSelection({
       selectionRole: input.authoritativeIntakeProvider ? 'eaten' : 'burned',
       authoritativeExpenditureProvider:
@@ -265,7 +277,7 @@ export default function OnboardingScreen() {
       authoritativeActivityProvider:
         input.authoritativeActivityProvider ?? current.activityContext.authoritativeProvider,
       authoritativeIntakeProvider:
-        input.authoritativeIntakeProvider ?? current.intake.authoritativeProvider,
+        intakeProvider,
       ...('appleHealthIntakeWriter' in input
         ? { appleHealthIntakeWriter: input.appleHealthIntakeWriter }
         : {}),

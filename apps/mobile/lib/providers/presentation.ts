@@ -21,5 +21,5 @@ const consumerSourceNames: Readonly<Record<string, string>> = {
 
 export function getConsumerSourceName(source: string | null | undefined) {
   if (!source) return 'Connected source';
-  return sourceLabel(consumerSourceNames[source] ?? 'Connected source');
+  return sourceLabel(consumerSourceNames[source] ?? 'Calorie source');
 }

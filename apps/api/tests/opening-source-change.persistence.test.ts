@@ -135,4 +135,60 @@ describe('Opening Bank source-context recovery', () => {
     await db.ingestionSyncSession.create({ data: { userId: user.id, provider: 'apple_health', localDate: date(today), timezone: zone, trigger: 'manual_refresh', status: 'completed', startedAt: new Date(selection.updatedAt.getTime() - 100), completedAt: new Date(selection.updatedAt.getTime() + 100), expenditureStatus: 'ready', intakeStatus: 'ready', datesQueried: openingImportDates(today) } });
     expect((await readOpeningImportState(db, user.id, today)).expenditure).toBe('preparing');
   });
+
+it('Phase 1A metadata migration and intake switching preserve populated Opening Bank, Recovery, History and ledger', async () => {
+  const user = await account();
+  await checked(user.id); await history(user.id);
+  expect((await bank.initializeOpeningBank(user, today, zone)).outcome).toBe('initialized');
+  await db.dailyExpenditureAggregate.create({ data: {
+    userId: user.id, localDate: date(today), timezone: zone, provider: 'apple_health', providerRecordId: `${user.id}:next:burn`,
+    rawTotalDailyExpenditure: 1000, adjustedDailyExpenditure: 800, adjustmentFactor: 0.8,
+    importedAt: new Date('2026-09-09T18:00:00Z'), syncStatus: 'ready', isCurrentDay: false,
+  } });
+  await db.dailyIntakeAggregate.create({ data: {
+    userId: user.id, localDate: date(today), timezone: zone, provider: 'fatsecret', providerRecordId: `${user.id}:next:food`,
+    totalCaloriesConsumed: 2000, importedAt: new Date('2026-09-09T18:00:00Z'), syncStatus: 'ready', isCurrentDay: false,
+  } });
+  const nextBank = new PrismaBankHistoryRepository(db, { now: () => new Date('2026-09-09T18:00:00Z') });
+  await nextBank.reconcileStoredDay(user, today, zone);
+  const capture = async () => ({
+    opening: await db.bankAccountInitialization.findUnique({ where: { userId: user.id } }),
+    openingDays: await db.openingBankCalculationDay.findMany({ where: { userId: user.id } }),
+    finalized: await db.finalizedDailyBankRecord.findMany({ where: { userId: user.id } }),
+    snapshots: await db.bankCalculationSnapshot.findMany({ where: { userId: user.id } }),
+    ledger: await db.calorieLedgerTransaction.findMany({ where: { userId: user.id } }),
+    summary: await nextBank.getSummary(user.id),
+    history: await nextBank.getHistory(user.id, 'ALL'),
+  });
+  const before = await capture();
+  expect(before.openingDays).toHaveLength(1);
+  expect(before.finalized).toHaveLength(1);
+  expect(before.summary.availableBankCalories).toBe(0);
+  expect(before.summary.recoveryCalories).toBe(700);
+  // Execute the actual additive migration against a separate audit table in this
+  // dedicated test database; existing populated accounting remains untouched.
+  const { readFileSync } = await import('node:fs');
+  const { resolve } = await import('node:path');
+  const auditName = `ia_${user.id.slice(0, 8)}`;
+  const sql = readFileSync(resolve(__dirname, '../prisma/migrations/20260920000000_intake_authority_boundaries/migration.sql'), 'utf8').replaceAll('intake_authority', auditName).replace('REFERENCES "users"', `REFERENCES "${auditName}_users"`).replace('FROM provider_selections', `FROM "${auditName}_selections"`);
+  await db.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(`CREATE TABLE "${auditName}_users" AS SELECT id FROM users WHERE id = $1::uuid`, user.id);
+    await tx.$executeRawUnsafe(`ALTER TABLE "${auditName}_users" ADD PRIMARY KEY (id)`);
+    await tx.$executeRawUnsafe(`CREATE TABLE "${auditName}_selections" AS SELECT * FROM provider_selections WHERE user_id = $1::uuid`, user.id);
+    for (const statement of sql.split(';').filter((part) => part.trim() && !['BEGIN', 'COMMIT'].includes(part.trim()))) await tx.$executeRawUnsafe(statement);
+    const rows = await tx.$queryRawUnsafe<Array<{ provider: string; effective_from: Date | null }>>(`SELECT provider, effective_from FROM "${auditName}_boundaries" WHERE user_id = $1::uuid`, user.id);
+    expect(rows).toEqual([{ provider: 'fatsecret', effective_from: null }]);
+    // Replaying only the deterministic metadata insert is harmless.
+    const insert = sql.slice(sql.indexOf('INSERT INTO'), sql.lastIndexOf('COMMIT;'));
+    await tx.$executeRawUnsafe(insert);
+    await tx.$executeRawUnsafe(`DROP TABLE "${auditName}_boundaries"`);
+    await tx.$executeRawUnsafe(`DROP TABLE "${auditName}_selections", "${auditName}_users"`);
+  });
+  expect(await capture()).toEqual(before);
+  await sources.update(user, { selectionRole: 'eaten', authoritativeExpenditureProvider: 'apple_health', authoritativeIntakeProvider: 'apple_health', appleHealthIntakeWriter: { bundleIdentifier: 'new.writer', displayName: 'New tracker' } });
+  expect(await capture()).toEqual(before);
+  await nextBank.reconcileStoredDay(user, today, zone);
+  expect(await capture()).toEqual(before);
+});
+
 });

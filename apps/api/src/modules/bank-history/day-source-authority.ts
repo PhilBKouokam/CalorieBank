@@ -1,3 +1,4 @@
+import { resolveIntakeAuthority } from '../provider-selection/intake-authority';
 import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import { createHash } from 'node:crypto';
 import { canProvideAuthoritativeExpenditure, getLocalDateUtcBounds, getProviderCapabilities, type ProviderId } from '@caloriebank/domain';
@@ -85,7 +86,7 @@ export function consumerProviderName(provider: string, intakeDisplayName?: strin
   if (provider === 'apple_health') return 'Apple Health';
   if (provider === 'health_connect') return 'Health Connect';
   if (provider === 'fatsecret') return 'FatSecret';
-  return 'Connected source';
+  return 'Calorie source';
 }
 
 export function historicalOptionId(userId: string, localDate: string, role: HistoricalRole, provider: string, writer: string | null) {
@@ -146,6 +147,19 @@ export async function resolveDaySourceAuthority(
       record,
     }));
 
+  const [datedIntake, snapshot] = await Promise.all([
+    resolveIntakeAuthority(db, userId, localDate, selection),
+    db.bankCalculationSnapshot.findFirst({
+      where: { userId, finalizedDailyBankRecord: { logDate: localDate } },
+      orderBy: { version: 'desc' },
+    }),
+  ]);
+  // Posted authority is stable; only evidence from that exact identity may revise.
+  const intakeIdentity = snapshot ? {
+    provider: snapshot.intakeProvider,
+    writerId: snapshot.intakeWriterBundleIdentifier,
+    sourceId: snapshot.intakeSourceId,
+  } : datedIntake;
   const expenditureOverride = overrides.find((item) => item.role === 'EXPENDITURE');
   const intakeOverride = overrides.find((item) => item.role === 'INTAKE');
   const selectedExpenditure = expenditureOverride
@@ -158,13 +172,14 @@ export async function resolveDaySourceAuthority(
         (item.provider !== 'health_connect' || item.sourceId === intakeOverride.intakeSourceId),
       ) ?? null
     : intake.find((item) =>
-        item.provider === selection.authoritativeIntakeProvider &&
-        matchesSelectedIntakeSource(item, selection),
+        item.provider === intakeIdentity.provider &&
+        matchesSelectedIntakeSource(item, { appleHealthIntakeWriterBundleId: intakeIdentity.writerId, nativeIntakeSourceId: intakeIdentity.sourceId }),
       ) ?? null;
 
   return {
     expenditure,
     intake,
+    intakeIdentity,
     selectedExpenditure,
     selectedIntake,
     expenditureOverride: expenditureOverride ?? null,

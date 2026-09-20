@@ -290,6 +290,12 @@ export const providerSelectionResponseSchema = z.object({
     writerDisplayName: z.string().min(1).nullable(),
     nativeIntakeSource: nativeIntakeSourceSchema.nullable().optional(),
     selectionRevision: z.string().datetime().optional(),
+    refreshPlan: z.array(z.object({
+      localDate: dateStringSchema,
+      provider: z.string().min(1).max(100),
+      writerId: z.string().min(1).nullable(),
+      sourceId: z.string().min(1).nullable(),
+    })).max(8).optional(),
   }),
   connectedProviders: z.array(
     z.object({
@@ -317,6 +323,8 @@ export const providerSelectionResponseSchema = z.object({
 });
 
 export const healthConnectionRoleStatusSchema = z.enum([
+  // Authority without an external connection. Phase 1A serializers never emit it.
+  'available',
   'connected',
   'needs_attention',
   'no_data',
@@ -998,7 +1006,18 @@ export type TodayResponse = z.infer<typeof todayResponseSchema>;
 export type IngestionProvider = z.infer<typeof ingestionProviderSchema>;
 export type BankingProvider = z.infer<typeof bankingProviderSchema>;
 export type ProviderSelectionInput = z.infer<typeof providerSelectionInputSchema>;
-export type ProviderSelectionResponse = z.infer<typeof providerSelectionResponseSchema>;
+// Domain mutations and the Phase 1A server serializer remain closed. Only readers
+// accept a future intake identity; it must never enter known-provider operations.
+export const compatibleProviderSelectionResponseSchema = providerSelectionResponseSchema.extend({
+  intake: providerSelectionResponseSchema.shape.intake.extend({
+    authoritativeProvider: z.string().min(1).max(100).regex(/^[a-z][a-z0-9_]*$/),
+  }).transform((intake) => intakeProviderSchema.safeParse(intake.authoritativeProvider).success
+    ? intake : { ...intake, displayName: 'Calorie source' }),
+});
+export function isKnownIntakeProvider(value: string): value is z.infer<typeof intakeProviderSchema> {
+  return intakeProviderSchema.safeParse(value).success;
+}
+export type ProviderSelectionResponse = z.infer<typeof compatibleProviderSelectionResponseSchema>;
 export type HealthConnectionRoleStatus = z.infer<typeof healthConnectionRoleStatusSchema>;
 export type HealthConnectionOption = z.infer<typeof healthConnectionOptionSchema>;
 export type HealthConnectionsResponse = z.infer<typeof healthConnectionsResponseSchema>;

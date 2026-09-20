@@ -1,3 +1,4 @@
+import { intakeRefreshPlan } from '../provider-selection/intake-authority';
 import type { PrismaClient } from '@prisma/client';
 
 import { AppError } from '../../errors';
@@ -126,7 +127,9 @@ export class AccountLifecycleCoordinator {
           select: { provider: true },
         })
       : [];
+    const intakePlan = await intakeRefreshPlan(this.db, user.id, datesRequested, selection);
     const providers = new Set([
+      ...intakePlan.map((authority) => authority.provider),
       selection.authoritativeExpenditureProvider,
       selection.authoritativeIntakeProvider,
       ...overrides.map((override) => override.provider),

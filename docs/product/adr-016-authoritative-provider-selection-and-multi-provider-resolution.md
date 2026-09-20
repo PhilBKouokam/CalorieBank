@@ -83,3 +83,13 @@ The pre-launch legacy Fitbit transport, OAuth endpoints, `summary.caloriesOut` p
 - **Always fall back silently:** can change banking inputs without informed user selection.
 - **Combine activity context across providers:** duplicates steps and sessions and obscures which ecosystem is authoritative.
 - **Rewrite locked QA days:** violates immutable locked-history policy.
+
+## Phase 1A supersession (ADR 029)
+
+[ADR 029](./adr-029-effective-dated-intake-authority.md) supersedes this ADR's
+ordinary global **intake** switch reconciliation behavior once Phase 1A is qualified.
+Intake changes apply to the current unposted local date and prospective dates;
+prior completed dates retain their exact authority. Same-source provisional evidence
+corrections and explicit existing historical override operations remain supported.
+Expenditure selection behavior is unchanged. Qualification is pending; this note
+must not be read as production deployment evidence.

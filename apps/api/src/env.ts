@@ -5,6 +5,7 @@ import { z } from 'zod';
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   APP_ENV: z.enum(['local', 'beta', 'production']).default('local'),
+  INTAKE_AUTHORITY_TRANSITIONS_ENABLED: z.enum(['0', '1']).default('0'),
   AUTH_MODE: z.enum(['development', 'clerk']).default('development'),
   CLERK_PUBLISHABLE_KEY: z.string().trim().min(1).optional(),
   CLERK_SECRET_KEY: z.string().trim().min(1).optional(),

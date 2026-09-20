@@ -1,3 +1,4 @@
+import { intakeRefreshPlan, resolveIntakeAuthority } from '../provider-selection/intake-authority';
 import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import {
   calculateRestOfDayBurnProjection,
@@ -247,10 +248,12 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     if (aggregate.provider === 'health_connect') throw new AppError('Use the native intake batch endpoint.', 400);
     if (aggregate.provider === 'apple_health') {
       const selection = await readProviderSelection(this.db, user.id);
+      const plan = await intakeRefreshPlan(this.db, user.id, [aggregate.localDate], selection);
       if (
         !aggregate.writerBundleIdentifier ||
         !aggregate.writerDisplayName ||
-        selection.appleHealthIntakeWriterBundleId !== aggregate.writerBundleIdentifier
+        (selection.appleHealthIntakeWriterBundleId !== aggregate.writerBundleIdentifier &&
+          !plan.some((entry) => entry.provider === 'apple_health' && entry.writerId === aggregate.writerBundleIdentifier))
       ) {
         throw new AppError('Apple Health intake does not match the selected food tracker.', 409, {
           code: 'APPLE_HEALTH_INTAKE_WRITER_MISMATCH',
@@ -258,11 +261,23 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       }
     }
     await this.ensureUser(user, aggregate.timezone);
+    // Preserve legacy rows and their provenance; additional Apple writers get
+    // separate deterministic storage identities, including for old client uploads.
+    const legacyApple = aggregate.provider === 'apple_health' ? await this.db.dailyIntakeAggregate.findUnique({
+      where: { userId_localDate_provider_sourceId: { userId: user.id, localDate: parseLocalDate(aggregate.localDate), provider: 'apple_health', sourceId: '' } },
+    }) : null;
+    const ownsLegacyApple = legacyApple?.writerBundleIdentifier === aggregate.writerBundleIdentifier;
+    const sourceId = aggregate.provider === 'apple_health'
+      ? ownsLegacyApple ? '' : aggregate.writerBundleIdentifier!
+      : aggregate.sourceId ?? '';
+    const providerRecordId = aggregate.provider === 'apple_health'
+      ? ownsLegacyApple ? legacyApple!.providerRecordId : `${aggregate.providerRecordId}:writer:${aggregate.writerBundleIdentifier}`
+      : aggregate.providerRecordId;
     const identity = {
       userId: user.id,
       localDate: parseLocalDate(aggregate.localDate),
       provider: aggregate.provider,
-      sourceId: aggregate.sourceId ?? '',
+      sourceId,
     };
     const existing = await this.db.dailyIntakeAggregate.findUnique({
       where: { userId_localDate_provider_sourceId: identity },
@@ -304,7 +319,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         where: { id: existing.id },
         data: {
           timezone: aggregate.timezone,
-          providerRecordId: aggregate.providerRecordId,
+          providerRecordId,
           totalCaloriesConsumed: aggregate.totalCaloriesConsumed,
           writerBundleIdentifier: aggregate.writerBundleIdentifier ?? null,
           writerDisplayName: aggregate.writerDisplayName ?? null,
@@ -324,7 +339,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         data: {
           ...identity,
           timezone: aggregate.timezone,
-          providerRecordId: aggregate.providerRecordId,
+          providerRecordId,
           totalCaloriesConsumed: aggregate.totalCaloriesConsumed,
           writerBundleIdentifier: aggregate.writerBundleIdentifier ?? null,
           writerDisplayName: aggregate.writerDisplayName ?? null,
@@ -630,6 +645,8 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       readProviderSelection(db, userId),
       db.restingBurnEstimate.findUnique({ where: { userId } }),
     ]);
+    const datedIntake = await resolveIntakeAuthority(db, userId, date, selection);
+    const intakeSelection = { appleHealthIntakeWriterBundleId: datedIntake.writerId, nativeIntakeSourceId: datedIntake.sourceId };
     const syntheticExpenditure = this.options.allowSyntheticProviders && expenditureRecords.length > 0 && expenditureRecords.every((record) => isSyntheticProvider(record.provider));
     const syntheticIntake = this.options.allowSyntheticProviders && intakeRecords.length > 0 && intakeRecords.every((record) => isSyntheticProvider(record.provider));
     const expenditure = resolveAuthoritativeProviderRecord(expenditureRecords, {
@@ -639,10 +656,10 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     });
     const usableIntakeRecords = intakeRecords.filter((record) =>
       (record.syncStatus === 'ready' || record.syncStatus === 'stale' || record.syncStatus === 'partial') &&
-      matchesSelectedIntakeSource(record, selection),
+      matchesSelectedIntakeSource(record, intakeSelection),
     );
     const intake = resolveAuthoritativeProviderRecord(usableIntakeRecords, {
-      authoritativeProvider: syntheticIntake ? 'development' : selection.authoritativeIntakeProvider,
+      authoritativeProvider: syntheticIntake ? 'development' : datedIntake.provider,
       allowFallback: false,
     });
     const syntheticContext = this.options.allowSyntheticProviders &&
@@ -663,7 +680,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         : contextProvider;
     const workouts = workoutRecords.filter((record) => record.provider === resolvedWorkoutProvider);
     const expenditureSession = sessions.find((session) => session.provider === (expenditure?.provider ?? selection.authoritativeExpenditureProvider)) ?? null;
-    const intakeSession = sessions.find((session) => session.provider === (intake?.provider ?? selection.authoritativeIntakeProvider)) ?? null;
+    const intakeSession = sessions.find((session) => session.provider === (intake?.provider ?? datedIntake.provider)) ?? null;
     const contextSession = sessions.find((session) => session.provider === contextProvider) ?? null;
     const expenditureSyncedAt = expenditureSession?.completedAt ?? expenditureSession?.startedAt ?? null;
     const intakeSyncedAt = intakeSession?.completedAt ?? intakeSession?.startedAt ?? null;

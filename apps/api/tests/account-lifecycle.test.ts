@@ -92,6 +92,8 @@ describe('account lifecycle coordinator', () => {
     const fatSecret = { syncRollingWindow: vi.fn().mockResolvedValue({}) };
     const finalization = { execute: vi.fn().mockResolvedValue({ datesReconciled: [], datesLocked: [], waitingDates: [], errors: [] }) };
     const db = {
+      intakeAuthorityBoundary: { findMany: vi.fn().mockResolvedValue([]), findFirst: vi.fn().mockResolvedValue(null) },
+      bankCalculationSnapshot: { findMany: vi.fn().mockResolvedValue([]) },
       bankAccountInitialization: { findUnique: vi.fn().mockResolvedValue(options.openingIncomplete ? { status: 'WAITING_FOR_OPENING_DATA' } : null) },
       ingestionSyncSession: { findMany: vi.fn().mockResolvedValue([]) },
       userProfile: { findMany: vi.fn().mockResolvedValue([]) },

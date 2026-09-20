@@ -128,7 +128,8 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
   const authentication = dependencies.authenticationBoundary ??
     createAuthenticationBoundary(config, prisma);
   const providerSelectionRepository = dependencies.providerSelectionRepository ??
-    new PrismaProviderSelectionRepository(prisma, bankHistoryRepository);
+    new PrismaProviderSelectionRepository(prisma, bankHistoryRepository, undefined,
+      config.APP_ENV === 'local' || config.INTAKE_AUTHORITY_TRANSITIONS_ENABLED === '1');
   const onboardingRepository = dependencies.onboardingRepository ??
     new PrismaOnboardingRepository(prisma, providerSelectionRepository, bankHistoryRepository);
   const googleHealthFitbitService = new GoogleHealthFitbitService(

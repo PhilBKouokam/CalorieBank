@@ -653,7 +653,7 @@ describe('provider-neutral Today ingestion', () => {
         writerDisplayName: 'Cronometer',
         providerUpdatedAt: secondUpdatedAt.toISOString(),
       })
-      .expect(200, { result: 'updated' });
+      .expect(200, { result: 'created' });
 
     const syntheticRepository = new PrismaTodayAggregateRepository(prisma);
     await new TodayIngestionService({
@@ -693,7 +693,7 @@ describe('provider-neutral Today ingestion', () => {
     expect(bankSummary.body.availableBankCalories).toBe(0);
     expect(plannedTreat.body).toMatchObject({ status: 'no_plan', availableBankCalories: 0 });
     expect(expenditureCount).toBe(1);
-    expect(intakeCount).toBe(1);
+    expect(intakeCount).toBe(2); // Unattributed legacy evidence remains intact.
     expect(ledgerCount).toBe(0);
   });
 });

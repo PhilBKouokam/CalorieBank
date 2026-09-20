@@ -1,3 +1,4 @@
+import { intakeRefreshPlan } from '../provider-selection/intake-authority';
 import { nativeIntakeBatchSchema, nativeIntakeSourceName } from '@caloriebank/schemas';
 import type { PrismaClient } from '@prisma/client';
 import { Router } from 'express';
@@ -28,8 +29,8 @@ export function createNativeIntakeRouter(db: PrismaClient, users: RequestUserSou
       const session = await db.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${user.id}), hashtext('opening-bank'))`;
         const selected = await tx.providerSelection.findUnique({ where: { userId: user.id } });
-        if (!selected?.intakeSelected || selected.authoritativeIntakeProvider !== 'health_connect' ||
-            selected.nativeIntakeSourceId !== input.source.id || selected.updatedAt.toISOString() !== input.selectionRevision ||
+        const plan = selected ? await intakeRefreshPlan(tx, user.id, dates, selected) : [];
+        if (!selected?.intakeSelected || !plan.some((entry) => entry.provider === 'health_connect' && entry.sourceId === input.source.id) || selected.updatedAt.toISOString() !== input.selectionRevision ||
             startedAt < selected.updatedAt) {
           throw new AppError('Your food source changed. Refresh again.', 409, { code: 'NATIVE_INTAKE_SELECTION_CHANGED' });
         }

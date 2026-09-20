@@ -1323,3 +1323,10 @@ Banking Goals decisions are governed comprehensively by ADR 013. Implementation 
 - What duplicate-suppression and cooldown rules apply by activity and notification category?
 - What delivery-history retention period is appropriate for fatigue controls and privacy?
 - What user controls are required to mute a specific activity, disable activity nudges, or disable goal-linked nudges?
+
+### Post-Android Phase 1A technical prerequisite
+
+[ADR 029](./adr-029-effective-dated-intake-authority.md) defines prospective intake
+authority and forward-compatible mobile reads. No Manual Intake product UI is
+enabled in this foundation phase. Known-source presentation and bank formulas
+remain unchanged. See the [manual-intake rollout prerequisite](./manual-estimated-intake.md).

@@ -553,6 +553,13 @@ async function performAppleHealthRollingWindowSync({
         : providerSelection.intake.writerBundleIdentifier
           ? 'missing'
           : 'selection_required';
+  const historicalWriters = new Map<string, Awaited<ReturnType<typeof sourceForSelectedWriter>>>();
+  for (const authority of providerSelection.intake.refreshPlan ?? []) {
+    if (authority.provider === 'apple_health' && authority.writerId && !historicalWriters.has(authority.writerId)) {
+      historicalWriters.set(authority.writerId, await sourceForSelectedWriter(authority.writerId));
+      assertAccountContext(context);
+    }
+  }
   const previousDiagnostics = await getAppleHealthDiagnostics(context.scope);
   const diagnostics = createHealthKitDiagnosticsSnapshot({
     ...previousDiagnostics,
@@ -590,14 +597,18 @@ async function performAppleHealthRollingWindowSync({
     assertAccountContext(context);
     if (index > 0) console.info(JSON.stringify({ component: 'historical_bootstrap', event: 'historical_date_requested', localDate: window.localDate }));
     const input = { userId: DEVICE_USER_ID, localDate: window.localDate, timezone: window.timezone, isCurrentDay: index === 0 };
+    const datedAuthority = providerSelection.intake.refreshPlan?.find((entry) => entry.localDate === window.localDate);
+    const datedWriter = providerSelection.intake.refreshPlan
+      ? datedAuthority?.provider === 'apple_health' && datedAuthority.writerId ? historicalWriters.get(datedAuthority.writerId) : null
+      : intakeWriter;
     const dependencies = {
       healthKit: nativeClient,
       dayStart: window.dayStart,
       dayEnd: window.dayEnd,
-      ...(intakeWriter ? { intakeWriter: {
-        source: intakeWriter.source,
-        bundleIdentifier: intakeWriter.bundleIdentifier,
-        displayName: intakeWriter.displayName,
+      ...(datedWriter ? { intakeWriter: {
+        source: datedWriter.source,
+        bundleIdentifier: datedWriter.bundleIdentifier,
+        displayName: datedWriter.displayName,
       } } : {}),
       onDiagnostic: (nativeDiagnostic: Omit<HealthKitQueryDiagnostic, 'localDate' | 'queryStart' | 'queryEnd' | 'error'> & { queryStart: Date; queryEnd: Date; error: unknown | null }) => {
         const queryDiagnostic: HealthKitQueryDiagnostic = {

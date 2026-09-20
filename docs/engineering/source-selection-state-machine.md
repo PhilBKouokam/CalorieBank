@@ -141,3 +141,11 @@ The founder confirmed these core journeys passed physical QA. They preserve inde
 selections, show the correct source in preparation, and offer a truthful
 retry/selection/checked-empty completion path. The compact
 Goal selector and all accounting/notification/authentication behavior are unchanged.
+
+## Phase 1A authority foundation (qualification pending)
+
+[ADR 029](../product/adr-029-effective-dated-intake-authority.md) replaces ordinary
+intake-switch historical reconciliation with date boundaries and posted source
+snapshots. Current role choice remains independent of external connection health.
+See the [mixed-version plan](../deployment/intake-authority-phase1a.md) for legacy
+projection, native historical refresh, rollback constraints and release gates.

@@ -55,3 +55,24 @@ describe('Android consumer nutrition boundary', () => {
     expect(await nativeIntake.refresh()).toBe('skipped'); expect(h.inspect).not.toHaveBeenCalled(); expect(h.upload).not.toHaveBeenCalled();
   });
 });
+
+describe('forward-compatible nutrition firewall', () => {
+  it('does not discover, upload, select or reconnect for a future authority', async () => {
+    h.fetch.mockResolvedValue({ intake: { selected: true, authoritativeProvider: 'manual_estimate', status: 'ready', selectionRevision: '2026-09-20T12:00:00.000Z', refreshPlan: [{ localDate: '2026-09-20', provider: 'manual_estimate', writerId: null, sourceId: null }] } });
+    expect(await nativeIntake.refresh()).toBe('skipped');
+    expect(h.inspect).not.toHaveBeenCalled();
+    expect(h.upload).not.toHaveBeenCalled();
+    expect(h.save).not.toHaveBeenCalled();
+    setNativeIntakeScope('account-b');
+    expect(await nativeIntake.select(source)).toBe('retry_required');
+    setNativeIntakeScope(null);
+    expect(await nativeIntake.refresh()).toBe('skipped');
+    expect(h.save).not.toHaveBeenCalled();
+  });
+  it('refreshes an authorized historical native writer without replacing current direct authority', async () => {
+    h.fetch.mockResolvedValue({ intake: { authoritativeProvider: 'fatsecret', selectionRevision: '2026-09-11T11:00:00.000Z', refreshPlan: [{ localDate: '2026-09-10', provider: 'health_connect', sourceId: source.id, writerId: null }] } });
+    expect(await nativeIntake.refresh()).toBe('ready');
+    expect(h.inspect).toHaveBeenCalledWith(source.id);
+    expect(h.save).not.toHaveBeenCalled();
+  });
+});

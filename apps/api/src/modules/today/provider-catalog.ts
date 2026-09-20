@@ -9,7 +9,7 @@ const providerDisplayNames: Readonly<Record<string, string>> = {
 };
 
 export function getProviderDisplayName(provider: string) {
-  return providerDisplayNames[provider] ?? provider;
+  return providerDisplayNames[provider] ?? 'Calorie source';
 }
 
 export function isSyntheticProvider(provider: string) {

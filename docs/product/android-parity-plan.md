@@ -650,3 +650,11 @@ No product change, extra build, public release, Render deployment or TestFlight 
 Health Connect burn remains disabled. Private Internal Testing is available to the
 one approved founder tester. Additional tester invitations and listing/closed-track
 review are not claimed complete. See the detailed distribution evidence above.
+
+### Phase 1A compatibility foundation
+
+Qualification pending under [ADR 029](./adr-029-effective-dated-intake-authority.md).
+Android must tolerate future intake identities without source writes and use exact
+writer/date refresh plans. Play remains READ_NUTRITION only; Health Connect burn
+remains disabled. No manual intake UI is exposed. The compatibility AAB must follow
+backend validation, then Pixel qualification and existing Play private testing.

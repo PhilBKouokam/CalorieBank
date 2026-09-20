@@ -1,3 +1,6 @@
+import { getLocalDateForTimezone } from '../today/today.time';
+import { openingImportDates } from '../bank-history/opening-bank-import';
+import { intakeRefreshPlan, resolveIntakeAuthority, sameIntakeIdentity, selectionIdentity, transitionIntakeAuthority } from './intake-authority';
 import { nativeIntakeSourceName } from '@caloriebank/schemas';
 import type {
   HealthConnectionOption,
@@ -5,7 +8,7 @@ import type {
   ProviderSelectionInput,
   ProviderSelectionResponse,
 } from '@caloriebank/schemas';
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import {
   canProvideAuthoritativeExpenditure,
   getProviderCapabilities,
@@ -91,26 +94,53 @@ export async function readProviderSelection(
   };
 }
 
+/** Current read projection follows the active civil-date boundary, including travel. */
+async function readEffectiveCurrentSelection(db: Prisma.TransactionClient, userId: string, now: Date) {
+  const [selection, profile] = await Promise.all([
+    readProviderSelection(db, userId),
+    db.userProfile.findUnique({ where: { userId }, select: { timezone: true } }),
+  ]);
+  const localDate = getLocalDateForTimezone(profile?.timezone ?? 'UTC', now);
+  const identity = await resolveIntakeAuthority(db, userId, new Date(`${localDate}T00:00:00.000Z`), selection);
+  if (sameIntakeIdentity(selectionIdentity(selection), identity)) return selection;
+  if (identity.provider === 'unselected') return { ...selection, intakeSelected: false };
+  const writer = identity.provider === 'apple_health' ? await db.dailyIntakeAggregate.findFirst({
+    where: { userId, provider: 'apple_health', writerBundleIdentifier: identity.writerId },
+    orderBy: { updatedAt: 'desc' }, select: { writerDisplayName: true },
+  }) : null;
+  return {
+    ...selection,
+    authoritativeIntakeProvider: identity.provider,
+    ...(identity.provider === 'apple_health' ? {
+      appleHealthIntakeWriterBundleId: identity.writerId,
+      appleHealthIntakeWriterDisplayName: writer?.writerDisplayName ?? null,
+    } : {}),
+    ...(identity.provider === 'health_connect' ? { nativeIntakeSourceId: identity.sourceId } : {}),
+  };
+}
+
 export class PrismaProviderSelectionRepository implements ProviderSelectionRepository {
   constructor(
     private readonly db: PrismaClient,
     private readonly bankHistory: BankHistoryRepository,
+    private readonly now: () => Date = () => new Date(),
+    private readonly transitionsEnabled = true,
   ) {}
 
-  private async response(userId: string): Promise<ProviderSelectionResponse> {
-    const selection = await readProviderSelection(this.db, userId);
+  private async responseInTransaction(userId: string, db: Prisma.TransactionClient): Promise<ProviderSelectionResponse> {
+    const selection = await readEffectiveCurrentSelection(db, userId, this.now());
     const [googleHealth, externalConnections, appleSync, appleExpenditure, appleIntake, fatSecretIntake, appleSteps, appleWorkout, fitbitExpenditure] = await Promise.all([
-      this.db.googleHealthConnection.findUnique({ where: { userId } }),
-      this.db.externalProviderConnection.findMany({ where: { userId } }),
-      this.db.ingestionSyncSession.findFirst({
+      db.googleHealthConnection.findUnique({ where: { userId } }),
+      db.externalProviderConnection.findMany({ where: { userId } }),
+      db.ingestionSyncSession.findFirst({
         where: { userId, provider: 'apple_health', completedAt: { not: null } },
         orderBy: { completedAt: 'desc' },
       }),
-      this.db.dailyExpenditureAggregate.findFirst({
+      db.dailyExpenditureAggregate.findFirst({
         where: { userId, provider: 'apple_health', syncStatus: { in: ['ready', 'stale', 'partial'] } },
         orderBy: { updatedAt: 'desc' },
       }),
-      this.db.dailyIntakeAggregate.findFirst({
+      db.dailyIntakeAggregate.findFirst({
         where: {
           userId,
           provider: 'apple_health',
@@ -121,17 +151,17 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         },
         orderBy: { updatedAt: 'desc' },
       }),
-      this.db.dailyIntakeAggregate.findFirst({
+      db.dailyIntakeAggregate.findFirst({
         where: { userId, provider: 'fatsecret', syncStatus: { in: ['ready', 'stale', 'partial'] } },
         orderBy: { updatedAt: 'desc' },
       }),
-      this.db.dailyStepAggregate.findFirst({
+      db.dailyStepAggregate.findFirst({
         where: { userId, provider: 'apple_health' }, orderBy: { updatedAt: 'desc' },
       }),
-      this.db.currentDayWorkout.findFirst({
+      db.currentDayWorkout.findFirst({
         where: { userId, provider: 'apple_health' }, orderBy: { updatedAt: 'desc' },
       }),
-      this.db.dailyExpenditureAggregate.findFirst({
+      db.dailyExpenditureAggregate.findFirst({
         where: { userId, provider: 'google_health_fitbit', syncStatus: { in: ['ready', 'stale', 'partial'] } },
         select: { id: true },
       }),
@@ -164,10 +194,14 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       capabilities: getProviderCapabilities(provider),
     });
     const selectedActivityProvider = selection.authoritativeActivityProvider as Exclude<ProviderId, 'fatsecret' | 'health_connect'>;
-    const nativeIntake = selection.nativeIntakeSourceId ? await this.db.dailyIntakeAggregate.findFirst({
+    const nativeIntake = selection.nativeIntakeSourceId ? await db.dailyIntakeAggregate.findFirst({
       where: { userId, provider: 'health_connect', sourceId: selection.nativeIntakeSourceId, syncStatus: { in: ['ready', 'stale', 'partial'] } },
     }) : null;
-    const storedSelection = await this.db.providerSelection.findUnique({ where: { userId } });
+    const storedSelection = await db.providerSelection.findUnique({ where: { userId } });
+    const profile = await db.userProfile.findUnique({ where: { userId }, select: { timezone: true } });
+    const refreshPlan = await intakeRefreshPlan(db, userId,
+      openingImportDates(getLocalDateForTimezone(profile?.timezone ?? 'UTC', this.now())), selection);
+
     return {
       expenditure: {
         selected: selection.expenditureSelected,
@@ -209,6 +243,8 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
             : 'unavailable',
         writerBundleIdentifier: selection.appleHealthIntakeWriterBundleId,
         writerDisplayName: selection.appleHealthIntakeWriterDisplayName,
+        refreshPlan,
+        ...(storedSelection && refreshPlan.some((entry) => entry.provider === 'health_connect') ? { selectionRevision: storedSelection.updatedAt.toISOString() } : {}),
         ...(selection.authoritativeIntakeProvider === 'health_connect' ? { nativeIntakeSource: selection.nativeIntakeSourceId ? { namespace: 'android_package' as const, id: selection.nativeIntakeSourceId } : null, selectionRevision: storedSelection!.updatedAt.toISOString() } : {}),
       },
       connectedProviders: [
@@ -244,12 +280,16 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
     };
   }
 
+  private response(userId: string) {
+    return this.db.$transaction((transaction) => this.responseInTransaction(userId, transaction), { isolationLevel: 'RepeatableRead' });
+  }
+
   get(userId: string) {
     return this.response(userId);
   }
 
   async getHealthConnections(userId: string): Promise<HealthConnectionsResponse> {
-    const selection = await readProviderSelection(this.db, userId);
+    const selection = await readEffectiveCurrentSelection(this.db, userId, this.now());
     const [fitbit, fatSecret, appleExpenditure, appleIntake, appleEvidence] = await Promise.all([
       this.db.googleHealthConnection.findUnique({ where: { userId } }),
       this.db.externalProviderConnection.findUnique({
@@ -566,22 +606,30 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       const changed = Object.entries(roleChanges).filter(([key, value]) =>
         !stored || stored[key as keyof typeof stored] !== value);
       if (changed.length === 0) return;
+      if (changesIntake && roleChanges.intakeSelected) {
+        await transitionIntakeAuthority(transaction, user.id, stored,
+          selectionIdentity({
+            authoritativeIntakeProvider: input.authoritativeIntakeProvider,
+            appleHealthIntakeWriterBundleId: roleChanges.appleHealthIntakeWriterBundleId ?? null,
+            nativeIntakeSourceId: roleChanges.nativeIntakeSourceId ?? null,
+          }), this.now(), this.transitionsEnabled);
+      }
       const materialChange = changed.some(([key]) => key !== 'appleHealthIntakeWriterDisplayName');
       await transaction.providerSelection.upsert({
         where: { userId: user.id },
         create: { userId: user.id, ...roleChanges },
         update: {
           ...roleChanges,
-          selectedAt: materialChange ? new Date() : stored!.selectedAt,
-          updatedAt: materialChange ? new Date() : stored!.updatedAt,
+          selectedAt: materialChange ? this.now() : stored!.selectedAt,
+          updatedAt: materialChange ? this.now() : stored!.updatedAt,
         },
       });
     });
 
-    const provisional = await this.db.finalizedDailyBankRecord.findMany({
+    const provisional = changesBurn ? await this.db.finalizedDailyBankRecord.findMany({
       where: { userId: user.id, status: 'PROVISIONAL' },
       select: { logDate: true, timezone: true },
-    });
+    }) : [];
     for (const record of provisional) {
       await this.bankHistory.reconcileStoredDay(
         user,

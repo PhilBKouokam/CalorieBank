@@ -425,6 +425,7 @@ function buildInventory(role: Role, connections: HealthConnectionsResponse | nul
   }
   const seen = new Set<string>();
   return roleOptions.flatMap((option) => {
+    if (!knownConnectionOption(option)) return [];
     const key = `${option.label}|${option.transportLabel ?? ''}`;
     if (seen.has(key)) return [];
     seen.add(key);
@@ -485,6 +486,10 @@ function InventorySection({ addLabel, appleBurnState, items, onAdd, onManage, on
   </View>;
 }
 
+function knownConnectionOption(option: HealthConnectionOption) {
+  return ['apple_health', 'google_health_fitbit', 'fatsecret', 'health_connect', 'service-apple', 'service-fitbit', 'burned-apple-health-v1', 'burned-fitbit-v1', 'eaten-apple-health-writer-v1', 'eaten-fatsecret-v1', 'eaten-health-connect-v1', 'service-apple-health-v1', 'service-fitbit-v1', 'service-fatsecret-v1'].includes(option.optionId);
+}
+
 function RoleCard({ role, data, onPress }: { role: Role; data: HealthConnectionsResponse[Role] | null; onPress: () => void }) {
   const selected = data?.selected;
   const unselected = Platform.OS === 'android' && !selected && data?.alternatives.some((option) => option.status === 'connected');
@@ -493,7 +498,7 @@ function RoleCard({ role, data, onPress }: { role: Role; data: HealthConnections
     <Text style={styles.roleLabel}>{role === 'burned' ? 'Calories Burned' : 'Calories Eaten'}</Text>
     <Text style={styles.roleValue}>{selected?.label ?? (unselected ? 'No source selected' : 'Not connected')}</Text>
     {selected?.transportLabel ? <Text style={styles.transport}>via {selected.transportLabel}</Text> : null}
-    <Text style={[styles.status, selected?.status === 'needs_attention' && styles.attention]}>{selected ? statusCopy(selected.status) : unselected ? 'Choose a connected source to use here.' : 'Not connected'}</Text>
+    <Text style={[styles.status, selected?.status === 'needs_attention' && styles.attention]}>{selected ? knownConnectionOption(selected) ? statusCopy(selected.status) : 'Selected' : unselected ? 'Choose a connected source to use here.' : 'Not connected'}</Text>
     <Pressable accessibilityLabel={`${action} for calories ${role}`} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}><Text style={styles.actionText}>{action}</Text></Pressable>
   </View>;
 }

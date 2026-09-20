@@ -266,7 +266,7 @@ describe('provisional finalization and reconciliation persistence', () => {
     });
   });
 
-  it('uses one selected intake provider and records a FatSecret source switch exactly once', async () => {
+  it('preserves snapshotted intake when current source changes to FatSecret', async () => {
     const user = testUser();
     await configureCut(user);
     await prisma.providerSelection.update({
@@ -295,9 +295,9 @@ describe('provisional finalization and reconciliation persistence', () => {
     await bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago');
     await bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago');
     const detail = await bank.getDayDetail(user.id, '2026-07-21');
-    expect(detail).toMatchObject({ effectiveDailyBankChange: -100, correctionCount: 1 });
-    expect(detail?.versions.map((version) => version.intakeProvider)).toEqual(['apple_health', 'fatsecret']);
+    expect(detail).toMatchObject({ effectiveDailyBankChange: 100, correctionCount: 0 });
+    expect(detail?.versions.map((version) => version.intakeProvider)).toEqual(['apple_health']);
     expect((await prisma.calorieLedgerTransaction.findMany({ where: { userId: user.id } }))
-      .map((transaction) => transaction.amountCalories)).toEqual([100, -200]);
+      .map((transaction) => transaction.amountCalories)).toEqual([100]);
   });
 });

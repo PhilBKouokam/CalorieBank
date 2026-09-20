@@ -147,6 +147,7 @@ model User {
   ingestionSyncSessions         IngestionSyncSession[]
   bankCalculationSnapshots      BankCalculationSnapshot[]
   bankDayProcessingStates       BankDayProcessingState[]
+  intakeAuthorityBoundaries     IntakeAuthorityBoundary[]
   providerSelection             ProviderSelection?
   googleHealthConnection        GoogleHealthConnection?
   googleHealthOAuthAttempts     GoogleHealthOAuthAttempt[]
@@ -291,6 +292,23 @@ model ProviderSelection {
   user                               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("provider_selections")
+}
+
+// A boundary owns [effectiveFrom, next boundary). NULL is a legacy unresolved-date
+// baseline, not a claim about when the user historically selected this source.
+model IntakeAuthorityBoundary {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  effectiveFrom  DateTime? @map("effective_from") @db.Date
+  provider       String
+  writerId       String?  @map("writer_id")
+  sourceId       String?  @map("source_id")
+  timezone       String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, effectiveFrom])
+  @@map("intake_authority_boundaries")
 }
 
 model HistoricalSourceAuthorityOverride {

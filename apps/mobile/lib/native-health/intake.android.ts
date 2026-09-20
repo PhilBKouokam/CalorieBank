@@ -2,7 +2,7 @@ import { fetchProviderSelection, saveProviderSelection, uploadNativeIntake } fro
 import { nativeNutritionQualification } from '../health-connect/bridge.android';
 import { discoverFoodOrigins } from '../health-connect/food-origins';
 import type { NativeIntakeService, NativeIntakeResult } from './intake';
-import type { NativeIntakeBatch } from '@caloriebank/schemas';
+import type { NativeIntakeBatch, ProviderSelectionResponse } from '@caloriebank/schemas';
 let scope: string | null = null, generation = 0;
 let discovered = new Set<string>();
 export function setNativeIntakeScope(next: string | null) {
@@ -14,8 +14,20 @@ async function refresh(): Promise<NativeIntakeResult> {
   if (!scope) return 'skipped';
   const selection = await fetchProviderSelection();
   if (!stillCurrent(run)) return 'skipped';
-  const source = selection.intake.nativeIntakeSource;
-  if (selection.intake.authoritativeProvider !== 'health_connect' || !source || !selection.intake.selectionRevision) return 'skipped';
+  if (!selection.intake.selectionRevision) return 'skipped';
+  const sourceIds = selection.intake.refreshPlan
+    ? [...new Set(selection.intake.refreshPlan.filter((entry) => entry.provider === 'health_connect' && entry.sourceId).map((entry) => entry.sourceId!))]
+    : selection.intake.authoritativeProvider === 'health_connect' && selection.intake.nativeIntakeSource ? [selection.intake.nativeIntakeSource.id] : [];
+  let result: NativeIntakeResult = 'skipped';
+  for (const id of sourceIds) {
+    const next = await refreshSource(run, selection, { namespace: 'android_package', id });
+    if (next === 'access_required' || next === 'retry_required') return next;
+    if (next === 'ready' || result !== 'ready') result = next;
+  }
+  return result;
+}
+async function refreshSource(run: number, selection: ProviderSelectionResponse, source: NativeIntakeBatch['source']): Promise<NativeIntakeResult> {
+  if (!stillCurrent(run)) return 'skipped';
   const report = await nativeNutritionQualification.inspect(source.id);
   if (!stillCurrent(run) || report.state === 'cancelled') return 'skipped';
   if (!report.access.granted.includes('nutrition')) return 'access_required';
@@ -28,7 +40,7 @@ async function refresh(): Promise<NativeIntakeResult> {
       providerUpdatedAt: day.intake.value?.providerUpdatedAt?.toISOString() ?? null });
   }
   if (!stillCurrent(run)) return 'skipped';
-  await uploadNativeIntake({ source, selectionRevision: selection.intake.selectionRevision, queryStartedAt: report.queryStartedAt,
+  await uploadNativeIntake({ source, selectionRevision: selection.intake.selectionRevision!, queryStartedAt: report.queryStartedAt,
     observedAt: report.observedAt, timezone: report.windows[0]!.timezone, days });
   if (!stillCurrent(run)) return 'skipped';
   if (days.some((day) => ['ambiguous_overlap', 'boundary_ambiguous'].includes(day.quality))) return 'retry_required';

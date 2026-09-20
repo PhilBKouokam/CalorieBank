@@ -357,7 +357,7 @@ describe('historical per-day source authority', () => {
     await prisma.dailyIntakeAggregate.delete({
       where: {
         userId_localDate_provider_sourceId: {
-          sourceId: '',
+          sourceId: 'CRONOMETER-GOLD',
           userId: account.id,
           localDate: new Date(`${date}T00:00:00.000Z`),
           provider: 'apple_health',

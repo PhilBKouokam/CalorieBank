@@ -31,7 +31,7 @@ import {
   googleHealthBurnParityDiagnosticResponseSchema,
   googleHealthSyncResponseSchema,
   providerSelectionInputSchema,
-  providerSelectionResponseSchema,
+  compatibleProviderSelectionResponseSchema as providerSelectionResponseSchema,
   healthConnectionSelectionInputSchema,
   healthConnectionsResponseSchema,
   providerAuthorizationResponseSchema,

@@ -106,3 +106,15 @@ Historical-first resting-burn estimation and ledger-neutral rest-of-day forecast
 - Prefer small vertical slices.
 - Report changed files and verification results.
 - Never claim a command passed unless it was run successfully.
+
+## Effective-dated intake authority (Phase 1A)
+
+Follow `docs/product/adr-029-effective-dated-intake-authority.md`. Normal intake
+selection is prospective/current-day and is not a historical correction endpoint.
+Resolve completed dates through exact date authority and posted source snapshots;
+never apply current intake selection backwards. Same-source late evidence may
+follow the existing provisional correction rules. Opening Bank and locked history
+remain immutable. Preserve exact native writers and separate their evidence rows.
+Unknown wire intake identities are read-safe, never known-provider mutation inputs.
+Do not enable manual intake until Phase 1A private clients and the mixed-version
+read/write gate are qualified and Phase 1B is explicitly authorized.

@@ -191,7 +191,7 @@ describe('consumer routes', () => {
     expect(getConsumerSourceName('apple_health')).toBe('Apple Health');
     expect(getConsumerSourceName('apple_watch')).toBe('Apple Watch');
     expect(getConsumerSourceName('fatsecret')).toBe('FatSecret');
-    expect(getConsumerSourceName('unknown_transport')).toBe('Connected source');
+    expect(getConsumerSourceName('unknown_transport')).toBe('Calorie source');
   });
 
   it('offers recognizable activity and verified food-tracker routes during iOS onboarding', () => {
