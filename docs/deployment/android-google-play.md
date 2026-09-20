@@ -479,3 +479,24 @@ Commit uses Render's documented `[skip render]` directive to preserve the backen
 
 September 20: founder revised the feature-graphic message to “Enjoy your favorite
 treats guilt free”. SVG/PNG updated; no app code, build or deployment changed.
+
+
+### September 20 — listing assets uploaded, AI declaration pending
+
+Chrome file uploads now work. Existing icon, revised feature graphic (“Enjoy your
+favorite treats guilt free”), and two real Pixel screenshots were uploaded and saved
+as an unpublished draft. Founder confirmed the dedicated support reviewer account
+and approved the Today/History captures. Screenshots preserve the entire actual UI
+with proportional scaling and neutral side padding to 1440 × 2560 (9:16).
+
+Google's Review step introduced an AI asset declaration: “Don't label assets” or
+“Label assets as created or edited using AI.” No option selected. The feature graphic
+was code-composed by the assistant from existing branding and founder-directed copy;
+screenshots were actual device captures. Original icon provenance awaits founder
+confirmation. Founder review requested before declaring scope.
+[Google's current asset-specific guidance](https://support.google.com/googleplay/android-developer/answer/17262077?hl=en).
+
+Draft saved; nothing sent for review. No AAB, signing enrollment, testing release,
+Production/Open Testing release, Render deployment or TestFlight change. Next: resolve
+this declaration, complete listing, inspect Internal Testing signing, then create the
+one authorized AAB from the validated product.
