@@ -623,3 +623,14 @@ requirement; 830 tests pass and Nutrition-only store configuration/prebuild chec
 pass. Store assets, signing, the single AAB and Pixel Play installation remain.
 See [current distribution evidence](../deployment/android-google-play.md).
 B4 functionality and Health Connect burn-disabled status are preserved.
+
+### Phase C Internal Testing available — September 20
+
+The single store AAB (EAS `4dc1d697-266a-42a7-afd7-a3192daa20cf`, source `88bd631`,
+1.0.0 / versionCode 2) compiled and was accepted by Google. Actual bundle manifest
+has only READ_NUTRITION for Health Connect, package `com.caloriebank.mobile`, target
+SDK 36. Internal Testing is active for the one approved founder tester; listing is
+not yet reviewed and uses Google's temporary name. Pixel Play installation and smoke
+checks remain pending safe migration from the differently signed preview.
+No Production/Open release, additional build, Render deployment or TestFlight change.
+Health Connect burn remains disabled. See [distribution evidence](../deployment/android-google-play.md).

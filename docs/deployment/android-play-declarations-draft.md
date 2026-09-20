@@ -145,3 +145,12 @@ health-app policy. The minimal Android Settings row is implemented and the full
 830-test release gate passed. Physical link verification on the Play binary remains
 pending. Store text is saved as a draft; the feature graphic has the founder-requested revised message and
 actual screenshots remain pending. Asset upload awaits Chrome file-URL permission. No AAB or Google review submission yet.
+
+### September 20 — uploaded manifest Nutrition justification
+
+After uploading the store AAB, Google detected only READ_NUTRITION and required its
+purpose. Saved the prepared exact-selected-tracker calorie/intake/banking/history
+explanation, explicitly read-only and not Health Connect burn. Both approved Health
+Apps categories remain selected. Regional requirements: Google reports none required.
+Listing/declaration changes remain unsubmitted; Internal Testing release is active
+and not reviewed. See [distribution evidence](android-google-play.md).

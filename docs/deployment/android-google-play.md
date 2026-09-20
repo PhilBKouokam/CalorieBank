@@ -1,10 +1,11 @@
 # Android Google Play testing distribution
 
-Status (September 19, 2026): Organization enrollment ACTIVE / ready to create an app.
-Setup warning cleared and Create app enabled; website, contact email/phone and public
-developer email/phone verified. No app was created.
-No Play app, AAB, upload or release submission. Historical preparation findings below
-are superseded by the dated enrollment evidence at the end of this document.
+Status (September 20, 2026): Organization account ACTIVE; canonical CalorieBank app
+created; declarations and approved listing saved; one-founder Friends & Family list
+selected for Internal Testing. The first and only store AAB compiled successfully (1.0.0 / 2) and was uploaded.
+Internal Testing is ACTIVE / available to internal testers. Pixel Play migration
+and smoke testing remain pending; store listing/declarations are not yet reviewed. Current evidence is at the end of
+this document; earlier dated findings are historical, not current blockers.
 Frozen product qualification: `37dfad4`; implementation `5231b3d`; qualified APK
 `7de86e07-019b-45b3-8e21-33edd6e94e23` retained.
 
@@ -518,3 +519,98 @@ with the existing preview must be checked before Pixel installation.
 The single `play-testing` AAB is next; final code remains the validated privacy-link
 implementation (830 passing tests). Tester email requested for the Pixel's actual
 Play Store account. Health Connect burn remains disabled.
+
+
+### September 20 — single AAB build dispatched
+
+Exactly one EAS store build dispatched using `play-testing` and the existing remote
+keystore: `4dc1d697-266a-42a7-afd7-a3192daa20cf`, source `88bd631`, marketing version
+1.0.0, remote versionCode incremented from 1 to 2.
+[Build status](https://expo.dev/accounts/philbk/projects/caloriebank/builds/4dc1d697-266a-42a7-afd7-a3192daa20cf).
+This is a build in progress, not an uploaded or available Play release.
+
+Friends & Family email list created with only the founder-approved Pixel Play Store
+Google account. List shows one user, is selected for Internal Testing, and was saved.
+No other testers invited. The official opt-in link remains disabled until release.
+
+Pending: cloud compile, final AAB manifest/package/version/signature checks, upload,
+Google processing and physical Play installation. No second AAB or APK authorized
+by this status entry.
+
+### Private testing update workflow
+
+Use the existing `com.caloriebank.mobile` Play app and EAS project. After validation,
+build a store AAB with a greater remote Android versionCode, upload to Internal
+Testing, review the release and confirm its private rollout. Approved Google-account
+testers use the official opt-in link and install/update through Google Play. Device
+account, track eligibility, rollout availability and the tester's Play auto-update
+settings determine update availability; do not promise an immediate automatic update.
+
+Maintain Friends & Family through the existing email list. Removing an address
+removes future track eligibility; it does not remotely erase an installed app or
+CalorieBank account. Promote an already-tested artifact to an authorized closed
+track only after its applicable setup/review is complete. No Production/Open Testing
+release or additional invitation is authorized by this document. Google's personal
+account 12-testers/14-days production-access requirement is not automatically an
+organization-account requirement. Record any account-specific Console gate before
+claiming production eligibility.
+
+### September 20 — native compile and final bundle inspection PASS
+
+EAS build `4dc1d697-266a-42a7-afd7-a3192daa20cf` finished successfully.
+[Store AAB](https://expo.dev/artifacts/eas/e4F3l1YJ4J2yyx0xl7LTt3gHYu3uCisOcFUTSYdJtck.aab),
+source `88bd631ace0ab716e0e69adeaa2c2a1afd36e989`, version 1.0.0 (2).
+SHA-256: `7bde05311eac084c13260e76dc4aa91625e3a166f4bf540620695535bfd4fc10`.
+
+Inspected compiled `base/manifest/AndroidManifest.xml` from the actual AAB, decoding
+AAPT2 protobuf XML using Android's official Resources.proto field definitions.
+Package `com.caloriebank.mobile`; min SDK 26; target/compile SDK 36. Exactly one
+Health Connect permission: `android.permission.health.READ_NUTRITION`. No Health
+Connect steps, exercise, distance, active/total calories or BMR reads; no health
+write/background/history permission. Health Connect burn remains disabled.
+
+AAB contains the existing upload certificate (SHA-256
+`F2:EE:9D:25:B3:E5:E5:54:74:72:50:B1:43:FC:42:2D:96:5A:CD:8D:08:BB:AD:59:87:FB:9B:B4:CC:9C:17:5C`).
+Google's app-signing certificate differs; verify installed-preview compatibility
+before migration. No signing secrets were exported or changed.
+
+Uploaded this bundle to the existing first Internal Testing draft. Google reports
+upload complete and optimization in progress. Release name: `1.0.0 (2) — Friends & Family`.
+No second build, Production/Open Testing release, Render deployment or TestFlight change.
+
+### September 20 — Internal Testing available, Pixel migration pending
+
+Google accepted version 2 (1.0.0), min API 26+, target 36, with native debug symbols.
+Only warning: no deobfuscation file; generated Gradle configuration defaults release
+minification to false. No release error. Internal rollout confirmed at 13:59 local;
+Console reports **Active / Available to internal testers / Not reviewed**. Production
+is **Inactive**. The temporary listing name is `com.caloriebank.mobile (unreviewed)`.
+
+Private eligible-tester opt-in URL:
+https://play.google.com/apps/internaltest/4701187796213670867
+
+Only the founder-approved Pixel Google account is in the selected one-user Friends
+& Family list. The link does not authorize arbitrary users. No Open/Production or
+Closed release was created. Closed-track assessment follows successful internal
+installation; no personal-account tester-count rule is assumed for this organization.
+
+The uploaded manifest triggered a Health Connect Nutrition permission justification.
+Entered the prepared exact-origin Nutrition purpose plus explicit read-only/no-burn
+scope; retained Activity and Fitness + Nutrition and Weight Management. Google said
+no regional health requirements apply, and confirmed the declaration was saved.
+
+Read the installed Pixel preview's v2 signing certificate: it matches the existing
+EAS upload certificate, but differs from Google Play's app-signing certificate.
+A direct update is not compatible. Requested founder confirmation to sign out, remove
+the preview (local session/settings only), install through Play, and sign into the
+same server-held account. No account/provider/server deletion is needed. Pixel was
+locked; unlock requested. No preview removal or Play-install success is claimed yet.
+
+After saving the Nutrition declaration, the dashboard no longer shows incomplete
+app-setup tasks. Publishing overview still keeps **Send app for review disabled**;
+listing/declaration changes remain unsubmitted. No review submission is claimed.
+This does not prevent the already-active internal release. Follow the actual
+Console gating when preparing an authorized closed test after the Pixel check.
+[Official testing guidance](https://support.google.com/googleplay/android-developer/answer/9845334?hl=en)
+permits fast internal distribution and temporary first-upload listing information;
+internal tests may not receive standard policy/security review.
