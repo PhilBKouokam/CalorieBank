@@ -4,7 +4,7 @@ Status (September 20, 2026): Organization account ACTIVE; canonical CalorieBank 
 created; declarations and approved listing saved; one-founder Friends & Family list
 selected for Internal Testing. The first and only store AAB compiled successfully (1.0.0 / 2) and was uploaded.
 Internal Testing is ACTIVE / available to internal testers. Pixel Play migration
-and smoke testing remain pending; store listing/declarations are not yet reviewed. Current evidence is at the end of
+and account/provider/notification-registration smoke checks passed; store listing/declarations are not yet reviewed. Current evidence is at the end of
 this document; earlier dated findings are historical, not current blockers.
 Frozen product qualification: `37dfad4`; implementation `5231b3d`; qualified APK
 `7de86e07-019b-45b3-8e21-33edd6e94e23` retained.
@@ -614,3 +614,89 @@ Console gating when preparing an authorized closed test after the Pixel check.
 [Official testing guidance](https://support.google.com/googleplay/android-developer/answer/9845334?hl=en)
 permits fast internal distribution and temporary first-upload listing information;
 internal tests may not receive standard policy/security review.
+
+### September 20 — Google Play installation and reviewer restoration PASS
+
+Founder explicitly approved removing the differently signed EAS preview, preserving
+all server-held data. Normal preview Sign Out reached Sign In; then only the local
+package was uninstalled. Pixel Chrome initially used a non-tester Google account;
+switching to the already-approved tester opened the official internal Play listing.
+Install completed through Google Play. Android package manager confirms:
+
+- installer `com.android.vending`; package `com.caloriebank.mobile`; version 1.0.0 (2)
+- min SDK 26 / target SDK 36
+- actual installed health permission: READ_NUTRITION only
+- installed certificate SHA-256 matches Google's app-signing certificate:
+  `18:3A:B4:0E:7A:92:A0:82:8B:79:63:D1:93:C9:68:38:90:9E:C0:E5:2E:DE:A9:9D:5E:FF:C5:EB:F6:BD:83:0D`
+
+Founder completed the existing dedicated reviewer account's password privately.
+Production Clerk returned directly to Today with no unmatched route or crash.
+Existing bank/September 19 History restored, Fitbit refreshed, and canonical Fitbit
++ FatSecret selections remained Connected. No CalorieBank account was deleted, no
+provider reauthorization/source change was needed, and no data was seeded or edited.
+
+Morning Bank Update: normal enable action displayed Android permission prompt;
+Allow succeeded; app showed On, including after leaving/reopening the settings page.
+OS POST_NOTIFICATIONS is granted. The screen's On state requires authenticated
+server preference plus active registration; this is app/API readback evidence, not
+an independent production database owner-count query. Existing authenticated
+registration uses global token uniqueness and serializable ownership transfer.
+Normal subsequent reviewer Sign Out completed, exercising its awaited device-release
+flow before the separately approved beta-account check. No notification was sent.
+
+Health Connections burn chooser showed no additional supported burn source after
+Fitbit; Health Connect burn remains unavailable. Qualification diagnostics are absent
+from store Settings. The new Privacy Policy action opened the approved HTTPS public
+policy on the physical Pixel. Populated Cronometer/Step Planning checks are pending
+the founder-completed sign-in to the specifically authorized existing beta account.
+
+
+### September 20 — Play-installed beta restoration and populated smoke PASS
+
+On the same Pixel 9a / Android 16 (API 36), founder authorized a temporary check of
+an existing beta account without changing either account's selected sources. Private
+production Clerk sign-in restored that account's existing bank and history, separate
+from the reviewer account. The newly installed app needed Health Connect permission;
+the system request contained Nutrition only. Granting it and the normal selected
+tracker refresh restored Cronometer to Connected without changing exact-source authority.
+
+The beta account's existing Fitbit connection required reconnection. Founder approved
+and completed normal same-Fitbit-account authorization. Callback reported “Fitbit
+reconnected.” Current burn/steps then populated and normal synchronization caught
+bank/history up through September 19. The credential's prior failure cause was not
+independently established; no Play signing/authentication defect is inferred from it.
+
+Today initially reported no Cronometer intake. Founder was asked to check normal
+Android Cronometer export and subsequently confirmed Eaten matches. UI independently
+showed populated intake and “Imported from Cronometer.” This confirms the final
+consumer result, not a new direct Health Connect record-count or export-timing audit.
+
+Physical Today detail showed populated Fitbit burn, Cronometer intake and steps.
+Both Step Planning cards rendered populated, coherent results. Visual screenshot
+inspection confirmed compact inputs, source translation, green primary results/time,
+dark bold remaining steps and readable session lines. No inputs/formulas/presentation
+were changed. History displayed the account's existing completed days and current
+bank. No private health amounts or diary contents are retained in this evidence.
+
+Morning Bank Update read On for the beta account through the normal authenticated
+settings readback. Android confirms POST_NOTIFICATIONS and READ_NUTRITION granted.
+The actual installed package still reports Google Play installer, version 1.0.0 (2),
+and only READ_NUTRITION among Health Connect permissions. Reviewer normal sign-out
+completed before beta sign-in; authenticated beta registration readback passed. No
+independent database owner-count query or new push delivery was performed in this
+migration smoke, so the earlier B4 ownership/delivery qualification remains distinct.
+
+Force-stop and normal launcher relaunch restored the beta session directly to
+populated Today, with matching source labels and history/bank state. Pixel is left
+signed into that authorized beta account. No account deletion or source reassignment
+occurred. Health Connect burn remains disabled; Fitbit is the Android burn source.
+
+No physical Play-build blocker was reproduced. No product/configuration changes,
+additional build/release, Render deployment, Production/Open release or TestFlight
+changes. Documentation-only validation applies; the exact store source retains its
+previous 830-test release validation. Future updates use a higher versionCode AAB
+on the same private Play track; a second update was not built merely to test that
+workflow. Only the approved founder Google account currently has tester access.
+Additional Friends & Family invitations require founder-provided Google accounts.
+Listing/declaration review and any closed-track preparation remain separate next
+steps; nothing was submitted to public Production.

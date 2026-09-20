@@ -631,6 +631,22 @@ The single store AAB (EAS `4dc1d697-266a-42a7-afd7-a3192daa20cf`, source `88bd63
 has only READ_NUTRITION for Health Connect, package `com.caloriebank.mobile`, target
 SDK 36. Internal Testing is active for the one approved founder tester; listing is
 not yet reviewed and uses Google's temporary name. Pixel Play installation and smoke
-checks remain pending safe migration from the differently signed preview.
+checks passed after the founder-approved migration from the differently signed preview.
 No Production/Open release, additional build, Render deployment or TestFlight change.
 Health Connect burn remains disabled. See [distribution evidence](../deployment/android-google-play.md).
+
+
+### Phase C Pixel Play installation qualified — September 20
+
+Google Play-installed 1.0.0 (2) restored the reviewer account and an authorized existing
+beta account through production Clerk. Reviewer Fitbit/FatSecret remained connected;
+beta Fitbit recovered through approved same-account reconnect and Cronometer through
+Nutrition-only permission. Founder confirmed current Eaten matches; Today, History,
+populated locked Step Planning and cold session restoration passed. Morning Bank
+Update read On for both accounts in sequence; OS permission is granted. Registration
+readback and normal sign-out cleanup were exercised, without a new independent token
+owner-count query or push send. Prior B4 transport/ownership evidence is separate.
+No product change, extra build, public release, Render deployment or TestFlight change.
+Health Connect burn remains disabled. Private Internal Testing is available to the
+one approved founder tester. Additional tester invitations and listing/closed-track
+review are not claimed complete. See the detailed distribution evidence above.
