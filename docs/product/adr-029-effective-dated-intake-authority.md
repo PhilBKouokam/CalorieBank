@@ -1,6 +1,6 @@
 # ADR 029: Effective-dated intake authority and compatibility bridge
 
-Status: implemented and backend deployed September 20, 2026; mobile/physical Phase 1A qualification pending.
+Status: implemented and backend deployed September 20, 2026; founder-assisted existing-source journeys passed September 21–22. Installed Pixel versionCode verification remains pending; unknown-source evidence is automated, not physical. See the deployment qualification record.
 
 ## Scope and supersession
 

@@ -1,6 +1,6 @@
 # Phase 1A qualification and mixed-version rollout
 
-Status: backend deployed and both compatibility builds privately available; physical qualification remains pending.
+Status: founder-assisted iPhone/Pixel source-switch journeys passed September 21–22; exact installed Pixel versionCode remains unverified. See the final founder-assisted evidence below.
 
 Contract: [ADR 029](../product/adr-029-effective-dated-intake-authority.md).
 Migration: `20260920000000_intake_authority_boundaries`.
@@ -245,3 +245,119 @@ Outstanding acceptance: installed compatibility builds on iPhone and Pixel; Toda
 Is it now safe to implement and privately enable `manual_estimate` without breaking distributed clients or rewriting historical authority? **NO**: physical compatibility qualification remains, and future enablement requires the specified mixed-version read/write capability gate. No manual source is enabled. Phase 1B requires a separate founder authorization after qualification; no later backlog work was started.
 
 The next authorized work is completing these Phase 1A physical checks. The next product implementation phase, only after clearance and explicit authorization, is Phase 1B Manual/Estimated Intake; Daily Eating Budget remains later.
+
+## Founder-assisted physical evidence — September 21–22, 2026
+
+This section supersedes the outstanding physical source-switch statements above.
+The founder operated both phones and reported UI observations; the agent compared
+read-only, repeatable-read production snapshots. No credentials or diary payloads
+were collected. No product code, build, production data repair or deployment was
+performed during these journeys.
+
+### iPhone
+
+- Founder confirmed installed TestFlight 1.0.0 (4). Account was disambiguated by
+  its reported balance; email alone matched two records and was not treated as
+  an ownership key.
+- Baseline at September 21 18:42:46 UTC: Apple Health exact writer
+  `CRONOMETER-GOLD`, Fitbit burn; Available Bank 2,529, Recovery 0, Opening Bank
+  224. September 20 was posted provisionally at eaten 1,952 from Cronometer.
+- Founder connected FatSecret, which became selected. Read at 19:16:57 UTC
+  confirmed a September 21 America/Chicago boundary for FatSecret, without
+  native writer identity, and the previous Cronometer baseline retained. Today
+  remained unposted. Current projection agreed with date authority; the stored
+  inactive Apple writer was retained without becoming FatSecret identity.
+- All 11 prior daily records, 12 snapshots and 12 ledger entries had identical
+  fingerprints. Available Bank and Recovery were unchanged. Opening Bank value
+  remained 224. The first combined opening fingerprint included `updatedAt` and
+  changed; existing initialization processing updates that timestamp. Because
+  the initial evidence did not separately fingerprint stable opening fields,
+  full opening-row equality for the first transition cannot be claimed.
+- FatSecret connected and completed its query without errors, returning no usable
+  intake. Founder saw unavailable with generic connected-source wording. September
+  20 still displayed 1,952 from Cronometer.
+- Switch back verified at 19:27:15 UTC: exactly one September 21 boundary, now
+  Apple Health / `CRONOMETER-GOLD`, with the legacy baseline retained. All prior
+  record/snapshot/ledger hashes still matched the original baseline. Stable
+  Opening Bank fields and all five opening-day fingerprints matched the
+  FatSecret-state capture; only mutable metadata was excluded.
+- Today showed 3,205 from Cronometer, then 3,538 after relaunch/refresh; Bank
+  remained 2,529. The refreshed intake value is a founder observation, not proof
+  of a separately inspected provider revision. History remained 1,952/Cronometer.
+- Founder confirmed no Eaten pencil and no manual source/setup options.
+
+### Pixel
+
+- App info showed version 1.0.0; its Google Play page showed Open. This does not
+  independently reveal installed versionCode. Saved EAS metadata and inspected
+  store AAB establish released versionCode 3, but installed-code verification
+  remains outstanding. Do not substitute release metadata for device metadata.
+- Baseline September 23 03:11:09 UTC (September 22 America/Chicago): exact source
+  `health_connect` / `com.cronometer.android.gold`, Fitbit burn; Bank 10,598,
+  Recovery 0, Opening Bank 6,213. September 21 posted provisionally at eaten
+  4,934. Five ledger entries were present.
+- Founder connected FatSecret. At 03:18:40 UTC, current projection and the single
+  September 22 boundary both resolved FatSecret. Earlier Cronometer authority
+  remained in the baseline. Today was unposted. Prior daily records, calculation
+  snapshots, ledger, stable opening fields and opening-day fingerprints were
+  identical to baseline. Bank/Recovery unchanged.
+- Today displayed “No intake today” and “FatSecret has not reported calories eaten
+  today.” History still displayed September 21 eaten 4,934 from Cronometer.
+- Founder switched back. At 03:24:11 UTC, the one current-day boundary resolved
+  the exact original Cronometer package; current projection agreed. All the same
+  accounting comparisons passed. Same-day reversal replaces the date boundary,
+  rather than creating overlapping intervals.
+- After full close/relaunch, Today displayed 2,097 from Cronometer, Bank 10,598.
+  September 21 still displayed 4,934 from Cronometer.
+- Founder inspected Health Connect app permissions: Nutrition only. Calories
+  Burned offered no Health Connect choice (“all supported sources connected”).
+  Compiled AAB evidence independently restricts health permissions to
+  READ_NUTRITION; burn remains disabled.
+- Founder confirmed no manual intake source/setup options and no Eaten pencil.
+
+### Reported UX issues, not implemented in qualification
+
+1. iPhone unavailable Today intake used a generic connected-source label instead
+   of naming selected FatSecret. Pixel's corresponding message named FatSecret.
+2. Pixel September 21 showed “This day needs attention” with only Cancel/Try again.
+   Founder reports opening/refreshing Cronometer resolved it. Screenshots show
+   11,424 through September 20 becoming 10,598 through September 21, with a -826
+   contribution. Arithmetic is coherent; the precise pre-recovery failure reason
+   was not captured, so missing intake is reported as the founder's diagnosis,
+   not independently proven from pre-recovery server state. Copy should name the
+   actually missing input/source and actionable recovery, rather than guessing.
+3. Settings lacks an obvious signed-in name/email section, making account
+   identification difficult. Record as follow-up product work, not part of this
+   qualification's implementation scope.
+
+### Controlled future source and Phase 1B boundary
+
+Saved EAS metadata ties both finished artifacts to exact commit
+`16e76c7a4c3f3ee8c36da43e2b7c81bc83f9709f`. Mobile/schema diff through `4c55480`
+contains only EAS submission configuration. The existing compatibility tests
+exercise shared schemas, actual native-intake adapter logic and rendered Settings
+with mocked APIs/platform state from that implementation. The focused 62-test
+rerun previously passed; tests were not rerun merely for these documentation edits.
+
+There is no identified existing safe production-binary fixture injection mechanism.
+No distributed binary received a fabricated unknown-source response. Evidence is
+source-linked automated qualification, not physical unknown-source qualification
+or direct execution of the compiled Hermes bundle by those tests. It supports
+the compatibility design, while native/network integration under the new protocol
+must be qualified in Phase 1B before enablement. No new build is warranted solely
+to inject this fixture.
+
+Floors: iOS 1.0.0 build 4; Android released 1.0.0 versionCode 3, pending direct
+installed-code confirmation. These clients do not send a capability header.
+Phase 1B must add and validate explicit per-request protocol negotiation before
+any manual authority is exposed. Missing/unsupported capability must receive a
+qualified update-required failure before serialization or conflicting mutation,
+including current source, Today, Settings, historical snapshots, native uploads,
+source changes and asynchronous connection completion. A header is protocol
+negotiation, not authentication or trustworthy binary attestation: Clerk ownership
+and strict source validation remain required. Qualify legacy error recovery and
+mixed-device reads/writes before private enablement. No gate is implemented here.
+
+Current verdict: **POST-ANDROID PHASE 1A: PASS CANDIDATE — installed Pixel versionCode
+3 remains unverified; source-switch journeys and accounting comparisons passed
+with the stated first-iPhone Opening Bank fingerprint limitation.**
