@@ -1,6 +1,6 @@
 # Phase 1A qualification and mixed-version rollout
 
-Status: founder-assisted iPhone/Pixel source-switch journeys passed September 21–22; exact installed Pixel versionCode remains unverified. See the final founder-assisted evidence below.
+Status: Phase 1A PASS. Founder-assisted source-switch journeys passed September 21–22; direct Pixel package inspection on September 23 confirmed installed versionCode 3 from Google Play. The final verification below supersedes earlier pending-verification statements.
 
 Contract: [ADR 029](../product/adr-029-effective-dated-intake-authority.md).
 Migration: `20260920000000_intake_authority_boundaries`.
@@ -361,3 +361,53 @@ mixed-device reads/writes before private enablement. No gate is implemented here
 Current verdict: **POST-ANDROID PHASE 1A: PASS CANDIDATE — installed Pixel versionCode
 3 remains unverified; source-switch journeys and accounting comparisons passed
 with the stated first-iPhone Opening Bank fingerprint limitation.**
+
+## Final installed Pixel verification — September 23, 2026
+
+The founder connected the physically tested Pixel 9a by USB. Google's official
+Android platform-tools were downloaded to temporary host storage. ADB reported
+the device as connected and authorized. Read-only `adb -d shell dumpsys package
+com.caloriebank.mobile` returned:
+
+```text
+Package [com.caloriebank.mobile]
+versionCode=3 minSdk=26 targetSdk=36
+versionName=1.0.0
+lastUpdateTime=2026-09-21 11:51:10
+installerPackageName=com.android.vending
+initiatingPackageName=com.android.vending
+```
+
+This is installed-device metadata, not inference from the Play listing. The last
+update precedes the September 22 physical source-switch qualification. No install,
+update, data clearing, permission change or source switch was performed during
+this verification. Package-manager signing metadata was present; no independent
+certificate digest comparison is claimed.
+
+The installed package/versionCode and Google Play installer correlate with the
+documented Internal Testing compatibility release 1.0.0 (3). Saved EAS build
+metadata confirms artifact `ff88d10a-4afd-46ab-9b26-7b59b022022f`, profile
+`play-testing`, versionName 1.0.0, versionCode 3, FINISHED, source commit
+`16e76c7a4c3f3ee8c36da43e2b7c81bc83f9709f`.
+
+Qualified compatibility floors: **iOS 1.0.0 build 4; Android 1.0.0 versionCode 3**.
+The earlier evidence limits and recorded UX issues remain accurately documented;
+unknown-source evidence remains automated rather than physical injection.
+
+Is Phase 1A sufficiently qualified to begin implementing Phase 1B, provided Phase
+1B implements and qualifies request-level capability negotiation before
+`manual_estimate` is exposed? **YES.** This does not authorize starting Phase 1B
+in this run or enable manual intake.
+
+Before manual enablement, the Phase 1B gate must protect every source-bearing read
+and conflicting write, including current intake selection, Today, History/finalized
+snapshots, Settings, preparation/source state, source mutations, native uploads,
+asynchronous connection completion and any other source-bearing API response.
+Unsupported/legacy requests must receive an update-required response **before**
+unsupported source serialization or conflicting mutation. Protocol capability is
+not account authorization; verified Clerk ownership remains mandatory.
+
+Documentation only: no product code, build, deployment, Play/TestFlight release,
+or production data changes; no repeated source-switch QA and no release-gate rerun.
+
+**POST-ANDROID PHASE 1A: PASS — COMPATIBILITY FOUNDATION READY FOR MANUAL INTAKE**
