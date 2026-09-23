@@ -95,8 +95,10 @@ Manual state, usual boundaries and overrides cascade with the account under the
 existing ordered deletion workflow. Same-email recreation has a new internal
 identity and must not recover old manual data. No new analytics or health-store
 writes. The founder approved the precise privacy paragraph in the
-[publication proposal](../deployment/manual-intake-privacy-proposal.md); live
-publication and current store-declaration comparison remain pending.
+[publication proposal](../deployment/manual-intake-privacy-proposal.md); publication is complete. Google Play’s saved Health info collection for app
+functionality covers this input without a category/purpose change. Apple’s public
+App Privacy form is not yet configured; no Apple declaration was changed or
+claimed complete. See the deployment evidence for the private rollout status.
 
 New selection is held behind a default-off server switch. Once manual records
 exist, disabling enrollment must preserve capable reads, edits, finalization and

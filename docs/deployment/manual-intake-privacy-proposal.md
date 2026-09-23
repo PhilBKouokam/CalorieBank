@@ -26,7 +26,10 @@ publication; publication completed on September 23. Vercel deployment `dpl_6mEwx
 
 No new processor, advertising use, health-store permission or sharing purpose is
 introduced. Estimates fit the existing nutrition/health category and app
-functionality purpose. Store declaration conclusions still require comparison to
-the actual current declarations before distribution. Existing account deletion
+functionality purpose. Read-only Console inspection confirmed Google Play Health info collected for App
+functionality, not shared; Health Apps retains Activity and fitness plus Nutrition
+and weight management. No category/purpose change is required for manual estimates.
+Apple’s public App Privacy form is still unconfigured, so no existing Apple
+declaration is claimed complete; public submission remains outside this task. Existing account deletion
 wording covers account-owned estimates; database deletion evidence must confirm
 the implementation. No public deletion-page change is proposed.
