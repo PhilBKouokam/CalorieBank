@@ -10,6 +10,7 @@ import {
   type OnboardingStatusResponse,
 } from '@caloriebank/schemas';
 import { Ionicons } from '@expo/vector-icons';
+import { subscribeToLocalDateChange } from '@/lib/today/local-date-change';
 import { Link, useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -20,6 +21,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -125,6 +127,7 @@ function isActivePlannedTreat(
 }
 
 export default function TodayScreen() {
+  const { fontScale } = useWindowDimensions();
   const router = useRouter();
   const [bankSummary, setBankSummary] = useState<BankSummaryResponse | null>(null);
   const [bankStatus, setBankStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading');
@@ -171,6 +174,12 @@ export default function TodayScreen() {
     setHealthSyncDetail(result.detail);
     setFirstRunCheckPending(isAccountLifecycleRunning());
     void Promise.all([refreshVisibleReadModels(), fetchOnboardingStatus().then(setOnboardingStatus).catch(() => null)]);
+  }), [refreshVisibleReadModels]);
+
+  useEffect(() => subscribeToLocalDateChange(() => {
+    setToday(null);
+    setTodayStatus('loading');
+    void refreshVisibleReadModels();
   }), [refreshVisibleReadModels]);
 
   const refreshHealthAwareness = useCallback(async (
@@ -267,7 +276,7 @@ export default function TodayScreen() {
       return () => {
         isMounted = false;
       };
-    }, [refreshVisibleReadModels]),
+    }, []),
   );
 
   const hasCompletedDays = hasLatestCompletedContribution(bankSummary);
@@ -351,7 +360,9 @@ export default function TodayScreen() {
     : today?.burned.raw !== null && today?.burned.raw !== undefined && today.burned.source
       ? `${today.burned.raw.toLocaleString()} from ${getConsumerSourceName(today.burned.source)} × ${formatPercent(today.burned.adjustmentFactor)}`
       : emptyTodayDetail(today?.burned.status ?? 'unavailable', today?.burned.source ?? providerSelection?.expenditure.displayName ?? null, 'calories burned');
-  const eatenDetail = firstRunIntakeState
+  const eatenDetail = today?.eaten.authoritative?.semanticKind === 'estimated_total_day_intake'
+    ? today.eaten.estimateKind === 'today' ? 'Your estimate for today' : 'Your daily estimate'
+    : firstRunIntakeState
     ? firstRunIntakeState.detail
     : today?.eaten.source
     ? `Imported from ${getConsumerSourceName(today.eaten.source)}`
@@ -542,7 +553,7 @@ export default function TodayScreen() {
             </>
           ) : (
             <>
-              <View style={styles.todayMetrics}>
+              <View style={[styles.todayMetrics, fontScale > 1.3 && { flexDirection: 'column' }]}>
                 <View style={styles.todayMetric}>
                   <Text style={styles.metricLabel}>Burned</Text>
                   <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>
@@ -569,6 +580,12 @@ export default function TodayScreen() {
                   <Text style={styles.metricLabel}>Eaten</Text>
                   <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>{eatenValue}</Text>
                   <Text style={styles.metricDetail}>{eatenDetail}</Text>
+                  {today?.eaten.authoritative?.source === 'manual_estimate' ? <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Calories eaten, ${today.eaten.calories ?? 0} kilocalories, ${eatenDetail.toLowerCase()}. Edit.`}
+                    onPress={(event) => { event.stopPropagation(); router.push({ pathname: '/manual-estimate', params: { mode: 'today' } }); }}
+                    style={{ minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center', alignSelf: 'flex-start' }}
+                  ><Ionicons name="pencil-outline" size={20} color={colors.primary} /></Pressable> : null}
                 </View>
               </View>
               <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>

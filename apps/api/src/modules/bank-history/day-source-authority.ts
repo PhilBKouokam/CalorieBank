@@ -1,4 +1,5 @@
 import { resolveIntakeAuthority } from '../provider-selection/intake-authority';
+import { manualAccountingEvidence } from '../manual-intake/manual-intake.repository';
 import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import { createHash } from 'node:crypto';
 import { canProvideAuthoritativeExpenditure, getLocalDateUtcBounds, getProviderCapabilities, type ProviderId } from '@caloriebank/domain';
@@ -86,6 +87,7 @@ export function consumerProviderName(provider: string, intakeDisplayName?: strin
   if (provider === 'apple_health') return 'Apple Health';
   if (provider === 'health_connect') return 'Health Connect';
   if (provider === 'fatsecret') return 'FatSecret';
+  if (provider === 'manual_estimate') return 'CalorieBank estimate';
   return 'Calorie source';
 }
 
@@ -160,6 +162,14 @@ export async function resolveDaySourceAuthority(
     writerId: snapshot.intakeWriterBundleIdentifier,
     sourceId: snapshot.intakeSourceId,
   } : datedIntake;
+  if (intakeIdentity.provider === 'manual_estimate') {
+    const record = await manualAccountingEvidence(db, userId, localDate, timezone);
+    if (record) intake.push({ kind: 'intake', provider: 'manual_estimate', label: 'CalorieBank estimate',
+      optionId: historicalOptionId(userId, date, 'INTAKE', 'manual_estimate', null),
+      writerBundleIdentifier: null, sourceId: null,
+      record: snapshot ? { ...record, totalCaloriesConsumed: snapshot.importedCalorieIntake,
+        providerRecordId: snapshot.intakeProviderRecordId } : record });
+  }
   const expenditureOverride = overrides.find((item) => item.role === 'EXPENDITURE');
   const intakeOverride = overrides.find((item) => item.role === 'INTAKE');
   const selectedExpenditure = expenditureOverride

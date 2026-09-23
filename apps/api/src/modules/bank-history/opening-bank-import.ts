@@ -78,7 +78,9 @@ export async function readOpeningImportState(
     status: expenditureSession.status,
     categoryStatus: expenditureSession.expenditureStatus,
   } : null);
-  const intake = roleState(intakeSession ? {
+  const manualConfigured = selection.authoritativeIntakeProvider === 'manual_estimate'
+    && Boolean(await transaction.manualEstimateBoundary.findFirst({ where: { userId, effectiveFrom: { lte: new Date(`${currentLocalDate}T00:00:00Z`) } }, select: { id: true } }));
+  const intake = manualConfigured ? 'complete' : roleState(intakeSession ? {
     completedAt: intakeSession.completedAt,
     status: intakeSession.status,
     categoryStatus: intakeSession.intakeStatus,

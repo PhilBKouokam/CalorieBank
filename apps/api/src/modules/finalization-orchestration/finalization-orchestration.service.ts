@@ -1,4 +1,6 @@
 import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
+import { resolveIntakeAuthority } from '../provider-selection/intake-authority';
+import { resolveManualIntake } from '../manual-intake/manual-intake.repository';
 import type { BankDayProcessingStatus, PrismaClient } from '@prisma/client';
 import { resolveAuthoritativeProviderRecord } from '@caloriebank/domain';
 
@@ -84,12 +86,14 @@ export class FinalizationOrchestrationService implements FinalizationScheduler {
       fallbackProvider: 'apple_health',
       allowFallback: selection.allowExpenditureFallback,
     });
-    const intake = resolveAuthoritativeProviderRecord(intakeRecords.filter((record) =>
+    const datedIntake = await resolveIntakeAuthority(this.db, userId, date, selection);
+    const manual = datedIntake.provider === 'manual_estimate' ? await resolveManualIntake(this.db, userId, date) : null;
+    const intake = manual ?? resolveAuthoritativeProviderRecord(intakeRecords.filter((record) =>
       (record.syncStatus === 'ready' || record.syncStatus === 'stale' || record.syncStatus === 'partial') &&
-      (record.provider !== 'health_connect' || matchesSelectedIntakeSource(record, selection)),
+      matchesSelectedIntakeSource(record, { appleHealthIntakeWriterBundleId: datedIntake.writerId, nativeIntakeSourceId: datedIntake.sourceId }),
     ), {
       authoritativeProvider: intakeRecords.length > 0 && intakeRecords.every((record) => record.provider === 'development')
-        ? 'development' : selection.authoritativeIntakeProvider,
+        ? 'development' : datedIntake.provider,
       allowFallback: false,
     });
 

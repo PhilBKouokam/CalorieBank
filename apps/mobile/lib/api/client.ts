@@ -1,4 +1,7 @@
 import { nativeIntakeBatchSchema, type NativeIntakeBatch } from '@caloriebank/schemas';
+import { setUpdateRequired } from './protocol-state';
+import { CLIENT_CAPABILITIES_HEADER, INTAKE_AUTHORITY_CAPABILITY, UPDATE_REQUIRED_MESSAGE } from '@caloriebank/schemas';
+import { manualIntakeStateSchema, manualIntakeMutationSchema, manualIntakeSaveSchema, type ManualIntakeMutation } from '@caloriebank/schemas';
 import {
   dailyBankTargetInputSchema,
   dailyBankTargetResponseSchema,
@@ -81,6 +84,18 @@ export type HealthResponse = {
   service: 'caloriebank-api';
 };
 
+export async function fetchManualIntake() {
+  const response = await apiRequest('/v1/me/manual-intake');
+  if (!response.ok) throw await responseError(response);
+  return manualIntakeStateSchema.parse(await response.json());
+}
+
+export async function saveManualIntake(input: ManualIntakeMutation) {
+  const response = await apiRequest('/v1/me/manual-intake', { method: 'PUT', body: JSON.stringify(manualIntakeMutationSchema.parse(input)) });
+  if (!response.ok) throw await responseError(response);
+  return manualIntakeSaveSchema.parse(await response.json());
+}
+
 export type ApiHealthState =
   | {
       status: 'loading';
@@ -109,7 +124,7 @@ export type ApiNetworkDiagnostics = {
 
 export type ApiRequestFailureKind = 'timeout' | 'cancelled' | 'network' | 'unknown';
 
-export type ApiHttpErrorKind = 'authentication' | 'forbidden' | 'conflict' | 'service' | 'unknown';
+export type ApiHttpErrorKind = 'authentication' | 'forbidden' | 'conflict' | 'service' | 'update_required' | 'unknown';
 
 export class ApiHttpError extends Error {
   constructor(
@@ -117,7 +132,7 @@ export class ApiHttpError extends Error {
     readonly kind: ApiHttpErrorKind,
     readonly code: string | null,
   ) {
-    super(`CalorieBank request failed with status ${status}.`);
+    super(kind === 'update_required' ? UPDATE_REQUIRED_MESSAGE : `CalorieBank request failed with status ${status}.`);
     this.name = 'ApiHttpError';
   }
 }
@@ -220,6 +235,7 @@ export function setApiAccessTokenProvider(
   if (accountContext !== accessTokenContext) {
     accessTokenContext = accountContext;
     accessTokenGeneration += 1;
+    setUpdateRequired(false);
   }
   accessTokenProvider = provider;
   apiAuthState = state;
@@ -317,6 +333,7 @@ async function apiRequest(path: string, init?: RequestInit, timeoutMs = 20000) {
         ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
+        [CLIENT_CAPABILITIES_HEADER]: INTAKE_AUTHORITY_CAPABILITY,
       },
       signal: controller.signal,
     }), deadline]);
@@ -328,6 +345,17 @@ async function apiRequest(path: string, init?: RequestInit, timeoutMs = 20000) {
       lastRequestPath: path,
       lastRequestStatus: `HTTP ${response.status}`,
       lastHttpStatus: response.status,
+    };
+    if (response.status === 426) {
+      setUpdateRequired(true);
+      throw new ApiHttpError(426, 'update_required', 'UPDATE_REQUIRED');
+    }
+    const readJson = response.json.bind(response);
+    response.json = async () => {
+      if (requestAuthGeneration !== accessTokenGeneration) throw new ApiAuthenticationPendingError();
+      const body: unknown = await readJson();
+      if (requestAuthGeneration !== accessTokenGeneration) throw new ApiAuthenticationPendingError();
+      return body;
     };
     return response;
   } catch (error) {

@@ -8,7 +8,7 @@ import { deriveOnboardingStatus } from '../src/modules/onboarding/onboarding.rep
 const h = vi.hoisted(() => ({
   params: {} as Record<string, string>, os: 'ios', providers: null as ProviderSelectionResponse | null, goal: false, empty: false, fail: false, writers: true,
   pause: null as Promise<void> | null, healthUnavailable: false,
-  targetChosen: false, nativeRefresh: vi.fn(async () => 'ready'),
+  targetChosen: false, manualEnabled: false, nativeRefresh: vi.fn(async () => 'ready'),
   router: { push: vi.fn(), replace: vi.fn() }, saves: [] as ProviderSelectionInput[],
 }));
 const data = () => h.providers!;
@@ -25,7 +25,7 @@ function connections(): HealthConnectionsResponse {
   const apple = data().intake.writerBundleIdentifier ? option('apple_health', data().intake.writerDisplayName!, true) : null;
   const fat = option('fatsecret', 'FatSecret');
   const native = data().intake.nativeIntakeSource ? { ...option('health_connect', data().intake.displayName), transportLabel: 'Health Connect', deviceManaged: true } : null;
-  const eaten = data().intake.authoritativeProvider === 'fatsecret' ? fat : data().intake.authoritativeProvider === 'health_connect' ? native : data().intake.authoritativeProvider === 'apple_health' ? apple : { ...option('future-source-v1', 'Calorie source'), status: 'available' as const };
+  const eaten = data().intake.authoritativeProvider === 'fatsecret' ? fat : data().intake.authoritativeProvider === 'health_connect' ? native : data().intake.authoritativeProvider === 'apple_health' ? apple : { ...option(data().intake.authoritativeProvider === 'manual_estimate' ? 'eaten-manual-estimate-v1' : 'future-source-v1', data().intake.displayName), status: 'available' as const };
   return {
     burned: { selected: data().expenditure.selected ? burn : null, alternatives: data().expenditure.selected ? [] : [option('google_health_fitbit', 'Fitbit')], canChange: !data().expenditure.selected, canAddSource: true },
     eaten: { selected: data().intake.selected ? eaten : null, alternatives: [apple, fat].filter((p): p is HealthConnectionOption => p !== null && p.optionId !== eaten?.optionId), canChange: true, canAddSource: true },
@@ -52,6 +52,7 @@ vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' 
 vi.mock('expo-router', () => ({ useRouter: () => h.router, useLocalSearchParams: () => ({ returnTo: 'onboarding', ...h.params }), useFocusEffect: (callback: () => void | (() => void)) => React.useEffect(callback, []) }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: async (url: string) => { connect(url); return { type: 'success', url: 'caloriebank://integrations?fitbit=connected' }; } }));
 vi.mock('../../mobile/lib/api/client', () => ({
+  fetchManualIntake: async () => ({ selectionEnabled: h.manualEnabled, selected: data().intake.authoritativeProvider === 'manual_estimate', localDate: '2026-09-23', revision: 0, selectionRevision: null, estimate: null }),
   fetchDailyBankTarget: async () => ({ calories: 0, chosen: h.targetChosen }),
   saveDailyBankTarget: async (calories: number) => { h.targetChosen = true; return { calories, chosen: true }; },
   fetchOnboardingStatus: async () => snapshot(), fetchProviderSelection: async () => structuredClone(data()),
@@ -141,6 +142,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: false });
   h.nativeRefresh.mockClear(); h.router.push.mockClear(); h.router.replace.mockClear();
   h.params = {}; h.os = 'ios'; h.goal = false; h.targetChosen = false; h.empty = false; h.fail = false; h.writers = true; h.saves = []; h.pause = null; h.healthUnavailable = false;
+  h.manualEnabled = false;
   h.providers = {
     expenditure: { selected: false, authoritativeProvider: 'apple_health', displayName: 'Apple Health', status: 'unavailable', fallbackActive: false },
     activityContext: { authoritativeProvider: 'apple_health', displayName: 'Apple Health', status: 'unavailable', fallbackActive: false },
@@ -341,13 +343,39 @@ describe('Android qualified direct-provider journeys', () => {
 describe('future intake authority presentation', () => {
   it.each(['ios', 'android'])('keeps %s Settings neutral without automatic source writes', async (platform) => {
     h.os = platform;
-    data().intake = { ...data().intake, selected: true, authoritativeProvider: 'manual_estimate', displayName: 'Calorie source', status: 'ready', writerBundleIdentifier: null, writerDisplayName: null };
+    data().intake = { ...data().intake, selected: true, authoritativeProvider: 'future_intake_v3', displayName: 'Calorie source', status: 'ready', writerBundleIdentifier: null, writerDisplayName: null };
     const before = structuredClone(data());
     await mountSettings();
     expect(text(screen!.root)).toContain('Calorie source');
     expect(text(screen!.root)).toContain('Selected');
     expect(text(screen!.root)).not.toContain('manual_estimate');
     expect(data()).toEqual(before);
+    expect(h.saves).toEqual([]);
+  });
+});
+
+describe('manual source mobile parity', () => {
+  it.each(['ios', 'android'])('offers %s estimate setup without committing on navigation, and resumes configured manual users at Goal', async (platform) => {
+    h.os = platform; h.manualEnabled = true;
+    data().expenditure = { ...data().expenditure, selected: true, authoritativeProvider: 'google_health_fitbit', displayName: 'Fitbit', status: 'ready' };
+    connect('google_health_fitbit');
+    await mount();
+    const before = structuredClone(data());
+    await press('I don’t track calories');
+    expect(h.router.push).toHaveBeenCalledWith({ pathname: '/manual-estimate', params: { mode: 'select' } });
+    expect(data()).toEqual(before); expect(h.saves).toEqual([]);
+    await act(async () => screen!.unmount());
+    data().intake = { ...data().intake, selected: true, authoritativeProvider: 'manual_estimate', displayName: 'CalorieBank estimate', status: 'ready' };
+    await mount();
+    expect(text(screen!.root)).toContain('Choose your goal');
+    expect(text(screen!.root)).not.toContain('Connect a food tracker');
+    await act(async () => screen!.unmount());
+    await mountSettings();
+    expect(text(screen!.root)).toContain('CalorieBank estimate');
+    await press('Manage sources for calories eaten');
+    const manualRow = screen!.root.findAll(node => String(node.type) === 'View' && node.children.some(child => typeof child !== 'string' && text(child).includes('CalorieBank estimate')));
+    expect(manualRow.length).toBeGreaterThan(0);
+    expect(text(screen!.root)).not.toContain('Needs refresh');
     expect(h.saves).toEqual([]);
   });
 });

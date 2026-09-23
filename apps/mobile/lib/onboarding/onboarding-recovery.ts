@@ -78,7 +78,7 @@ export function onboardingSourceState(input: {
 export function sourceSelectionSatisfiesOnboarding(
   source: OnboardingStatusResponse['expenditure'] | OnboardingStatusResponse['intake'],
 ) {
-  return source.connected
+  return (source.connected || source.provider === 'manual_estimate')
     && (source.readiness === 'ready' || source.readiness === 'connected_waiting_for_data');
 }
 

@@ -18,12 +18,12 @@ describe('intake wire compatibility without enabling future authorities', () => 
     expect(legacyIntake.parse(response.intake)).toEqual(response.intake);
     expect(compatibleProviderSelectionResponseSchema.parse(response)).toEqual(response);
   });
-  it('accepts future identity for reads but neither emits nor accepts it as a server mutation', () => {
+  it('parses manual reads but keeps manual out of legacy and provider-specific mutations', () => {
     const fixture = selection('manual_estimate');
     const parsed = compatibleProviderSelectionResponseSchema.parse(fixture);
     expect(parsed.intake.authoritativeProvider).toBe('manual_estimate');
     expect(isKnownIntakeProvider(parsed.intake.authoritativeProvider)).toBe(false);
-    expect(providerSelectionResponseSchema.safeParse(fixture).success).toBe(false);
+    expect(providerSelectionResponseSchema.safeParse(fixture).success).toBe(true);
     expect(legacyIntake.safeParse(fixture.intake).success).toBe(false);
     expect(providerSelectionInputSchema.safeParse({ authoritativeExpenditureProvider: 'google_health_fitbit', authoritativeIntakeProvider: 'manual_estimate' }).success).toBe(false);
     expect(initialImportPlan(parsed)).toEqual({ fitbit: true, fatSecret: false, appleHealth: false });
@@ -33,5 +33,13 @@ describe('intake wire compatibility without enabling future authorities', () => 
     const response = healthConnectionsResponseSchema.parse({ burned: empty, eaten: { ...empty, selected: { optionId: 'future-intake-v1', label: 'Calorie source', status: 'available', transportLabel: null, primaryAction: null, deviceManaged: false } }, connectedServices: [] });
     expect(response.eaten.selected?.status).toBe('available');
     expect(response.connectedServices).toEqual([]);
+  });
+  it('retains a genuinely future wire identity without granting provider operations', () => {
+    const parsed = compatibleProviderSelectionResponseSchema.parse(selection('future_intake_v3'));
+    expect(parsed.intake.authoritativeProvider).toBe('future_intake_v3');
+    expect(parsed.intake.displayName).toBe('Calorie source');
+    expect(isKnownIntakeProvider(parsed.intake.authoritativeProvider)).toBe(false);
+    expect(initialImportPlan(parsed)).toEqual({ fitbit: true, fatSecret: false, appleHealth: false });
+    expect(providerSelectionResponseSchema.safeParse(selection('future_intake_v3')).success).toBe(false);
   });
 });

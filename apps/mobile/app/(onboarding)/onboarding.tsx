@@ -1,5 +1,6 @@
 import { isKnownIntakeProvider } from '@caloriebank/schemas';
 import { AndroidFoodChoices } from '@/components/caloriebank/AndroidFoodChoices';
+import { ManualSourceChoice } from '@/components/caloriebank/ManualSourceChoice';
 import { beginOnboardingProviderReturn } from '@/lib/auth/native-intent';
 import { nativeSourceRecoveryStage } from '@/lib/native-health/presentation';
 import { preferDirectFoodSources } from '@/lib/providers/intake-writer-policy';
@@ -621,6 +622,11 @@ export default function OnboardingScreen() {
         return <>
           <Text style={styles.title}>Where do you track your food?</Text>
           <Text style={styles.detail}>{nativeRecoveryStage === 'calories_eaten' ? 'Your saved source cannot refresh on this phone. Choose a food source to continue.' : 'Choose one source for your daily calorie total.'}</Text>
+          <ManualSourceChoice disabled={busy !== null} />
+          {status.intake.provider === 'manual_estimate' && editingRole !== 'intake' ? <>
+            <PrimaryButton busy={busy !== null} label="Continue" onPress={() => showStage(nextStageAfterSource('intake'))} />
+            <BackButton label="Change source" onPress={() => showStage('calories_eaten', 'intake')} />
+          </> : null}
           {status.intake.connected && nativeRecoveryStage !== 'calories_eaten' && editingRole !== 'intake' ? <ConnectedSource
             busy={intakeActionActive}
             canContinue={sourceSelectionSatisfiesOnboarding(status.intake)}
@@ -680,7 +686,9 @@ export default function OnboardingScreen() {
         return <>
           {busy === 'preparing' ? <ActivityIndicator accessibilityLabel="Preparing your bank" color={colors.primary} size="large" /> : null}
           <Text style={styles.title}>Preparing your bank</Text>
-          <Text style={styles.detail}>{busy === 'preparing' ? 'Checking your recent activity and nutrition data.' : 'Waiting for recent calorie data from your connected apps. You can refresh or review your connections below.'}</Text>
+          <Text style={styles.detail}>{status.intake.provider === 'manual_estimate'
+            ? busy === 'preparing' ? 'Checking your activity data. Your daily estimate is ready.' : 'Your daily estimate is ready. Refresh your activity source to finish preparing your bank.'
+            : busy === 'preparing' ? 'Checking your recent activity and nutrition data.' : 'Waiting for recent calorie data from your connected apps. You can refresh or review your connections below.'}</Text>
           <PreparationRow label="Calories burned" source={status.expenditure.displayName} state={status.preparation.expenditure} waitingLabel={status.expenditure.provider === 'apple_health' ? 'Waiting for Apple Health data' : undefined} />
           <PreparationRow label="Calories eaten" source={status.intake.displayName} state={status.preparation.intake} waitingLabel={status.intake.provider === 'apple_health' ? 'Waiting for Apple Health data' : undefined} />
           <PrimaryButton busy={busy === 'preparing'} label={status.expenditure.provider === 'apple_health' || status.intake.provider === 'apple_health' ? 'Refresh Apple Health' : 'Try again'} onPress={() => void prepareBank()} />
@@ -695,7 +703,7 @@ export default function OnboardingScreen() {
             <Text style={styles.balanceLabel}>Starting balance</Text>
             <Text adjustsFontSizeToFit numberOfLines={1} style={styles.balanceValue}>{status.openingBankCalories.toLocaleString()} kcal</Text>
           </View>
-          {status.preparation.history === 'no_history'
+          {status.intake.provider === 'manual_estimate' || status.preparation.history === 'no_history'
             ? <Text style={styles.detail}>You’re ready. Your bank will start with your first completed day.</Text>
             : status.openingBankCalories === 0 ? <Text style={styles.detail}>Today’s a fresh start.</Text> : null}
           <View style={styles.morningUpdatePanel}>

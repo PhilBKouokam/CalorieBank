@@ -3,6 +3,7 @@ import { nativeIntakeBatchSchema, nativeIntakeSourceName } from '@caloriebank/sc
 import type { PrismaClient } from '@prisma/client';
 import { Router } from 'express';
 import { AppError } from '../../errors';
+import { requireIntakeCapability } from '../../security/intake-capability';
 import { resolveRequestUser, type RequestUserSource } from '../../auth/current-user';
 import { getLocalDateForTimezone } from '../today/today.time';
 import { openingImportDates } from '../bank-history/opening-bank-import';
@@ -29,6 +30,7 @@ export function createNativeIntakeRouter(db: PrismaClient, users: RequestUserSou
       const session = await db.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${user.id}), hashtext('opening-bank'))`;
         const selected = await tx.providerSelection.findUnique({ where: { userId: user.id } });
+        requireIntakeCapability(selected?.authoritativeIntakeProvider);
         const plan = selected ? await intakeRefreshPlan(tx, user.id, dates, selected) : [];
         if (!selected?.intakeSelected || !plan.some((entry) => entry.provider === 'health_connect' && entry.sourceId === input.source.id) || selected.updatedAt.toISOString() !== input.selectionRevision ||
             startedAt < selected.updatedAt) {

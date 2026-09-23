@@ -32,6 +32,7 @@ import type { DevelopmentUser } from '../goal-configuration/goal-configuration.r
 import { readProviderSelection } from '../provider-selection/provider-selection.repository';
 import { openingPreparationSourceKey, readOpeningImportState } from './opening-bank-import';
 import { AppError } from '../../errors';
+import { requireIntakeCapability } from '../../security/intake-capability';
 import { getLocalDateForTimezone } from '../today/today.time';
 import {
   consumerProviderName,
@@ -750,6 +751,21 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       }
 
       const dates = getPreviousCompletedLocalDates(currentLocalDate);
+      if (currentSelection.authoritativeIntakeProvider === 'manual_estimate') {
+        const [usual, goal, manualAuthority] = await Promise.all([
+          transaction.manualEstimateBoundary.findFirst({ where: { userId: user.id, effectiveFrom: { lte: parseLogDate(currentLocalDate) } }, orderBy: { effectiveFrom: 'asc' } }),
+          transaction.goalConfiguration.findUnique({ where: { userId: user.id }, select: { userId: true } }),
+          transaction.intakeAuthorityBoundary.findFirst({ where: { userId: user.id, effectiveFrom: { lte: parseLogDate(currentLocalDate) } }, orderBy: { effectiveFrom: 'desc' } }),
+        ]);
+        if (!usual || !goal || manualAuthority?.provider !== 'manual_estimate' || !manualAuthority.effectiveFrom) return { outcome: 'waiting_for_opening_data', accountingStartsOn: null, openingEffectiveBalanceCalories: 0 };
+        // Manual preferences are prospective evidence, never a historical import.
+        await transaction.bankAccountInitialization.update({ where: { userId: user.id }, data: {
+          status: 'INITIALIZED', historicalOpeningNetCalories: 0, openingEffectiveBalanceCalories: 0,
+          eligibleDayCount: 0, accountingStartsOn: manualAuthority.effectiveFrom, timezone,
+          initializedAt: this.now(), preparationSourceKey: sourceKey,
+        } });
+        return { outcome: 'initialized', accountingStartsOn: toDateOnly(manualAuthority.effectiveFrom), openingEffectiveBalanceCalories: 0 };
+      }
       const [goal, expenditureRecords, intakeRecords, selection] = await Promise.all([
         transaction.goalConfiguration.findUnique({ where: { userId: user.id } }),
         transaction.dailyExpenditureAggregate.findMany({
@@ -1233,7 +1249,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
             aggregateImportedAt: expenditure.importedAt,
             aggregateWasCurrentDay: expenditure.isCurrentDay,
           }),
-          hasCompletedDayQueryEvidence(transaction, {
+          intake.provider === 'manual_estimate' ? Promise.resolve(true) : hasCompletedDayQueryEvidence(transaction, {
             userId: user.id,
             localDate: logDate,
             timezone,
@@ -1280,7 +1296,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           intakeProviderRecordId: intake.providerRecordId,
           intakeSourceDisplayName: intake.provider === 'health_connect' ? intake.sourceDisplayName : intake.provider === 'apple_health'
             ? intake.writerDisplayName
-            : intake.provider === 'fatsecret' ? 'FatSecret' : null,
+            : intake.provider === 'fatsecret' ? 'FatSecret' : intake.provider === 'manual_estimate' ? 'CalorieBank estimate' : null,
           intakeSourceId: intake.provider === 'health_connect' ? intake.sourceId : null,
           intakeWriterBundleIdentifier: intake.provider === 'apple_health'
             ? intake.writerBundleIdentifier
@@ -1529,6 +1545,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         include: { initialization: true },
       }),
     ]);
+    requireIntakeCapability(...records.flatMap((record) => record.calculationSnapshots.map((snapshot) => snapshot.intakeProvider)));
     const finalizedDays = records.map(toDaySummary);
     const days = [...finalizedDays, ...openingDays.map(openingDaySummary)]
       .sort((a, b) => b.logDate.localeCompare(a.logDate));
@@ -1608,7 +1625,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
     const authority = await resolveDaySourceAuthority(transaction, userId, date, record.timezone);
     const latest = record.calculationSnapshots.at(-1);
     if (!latest) throw new AppError('Completed bank day has no calculation provenance.', 409, { code: 'BANK_DAY_PROVENANCE_MISSING' });
-    const changeable = record.status === 'PROVISIONAL' && this.now() < record.lockAt;
+    const changeable = latest.intakeProvider !== 'manual_estimate' && record.status === 'PROVISIONAL' && this.now() < record.lockAt;
 
     // A global role change may not yet have usable data for this date. Until it does,
     // the latest effective snapshot remains the unchanged role's accounting authority.
@@ -1665,6 +1682,8 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
   }
 
   async getHistoricalSourceOptions(userId: string, logDate: string) {
+    const snapshot = await this.db.bankCalculationSnapshot.findFirst({ where: { userId, finalizedDailyBankRecord: { logDate: parseLogDate(logDate) } }, orderBy: { version: 'desc' }, select: { intakeProvider: true } });
+    requireIntakeCapability(snapshot?.intakeProvider);
     const sources = await this.db.$transaction((transaction) =>
       this.sourceOptionsInTransaction(transaction, userId, logDate));
     console.info(JSON.stringify({
@@ -1716,6 +1735,10 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       const candidate = dbRole === 'EXPENDITURE'
         ? authority.expenditure.find((item) => item.optionId === input.optionId)
         : authority.intake.find((item) => item.optionId === input.optionId);
+      requireIntakeCapability(latestSnapshot?.intakeProvider, candidate?.provider);
+      if (latestSnapshot?.intakeProvider === 'manual_estimate' || candidate?.provider === 'manual_estimate') {
+        throw new AppError('This completed day cannot be edited.', 409, { code: 'DAY_NO_LONGER_CHANGEABLE' });
+      }
       if (!candidate) {
         const knownMissingOptionIds = dbRole === 'EXPENDITURE'
           ? [
@@ -1873,7 +1896,10 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       where: { userId_logDate: { userId, logDate: parseLogDate(logDate) } },
       include: { calculationSnapshots: { orderBy: { version: 'asc' } } },
     });
-    if (record) return toDetail(record);
+    if (record) {
+      requireIntakeCapability(...record.calculationSnapshots.map((snapshot) => snapshot.intakeProvider));
+      return toDetail(record);
+    }
     const openingDay = await this.db.openingBankCalculationDay.findUnique({
       where: { userId_logDate: { userId, logDate: parseLogDate(logDate) } },
       include: { initialization: true },

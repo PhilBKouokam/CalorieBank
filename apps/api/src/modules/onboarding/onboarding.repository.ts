@@ -30,6 +30,10 @@ function selectedSource(
 ) {
   const connection = connectedProviders.find((item) => item.provider === role.authoritativeProvider);
   const state = deriveSourceState(sourceRole, role, connection?.status);
+  if (sourceRole === 'eaten' && role.authoritativeProvider === 'manual_estimate') {
+    return { provider: role.authoritativeProvider, displayName: 'CalorieBank estimate', connected: false,
+      status: role.status, readiness: role.status === 'ready' ? 'ready' as const : 'not_connected' as const };
+  }
   return {
     provider: role.authoritativeProvider,
     displayName: state === 'unselected' ? (sourceRole === 'eaten' ? 'No food source selected' : 'No burn source selected') : role.displayName,
@@ -45,7 +49,7 @@ function selectedSource(
 export function sourceSelectionSatisfiesSetup(
   source: OnboardingStatusResponse['expenditure'] | OnboardingStatusResponse['intake'],
 ) {
-  return source.connected
+  return (source.connected || source.provider === 'manual_estimate')
     && (source.readiness === 'ready' || source.readiness === 'connected_waiting_for_data');
 }
 
@@ -162,7 +166,7 @@ export class PrismaOnboardingRepository implements OnboardingRepository {
       if (!burnData && providerSelection.expenditure.status === 'ready') {
         providerSelection.expenditure.status = 'unavailable';
       }
-      if (!intakeData && providerSelection.intake.status === 'ready') {
+      if (!intakeData && selection.authoritativeIntakeProvider !== 'manual_estimate' && providerSelection.intake.status === 'ready') {
         providerSelection.intake.status = 'unavailable';
       }
     }

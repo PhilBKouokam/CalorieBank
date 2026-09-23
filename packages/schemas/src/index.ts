@@ -1,5 +1,8 @@
 export { nativeIntakeSourceName } from './native-intake-source';
+export * from './client-capabilities';
+export * from './manual-intake';
 import { z } from 'zod';
+import { authoritativeEatenSchema } from './manual-intake';
 export * from './source-state';
 
 export const goalModeSchema = z.enum(['cut', 'maintain', 'bulk']);
@@ -283,7 +286,7 @@ export const providerSelectionResponseSchema = z.object({
   }),
   intake: z.object({
     selected: z.boolean().optional(),
-    authoritativeProvider: intakeProviderSchema,
+    authoritativeProvider: z.union([intakeProviderSchema, z.literal('manual_estimate')]),
     displayName: z.string().min(1),
     status: providerConnectionStatusSchema,
     writerBundleIdentifier: z.string().min(1).nullable(),
@@ -621,6 +624,8 @@ export const todayResponseSchema = z.object({
   }),
   eaten: z.object({
     calories: z.number().int().nonnegative().nullable(),
+    authoritative: authoritativeEatenSchema.nullable().optional(),
+    estimateKind: z.enum(['usual', 'today']).optional(),
     source: z.string().min(1).nullable(),
     lastSyncedAt: z.string().datetime().nullable(),
     status: todaySourceStatusSchema,
@@ -1011,7 +1016,7 @@ export type ProviderSelectionInput = z.infer<typeof providerSelectionInputSchema
 export const compatibleProviderSelectionResponseSchema = providerSelectionResponseSchema.extend({
   intake: providerSelectionResponseSchema.shape.intake.extend({
     authoritativeProvider: z.string().min(1).max(100).regex(/^[a-z][a-z0-9_]*$/),
-  }).transform((intake) => intakeProviderSchema.safeParse(intake.authoritativeProvider).success
+  }).transform((intake) => providerSelectionResponseSchema.shape.intake.shape.authoritativeProvider.safeParse(intake.authoritativeProvider).success
     ? intake : { ...intake, displayName: 'Calorie source' }),
 });
 export function isKnownIntakeProvider(value: string): value is z.infer<typeof intakeProviderSchema> {

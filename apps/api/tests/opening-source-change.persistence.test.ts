@@ -4,6 +4,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { PrismaBankHistoryRepository } from '../src/modules/bank-history/bank-history.repository';
 import { openingImportDates, openingPreparationSourceKey, readOpeningImportState } from '../src/modules/bank-history/opening-bank-import';
 import { PrismaProviderSelectionRepository } from '../src/modules/provider-selection/provider-selection.repository';
+import { ManualIntakeRepository } from '../src/modules/manual-intake/manual-intake.repository';
 
 const db = new PrismaClient();
 const ids: string[] = [];
@@ -136,7 +137,7 @@ describe('Opening Bank source-context recovery', () => {
     expect((await readOpeningImportState(db, user.id, today)).expenditure).toBe('preparing');
   });
 
-it('Phase 1A metadata migration and intake switching preserve populated Opening Bank, Recovery, History and ledger', async () => {
+it.each(['phase1a', 'phase1b'])('%s metadata migration and intake switching preserve populated Opening Bank, Recovery, History and ledger', async (phase) => {
   const user = await account();
   await checked(user.id); await history(user.id);
   expect((await bank.initializeOpeningBank(user, today, zone)).outcome).toBe('initialized');
@@ -161,6 +162,7 @@ it('Phase 1A metadata migration and intake switching preserve populated Opening 
     history: await nextBank.getHistory(user.id, 'ALL'),
   });
   const before = await capture();
+  const selectionBefore = await db.providerSelection.findUnique({ where: { userId: user.id } });
   expect(before.openingDays).toHaveLength(1);
   expect(before.finalized).toHaveLength(1);
   expect(before.summary.availableBankCalories).toBe(0);
@@ -170,6 +172,34 @@ it('Phase 1A metadata migration and intake switching preserve populated Opening 
   const { readFileSync } = await import('node:fs');
   const { resolve } = await import('node:path');
   const auditName = `ia_${user.id.slice(0, 8)}`;
+  if (phase === 'phase1b') {
+    // Run the unmodified additive DDL in an isolated schema of this dedicated
+    // test database. Foreign keys refer to the populated public users table.
+    const sql = readFileSync(resolve(__dirname, '../prisma/migrations/20260923000000_manual_intake/migration.sql'), 'utf8');
+    await db.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`CREATE SCHEMA "${auditName}"`);
+      await tx.$executeRawUnsafe(`SET LOCAL search_path TO "${auditName}", public`);
+      // Keep foreign-key DDL isolated from concurrent suites deleting their own
+      // public users. The migration sees the populated user's real persisted ID.
+      await tx.$executeRawUnsafe(`CREATE TABLE "${auditName}".users AS SELECT * FROM public.users WHERE id = $1::uuid`, user.id);
+      await tx.$executeRawUnsafe(`ALTER TABLE "${auditName}".users ADD PRIMARY KEY (id)`);
+      for (const statement of sql.split(';').filter((part) => part.trim() && !['BEGIN', 'COMMIT'].includes(part.trim()))) await tx.$executeRawUnsafe(statement);
+      for (const table of ['manual_intake_states', 'manual_estimate_boundaries', 'manual_intake_overrides']) {
+        expect(await tx.$queryRawUnsafe(`SELECT * FROM "${auditName}".${table}`)).toEqual([]);
+      }
+      await tx.$executeRawUnsafe(`DROP SCHEMA "${auditName}" CASCADE`);
+    });
+    expect(await capture()).toEqual(before);
+    expect(await db.providerSelection.findUnique({ where: { userId: user.id } })).toEqual(selectionBefore);
+    const manual = new ManualIntakeRepository(db, true, () => new Date('2026-09-10T18:00:00Z'));
+    await manual.mutate(user.id, { operation: 'select', calories: 2500, expectedRevision: 0, selectionRevision: selectionBefore!.updatedAt.toISOString() });
+    await manual.mutate(user.id, { operation: 'today', calories: 2900, expectedRevision: 1, localDate: '2026-09-10' });
+    await manual.mutate(user.id, { operation: 'usual', calories: 2700, expectedRevision: 2, localDate: '2026-09-10' });
+    expect(await capture()).toEqual(before);
+    await nextBank.reconcileStoredDay(user, today, zone);
+    expect(await capture()).toEqual(before);
+    return;
+  }
   const sql = readFileSync(resolve(__dirname, '../prisma/migrations/20260920000000_intake_authority_boundaries/migration.sql'), 'utf8').replaceAll('intake_authority', auditName).replace('REFERENCES "users"', `REFERENCES "${auditName}_users"`).replace('FROM provider_selections', `FROM "${auditName}_selections"`);
   await db.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(`CREATE TABLE "${auditName}_users" AS SELECT id FROM users WHERE id = $1::uuid`, user.id);

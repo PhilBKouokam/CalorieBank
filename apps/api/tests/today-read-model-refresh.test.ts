@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ fetch: vi.fn(), listener: null as null | ((result: { status: string }) => void) }));
+vi.mock('expo-router', () => ({ useFocusEffect: (effect: () => void | (() => void)) => React.useEffect(effect, [effect]) }));
 vi.mock('../../mobile/lib/api/client', () => ({ fetchToday: state.fetch }));
 vi.mock('../../mobile/lib/lifecycle/account-lifecycle', () => ({ subscribeToAccountLifecycle: (listener: typeof state.listener) => { state.listener = listener; return () => { state.listener = null; }; } }));
 describe('read-only Today refresh consumers', () => {

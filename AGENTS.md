@@ -109,6 +109,17 @@ Historical-first resting-burn estimation and ledger-neutral rest-of-day forecast
 
 ## Effective-dated intake authority (Phase 1A)
 
+Phase 1B is explicitly authorized by the founder under
+`docs/product/manual-estimated-intake.md`. Manual estimates are a first-class
+intake authority; this supersedes tracker-required/manual-fallback-only wording
+for this feature. Preserve effective-dated usual estimates, date-specific Today
+overrides, and the distinction between estimated total-day intake and observed
+intake so far. Manual and provider evidence never sum. Current edits remain
+ledger-neutral; finalization snapshots source/value coherently. Manual intake
+never writes to HealthKit or Health Connect. New manual selection remains held
+until the request-level capability read/write gate, private clients and physical
+qualification satisfy Phase 1B rollout checkpoints. Capability is not identity.
+
 Follow `docs/product/adr-029-effective-dated-intake-authority.md`. Normal intake
 selection is prospective/current-day and is not a historical correction endpoint.
 Resolve completed dates through exact date authority and posted source snapshots;

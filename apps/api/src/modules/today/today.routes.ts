@@ -38,9 +38,13 @@ export function createTodayRouter(
 
   router.get('/today', async (_req, res, next) => {
     try {
-      const timezone = validTimezone(_req.query.timezone) ?? 'America/Chicago';
-      const localDate = getLocalDateForTimezone(timezone);
       const user = resolveRequestUser(userSource, res);
+      const requestedTimezone = validTimezone(_req.query.timezone) ?? 'America/Chicago';
+      // Reads and manual writes share the persisted account timezone. A query
+      // parameter must not move an override to a different civil date.
+      const { timezone, localDate } = repository.getCurrentDateContext
+        ? await repository.getCurrentDateContext(user.id, requestedTimezone)
+        : { timezone: requestedTimezone, localDate: getLocalDateForTimezone(requestedTimezone) };
       if (predictionResolver) {
         await predictionResolver.resolveRestingBurnEstimate(user, localDate, timezone).catch((error) => {
           diagnosticLogger?.('resting_model_resolution_error', {

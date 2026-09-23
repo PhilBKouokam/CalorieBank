@@ -68,3 +68,13 @@ document links, HTML semantics, cross-links and git diff --check passed. No app 
 gate was run because only static web and documentation files changed. Existing Data
 Safety legal classifications remain review items; published statements do not assert
 that infrastructure transfers are universally excluded from Google's sharing definition.
+
+## September 23 approved Manual Intake clarification
+
+Founder explicitly approved the exact calorie-estimates paragraph and publication.
+The HTML and Markdown policy now carry September 23, 2026. Published through the
+existing isolated project: `dpl_6mEwxhXcBo8FQDxehwP5Uqxb6vwX`, artifact
+https://caloriebank-legal-7t8s6730s-philbkouokams-projects.vercel.app.
+Public policy matched repository bytes; deletion page remained byte-identical.
+320px paragraph wrapping and no horizontal overflow verified. No DNS, portfolio,
+Clerk, mail, app release or store declaration changes accompanied publication.

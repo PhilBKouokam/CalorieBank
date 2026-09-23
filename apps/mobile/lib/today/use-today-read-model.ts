@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import type { TodayResponse } from '@caloriebank/schemas';
 import { fetchToday } from '@/lib/api/client';
 import { subscribeToAccountLifecycle } from '@/lib/lifecycle/account-lifecycle';
+import { subscribeToLocalDateChange } from './local-date-change';
 
 // Read-only consumers never initiate another provider refresh.
 export function useTodayReadModel() {
   const [today, setToday] = useState<TodayResponse | null>(null);
   const [failed, setFailed] = useState(false);
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let generation = 0;
     let mounted = true;
     async function load() {
@@ -19,7 +21,8 @@ export function useTodayReadModel() {
     }
     void load();
     const unsubscribe = subscribeToAccountLifecycle((result) => { if (result.status !== 'skipped') void load(); });
-    return () => { mounted = false; generation += 1; unsubscribe(); };
-  }, []);
+    const stopDate = subscribeToLocalDateChange(() => { setToday(null); void load(); });
+    return () => { mounted = false; generation += 1; unsubscribe(); stopDate(); };
+  }, []));
   return { today, failed: !today && failed };
 }

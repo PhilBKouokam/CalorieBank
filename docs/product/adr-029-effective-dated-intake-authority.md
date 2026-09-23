@@ -1,6 +1,6 @@
 # ADR 029: Effective-dated intake authority and compatibility bridge
 
-Status: implemented and backend deployed September 20, 2026; founder-assisted existing-source journeys passed September 21–22. Installed Pixel versionCode verification remains pending; unknown-source evidence is automated, not physical. See the deployment qualification record.
+Status: Phase 1A qualified; final evidence commit `4ebd52a` includes installed Pixel versionCode 3 / Play installer verification. Unknown-source evidence is automated, not physical. See the deployment qualification record. Phase 1B implementation is separately authorized under [Manual / estimated intake](manual-estimated-intake.md); private enablement remains gated.
 
 ## Scope and supersession
 

@@ -1,5 +1,7 @@
 import { StepPlanningCards } from '@/components/caloriebank/StepPlanningCards';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
@@ -7,6 +9,7 @@ import { useTodayReadModel } from '@/lib/today/use-today-read-model';
 import { getConsumerSourceName } from '@/lib/providers/presentation';
 
 export default function TodayBurnDetailScreen() {
+  const router = useRouter();
   const { today, failed } = useTodayReadModel();
 
   const burnSource = getConsumerSourceName(today?.burned.source);
@@ -34,7 +37,14 @@ export default function TodayBurnDetailScreen() {
               <View style={styles.metricBlock}>
                 <Text style={styles.metricLabel}>Eaten</Text>
                 <Text style={styles.metricValue}>{today.eaten.calories === null ? 'Unavailable' : `${today.eaten.calories.toLocaleString()} kcal`}</Text>
-                <Text style={styles.detail}>Imported from {intakeSource}</Text>
+                <Text style={styles.detail}>{today.eaten.authoritative?.semanticKind === 'estimated_total_day_intake'
+                  ? today.eaten.estimateKind === 'today' ? 'Your estimate for today' : 'Your daily estimate'
+                  : `Imported from ${intakeSource}`}</Text>
+                {today.eaten.authoritative?.source === 'manual_estimate' ? <Pressable accessibilityRole="button"
+                  accessibilityLabel={`Edit calories eaten, ${today.eaten.calories ?? 0} kilocalories, your estimate for today`}
+                  onPress={() => router.push({ pathname: '/manual-estimate', params: { mode: 'today' } })}
+                  style={{ minHeight: 48, minWidth: 48, justifyContent: 'center', alignSelf: 'flex-start' }}
+                ><Ionicons name="pencil-outline" size={20} color={colors.primary} /></Pressable> : null}
               </View>
               <View style={styles.metricBlock}><Text style={styles.metricLabel}>Steps</Text><Text style={styles.metricValue}>{today.steps.count?.toLocaleString() ?? 'Unavailable'}</Text></View>
             </View>

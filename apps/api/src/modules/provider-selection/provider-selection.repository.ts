@@ -1,6 +1,8 @@
 import { getLocalDateForTimezone } from '../today/today.time';
 import { openingImportDates } from '../bank-history/opening-bank-import';
 import { intakeRefreshPlan, resolveIntakeAuthority, sameIntakeIdentity, selectionIdentity, transitionIntakeAuthority } from './intake-authority';
+import { requireCompatibleSourceMutation, requireIntakeCapability } from '../../security/intake-capability';
+import { resolveManualIntake } from '../manual-intake/manual-intake.repository';
 import { nativeIntakeSourceName } from '@caloriebank/schemas';
 import type {
   HealthConnectionOption,
@@ -129,6 +131,11 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
 
   private async responseInTransaction(userId: string, db: Prisma.TransactionClient): Promise<ProviderSelectionResponse> {
     const selection = await readEffectiveCurrentSelection(db, userId, this.now());
+    requireIntakeCapability(selection.authoritativeIntakeProvider);
+    const manualProfile = selection.authoritativeIntakeProvider === 'manual_estimate'
+      ? await db.userProfile.findUnique({ where: { userId }, select: { timezone: true } }) : null;
+    const manual = selection.authoritativeIntakeProvider === 'manual_estimate'
+      ? await resolveManualIntake(db, userId, new Date(`${getLocalDateForTimezone(manualProfile?.timezone ?? 'UTC', this.now())}T00:00:00Z`)) : null;
     const [googleHealth, externalConnections, appleSync, appleExpenditure, appleIntake, fatSecretIntake, appleSteps, appleWorkout, fitbitExpenditure] = await Promise.all([
       db.googleHealthConnection.findUnique({ where: { userId } }),
       db.externalProviderConnection.findMany({ where: { userId } }),
@@ -224,13 +231,13 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       },
       intake: {
         selected: selection.intakeSelected && (selection.authoritativeIntakeProvider !== 'apple_health' || Boolean(selection.appleHealthIntakeWriterBundleId)),
-        authoritativeProvider: selection.authoritativeIntakeProvider as 'apple_health' | 'fatsecret' | 'health_connect',
-        displayName: selection.authoritativeIntakeProvider === 'health_connect'
+        authoritativeProvider: selection.authoritativeIntakeProvider as 'apple_health' | 'fatsecret' | 'health_connect' | 'manual_estimate',
+        displayName: selection.authoritativeIntakeProvider === 'manual_estimate' ? 'CalorieBank estimate' : selection.authoritativeIntakeProvider === 'health_connect'
           ? nativeIntakeSourceName(selection.nativeIntakeSourceId ?? '')
           : selection.authoritativeIntakeProvider === 'fatsecret'
           ? 'FatSecret'
           : selection.appleHealthIntakeWriterDisplayName ?? 'Apple Health',
-        status: selection.authoritativeIntakeProvider === 'health_connect'
+        status: selection.authoritativeIntakeProvider === 'manual_estimate' ? manual ? 'ready' : 'unavailable' : selection.authoritativeIntakeProvider === 'health_connect'
           ? nativeIntake ? 'ready' : 'unavailable'
           : selection.authoritativeIntakeProvider === 'fatsecret'
           ? fatSecretIntake
@@ -241,8 +248,8 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
           : appleIntake
             ? 'ready'
             : 'unavailable',
-        writerBundleIdentifier: selection.appleHealthIntakeWriterBundleId,
-        writerDisplayName: selection.appleHealthIntakeWriterDisplayName,
+        writerBundleIdentifier: selection.authoritativeIntakeProvider === 'manual_estimate' ? null : selection.appleHealthIntakeWriterBundleId,
+        writerDisplayName: selection.authoritativeIntakeProvider === 'manual_estimate' ? null : selection.appleHealthIntakeWriterDisplayName,
         refreshPlan,
         ...(storedSelection && refreshPlan.some((entry) => entry.provider === 'health_connect') ? { selectionRevision: storedSelection.updatedAt.toISOString() } : {}),
         ...(selection.authoritativeIntakeProvider === 'health_connect' ? { nativeIntakeSource: selection.nativeIntakeSourceId ? { namespace: 'android_package' as const, id: selection.nativeIntakeSourceId } : null, selectionRevision: storedSelection!.updatedAt.toISOString() } : {}),
@@ -387,7 +394,10 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
     const nativeData = selection.nativeIntakeSourceId ? await this.db.dailyIntakeAggregate.findFirst({ where: { userId, provider: 'health_connect', sourceId: selection.nativeIntakeSourceId, syncStatus: { in: ['ready', 'stale', 'partial'] } } }) : null;
     const nativeOption = selection.nativeIntakeSourceId ? roleOption(HEALTH_CONNECTION_OPTION_IDS.eatenNative, nativeIntakeSourceName(selection.nativeIntakeSourceId), nativeData ? 'connected' : 'no_data', { transportLabel: 'Health Connect', deviceManaged: true, primaryAction: 'check_native_health' }) : null;
     if (nativeOption && (selection.authoritativeIntakeProvider === 'health_connect' || selection.nativeIntakeSourceId !== 'com.fatsecret.android' || fatSecretStatus !== 'connected')) eatenOptions.push(nativeOption);
-    const effectiveEatenSelected = selection.intakeSelected && selection.authoritativeIntakeProvider === 'health_connect' ? nativeOption : eatenSelected;
+    requireIntakeCapability(selection.authoritativeIntakeProvider);
+    const effectiveEatenSelected = selection.intakeSelected && selection.authoritativeIntakeProvider === 'manual_estimate'
+      ? roleOption('eaten-manual-estimate-v1', 'CalorieBank estimate', 'available')
+      : selection.intakeSelected && selection.authoritativeIntakeProvider === 'health_connect' ? nativeOption : eatenSelected;
     const selectable = (option: HealthConnectionOption) => option.status === 'connected';
 
     const connectedServices: HealthConnectionOption[] = [];
@@ -447,7 +457,9 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
   }
 
   async selectBurned(user: DevelopmentUser, optionId: string) {
+    await requireCompatibleSourceMutation(this.db, user.id);
     const current = await readProviderSelection(this.db, user.id);
+    requireIntakeCapability(current.authoritativeIntakeProvider);
     const provider = optionId === HEALTH_CONNECTION_OPTION_IDS.burnedFitbit
       ? 'google_health_fitbit'
       : optionId === HEALTH_CONNECTION_OPTION_IDS.burnedAppleHealth
@@ -470,7 +482,9 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
   }
 
   async selectEaten(user: DevelopmentUser, optionId: string) {
+    await requireCompatibleSourceMutation(this.db, user.id);
     const current = await readProviderSelection(this.db, user.id);
+    requireIntakeCapability(current.authoritativeIntakeProvider);
     const provider = optionId === HEALTH_CONNECTION_OPTION_IDS.eatenFatSecret
       ? 'fatsecret'
       : optionId === HEALTH_CONNECTION_OPTION_IDS.eatenNative
@@ -508,6 +522,9 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
   }
 
   async update(user: DevelopmentUser, input: ProviderSelectionInput) {
+    await requireCompatibleSourceMutation(this.db, user.id);
+    const existingSelection = await this.db.providerSelection.findUnique({ where: { userId: user.id } });
+    requireIntakeCapability(existingSelection?.authoritativeIntakeProvider, input.authoritativeIntakeProvider);
     const changesBurn = input.selectionRole !== 'eaten';
     const changesIntake = input.selectionRole !== 'burned';
     if (changesBurn && !canProvideAuthoritativeExpenditure(input.authoritativeExpenditureProvider)) {
@@ -563,7 +580,6 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         throw new AppError('Connect FatSecret before selecting it for calories eaten.', 409);
       }
     }
-    const existingSelection = await this.db.providerSelection.findUnique({ where: { userId: user.id } });
     const selectedWriter = input.appleHealthIntakeWriter === undefined
       ? existingSelection?.appleHealthIntakeWriterBundleId
         ? {
@@ -602,7 +618,9 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
     };
     await this.db.$transaction(async (transaction) => {
       await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${user.id}), hashtext('opening-bank'))`;
+      await requireCompatibleSourceMutation(transaction, user.id);
       const stored = await transaction.providerSelection.findUnique({ where: { userId: user.id } });
+      requireIntakeCapability(stored?.authoritativeIntakeProvider, input.authoritativeIntakeProvider);
       const changed = Object.entries(roleChanges).filter(([key, value]) =>
         !stored || stored[key as keyof typeof stored] !== value);
       if (changed.length === 0) return;

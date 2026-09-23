@@ -1,4 +1,5 @@
-import { intakeRefreshPlan } from '../provider-selection/intake-authority';
+import { intakeRefreshPlan, lockIntakeAuthority } from '../provider-selection/intake-authority';
+import { requireIntakeCapability } from '../../security/intake-capability';
 import type { PrismaClient } from '@prisma/client';
 
 import { AppError } from '../../errors';
@@ -65,10 +66,17 @@ export class AccountLifecycleCoordinator {
   }
 
   async prepareForegroundUser(userId: string, timezone: string) {
-    const profile = await this.db.userProfile.update({
-      where: { userId },
-      data: { timezone },
-      select: { onboardingCompletedAt: true },
+    try { new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(); }
+    catch { throw new AppError('Timezone is invalid.', 400); }
+    const profile = await this.db.$transaction(async (tx) => {
+      await lockIntakeAuthority(tx, userId);
+      const source = await tx.providerSelection.findUnique({ where: { userId }, select: { authoritativeIntakeProvider: true } });
+      // Changing the canonical timezone affects Today authority. Reject an old
+      // client before that write; scheduled server lifecycle has no HTTP context.
+      requireIntakeCapability(source?.authoritativeIntakeProvider);
+      return tx.userProfile.update({
+        where: { userId }, data: { timezone }, select: { onboardingCompletedAt: true },
+      });
     });
     return { onboardingComplete: Boolean(profile.onboardingCompletedAt) };
   }

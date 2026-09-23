@@ -4,10 +4,11 @@ import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { AppState, View } from 'react-native';
 import 'react-native-reanimated';
 
 import { colors } from '@/constants/caloriebank-theme';
+import { ProtocolUpdateNotice } from '@/components/caloriebank/ProtocolUpdateNotice';
 import { logMobileClerkConfiguration, setApiAccessTokenProvider } from '@/lib/api/client';
 import { setNativeHealthAccountScope } from '@/lib/native-health';
 import { resetAccountLifecycle, refreshOnAppState } from '@/lib/lifecycle/account-lifecycle';
@@ -15,7 +16,8 @@ import { setNotificationAccountScope, syncMorningBankUpdateDevice } from '@/lib/
 
 function AppStack() {
   return (
-    <>
+    <View style={{ flex: 1 }}>
+      <ProtocolUpdateNotice />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.background },
@@ -32,7 +34,7 @@ function AppStack() {
         <Stack.Screen name="(modals)" options={{ presentation: 'modal' }} />
       </Stack>
       <StatusBar style="dark" />
-    </>
+    </View>
   );
 }
 

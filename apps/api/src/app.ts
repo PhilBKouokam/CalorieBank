@@ -76,6 +76,8 @@ import { createAccountLifecycleRouter } from './modules/lifecycle/account-lifecy
 import { AccountSafetyService } from './modules/account-safety/account-safety.service';
 import { createAccountSafetyRouter } from './modules/account-safety/account-safety.routes';
 import { createRateLimit } from './security/rate-limit';
+import { intakeCapabilityBoundary } from './security/intake-capability';
+import { createManualIntakeRouter } from './modules/manual-intake/manual-intake.routes';
 import { createMorningBankUpdateRouter } from './modules/morning-bank-update/morning-bank-update.routes';
 import { ExpoPushTransport, MorningBankUpdateService } from './modules/morning-bank-update/morning-bank-update.service';
 
@@ -168,6 +170,7 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
   app.use(express.json({ limit: '32kb' }));
   app.use(requestLogger);
   app.use(authentication.verify);
+  app.use(intakeCapabilityBoundary);
 
   app.get('/health', (_req, res) => {
     res.json({
@@ -250,6 +253,7 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
     createDashboardPreferencesRouter(dashboardPreferencesRepository, currentUser),
   );
   app.use('/v1/me/daily-bank-target', createDailyBankTargetRouter(new DailyBankTargetRepository(prisma), currentUser));
+  app.use('/v1/me/manual-intake', createManualIntakeRouter(prisma, currentUser, config.MANUAL_INTAKE_SELECTION_ENABLED === '1'));
   app.use(
     '/v1/me/ingestion/sync-sessions',
     createSyncSessionRouter(syncSessionRepository, currentUser, finalizationScheduler),

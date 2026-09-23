@@ -1,6 +1,6 @@
 # CalorieBank Privacy Policy
 
-Last updated: September 19, 2026
+Last updated: September 23, 2026
 
 ## 1. Who operates CalorieBank
 
@@ -19,6 +19,12 @@ CalorieBank uses calories eaten, calories burned, steps and supported exercise
 information, such as activity type, time, duration, distance and available calorie
 or step measurements. It stores imported daily totals, supported activity summaries,
 source identifiers, dates and update information in your account.
+
+**Your calorie estimates.** If you choose CalorieBank estimate, CalorieBank stores
+your usual daily calorie estimate, changes you make for a specific day, and the
+dates and source information needed to calculate your bank and preserve your
+history. These estimates stay in your CalorieBank account; CalorieBank does not
+write them to Apple Health or Health Connect.
 
 **Your settings and calculated information.** CalorieBank stores your Fitness Goal,
 Daily Bank Target, Banking Goal, source choices and display preferences. It also

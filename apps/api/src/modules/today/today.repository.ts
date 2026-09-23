@@ -1,4 +1,6 @@
 import { intakeRefreshPlan, resolveIntakeAuthority } from '../provider-selection/intake-authority';
+import { resolveManualIntake } from '../manual-intake/manual-intake.repository';
+import { requireIntakeCapability } from '../../security/intake-capability';
 import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import {
   calculateRestOfDayBurnProjection,
@@ -27,6 +29,7 @@ import { getProviderDisplayName, isSyntheticProvider } from './provider-catalog'
 import { combineTodayFreshness, currentDayFreshness } from './today.freshness';
 import { readProviderSelection } from '../provider-selection/provider-selection.repository';
 import { estimateStepContribution, estimateWalkingPace } from './steps-intelligence';
+import { getLocalDateForTimezone } from './today.time';
 
 export type AggregateUpsertResult = 'created' | 'updated' | 'unchanged' | 'ignored_stale';
 
@@ -76,6 +79,7 @@ export interface TodayAggregateRepository {
     providerUpdatedAt: Date,
   ): Promise<number>;
   getTodayForUser(userId: string, localDate: string, timezone: string): Promise<TodayResponse>;
+  getCurrentDateContext?(userId: string, fallbackTimezone: string): Promise<{ localDate: string; timezone: string }>;
   assertSyncSessionOwnedBy(sessionId: string, userId: string): Promise<void>;
 }
 
@@ -598,6 +602,12 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     return result.count;
   }
 
+  async getCurrentDateContext(userId: string, fallbackTimezone: string) {
+    const profile = await this.db.userProfile.findUnique({ where: { userId }, select: { timezone: true } });
+    const timezone = profile?.timezone ?? fallbackTimezone;
+    return { timezone, localDate: getLocalDateForTimezone(timezone) };
+  }
+
   async getTodayForUser(userId: string, localDate: string, timezone: string): Promise<TodayResponse> {
     return this.db.$transaction(
       (db) => this.readTodaySnapshot(db, userId, localDate, timezone),
@@ -646,6 +656,8 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       db.restingBurnEstimate.findUnique({ where: { userId } }),
     ]);
     const datedIntake = await resolveIntakeAuthority(db, userId, date, selection);
+    requireIntakeCapability(datedIntake.provider);
+    const manual = datedIntake.provider === 'manual_estimate' ? await resolveManualIntake(db, userId, date) : null;
     const intakeSelection = { appleHealthIntakeWriterBundleId: datedIntake.writerId, nativeIntakeSourceId: datedIntake.sourceId };
     const syntheticExpenditure = this.options.allowSyntheticProviders && expenditureRecords.length > 0 && expenditureRecords.every((record) => isSyntheticProvider(record.provider));
     const syntheticIntake = this.options.allowSyntheticProviders && intakeRecords.length > 0 && intakeRecords.every((record) => isSyntheticProvider(record.provider));
@@ -689,7 +701,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       expenditure ? syncStatus(expenditure.syncStatus) : categoryStatus(expenditureSession?.expenditureStatus),
       expenditure?.updatedAt ?? expenditureSyncedAt,
     );
-    const eatenStatus = currentDayFreshness(
+    const eatenStatus = manual ? 'ready' : currentDayFreshness(
       intake ? syncStatus(intake.syncStatus) : categoryStatus(intakeSession?.intakeStatus),
       intake?.updatedAt ?? intakeSyncedAt,
     );
@@ -769,13 +781,20 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         status: burnedStatus,
       },
       eaten: {
-        calories: intake?.totalCaloriesConsumed ?? null,
-        source: intake
+        calories: manual?.value.calories ?? intake?.totalCaloriesConsumed ?? null,
+        authoritative: manual?.value ?? (intake ? {
+          localDate, calories: intake.totalCaloriesConsumed, source: intake.provider,
+          semanticKind: 'observed_current_day_intake' as const,
+          evidenceVersion: `${intake.providerRecordId}:${intake.updatedAt.toISOString()}`,
+          updatedAt: intake.updatedAt.toISOString(),
+        } : null),
+        ...(manual ? { estimateKind: manual.overridden ? 'today' as const : 'usual' as const } : {}),
+        source: manual ? 'CalorieBank estimate' : intake
           ? intake.provider === 'health_connect' ? intake.sourceDisplayName ?? 'Food tracker' : intake.provider === 'apple_health'
             ? intake.writerDisplayName
             : getProviderDisplayName(intake.provider)
           : null,
-        lastSyncedAt: latestSyncedAt(intake),
+        lastSyncedAt: manual?.value.updatedAt ?? latestSyncedAt(intake),
         status: eatenStatus,
       },
       steps: {

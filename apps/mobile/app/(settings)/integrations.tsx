@@ -1,4 +1,5 @@
 import { connectionsForNativeCapability } from '@/lib/native-health/presentation';
+import { ManualSourceChoice } from '@/components/caloriebank/ManualSourceChoice';
 import { preferDirectFoodSources } from '@/lib/providers/intake-writer-policy';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FoodTrackerHelp } from '@/components/caloriebank/FoodTrackerHelp';
@@ -383,6 +384,7 @@ export default function IntegrationsScreen() {
         </View>
         <RoleCard data={displayConnections?.burned ?? null} onPress={() => openRole('burned')} role="burned" />
         <RoleCard data={displayConnections?.eaten ?? null} onPress={() => openRole('eaten')} role="eaten" />
+        <ManualSourceChoice disabled={busy !== null} onOpen={dismissSheets} />
         {appleUsable && displayConnections?.eaten.selected?.transportLabel === 'Apple Health' && displayConnections.eaten.selected.status === 'no_data' ? <FoodTrackerHelp provider="apple_health" bundleId={helpBundleId} /> : null}
         <InventorySection
           addLabel="Add burn source"
@@ -504,7 +506,7 @@ function RoleCard({ role, data, onPress }: { role: Role; data: HealthConnections
 }
 
 function Sheet({ children, onClose, visible }: { children: ReactNode; onClose: () => void; visible: boolean }) {
-  return <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}><Pressable accessibilityRole="button" onPress={onClose} style={styles.backdrop}><Pressable accessibilityRole="none" onPress={(event) => event.stopPropagation()} style={styles.sheet}>{children}</Pressable></Pressable></Modal>;
+  return <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}><Pressable accessibilityRole="button" onPress={onClose} style={styles.backdrop}><Pressable accessibilityRole="none" onPress={(event) => event.stopPropagation()} style={styles.sheet}><ScrollView contentContainerStyle={{ gap: spacing.sm }} keyboardShouldPersistTaps="handled">{children}</ScrollView></Pressable></Pressable></Modal>;
 }
 
 function SheetHeader({ title, onClose }: { title: string; onClose: () => void }) {
@@ -531,7 +533,7 @@ function RoleSelector({ onNativeDetails, onReconnect, appleBurnState, busy, data
         <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled: selected || busy || !usable }} disabled={selected || busy || !usable} onPress={() => onSelect(option)} style={styles.optionText}>
           <Text style={styles.optionLabel}>{option.label}</Text>
           {option.transportLabel ? <Text style={styles.optionDetail}>via {option.transportLabel}</Text> : null}
-          {!usable ? <Text style={styles.optionDetail}>{option.primaryAction === 'reconnect' ? 'Reconnect to use this source' : unavailableCopy}</Text> : null}
+          {!usable && option.status !== 'available' ? <Text style={styles.optionDetail}>{option.primaryAction === 'reconnect' ? 'Reconnect to use this source' : unavailableCopy}</Text> : null}
         </Pressable>
         {nativeIntake.supported && option.transportLabel === 'Health Connect' ? <Pressable accessibilityRole="button" disabled={busy} onPress={onNativeDetails} style={styles.inlineAction}><Text style={styles.actionText}>Manage</Text></Pressable> : option.primaryAction === 'reconnect' && (option.label === 'Fitbit' || option.label === 'FatSecret') ?
           <Pressable accessibilityRole="button" disabled={busy} onPress={() => onReconnect(option.label as 'Fitbit' | 'FatSecret')} style={styles.inlineAction}><Text style={styles.actionText}>Reconnect</Text></Pressable> :
@@ -555,6 +557,7 @@ function AddSourceSheet({ onNativeIntake, busy, connections, intakeWriters, mess
   const hasAddChoice = role === 'burned' ? !fitbitConnected || (nativeHealthCapability.supported && !appleAvailable) : !fatSecretConnected || nativeHealthCapability.supported || nativeIntake.supported;
   return <Sheet onClose={onClose} visible={role !== null}>
     <SheetHeader onClose={onClose} title={choosingWriters ? 'Choose your food tracker' : role === 'burned' ? 'Add calories burned source' : 'Add calories eaten source'} />
+    {role === 'eaten' && !choosingWriters ? <ManualSourceChoice disabled={busy !== null} onOpen={onClose} /> : null}
     {choosingWriters ? intakeWriters.map((writer) => <SourceAction detail="via Apple Health" disabled={busy !== null} key={writer.bundleIdentifier} label={writer.displayName} onPress={() => onWriter(writer)} />) : role === 'burned' ? <>{!fitbitConnected ? <SourceAction disabled={busy !== null} label="Fitbit" onPress={onFitbit} /> : null}{nativeHealthCapability.supported && !appleAvailable ? <SourceAction disabled={busy !== null} label="Apple Health" onPress={onAppleBurn} /> : null}</> : <>{!fatSecretConnected ? <SourceAction disabled={busy !== null} label="FatSecret" onPress={onFatSecret} /> : null}{nativeHealthCapability.supported ? <SourceAction detail="Choose the food app you use with Apple Health" disabled={busy !== null} label="Apple Health food tracker" onPress={onAppleIntake} /> : null}{nativeIntake.supported ? <SourceAction disabled={busy !== null} label="Health Connect food tracker" detail="Choose the app that shares your calories eaten." onPress={onNativeIntake} /> : null}</>}
     {!choosingWriters && !hasAddChoice ? <Text style={styles.emptyText}>All supported sources are connected.</Text> : null}
     {busy ? <ActivityIndicator color={colors.primary} style={styles.sheetSpinner} /> : null}{message ? <Text style={messageTone === 'success' ? styles.successText : messageTone === 'attention' ? styles.attentionText : styles.errorText}>{message}</Text> : null}<Pressable accessibilityRole="button" onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Cancel</Text></Pressable>

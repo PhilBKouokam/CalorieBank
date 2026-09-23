@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fetchPlannedTreat, setApiAccessTokenProvider } from '../../mobile/lib/api/client';
+import { isUpdateRequired } from '../../mobile/lib/api/protocol-state';
 
 afterEach(() => {
   setApiAccessTokenProvider(null);
@@ -31,6 +32,21 @@ function setup(token: () => Promise<string | null>) {
   setApiAccessTokenProvider(token, { ready: true, activeSessionPresent: true }, 'A');
 }
 const emptyPlan = { status: 'no_plan', plannedTreat: null, availableBankCalories: 0 };
+
+it('advertises capability and treats update-required as compatibility, preserving session for retry', async () => {
+  setup(async () => 'token');
+  const fetcher = vi.fn().mockResolvedValueOnce({ ok: false, status: 426 })
+    .mockResolvedValue({ ok: true, status: 200, json: async () => emptyPlan });
+  vi.stubGlobal('fetch', fetcher);
+  await expect(fetchPlannedTreat()).rejects.toMatchObject({ kind: 'update_required', code: 'UPDATE_REQUIRED', message: 'Update CalorieBank to continue with this account.' });
+  expect(isUpdateRequired()).toBe(true);
+  await expect(fetchPlannedTreat()).resolves.toEqual(emptyPlan);
+  expect(fetcher.mock.calls[0]?.[1].headers).toMatchObject({
+    'x-caloriebank-capabilities': 'intake-authority-v2', Authorization: 'Bearer token',
+  });
+  setApiAccessTokenProvider(async () => 'B-token', { ready: true, activeSessionPresent: true }, 'B');
+  expect(isUpdateRequired()).toBe(false);
+});
 
 it('never starts a request with a token arriving after the deadline, and retry succeeds', async () => {
   let resolveToken!: (token: string) => void;
@@ -68,4 +84,17 @@ it('rejects an old account token without sending it after account switching', as
   resolveToken('A-token'); await failed;
   expect(fetcher).not.toHaveBeenCalled();
   expect(vi.getTimerCount()).toBe(0);
+});
+
+it('rejects a delayed response body from the previous account', async () => {
+  setup(async () => 'A-token');
+  let resolveBody!: (value: unknown) => void;
+  const json = vi.fn(() => new Promise(resolve => { resolveBody = resolve; }));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json }));
+  const failed = expect(fetchPlannedTreat()).rejects.toMatchObject({ name: 'ApiAuthenticationPendingError' });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(json).toHaveBeenCalledOnce();
+  setApiAccessTokenProvider(async () => 'B-token', { ready: true, activeSessionPresent: true }, 'B');
+  resolveBody(emptyPlan);
+  await failed;
 });

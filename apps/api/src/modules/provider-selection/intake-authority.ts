@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { AppError } from '../../errors';
+import { requireIntakeCapability } from '../../security/intake-capability';
 import { getLocalDateForTimezone } from '../today/today.time';
 
 export type IntakeAuthorityIdentity = {
@@ -50,6 +51,7 @@ export async function transitionIntakeAuthority(
   db: Prisma.TransactionClient, userId: string, prior: Selection | null,
   next: IntakeAuthorityIdentity, now: Date, enabled = true,
 ) {
+  requireIntakeCapability(prior?.authoritativeIntakeProvider, next.provider);
   if (!enabled && (!prior || !sameIntakeIdentity(selectionIdentity(prior), next))) {
     throw new AppError('Sources are updating. Try again shortly.', 409, { code: 'INTAKE_AUTHORITY_ROLLOUT_HOLD' });
   }
@@ -108,7 +110,7 @@ export async function intakeRefreshPlan(
     // Explicit historical import is allowed only while Opening Bank is incomplete.
     const identity = override ? { provider: override.provider, writerId: override.intakeWriterBundleIdentifier, sourceId: override.intakeSourceId }
       : snapshot ? { provider: snapshot.intakeProvider, writerId: snapshot.intakeWriterBundleIdentifier, sourceId: snapshot.intakeSourceId }
-      : initialization?.status !== 'INITIALIZED' ? selectionIdentity(legacy)
+      : initialization?.status !== 'INITIALIZED' && legacy.authoritativeIntakeProvider !== 'manual_estimate' ? selectionIdentity(legacy)
       : dated ? boundary ?? selectionIdentity(legacy) : selectionIdentity(legacy);
     return { localDate, provider: identity.provider, writerId: identity.writerId, sourceId: identity.sourceId };
   });

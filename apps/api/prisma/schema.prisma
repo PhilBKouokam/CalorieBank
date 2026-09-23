@@ -148,6 +148,9 @@ model User {
   bankCalculationSnapshots      BankCalculationSnapshot[]
   bankDayProcessingStates       BankDayProcessingState[]
   intakeAuthorityBoundaries     IntakeAuthorityBoundary[]
+  manualIntakeState             ManualIntakeState?
+  manualEstimateBoundaries      ManualEstimateBoundary[]
+  manualIntakeOverrides         ManualIntakeOverride[]
   providerSelection             ProviderSelection?
   googleHealthConnection        GoogleHealthConnection?
   googleHealthOAuthAttempts     GoogleHealthOAuthAttempt[]
@@ -406,6 +409,42 @@ model ExternalProviderConnection {
   @@unique([userId, provider])
   @@index([provider, status])
   @@map("external_provider_connections")
+}
+
+model ManualIntakeState {
+  userId    String @id @map("user_id") @db.Uuid
+  revision  Int @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("manual_intake_states")
+}
+
+model ManualEstimateBoundary {
+  id            String @id @default(uuid()) @db.Uuid
+  userId        String @map("user_id") @db.Uuid
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  calories      Int
+  revision      Int
+  timezone      String
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, effectiveFrom])
+  @@map("manual_estimate_boundaries")
+}
+
+model ManualIntakeOverride {
+  userId    String @map("user_id") @db.Uuid
+  localDate DateTime @map("local_date") @db.Date
+  calories  Int
+  revision  Int
+  timezone  String
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, localDate])
+  @@map("manual_intake_overrides")
 }
 
 model ExternalProviderOAuthAttempt {

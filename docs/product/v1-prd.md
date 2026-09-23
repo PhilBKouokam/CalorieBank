@@ -4,6 +4,20 @@ Date: 2026-07-16
 
 ## Source Of Truth
 
+### Phase 1B approved intake expansion
+
+[Manual / estimated intake](manual-estimated-intake.md) is a first-class approved
+intake mode. A calorie tracker is optional: users may supply an effective-dated
+usual daily estimate and edit Today without changing future days. This supersedes
+the tracker-required and manual-fallback-only language below specifically for this
+feature. It does not authorize meal logging, historical corrections or Daily Eating
+Budget. Private enablement requires the Phase 1B capability, accounting, distribution
+and physical gates. Implementation is in progress; no release is claimed here.
+
+Manual Today represents estimated total-day intake; provider Today generally
+represents observed/logged intake so far. Preserve this distinction downstream.
+Completed-day totals use the existing server-owned accounting formula.
+
 This PRD is the authoritative V1 product document. It supersedes prior food-logging-first assumptions in older audits, prototype docs, and implementation notes. Bank-calculation behavior is governed by `docs/product/bank-calculation-spec.md`. Supporting architecture guidance lives in `docs/architecture/current-state-audit.md`; focused accepted decisions are recorded in the applicable product ADRs. Progressive Feature Discovery, including the distinction between V1 availability and first-use visibility, is governed by `docs/product/adr-011-progressive-feature-discovery.md`. Progressive Familiarity, including recommendation readiness, complementarity, and pacing, is governed by `docs/product/adr-014-progressive-familiarity.md`. Today's Eating Budget product boundaries and unresolved calculation requirements are governed by `docs/product/adr-012-todays-eating-budget.md`. Banking Goals, one-bank conservation, conceptual allocation methods, and implementation-blocking withdrawal policy decisions are governed by `docs/product/adr-013-banking-goals.md`. Time-Aware Activity Forecasting, including system confidence, user readiness, time opportunity, and burn-target feasibility, is governed by `docs/product/adr-015-time-aware-activity-forecasting.md`.
 
 ## Future Social authority and scope
