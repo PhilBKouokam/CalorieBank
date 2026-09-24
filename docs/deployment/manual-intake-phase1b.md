@@ -332,3 +332,37 @@ all older mutable provisional record fields are byte-identical across the nightl
 lock transition. No manual state, override or authority exists. Physical display
 of Recovery 381 remains to be confirmed. No mutation or lifecycle invocation was
 performed during this inspection.
+
+### iPhone provider round-trip — September 24
+
+Founder confirmed Recovery 381 matches the server. Current-day intake advanced
+from 1,158 to 2,051 kcal from Cronometer; Sep 23 remained 4,654 from Cronometer.
+On TestFlight build 5, selected the already-connected FatSecret without another
+OAuth sign-in. Today showed “No intake today” and “FatSecret has not reported
+calories eaten today.” Sep 23 History remained 4,654 from Cronometer. Selected
+Cronometer again; Today showed 2,051 from Cronometer and retained that source
+after refresh and force-close/relaunch. No stale FatSecret overwrite was observed.
+
+Read-only production transactions at 21:09:38Z (before), 21:12:18Z (FatSecret),
+and 21:32:17Z (Cronometer again) confirmed America/Chicago Sep 24 authority.
+The current-source projection agreed with the Sep 24 boundary at each stage.
+FatSecret's boundary had no native writer; returning to Cronometer restored exact
+`CRONOMETER-GOLD`. The same-date boundary was updated on switch-back, leaving one
+Sep 24 boundary, the Sep 21 boundary and the legacy baseline. No duplicate or
+competing same-date boundary was present.
+
+Across both transitions, Opening Bank stayed 224, Available Bank 0 and Recovery
+381. All four accounting fingerprints were identical (sorted JSON rows joined
+with `|`, SHA-256):
+
+| Persisted evidence | Rows | Fingerprint |
+| --- | ---: | --- |
+| Opening calculation days | 5 | `b8d5651ffc8336e346567d9b216fab7a80625785bd6803f736cde0aaf1e64ee0` |
+| Finalized records | 14 | `74d12d3658aecfb77a728c70a30a14a0676ed4a6d1f65acec725ee49a713a2b2` |
+| Calculation snapshots | 16 | `3d2ee7236428f08e656927709c85c3398c110a82ad1ca82124a470875fee2773` |
+| Ledger transactions | 16 | `e5733069a198675630f9393e6d47698b0ab9eed7f2e7a3fd45f5bd3c9472179e` |
+
+This completes the exercised iPhone existing-provider round-trip on build 5.
+Navigation-fix replacement binary qualification and Android provider smoke remain
+pending. Manual enrollment is still disabled; no manual physical journey or
+Phase 1B PASS is claimed.
