@@ -261,3 +261,49 @@ private enablement and real manual-account/finalization evidence remain.**
 This evidence-only commit uses `[skip render]`; it changes no compiled code or
 validated backend/build source. Daily Eating Budget and all deferred polish remain
 unimplemented.
+
+## Founder iPhone smoke and navigation defect — September 23
+
+Founder confirmed TestFlight 1.0.0 (5), existing session/Home, Available Bank
+1,124, Today 3,671 from Cronometer, latest completed-day intake 2,097 from
+Cronometer, Fitbit/Cronometer role cards, normal foreground refresh, Step Planning,
+Morning Bank Update enabled, and session persistence after relaunch. Imported
+Today correctly has no edit pencil; the source chooser correctly has no manual
+choice while enrollment is disabled. VoiceOver announced 3,671; full source-label
+and navigation accessibility qualification is not yet complete.
+
+Read-only server inspection matched the existing account and exact Apple writer
+`CRONOMETER-GOLD`. Opening Bank 224, Available Bank 1,124 and Recovery 0 were
+stable across refresh. Opening evidence, finalized records/snapshots, ledger and
+intake-boundary fingerprints were unchanged. No manual authority was created.
+
+A separate Sep 21 correction remains an upstream export discrepancy: founder
+reported Cronometer 4,934 while Apple Health and the latest CalorieBank snapshot
+both contained 4,874. Export/read permission checks and Cronometer relaunch did
+not change Apple Health. This does not prove a CalorieBank reconciliation defect
+or successful physical correction; deterministic same-source coverage is separate.
+
+The founder found a real navigation defect in Today detail: the header had no
+Back control. Detail and Settings groups have nested stacks whose first screen
+has no local previous screen, while the parent header is hidden. Added a shared
+native-style, accessibility-labeled Back control that uses router history across
+parents, with Today/Settings fallback for direct entry. Applied it to detail,
+Settings and ledger-modal headers; removed the duplicate parent modal header.
+Root tabs, sign-in and onboarding keep their existing navigation semantics.
+No accounting, provider, manual-enrollment or Step Planning changes.
+
+Validation: `release:friends-family` PASS, 905 tests across 81 files, including
+three new navigation tests; TypeScript, lint, Prisma/local migrations and builds
+passed. Isolated React Native Web rendering of the actual shared Back component
+and React Navigation header checked 320/390 widths and 200% title size: Back
+remained visible and announced as a button, and activation invoked return. Long
+header titles retain the library's truncation behavior. This is rendered evidence,
+not native iPhone/Android qualification. The fix is not in already-distributed
+iOS build 5 or Android build 4; a consolidated replacement binary is required
+under the genuine-defect exception before claiming navigation physically fixed.
+
+Founder no longer has the Pixel. Android physical qualification will use the
+incoming Samsung Galaxy, with exact Play package/versionCode/installer verified
+before testing. Manual Intake remains disabled pending both platform provider
+smokes and the pre-enablement checkpoint. Continue founder-assisted checks one
+action at a time; do not enable Manual Intake or claim Phase 1B PASS yet.

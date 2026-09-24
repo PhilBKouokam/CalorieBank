@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { NavigationBackButton } from '@/components/caloriebank/NavigationBackButton';
 import { nativeDiagnosticsTitle } from '@/lib/native-health/copy';
 
 import { colors } from '@/constants/caloriebank-theme';
@@ -7,6 +8,8 @@ export default function SettingsLayout() {
   return (
     <Stack
       screenOptions={{
+        headerBackVisible: false,
+        headerLeft: () => <NavigationBackButton fallback="/settings" />,
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
         contentStyle: { backgroundColor: colors.background },

@@ -31,7 +31,7 @@ function AppStack() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(details)" options={{ headerShown: false }} />
         <Stack.Screen name="(settings)" options={{ headerShown: false }} />
-        <Stack.Screen name="(modals)" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="(modals)" options={{ presentation: 'modal', headerShown: false }} />
       </Stack>
       <StatusBar style="dark" />
     </View>
