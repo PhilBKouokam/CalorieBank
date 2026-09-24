@@ -307,3 +307,28 @@ incoming Samsung Galaxy, with exact Play package/versionCode/installer verified
 before testing. Manual Intake remains disabled pending both platform provider
 smokes and the pre-enablement checkpoint. Continue founder-assisted checks one
 action at a time; do not enable Manual Intake or claim Phase 1B PASS yet.
+
+### iPhone accessibility, offline and completed-day follow-up — September 24
+
+Founder confirmed VoiceOver announced both the Eaten value and “Imported from
+Cronometer.” At the largest accessibility text size, Today Eaten/provenance and
+Step Planning inputs/results remained readable without overlap or clipping.
+Preferred text size and VoiceOver state were restored afterward.
+
+With Airplane Mode on and Wi-Fi explicitly off, the previously loaded 4,654 kcal
+from Cronometer remained visible, including after backgrounding/reopening without
+force close. After restoring connectivity, refresh worked and retained Cronometer.
+This qualifies warm-cache provider behavior, not manual/offline editing or a cold
+start. History then showed Sep 23 with 4,654 kcal from Cronometer; Home showed 0.
+
+A read-only RepeatableRead server transaction confirmed Sep 24 local date,
+Sep 23 provisional posting with intake 4,654, Cronometer exact writer
+`CRONOMETER-GOLD`, and contribution -1,505. Previous effective balance 1,124 minus
+1,505 equals -381: Available Bank 0 and Recovery 381 are therefore coherent.
+One additional finalized record, calculation snapshot and ledger row exist since
+the prior checkpoint. Opening evidence and stable initialization hashes are
+unchanged; the authority-boundary hash is unchanged. This check does not claim
+all older mutable provisional record fields are byte-identical across the nightly
+lock transition. No manual state, override or authority exists. Physical display
+of Recovery 381 remains to be confirmed. No mutation or lifecycle invocation was
+performed during this inspection.
