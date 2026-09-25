@@ -732,3 +732,26 @@ Recovery 725 and calculation through September 24. No false connection warning
 was seen in observed startup frames; this is not continuous frame capture or a
 natural midnight test. Remaining chooser/source/accessibility checks and known
 open defects still prevent replacement PASS. Manual selection remains held.
+
+### Samsung Play build 5: chooser and source-card inspection
+
+Direct mirrored physical inspection September 25 around 12:40 local time:
+- Resumed authenticated Home resolves to Bank 0 / Recovery 725 through Sep 24.
+- Health Connections shows Fitbit Connected and Cronometer Connected, with
+  “Updates from Apple Health on iPhone”, matching the founder's explicit current
+  Apple Health selection. No false Needs attention appears for remote transport.
+- Calories Eaten chooser reproduces duplicate Cronometer rows (Apple Health and
+  Health Connect), with FatSecret separately present. Check glyphs are visible on
+  multiple rows, so selected-state visual clarity also requires inspection/fix.
+- Add another source now opens recognizable choices: Cronometer, MyFitnessPal,
+  Lose It!, MacroFactor, Another app using Health Connect, and FatSecret with
+  Direct connection. This passes the requested tracker-first chooser correction
+  on the actual Play artifact; permission/settings actions are not the first list.
+- No Manual Intake choice is visible. Cancel returns to the unchanged displayed
+  Apple Health source card. No source selection, permission change or account
+  mutation was performed in this inspection.
+
+The previous stale-card fix after a successful source transition has not been
+requalified by this read-only journey. Duplicate tracker rows remain a confirmed
+cross-platform defect, including the iOS History chooser. Manual Intake remains
+held and replacement qualification remains incomplete.
