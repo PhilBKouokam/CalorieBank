@@ -822,6 +822,8 @@ export const bankHistoryMissingDaySchema = z.object({
   ]),
   message: z.string().min(1),
   canRetry: z.boolean(),
+  recoveryDevice: z.enum(['ios', 'android']).nullable().optional(),
+  recoveryMessage: z.string().min(1).optional(),
 });
 
 export const bankHistoryResponseSchema = z.object({

@@ -376,23 +376,49 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         session.provider === expenditureProvider && session.datesQueried.includes(logDate));
       const foodSessions = sessions.filter((session) =>
         session.provider === intakeProvider && session.datesQueried.includes(logDate));
+      const burnRecord = authority.selectedExpenditure?.record;
+      const foodRecord = authority.selectedIntake?.record;
+      const [burnComplete, foodComplete] = await Promise.all([
+        expenditureProvider ? hasCompletedDayQueryEvidence(this.db, {
+          userId, localDate: logDate, timezone: initialization.timezone,
+          provider: expenditureProvider, role: 'EXPENDITURE',
+          ...(burnRecord ? { aggregateImportedAt: burnRecord.importedAt, aggregateWasCurrentDay: burnRecord.isCurrentDay } : {}),
+        }) : false,
+        intakeProvider === 'manual_estimate' ? Boolean(foodRecord) : intakeProvider ? hasCompletedDayQueryEvidence(this.db, {
+          userId, localDate: logDate, timezone: initialization.timezone,
+          provider: intakeProvider, role: 'INTAKE',
+          ...(foodRecord ? { aggregateImportedAt: foodRecord.importedAt, aggregateWasCurrentDay: foodRecord.isCurrentDay } : {}),
+        }) : false,
+      ]);
+      const missingFood = !foodRecord || !foodComplete;
+      const missingBurn = !burnRecord || !burnComplete;
+      const recoveryProvider = missingFood ? intakeProvider : missingBurn ? expenditureProvider : null;
+      const recoveryDevice = recoveryProvider === 'health_connect' ? 'android' as const
+        : recoveryProvider === 'apple_health' ? 'ios' as const : null;
+      const recoveryLabel = missingFood
+        ? authority.selectedIntake?.label ?? consumerProviderName(intakeProvider ?? '')
+        : authority.selectedExpenditure?.label ?? consumerProviderName(expenditureProvider ?? '');
       const state = processingByDate.get(logDate);
       const syncFailed = Boolean(state?.lastErrorCode)
-        || burnSessions.some((session) => session.status === 'failed' || session.expenditureStatus === 'error')
-        || foodSessions.some((session) => session.status === 'failed' || session.intakeStatus === 'error');
+        || (burnSessions[0]?.status === 'failed' || burnSessions[0]?.expenditureStatus === 'error')
+        || (foodSessions[0]?.status === 'failed' || foodSessions[0]?.intakeStatus === 'error');
       const status = classifyCompletedDayGap({
         hasCalculatedRecord: false,
-        hasBurnData: Boolean(authority.selectedExpenditure),
-        hasFoodData: Boolean(authority.selectedIntake),
-        burnQueried: burnSessions.length > 0,
-        foodQueried: foodSessions.length > 0,
+        hasBurnData: !missingBurn,
+        hasFoodData: !missingFood,
+        burnQueried: burnComplete || burnSessions.length > 0,
+        foodQueried: foodComplete || foodSessions.length > 0,
         syncFailed,
       });
       if (!status) continue;
       missing.push({
         logDate,
         status,
-        message: continuityMessage(status),
+        message: recoveryDevice
+          ? `Waiting for ${recoveryLabel} ${missingFood ? 'calories eaten' : 'calories burned'}.`
+          : continuityMessage(status),
+        recoveryDevice,
+        ...(recoveryDevice ? { recoveryMessage: `CalorieBank still needs ${missingFood ? 'calories eaten' : 'calories burned'} for this day from ${recoveryLabel}. Open ${recoveryLabel} to sync, then refresh CalorieBank on your ${recoveryDevice === 'ios' ? 'iPhone' : 'Android phone'}.` } : {}),
         canRetry: recoverableDates.has(logDate)
           && (status !== 'waiting_for_data' || !state?.nextRetryAt || state.nextRetryAt <= this.now()),
       });

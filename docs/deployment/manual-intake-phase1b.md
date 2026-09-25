@@ -755,3 +755,53 @@ The previous stale-card fix after a successful source transition has not been
 requalified by this read-only journey. Duplicate tracker rows remain a confirmed
 cross-platform defect, including the iOS History chooser. Manual Intake remains
 held and replacement qualification remains incomplete.
+
+### September 25: corrections following build 6 / versionCode 5 physical findings
+
+Implemented for the next consolidated replacement (not yet present in installed
+builds 6/5):
+
+- Health Connections and History group recognized tracker names into one choice.
+  The selected exact source/opaque historical option remains selected; grouping
+  never writes authority or merges evidence. Unknown generic tracker names are
+  not collapsed. Manage opens the platform-native setup for a local equivalent;
+  an authority transition still requires explicit successful selection. A remote
+  selected source keeps truthful provenance until that transition occurs.
+- Only the selected row renders a checkmark. Unselected rows render an empty
+  spacer, avoiding the observed Android transparent-icon rendering ambiguity.
+- Back uses a centered 48×48 accessible press target and a 28-point chevron,
+  replacing the stretched native HeaderBackButton. History navigation and direct
+  entry fallback behavior are unchanged.
+- History gap diagnosis requires completed-day query evidence, not merely a
+  same-day aggregate. Recovery uses the missing date's authority even when the
+  current source has changed. Additive optional `recoveryDevice` and
+  `recoveryMessage` fields tell a capable UI which phone can refresh native data.
+  The row stays concise; the detail explains the missing input and where to sync.
+  The other platform shows OK instead of a futile local retry. Generic refresh
+  errors no longer assert that the connection is broken.
+- Source-row actions wrap below the tracker at enlarged text instead of squeezing
+  its name into a narrow column. The existing sheet remains scrollable.
+
+A dedicated PostgreSQL regression reproduces prior-date Health Connect authority,
+current Apple Health selection, usable burn, and only pre-midnight nutrition
+input. History names Cronometer and Android recovery without posting ledger data.
+Tracker tests cover both selected transports, historical opaque ID preservation,
+and unknown writer non-collapsing. Back tests retain actual navigation/fallback.
+Rendered component checks inspected Back at 320px/200% and source choices at
+320px/200% and 390px/100%/200%, including both platform directions. These web
+component fixtures are not substitutes for native TestFlight/Play qualification.
+
+No finalization formula, correction window, source mutation API, ledger, Opening
+Bank, Step Planning, provider permission or Manual Intake rollout flag changed.
+The Fitbit 5,186 API / 5,271 user-visible discrepancy remains unresolved upstream
+comparison evidence; these UI corrections do not claim to fix that discrepancy.
+Manual selection stays disabled. Replacement PASS still requires delivery and
+physical qualification of the corrected binaries.
+
+Final correction validation: `release:friends-family` passed on Node 20.20.2
+against dedicated local `caloriebank_test_phase1b_20260923`: 936 tests / 86 files,
+TypeScript, lint, API/domain/schema builds, Prisma generation/validation, local
+migration deployment and diff checks. Default Expo public configuration resolved;
+a standalone hosted Play-profile config invocation lacked required hosted
+credentials in its local environment, so it is not recorded as a hosted config
+PASS. No remote build or deployment was performed for this correction checkpoint.

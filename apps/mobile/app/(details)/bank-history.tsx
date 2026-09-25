@@ -1,3 +1,4 @@
+import { trackerChoices } from '@/lib/native-health/tracker-choices';
 import { sourceLabel } from '@/lib/native-health/copy';
 import type {
   BankHistoryDayDetailResponse,
@@ -9,7 +10,7 @@ import type {
 import * as Crypto from 'expo-crypto';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PlaceholderScreen } from '@/components/caloriebank/PlaceholderScreen';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
@@ -242,18 +243,18 @@ export default function BankHistoryScreen() {
   }
 
   function showMissingDay(day: BankHistoryMissingDay) {
-    const actions = day.canRetry
+    const actions = day.canRetry && (!day.recoveryDevice || day.recoveryDevice === Platform.OS)
       ? [
           { text: 'Cancel', style: 'cancel' as const },
           {
             text: 'Try again',
             onPress: () => void retryMissingDay().catch(() => {
-              Alert.alert('Couldn’t refresh this day', 'Check your health connections and try again.');
+              Alert.alert('Couldn’t refresh this day', 'Couldn’t get fresh data. Please try again when you’re connected.');
             }),
           },
         ]
       : [{ text: 'OK' }];
-    Alert.alert(formatDate(day.logDate), day.message, actions);
+    Alert.alert(formatDate(day.logDate), day.recoveryMessage ?? day.message, actions);
   }
 
   const hasCompletedDays = Boolean(history && history.days.length > 0);
@@ -426,7 +427,7 @@ export default function BankHistoryScreen() {
                         ?? selectedDay.versions.at(-1)!.intakeSourceDisplayName
                         ?? getConsumerSourceName(selectedDay.versions.at(-1)!.intakeProvider))}
                     </Text>
-                    {sourceOptions?.intake.canChange ? (
+                    {sourceOptions?.intake.canChange && trackerChoices(sourceOptions.intake.options.filter((option) => option.id !== sourceOptions.intake.selected.id), sourceOptions.intake.selected).length > 1 ? (
                       <Pressable accessibilityRole="button" onPress={() => openSourcePicker('intake')}>
                         <Text style={styles.changeSourceText}>Change</Text>
                       </Pressable>
@@ -450,7 +451,7 @@ export default function BankHistoryScreen() {
             <Text style={styles.sourceSheetTitle}>
               {sourcePickerRole === 'expenditure' ? 'Calories burned' : 'Calories eaten'}
             </Text>
-            {sourcePickerRole ? sourceOptions?.[sourcePickerRole].options.map((option) => {
+            {sourcePickerRole ? sourceOptions && trackerChoices(sourceOptions[sourcePickerRole].options.filter((option) => option.id !== sourceOptions[sourcePickerRole].selected.id), sourceOptions[sourcePickerRole].selected).map((option) => {
               const selected = option.id === sourceOptions[sourcePickerRole].selected.id;
               return (
                 <Pressable
