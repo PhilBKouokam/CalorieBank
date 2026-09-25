@@ -908,3 +908,22 @@ or enablement change was made while recording this finding.
 Replacement qualification remains incomplete: Back-button alignment must be
 corrected and physically rechecked, alongside the remaining device checks.
 Manual Intake remains disabled; no replacement PASS is claimed.
+
+### September 25: closeout investigation and held native alignment correction
+
+See [replacement closeout evidence](phase1b-replacement-closeout.md) for the
+read-only historical requery, four-date UI/API comparison, timezone probe,
+current-day observations, native Back-wrapper correction, and evidence limits.
+Samsung versionCode 6 was verified via ADB as package `com.caloriebank.mobile`,
+versionName 1.0.0, installer `com.android.vending`. Founder physical checks passed
+startup, one Cronometer choice, recognizable native tracker chooser, cross-device
+Cronometer card, Back navigation, and completed History without attention warnings.
+These results do not qualify the unresolved iPhone Back visual result or establish
+Fitbit UI/API parity.
+
+The September 23 API still returns 5185.987776; the UI remains 5271. Three additional
+dates also differ despite CB matching the API. No wrong field, historical late
+revision, or required finalization-delay policy has been established. No accounting
+change is justified at this checkpoint. Native alignment correction is held for
+the next consolidated binary, with native compilation/physical recheck still due.
+No new build, backend deployment, Manual Intake enablement, or public release.
