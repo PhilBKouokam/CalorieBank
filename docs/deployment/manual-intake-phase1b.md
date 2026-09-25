@@ -698,3 +698,37 @@ mutation or of its absence. Do not ask the founder to choose either ambiguous
 historical row. Any correction must retain exact per-date source identity and
 must not turn UI deduplication into a historical source/accounting mutation.
 Manual Intake remains held; replacement physical qualification is incomplete.
+
+Founder subsequently confirmed iPhone build 6 Today refresh retains Cronometer,
+with no connection warning and no imported-intake pencil; Fitbit remains selected
+for burn. September 23 detail still shows raw Fitbit burn 5,186, Eaten 4,654 and
+contribution -1,505. The raw UI/API mismatch remains unresolved.
+
+September 25 Samsung pre-update inspection: SM-A136U, package
+`com.caloriebank.mobile`, versionName 1.0.0, versionCode 4, installer
+`com.android.vending`; Health Connect READ_NUTRITION only. Replacement EAS Android
+build `896c9f4c-0a41-4186-9f28-a89f94d8f082` finished from `d2eda4d`, versionCode 5.
+The exact AAB compiled manifest contains only READ_NUTRITION among Health Connect
+permissions. Its compiled bundle contains `intake-authority-v2`; bundle SHA-256:
+`f19b98db1b6b91d479ccfd6efa48850e5b5398191100c81adfe4ec3cfb5b7b70`.
+Uploaded to existing Play Internal Testing release draft 4; processing/publication
+and installed-build-5 qualification remain pending at this checkpoint.
+
+Play Internal Testing release 4, “1.0.0 (5) - Provider qualification”, was
+published September 25 at 11:08 local time. Console confirms Available to internal
+testers, one version code, unchanged supported-device counts. The sole warning
+was absence of a deobfuscation file. No Production or Open Testing release was
+made. The Samsung's existing tester link opened the Play app listing, which
+showed Update and the new release notes; the normal Play update was initiated.
+
+The first Play update attempt showed a generic Cannot update message; device
+storage had 44 GB free. One normal retry succeeded without uninstalling or clearing
+data. Read-only ADB then verified actual Samsung package `com.caloriebank.mobile`,
+versionName 1.0.0, versionCode 5, installer `com.android.vending`, and
+READ_NUTRITION as the only Health Connect permission.
+Direct mirrored physical observation of this Play binary showed splash -> calm
+loading (“Loading today’s data…”) -> authenticated Home with Available Bank 0,
+Recovery 725 and calculation through September 24. No false connection warning
+was seen in observed startup frames; this is not continuous frame capture or a
+natural midnight test. Remaining chooser/source/accessibility checks and known
+open defects still prevent replacement PASS. Manual selection remains held.
