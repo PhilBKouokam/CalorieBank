@@ -403,3 +403,49 @@ scrolling is required for longer content. Native physical qualification remains
 pending the replacement binary. No backend deployment, permission expansion or
 manual enablement accompanies this fix. Consolidate it with the Back-button fix
 for replacement builds under the genuine-defect exception.
+
+### Samsung provider qualification via USB mirror — September 24
+
+The founder authorized direct device operation to reduce step-by-step prompts.
+The actual Google Play installation on Samsung SM-A136U was operated through
+local USB mirroring and native UI controls, not an emulator or a different APK.
+The founder granted CalorieBank Nutrition access and separately approved Cronometer
+Nutrition export. Only Cronometer's Nutrition write toggle was enabled; its
+follow-up request for activity reads was declined. CalorieBank subsequently
+discovered Cronometer without fabricated diary data or a backfill operation.
+
+Read-only RepeatableRead production inspections at 01:00:30, 01:02:03, 01:04:38
+and 01:06:07 UTC on September 25 (September 24 America/Chicago) bracketed:
+Apple Health Cronometer → Health Connect Cronometer → FatSecret → Health Connect
+Cronometer. The September 24 boundary and compatibility projection agreed at
+each successful transition. Health Connect preserved exact source identity
+`com.cronometer.android.gold`; FatSecret's boundary had no native writer/source.
+The boundary count stayed three (legacy baseline, September 21, September 24),
+with no duplicate current-date boundary. Dormant provider identities in the
+selection row did not become active authority.
+
+Opening Bank stayed 224, Available Bank 0, Recovery 381. All four accounting
+fingerprints matched the iPhone round-trip baseline above at every inspection:
+five opening days, fourteen finalized records, sixteen snapshots and sixteen
+ledger rows. September 23 retained Apple Health Cronometer provenance, Eaten
+4,654 and contribution −1,505. The device's History detail showed the same values.
+
+Samsung Home and Today detail showed 2,498 kcal imported from Cronometer. After
+selecting connected FatSecret, Today settled to “No intake today” and “FatSecret
+has not reported calories eaten today.” Returning to Cronometer restored 2,498
+with correct provenance; values were not summed. Canonical Health Connections
+cards agreed after the round-trip transitions. Returning from the old standalone
+native-food screen initially left its parent card stale (“Source on another
+device”); reopening Health Connections corrected it. The replacement chooser's
+explicit selection callback reloads this state, but native confirmation in the
+replacement binary remains required. This observation is not reported as a pass
+for the old screen's immediate return behavior.
+
+Fitbit remained the burn source. Today detail and the visible walk-target planning
+card rendered normally without editing planning inputs. Morning Bank Update
+displayed Off on this Samsung and was left unchanged; no notification delivery
+claim is made. Add calories burned source showed “All supported sources are
+connected,” with no Health Connect burn choice. Imported Eaten had no pencil and
+the examined source chooser exposed no manual option. Manual selection remains
+disabled. Manual journeys, Samsung accessibility/offline/relaunch qualification
+and replacement-binary checks are still outstanding.
