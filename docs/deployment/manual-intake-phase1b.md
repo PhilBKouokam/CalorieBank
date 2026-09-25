@@ -496,8 +496,10 @@ the same value from `google-sources` and `google-wearables`; changing source
 families would not resolve this observed discrepancy. No health/accounting writes
 were performed by these inspections; credentials and full provider payloads were
 not printed. At this checkpoint CalorieBank matches the fresh cloud API, while the
-founder's observed provider UI total differs by 85 rounded kcal. A fresh physical
-UI comparison was requested. The evidence does not yet distinguish upstream
+founder's observed provider UI total differs by 85 rounded kcal. The founder subsequently refreshed the provider UI for September 23 and
+confirmed it still displayed 5,271. This is founder-observed physical UI evidence
+paired with the timestamped cloud reads above, not a simultaneous instrumented
+read. The evidence does not yet distinguish upstream
 latency from a provider UI/API calculation difference; it does not prove the API
 ever revised this date to 5,271. No such claim or fake parity adjustment is made.
 
@@ -553,8 +555,40 @@ The 01:51:55Z predeployment inspection retained all four accounting fingerprints
 from the Samsung round-trip, with unchanged 224 Opening Bank / 0 Available Bank /
 381 Recovery and unchanged active Health Connect Cronometer boundary.
 
-Remaining before replacement qualification: fresh provider UI/API comparison,
-validated backend deployment, one consolidated private binary per platform and
-physical checks on those artifacts. Exact provider UI/API parity cannot yet be
+Remaining before replacement qualification: completion and private distribution
+of the submitted consolidated binaries, followed by physical checks on those
+artifacts. The refreshed provider UI/API discrepancy remains an identified
+evidence limitation, with its upstream cause unresolved. Exact provider UI/API parity cannot yet be
 promised. Manual account qualification and capability rejection against real
 manual records remain later Phase 1B gates, not completed by this addendum.
+
+
+### Replacement deployment and build submission
+
+Validated implementation commit: `d2eda4da1e60f39818eeb5b9c680b43cbb3de2c1`.
+Render API deployment `dep-daqt7s3bc2fs738ej9fg` became live on this commit;
+lifecycle build `bld-daqt7s3bc2fs738ej9r0` uses the same source. No new migration
+was required. Health and database readiness returned HTTP 200. At
+2026-09-25T01:56:16Z, deployed provider repository reads succeeded without
+capability metadata, selection enablement remained false, and there were zero
+manual authority boundaries. The 01:56:29Z accounting comparison retained all
+four predeployment fingerprints. These are server checks, not replacement-client
+physical qualification.
+
+Exactly one replacement per platform was submitted from that implementation:
+
+| Platform | Version | EAS build | Submission state |
+| --- | --- | --- | --- |
+| iOS | 1.0.0 (6) | `a2129ff1-5105-4bd6-9d5d-9de7436a5bb3` | Build in progress; not yet qualified |
+| Android | 1.0.0 (5) | `896c9f4c-0a41-4186-9f28-a89f94d8f082` | Build in progress; not yet qualified |
+
+Manual Intake remains disabled. No public release has been made. Store
+availability, artifact inspection and replacement physical evidence are pending.
+
+The first observed scheduled lifecycle on the replacement backend completed at
+2026-09-25T02:02:52Z: 10 accounts completed, zero failed accounts, five provider
+errors. The previous hourly run also had 10 completed, zero failed and five
+provider errors. The inspected existing Fitbit HTTP 409 warning remained present;
+these counts do not imply every provider credential is healthy. The qualification
+account completed with zero errors and zero unresolved dates. Render reported the
+cron run finished successfully at 02:02:55Z.
