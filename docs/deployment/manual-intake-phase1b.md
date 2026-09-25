@@ -886,3 +886,25 @@ This delivery evidence is documentation-only and uses `[skip render]`; no furthe
 build or deployment is requested. The validated source release gate remains the
 936-test/86-file run above. Manual enablement and the remaining real-account,
 capability-rejection and completed-day finalization gates remain pending.
+
+### September 25: build 7 physical checks — Back alignment still fails
+
+Founder confirmed installed TestFlight 1.0.0 (7). Founder-observed checks:
+
+- Startup preserves values without transient Not connected, Review Health
+  Connections, or error: PASS.
+- Calories Eaten chooser shows Cronometer only once: PASS.
+- Health Connections Back-button visual alignment: FAIL. Founder photo shows
+  the chevron positioned low within the white rounded container; founder reports
+  it is still not correctly centered. The earlier implementation/rendered checks
+  do not qualify this physical result. Navigation behavior was not separately
+  confirmed in this response.
+
+Evidence: founder attachment `4C7AFC9D-49CF-4EF0-B551-AEDCC009C485/1-Photo-1.jpg`.
+These are physical observations, not new server/accounting inspections. No source
+switch or accounting mutation was requested. No product code, build, deployment,
+or enablement change was made while recording this finding.
+
+Replacement qualification remains incomplete: Back-button alignment must be
+corrected and physically rechecked, alongside the remaining device checks.
+Manual Intake remains disabled; no replacement PASS is claimed.
