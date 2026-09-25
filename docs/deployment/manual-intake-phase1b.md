@@ -927,3 +927,18 @@ revision, or required finalization-delay policy has been established. No account
 change is justified at this checkpoint. Native alignment correction is held for
 the next consolidated binary, with native compilation/physical recheck still due.
 No new build, backend deployment, Manual Intake enablement, or public release.
+
+### September 25 — provider escalation and replacement-gate decision
+
+**PHASE 1B REPLACEMENT BUILD: PASS — FITBIT UI/API DISCREPANCY TRACKED AS
+NON-BLOCKING PROVIDER INVESTIGATION**
+
+The [official documentation review and exact unsent support draft](fitbit-google-health-provider-escalation.md)
+establish no new CalorieBank defect. The upstream discrepancy remains OPEN.
+Founder approval is required before external submission. This supersedes the
+earlier discrepancy hold without claiming UI/API parity or a resolved root cause.
+The Back correction stays in the next consolidated feature binary, with native
+physical verification outstanding. Manual Intake remains disabled. Subsequent
+work resumes at pre-enablement capability/safety checks, then appropriate feature
+binaries, controlled enablement and all real-account/capability/finalization gates.
+This document-only task stops before that work; it is not full Phase 1B PASS.

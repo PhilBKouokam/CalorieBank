@@ -1,6 +1,10 @@
 # Phase 1B replacement closeout — September 25, 2026
 
-Status: **PASS CANDIDATE**. Manual Intake remains disabled. No new binary,
+Status: **PASS — Fitbit UI/API discrepancy tracked as non-blocking provider
+investigation**, by the subsequent founder-authorized
+[provider escalation decision](fitbit-google-health-provider-escalation.md).
+The earlier PASS CANDIDATE below is retained as chronological evidence, not the
+current gate verdict. Manual Intake remains disabled. No new binary,
 backend deployment, accounting change, or public release is authorized by this
 closeout. The native Back correction is held for the next consolidated binary.
 
