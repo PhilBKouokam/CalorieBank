@@ -604,3 +604,97 @@ App Store Connect build `e6d4a4e1-8609-44b2-9e1b-c2d83aa2f862` reports Testing
 with Friends & Family assigned after the private beta review submission.
 The founder has been asked to update through TestFlight; no physical build-6
 result is claimed yet. No public App Store submission occurred.
+
+### Replacement iPhone startup qualification — in progress
+
+Founder confirmed TestFlight 1.0.0 (6), existing session retained and Home opened
+normally. Read-only production baseline at 2026-09-25T02:19:26Z (September 24,
+America/Chicago) retained all four accounting fingerprints and the authority
+fingerprint above: Opening Bank 224, Available Bank 0, Recovery 381; 14 finalized
+records, 16 snapshots and 16 ledger entries. The active source remains Cronometer
+via Health Connect, exact package `com.cronometer.android.gold`, selected during
+the Samsung journey. Opening iPhone build 6 did not replace that account authority
+with Apple Health. The September 23 source/value snapshot remains unchanged.
+At 02:19:40Z the deployed commit was `d2eda4d`; Today repository reads reported
+both Fitbit burn and Health Connect intake ready. Manual selection remained false
+and manual authority boundary count remained zero. These server statuses do not
+prove every transient client startup frame. A cold-relaunch visual observation is
+the next physical check; a natural new-local-day startup is not yet qualified.
+
+### Founder-blocking duplicate tracker presentation — build 6
+
+Founder physically confirmed cold relaunch preserves values/shows loading without
+Not connected, Review Health Connections or a transient error. This passes the
+observed same-date cold-start check, not a natural midnight rollover.
+
+The next Health Connections check exposed a consumer presentation defect:
+Cronometer appears twice, once as the selected Health Connect source and once as
+an Apple Health alternative. The founder rejected both the duplicate app choices
+and asking ordinary users to manage the cross-platform transport distinction.
+The requested presentation is one recognizable tracker choice, with native setup
+on the current platform (Apple Health on iPhone, Health Connect on Android).
+
+Do not fix this by choosing authority on app launch, merging provider totals, or
+changing historical source identity. A single tracker row must retain the actual
+selected account authority; device-local setup belongs behind that row's Manage
+flow. An explicit successful local setup may make the existing ADR 029 transition.
+Automatically accepting evidence from both transports is a separate authority
+policy and is not established by grouping rows. This physical defect remains open;
+build 6 cannot yet be declared replacement-qualified. Manual selection stays off.
+
+### September 25 recording: unresolved September 24
+
+Founder recording at approximately 10:15 local time shows September 24 as
+“CalorieBank is missing data for this day”; opening it offers Cancel/Try again
+without identifying the missing source. Available Bank remains 0 through
+September 23 and Recovery 381. This is not evidence of a new ledger mutation.
+
+Read-only server inspection at 2026-09-25T15:20:55Z confirms the selected source
+is still Health Connect Cronometer. September 24 Fitbit evidence is completed-day
+(`isCurrentDay=false`) and was refreshed at 15:15:51Z. Health Connect intake for
+September 24 remains current-day evidence, last observed at 02:14:36Z (September
+24 at 21:14 Chicago), before that day ended. The latest Health Connect sync is
+that same successful pre-midnight session; September 24 has no posted record.
+Apple Health evidence for that date is also a pre-midnight observation and is not
+the selected date authority. Manual selection remains disabled.
+
+The immediate missing input is a post-midnight exact-date intake query from the
+selected Android transport. An iPhone refresh cannot query Health Connect. Do not
+substitute Apple evidence, infer a completed total from the last partial value,
+or rewrite September 24 authority. The generic retry UI fails to explain this
+required device/source recovery and remains an open qualification finding.
+
+After founder opened Samsung, Health Connect uploaded completed-day September 24
+intake at 2026-09-25T15:23:38Z (`isCurrentDay=false`, successful session). By
+15:24:31Z one September 24 finalized record existed. Its intake is 2,498 from
+Health Connect and contribution is -344. Opening Bank remains 224, Available Bank
+0, and Recovery moves from 381 to 725. One snapshot and one ledger row were added;
+the previous 16 snapshots and 16 ledger rows retain their exact fingerprints.
+The prior finalized-record whole-row fingerprint differs (metadata/lifecycle
+fields not yet compared); no assertion that every prior row is byte-identical is
+made. Opening provenance fingerprint is unchanged.
+
+The current selection now reads Apple Health Cronometer with a September 25
+boundary; September 24 still snapshots Health Connect. Founder confirmation of
+an explicit iPhone source selection is pending before attributing that transition.
+No further source switches are requested pending this clarification. Manual
+selection remains disabled.
+
+### Additional physical findings: Back spacing and History chooser
+
+Founder confirmed Back navigation works on iOS build 6, but its chevron is
+visually left-biased within the rounded container. Track balanced padding/icon
+centering as an open visual defect while preserving the accessible touch target.
+
+Founder confirmed the September 25 Apple Health selection was intentional.
+After Samsung recovery, iPhone History refresh displayed September 24 -344 and
+Recovery 725 as expected. The new 10:30 screen recording additionally reproduces
+the duplicate-tracker defect in History: September 24 detail -> Calories eaten
+Change opens two identically labelled Cronometer rows, one checked, with no
+visible distinction. The previously recorded duplicate-choice defect therefore
+covers both Health Connections and the historical source chooser. The clip shows
+no changed intake/contribution after dismissal; it is not proof of a server-side
+mutation or of its absence. Do not ask the founder to choose either ambiguous
+historical row. Any correction must retain exact per-date source identity and
+must not turn UI deduplication into a historical source/accounting mutation.
+Manual Intake remains held; replacement physical qualification is incomplete.
