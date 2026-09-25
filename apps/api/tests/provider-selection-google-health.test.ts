@@ -493,11 +493,12 @@ describe('Google OAuth state and token exchange', () => {
     }
   });
 
-  it('retrieves three civil days independently and rotates a refresh token', async () => {
+  it('retrieves civil days independently, refreshes revisions, and never throttles across local midnight', async () => {
     const prisma = new PrismaClient();
     const id = randomUUID();
     const key = Buffer.alloc(32, 11).toString('base64');
-    const now = new Date('2026-08-14T18:00:00.000Z');
+    let now = new Date('2026-08-14T18:00:00.000Z');
+    let rawBurn = 2000;
     const receivedDates: string[] = [];
     const exerciseDates: string[] = [];
     const receivedAggregates: Array<{ localDate: string; isCurrentDay: boolean; raw: number }> = [];
@@ -584,7 +585,7 @@ describe('Google OAuth state and token exchange', () => {
         rollupDataPoints: [{
           civilStartTime: { date },
           civilEndTime: { date: { ...date, day: date.day + 1 } },
-          ...(isExpenditure ? { totalCalories: { kcalSum: 2000 } } : { steps: { countSum: '5000' } }),
+          ...(isExpenditure ? { totalCalories: { kcalSum: rawBurn } } : { steps: { countSum: '5000' } }),
         }],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     };
@@ -638,6 +639,30 @@ describe('Google OAuth state and token exchange', () => {
       expect(restingEstimate).toMatchObject({ providerKcalPerHour: 72, observationCount: 3 });
       const connection = await prisma.googleHealthConnection.findUniqueOrThrow({ where: { userId: id } });
       expect(decryptGoogleHealthSecret(connection.encryptedRefreshToken, key)).toBe('rotated-refresh');
+      const user = { id, email: `${id}@test.local` };
+      // Ordinary same-day retries can throttle, but explicit foreground refresh is fresh.
+      now = new Date('2026-08-14T18:01:00.000Z');
+      rawBurn = 5271;
+      receivedDates.length = 0;
+      await service.syncRollingWindow(user, '2026-08-14', 'America/Chicago', false);
+      expect(receivedDates).toEqual([]);
+      await service.syncRollingWindow(user, '2026-08-14', 'America/Chicago', true);
+      expect(receivedDates).toEqual(['2026-08-14', '2026-08-13', '2026-08-12']);
+      expect(receivedAggregates.at(-1)?.raw).toBe(5271);
+      // A scheduled run two minutes after a pre-midnight sync must fetch again.
+      await prisma.googleHealthConnection.update({ where: { userId: id }, data: {
+        lastSyncedAt: new Date('2026-08-15T04:59:00.000Z'),
+        accessTokenExpiresAt: new Date('2026-08-16T00:00:00.000Z'),
+      } });
+      now = new Date('2026-08-15T05:01:00.000Z');
+      receivedDates.length = 0;
+      await service.syncRollingWindow(user, '2026-08-15', 'America/Chicago', false, 3, 'scheduled');
+      expect(receivedDates).toEqual(['2026-08-15', '2026-08-14', '2026-08-13']);
+      expect(receivedAggregates.slice(-3)).toEqual([
+        { localDate: '2026-08-15', isCurrentDay: true, raw: 5271 },
+        { localDate: '2026-08-14', isCurrentDay: false, raw: 5271 },
+        { localDate: '2026-08-13', isCurrentDay: false, raw: 5271 },
+      ]);
     } finally {
       await prisma.user.deleteMany({ where: { id } });
       await prisma.$disconnect();

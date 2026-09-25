@@ -11,7 +11,7 @@ describe('read-only Today refresh consumers', () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     const { useTodayReadModel } = await import(resolve(__dirname, '../../mobile/lib/today/use-today-read-model.ts')) as { useTodayReadModel: () => { today: unknown; failed: boolean } };
     function Consumer() { return React.createElement('output', null, JSON.stringify(useTodayReadModel())); }
-    state.fetch.mockResolvedValue({ steps: { count: 100 } });
+    state.fetch.mockResolvedValue({ date: new Date().toISOString().slice(0, 10), timezone: 'UTC', steps: { count: 100 } });
     let view!: ReactTestRenderer;
     await act(async () => { view = create(React.createElement(Consumer)); });
     state.fetch.mockRejectedValueOnce(new Error('network'));
@@ -21,9 +21,9 @@ describe('read-only Today refresh consumers', () => {
     let resolveOld!: (value: unknown) => void;
     state.fetch.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }));
     await act(async () => state.listener!({ status: 'success' }));
-    state.fetch.mockResolvedValue({ steps: { count: 300 } });
+    state.fetch.mockResolvedValue({ date: new Date().toISOString().slice(0, 10), timezone: 'UTC', steps: { count: 300 } });
     await act(async () => state.listener!({ status: 'success' }));
-    await act(async () => resolveOld({ steps: { count: 200 } }));
+    await act(async () => resolveOld({ date: new Date().toISOString().slice(0, 10), timezone: 'UTC', steps: { count: 200 } }));
     expect(JSON.stringify(view.toJSON())).toContain('300');
     expect(JSON.stringify(view.toJSON())).not.toContain('200');
     await act(async () => view.unmount()); expect(state.listener).toBeNull();

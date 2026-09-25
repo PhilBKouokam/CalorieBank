@@ -380,6 +380,9 @@ export default function BankHistoryScreen() {
             <Text style={styles.changeText}>
               {contributionVerb(selectedDay.dailyBankChange)} {Math.abs(selectedDay.dailyBankChange).toLocaleString()} kcal
             </Text>
+            {selectedDay.status === 'provisional' ? (
+              <Text style={styles.mutedText}>May still update as your source syncs.</Text>
+            ) : null}
 
             <View style={styles.breakdownRows}>
               <DetailRow

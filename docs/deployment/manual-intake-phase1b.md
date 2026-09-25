@@ -449,3 +449,112 @@ connected,” with no Health Connect burn choice. Imported Eaten had no pencil a
 the examined source chooser exposed no manual option. Manual selection remains
 disabled. Manual journeys, Samsung accessibility/offline/relaunch qualification
 and replacement-binary checks are still outstanding.
+
+### Consolidated replacement addendum — September 24 (in progress)
+
+Manual selection remains disabled. The replacement pair must include Back
+navigation, the Android tracker chooser/return-state reload, startup state,
+cross-device source presentation and the safely qualified Fitbit freshness work.
+No replacement build, deployment or enablement has occurred at this checkpoint.
+
+**Startup diagnosis:** a selected provider with no current-date aggregate and no
+current-date ingestion session fell through to `not_connected`. In addition,
+Home sampled lifecycle activity on focus/completion but did not subscribe to its
+start. The server now distinguishes configured-but-awaiting-evidence from no
+source, and Home receives lifecycle start/stop events. In-progress work hides old
+refresh errors; confirmed same-date values remain visible. Cached observations
+are accepted only for their canonical date. Failed new-date reads show a refresh
+error, never yesterday's intake or a permanent loading state. The connection CTA
+requires canonical missing/needs-attention source state, after loading finishes.
+Temporary refresh failure alone does not imply a disconnected provider.
+
+**Cross-device diagnosis:** the client intentionally replaced a selected native
+source's label with “Source on another device” and forced `needs_attention` when
+its transport was unavailable locally, even though the server retained exact
+authority and valid data. Android also replaced Apple source labels globally.
+Presentation now preserves the server label and health state, with “Updates from
+Apple Health on iPhone” or “Updates from Health Connect on Android” and an explicit
+Change source action. Local HealthKit permission composition no longer applies
+to remote Health Connect sources. Local native permission failures still require
+attention. Manual/server-owned authority has no remote-device label. These are
+presentation changes, with no authority, ledger, Opening Bank or History writes.
+
+**Fitbit evidence boundary:** the founder observed September 23 raw History burn
+5,186 versus the provider UI's 5,271. Read-only production inspection at
+2026-09-25T01:43:47Z found raw 5,186 / adjusted 4,149 in both the aggregate and
+the sole September 23 snapshot. The snapshot was posted September 24 at
+15:03:18Z. The aggregate's latest completed foreground fetch was September 25
+01:13:58Z, in a completed session querying September 24/23/22 and reconciling
+September 23/22. Thus the persisted value was recently refreshed, not merely an
+unrefreshed midnight snapshot. The posting-trigger session was a separate native
+sync with expenditure unavailable; its timestamp is not the original Fitbit fetch.
+
+A direct authenticated cloud read at 01:44:27Z returned HTTP 200 and
+`kcalSum=5185.987776` for exactly September 23 → September 24 civil dates. This
+rounds to 5,186 before the 0.8 adjustment. Follow-up reads at 01:45:01Z returned
+the same value from `google-sources` and `google-wearables`; changing source
+families would not resolve this observed discrepancy. No health/accounting writes
+were performed by these inspections; credentials and full provider payloads were
+not printed. At this checkpoint CalorieBank matches the fresh cloud API, while the
+founder's observed provider UI total differs by 85 rounded kcal. A fresh physical
+UI comparison was requested. The evidence does not yet distinguish upstream
+latency from a provider UI/API calculation difference; it does not prove the API
+ever revised this date to 5,271. No such claim or fake parity adjustment is made.
+
+Both foreground and scheduled refresh use Google Health v4
+`users/me/dataTypes/total-calories/dataPoints:dailyRollUp`, one civil date per
+request, `all-sources`, and `totalCalories.kcalSum`. Normalization rounds raw kcal
+then applies the existing 0.8 policy once. `providerUpdatedAt` for this adapter is
+the fetch timestamp, not an upstream revision timestamp. See the official
+[total-calorie rollup contract](https://developers.google.com/health/reference/rest/v4/TotalCaloriesRollupValue)
+and [source-family definitions](https://developers.google.com/health/filters).
+The code audit found a separately reproducible issue: the five-minute throttle
+could span local midnight. It now requires the prior sync to belong to the same
+local date, so a pre-midnight observation cannot suppress the first completed-day
+query. Explicit foreground/manual refresh already bypasses this throttle.
+This correction is not attributed to the reported September 23 discrepancy.
+
+ADR 009 already posts provisionally and accepts same-source revisions for two
+full local days through new snapshots and append-only ledger corrections.
+It then locks permanently. No change to that accounting contract is proposed.
+Dedicated database regressions cover 5,186 → 5,271 before posting, after provisional
+posting, concurrent retries, and a later revision after the Chicago midnight lock.
+Original ledger entries remain identical; retries produce no duplicate effect;
+locked accounting remains unchanged. Provider-service coverage proves explicit
+fresh retrieval and the first scheduled post-midnight query. These are automated
+evidence, not a claim of physical provider/UI parity.
+
+History day details now explicitly say “May still update as your source syncs”
+while provisional. Locked bank snapshots remain historical calculation evidence;
+the implementation does not claim that a provider can never revise its own data
+after CalorieBank's existing lock. Extending that window or revising locked
+accounting is not authorized by these changes.
+
+The full release gate passed 931 tests across 85 files, including capability,
+provider, authority, accounting, local migration, TypeScript, lint and API builds.
+An earlier run caught an obsolete refresh-error copy assertion; a subsequent run
+hit a database test timeout while all-platform Metro export was competing for
+resources. The uncontended full rerun passed without increasing test timeouts.
+Autolinking and store-profile Expo configuration passed; Health Connect remains
+READ_NUTRITION-only, with burn/activity reads blocked. All-platform exports passed.
+After visual inspection, the large-text per-value loading label was shortened to
+“Loading…” to avoid truncation; final validation includes that last copy change.
+Actual RoleCard and Home metric JSX/styles were rendered in isolated browser
+fixtures at 320px/200% text and 390px/normal text. The new platform hint wraps
+without overlap; the shortened loading state remains visible alongside confirmed
+burn. This is rendered evidence, not replacement-binary physical qualification.
+
+The final release gate after the loading-label adjustment and provisional-detail
+note passed again: 931 tests / 85 files. At September 25 01:52:15Z the deployed
+backend remained `9435eaf`, selection enablement was false, and production had
+zero manual authority boundaries and zero manual selections. This replacement
+requires no new migration or accounting changes.
+The 01:51:55Z predeployment inspection retained all four accounting fingerprints
+from the Samsung round-trip, with unchanged 224 Opening Bank / 0 Available Bank /
+381 Recovery and unchanged active Health Connect Cronometer boundary.
+
+Remaining before replacement qualification: fresh provider UI/API comparison,
+validated backend deployment, one consolidated private binary per platform and
+physical checks on those artifacts. Exact provider UI/API parity cannot yet be
+promised. Manual account qualification and capability rejection against real
+manual records remain later Phase 1B gates, not completed by this addendum.

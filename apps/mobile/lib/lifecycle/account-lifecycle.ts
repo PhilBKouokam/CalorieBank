@@ -13,6 +13,7 @@ let suspended = false;
 let appState = 'inactive';
 let scopeGeneration = 0;
 let runId = 0;
+const activityListeners = new Set<(running: boolean) => void>();
 const listeners = new Set<(result: AccountLifecycleResult) => void>();
 
 export type AccountLifecycleResult = {
@@ -28,6 +29,7 @@ export function resetAccountLifecycle(scope: string | null) {
   queuedForcedRun = null;
   suspended = false;
   appState = 'inactive';
+  activityListeners.forEach((listener) => listener(false));
 }
 
 export function pauseAccountLifecycle() { suspended = true; scopeGeneration += 1; queuedForcedRun = null; }
@@ -46,6 +48,12 @@ export function subscribeToAccountLifecycle(listener: (result: AccountLifecycleR
   return () => { listeners.delete(listener); };
 }
 
+export function subscribeToAccountLifecycleActivity(listener: (running: boolean) => void) {
+  activityListeners.add(listener);
+  listener(isAccountLifecycleRunning());
+  return () => { activityListeners.delete(listener); };
+}
+
 export function runAccountLifecycle(options: { force?: boolean; foreground?: boolean } = {}): Promise<AccountLifecycleResult> {
   if (!accountScope || suspended) return Promise.resolve({ status: 'skipped', detail: null });
   const force = options.force ?? false;
@@ -59,7 +67,10 @@ export function runAccountLifecycle(options: { force?: boolean; foreground?: boo
         }
         return runAccountLifecycle(options);
       }).finally(() => {
-        if (generation === scopeGeneration) queuedForcedRun = null;
+        if (generation === scopeGeneration) {
+          queuedForcedRun = null;
+          activityListeners.forEach((listener) => listener(isAccountLifecycleRunning()));
+        }
       });
     }
     return queuedForcedRun;
@@ -117,10 +128,14 @@ export function runAccountLifecycle(options: { force?: boolean; foreground?: boo
       if (currentRunId === runId) activeRun = null;
     }
   })().then((result) => {
-    if (generation === scopeGeneration) listeners.forEach((listener) => listener(result));
+    if (generation === scopeGeneration) {
+      activityListeners.forEach((listener) => listener(isAccountLifecycleRunning()));
+      listeners.forEach((listener) => listener(result));
+    }
     return result;
   });
   activeRun = run;
+  activityListeners.forEach((listener) => listener(true));
   return run;
 }
 

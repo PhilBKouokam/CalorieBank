@@ -11,6 +11,7 @@ type Lifecycle = {
   resetAccountLifecycle: (scope: string | null) => void;
   refreshOnAppState: (state: string) => Promise<Result>;
   runAccountLifecycle: (options?: { force?: boolean }) => Promise<Result>;
+  subscribeToAccountLifecycleActivity: (listener: (running: boolean) => void) => () => void;
   subscribeToAccountLifecycle: (listener: (result: Result) => void) => () => void;
 };
 let lifecycle: Lifecycle;
@@ -27,6 +28,20 @@ beforeEach(async () => {
   api.server.mockReset().mockResolvedValue(ready); api.apple.mockReset().mockResolvedValue(undefined);
 });
 describe('one account-owned foreground refresh', () => {
+  it('reports loading before slow providers complete and clears it after failure or success', async () => {
+    let finish!: (value: typeof ready) => void;
+    api.server.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const observed = vi.fn(); const off = lifecycle.subscribeToAccountLifecycleActivity(observed);
+    const pending = refreshOnAppState('active');
+    expect(observed.mock.calls.map(call => call[0])).toEqual([false, true]);
+    expect(api.apple).not.toHaveBeenCalled();
+    finish(ready); await pending;
+    expect(observed).toHaveBeenLastCalledWith(false);
+    api.server.mockRejectedValueOnce(new Error('offline'));
+    await runAccountLifecycle({ force: true });
+    expect(observed.mock.calls.map(call => call[0])).toEqual([false, true, false, true, false]);
+    off();
+  });
   it('refreshes on cold open and each actual transition, not duplicate active events', async () => {
     await refreshOnAppState('active'); await refreshOnAppState('active');
     expect(api.server).toHaveBeenCalledTimes(1);

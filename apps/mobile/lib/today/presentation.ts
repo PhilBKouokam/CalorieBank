@@ -1,5 +1,5 @@
 import { sourceLabel } from '../native-health/copy';
-import type { BankSummaryResponse, TodaySoFarDataFreshnessStatus } from '@caloriebank/schemas';
+import type { BankSummaryResponse, ProviderSelectionResponse, TodaySoFarDataFreshnessStatus } from '@caloriebank/schemas';
 
 import { getConsumerSourceName } from '../providers/presentation';
 
@@ -7,7 +7,7 @@ export function emptyTodayValue(status: TodaySoFarDataFreshnessStatus, noun: str
   if (status === 'not_connected') return 'Not connected';
   if (status === 'syncing') return 'Refreshing…';
   if (status === 'stale') return 'Out of date';
-  if (status === 'error') return 'Needs attention';
+  if (status === 'error') return 'Unavailable';
   if (status === 'partial') return `Some ${noun} unavailable`;
   return `No ${noun} today`;
 }
@@ -21,7 +21,7 @@ export function emptyTodayDetail(
   if (status === 'not_connected') return `Connect a source for ${noun}`;
   if (status === 'syncing') return `${provider} is refreshing`;
   if (status === 'stale') return `${provider} has not refreshed recently`;
-  if (status === 'error') return `${provider} needs attention`;
+  if (status === 'error') return `${provider} couldn’t refresh. Try again.`;
   return `${provider} has not reported ${noun} today`;
 }
 
@@ -33,7 +33,7 @@ export function firstRunTodayEmptyState(input: {
   if (!input.checking) return null;
   const provider = sourceLabel(input.source ?? 'your source');
   return {
-    value: input.noun === 'intake' ? 'Loading today’s calories…' : 'Loading today’s burn…',
+    value: 'Loading…',
     detail: `Checking ${provider}`,
   };
 }
@@ -115,4 +115,12 @@ export function formatWorkoutCalorieLines(input: {
       input.rawCalories * input.adjustmentFactor,
     ).toLocaleString()} kcal est. actual burn`,
   };
+}
+
+/** Missing date evidence and temporary fetch failures are not disconnections. */
+export function needsConnectionRecovery(selection: ProviderSelectionResponse | null) {
+  if (!selection) return false;
+  return [selection.expenditure, selection.intake].some((role) =>
+    role.selected === false || role.status === 'not_connected' || role.status === 'needs_attention',
+  );
 }

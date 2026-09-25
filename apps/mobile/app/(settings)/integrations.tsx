@@ -1,4 +1,4 @@
-import { connectionsForNativeCapability } from '@/lib/native-health/presentation';
+import { connectionsForNativeCapability, crossDeviceSourceHint } from '@/lib/native-health/presentation';
 import { AndroidFoodChoices } from '@/components/caloriebank/AndroidFoodChoices';
 import { ManualSourceChoice } from '@/components/caloriebank/ManualSourceChoice';
 import { preferDirectFoodSources } from '@/lib/providers/intake-writer-policy';
@@ -514,11 +514,12 @@ function knownConnectionOption(option: HealthConnectionOption) {
 function RoleCard({ role, data, onPress }: { role: Role; data: HealthConnectionsResponse[Role] | null; onPress: () => void }) {
   const selected = data?.selected;
   const unselected = Platform.OS === 'android' && !selected && data?.alternatives.some((option) => option.status === 'connected');
-  const action = selected ? 'Manage sources' : unselected ? 'Choose source' : 'Connect source';
+  const remoteHint = crossDeviceSourceHint(selected, nativeHealthCapability.supported);
+  const action = remoteHint ? 'Change source' : selected ? 'Manage sources' : unselected ? 'Choose source' : 'Connect source';
   return <View style={styles.roleCard}>
     <Text style={styles.roleLabel}>{role === 'burned' ? 'Calories Burned' : 'Calories Eaten'}</Text>
     <Text style={styles.roleValue}>{selected?.label ?? (unselected ? 'No source selected' : 'Not connected')}</Text>
-    {selected?.transportLabel ? <Text style={styles.transport}>via {selected.transportLabel}</Text> : null}
+    {remoteHint ? <Text style={styles.transport}>{remoteHint}</Text> : selected?.transportLabel ? <Text style={styles.transport}>via {selected.transportLabel}</Text> : null}
     <Text style={[styles.status, selected?.status === 'needs_attention' && styles.attention]}>{selected ? knownConnectionOption(selected) ? statusCopy(selected.status) : 'Selected' : unselected ? 'Choose a connected source to use here.' : 'Not connected'}</Text>
     <Pressable accessibilityLabel={`${action} for calories ${role}`} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}><Text style={styles.actionText}>{action}</Text></Pressable>
   </View>;
@@ -538,6 +539,7 @@ function RoleSelector({ onNativeDetails, onReconnect, appleBurnState, busy, data
     <SheetHeader onClose={onClose} title={role === 'burned' ? 'Calories burned' : 'Calories eaten'} />
     {options.map((option) => {
       const selected = option.optionId === data?.selected?.optionId;
+      const remoteHint = crossDeviceSourceHint(option, nativeHealthCapability.supported);
       const usable = option.status === 'connected';
       const noBurnData = role === 'burned' && option.deviceManaged && appleBurnState === 'no_burn_data';
       const unavailableCopy = option.deviceManaged && !nativeHealthCapability.supported && option.transportLabel !== 'Health Connect'
@@ -551,12 +553,12 @@ function RoleSelector({ onNativeDetails, onReconnect, appleBurnState, busy, data
         <Ionicons color={selected ? colors.primary : 'transparent'} name="checkmark" size={22} />
         <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled: selected || busy || !usable }} disabled={selected || busy || !usable} onPress={() => onSelect(option)} style={styles.optionText}>
           <Text style={styles.optionLabel}>{option.label}</Text>
-          {option.transportLabel ? <Text style={styles.optionDetail}>via {option.transportLabel}</Text> : null}
-          {!usable && option.status !== 'available' ? <Text style={styles.optionDetail}>{option.primaryAction === 'reconnect' ? 'Reconnect to use this source' : unavailableCopy}</Text> : null}
+          {remoteHint ? <Text style={styles.optionDetail}>{remoteHint}</Text> : option.transportLabel ? <Text style={styles.optionDetail}>via {option.transportLabel}</Text> : null}
+          {!remoteHint && !usable && option.status !== 'available' ? <Text style={styles.optionDetail}>{option.primaryAction === 'reconnect' ? 'Reconnect to use this source' : unavailableCopy}</Text> : null}
         </Pressable>
         {nativeIntake.supported && option.transportLabel === 'Health Connect' ? <Pressable accessibilityRole="button" disabled={busy} onPress={onNativeDetails} style={styles.inlineAction}><Text style={styles.actionText}>Manage</Text></Pressable> : option.primaryAction === 'reconnect' && (option.label === 'Fitbit' || option.label === 'FatSecret') ?
           <Pressable accessibilityRole="button" disabled={busy} onPress={() => onReconnect(option.label as 'Fitbit' | 'FatSecret')} style={styles.inlineAction}><Text style={styles.actionText}>Reconnect</Text></Pressable> :
-          nativeHealthCapability.supported && (noBurnData || (role === 'eaten' && option.deviceManaged)) ?
+          !remoteHint && nativeHealthCapability.supported && (noBurnData || (role === 'eaten' && option.deviceManaged)) ?
             <Pressable accessibilityRole="button" disabled={busy} onPress={onAppleDetails} style={styles.inlineAction}><Text style={styles.actionText}>Manage</Text></Pressable> :
             nativeHealthCapability.supported && option.deviceManaged && !usable && option.primaryAction === 'refresh_apple_health' ?
               <Pressable accessibilityRole="button" disabled={busy} onPress={onRefreshApple} style={styles.inlineAction}><Text style={styles.actionText}>Refresh</Text></Pressable> : busy && !selected ? <ActivityIndicator color={colors.primary} /> : null}

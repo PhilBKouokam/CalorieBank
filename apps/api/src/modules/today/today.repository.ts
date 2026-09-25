@@ -118,11 +118,11 @@ function isUniqueConstraintError(error: unknown) {
   );
 }
 
-function categoryStatus(value: IngestionCategoryStatus | undefined): TodaySoFarDataFreshnessStatus {
+function categoryStatus(value: IngestionCategoryStatus | undefined, selected = false): TodaySoFarDataFreshnessStatus {
   if (value === 'ready') return 'ready';
   if (value === 'error') return 'error';
   if (value === 'unavailable' || value === 'skipped') return 'unavailable';
-  return 'not_connected';
+  return selected ? 'unavailable' : 'not_connected';
 }
 
 
@@ -698,11 +698,11 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     const intakeSyncedAt = intakeSession?.completedAt ?? intakeSession?.startedAt ?? null;
     const contextSyncedAt = contextSession?.completedAt ?? contextSession?.startedAt ?? null;
     const burnedStatus = currentDayFreshness(
-      expenditure ? syncStatus(expenditure.syncStatus) : categoryStatus(expenditureSession?.expenditureStatus),
+      expenditure ? syncStatus(expenditure.syncStatus) : categoryStatus(expenditureSession?.expenditureStatus, selection.expenditureSelected),
       expenditure?.updatedAt ?? expenditureSyncedAt,
     );
     const eatenStatus = manual ? 'ready' : currentDayFreshness(
-      intake ? syncStatus(intake.syncStatus) : categoryStatus(intakeSession?.intakeStatus),
+      intake ? syncStatus(intake.syncStatus) : categoryStatus(intakeSession?.intakeStatus, selection.intakeSelected),
       intake?.updatedAt ?? intakeSyncedAt,
     );
     const stepsStatus = currentDayFreshness(

@@ -758,7 +758,11 @@ export class GoogleHealthFitbitService {
   async syncRollingWindow(user: DevelopmentUser, currentLocalDate: string, timezone: string, force = false, dayCount = 3, trigger: OrchestrationTrigger = 'manual_refresh') {
     const datesRequested = Array.from({ length: dayCount }, (_, days) => previousLocalDate(currentLocalDate, days));
     const connection = await this.db.googleHealthConnection.findUnique({ where: { userId: user.id } });
-    if (!force && connection?.lastSyncedAt && this.now().getTime() - connection.lastSyncedAt.getTime() < 5 * 60 * 1000) {
+    // A pre-midnight fetch is not completed-day evidence. Never let its short
+    // throttle suppress the first post-midnight query for the new civil day.
+    if (!force && connection?.lastSyncedAt
+      && getLocalDateForTimezone(timezone, connection.lastSyncedAt) === currentLocalDate
+      && this.now().getTime() - connection.lastSyncedAt.getTime() < 5 * 60 * 1000) {
       return { datesRequested, datesUpdated: [], datesSkipped: datesRequested };
     }
     const accessToken = await this.accessToken(user.id);

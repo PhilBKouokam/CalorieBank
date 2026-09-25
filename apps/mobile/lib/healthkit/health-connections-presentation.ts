@@ -32,7 +32,7 @@ export function composeAppleHealthConnections(
         : 'ready',
 ): HealthConnectionsResponse {
   const composeBurnOption = (option: HealthConnectionOption) => {
-    if (!option.deviceManaged || burnState === 'ready') return option;
+    if (!option.deviceManaged || option.transportLabel === 'Health Connect' || burnState === 'ready') return option;
     if (burnState === 'no_burn_data') return { ...option, status: 'no_data' as const, primaryAction: null };
     if (burnState === 'needs_attention') return { ...option, status: 'needs_attention' as const, primaryAction: 'check_apple_health' as const };
     if (burnState === 'refresh_failed') return { ...option, status: 'needs_attention' as const, primaryAction: 'refresh_apple_health' as const };
@@ -41,14 +41,14 @@ export function composeAppleHealthConnections(
 
   const composeRole = (role: HealthConnectionsResponse['burned'], roleName: 'burned' | 'eaten') => ({
     ...role,
-    selected: role.selected?.deviceManaged
+    selected: role.selected?.deviceManaged && role.selected.transportLabel !== 'Health Connect'
       ? roleName === 'burned'
         ? composeBurnOption(role.selected)
         : localState === 'connected' || localState === 'connected_partial' || localState === 'syncing'
           ? role.selected
           : refreshable(role.selected)
       : role.selected,
-    alternatives: role.alternatives.map((option) => option.deviceManaged
+    alternatives: role.alternatives.map((option) => option.deviceManaged && option.transportLabel !== 'Health Connect'
       ? roleName === 'burned'
         ? composeBurnOption(option)
         : localState === 'connected' || localState === 'connected_partial' || localState === 'syncing'
@@ -56,7 +56,7 @@ export function composeAppleHealthConnections(
           : refreshable(option)
       : option),
     canChange: role.alternatives.some(
-      (option) => (roleName !== 'burned' || !option.deviceManaged || burnState === 'ready') && option.status === 'connected',
+      (option) => (roleName !== 'burned' || !option.deviceManaged || option.transportLabel === 'Health Connect' || burnState === 'ready') && option.status === 'connected',
     ),
   });
 
@@ -65,7 +65,7 @@ export function composeAppleHealthConnections(
     burned: composeRole(connections.burned, 'burned'),
     eaten: composeRole(connections.eaten, 'eaten'),
     connectedServices: connections.connectedServices.map((option) =>
-      option.deviceManaged && localState !== 'connected' && localState !== 'connected_partial' && localState !== 'syncing'
+      option.deviceManaged && option.transportLabel !== 'Health Connect' && localState !== 'connected' && localState !== 'connected_partial' && localState !== 'syncing'
         ? refreshable(option)
         : option),
   };

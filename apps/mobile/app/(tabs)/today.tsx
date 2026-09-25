@@ -10,6 +10,7 @@ import {
   type OnboardingStatusResponse,
 } from '@caloriebank/schemas';
 import { Ionicons } from '@expo/vector-icons';
+import { currentDateSnapshot } from '@/lib/today/current-date';
 import { subscribeToLocalDateChange } from '@/lib/today/local-date-change';
 import { Link, useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -37,12 +38,13 @@ import {
   fetchToday,
   getApiBaseUrl,
 } from '@/lib/api/client';
-import { isAccountLifecycleRunning, runAccountLifecycle, subscribeToAccountLifecycle } from '@/lib/lifecycle/account-lifecycle';
+import { isAccountLifecycleRunning, runAccountLifecycle, subscribeToAccountLifecycle, subscribeToAccountLifecycleActivity } from '@/lib/lifecycle/account-lifecycle';
 import { CompletedContribution } from '@/components/caloriebank/CompletedContribution';
 import {
   emptyTodayDetail,
   emptyTodayValue,
   firstRunTodayEmptyState,
+  needsConnectionRecovery,
   formatStepContributions,
   formatWorkoutCalorieLines,
   hasLatestCompletedContribution,
@@ -137,8 +139,12 @@ export default function TodayScreen() {
   const [plannedTreat, setPlannedTreat] = useState<PlannedTreatGetResponse | null>(null);
   const [plannedTreatStatus, setPlannedTreatStatus] =
     useState<'loading' | 'ready' | 'empty' | 'error'>('loading');
-  const [today, setToday] = useState<TodayResponse | null>(null);
-  const [todayStatus, setTodayStatus] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
+  const [storedToday, setToday] = useState<TodayResponse | null>(null);
+  const [storedTodayStatus, setTodayStatus] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
+  const today = currentDateSnapshot(storedToday);
+  const todayStatus = storedTodayStatus === 'error'
+    ? today ? 'ready' : 'error'
+    : storedToday && !today ? 'loading' : storedTodayStatus;
   const [providerSelection, setProviderSelection] = useState<ProviderSelectionResponse | null>(null);
   const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatusResponse | null>(null);
   const [firstRunCheckPending, setFirstRunCheckPending] = useState(false);
@@ -152,6 +158,7 @@ export default function TodayScreen() {
 
   const refreshVisibleReadModels = useCallback(async () => {
     const generation = ++readGeneration.current;
+    setTodayStatus((current) => current === 'error' ? 'loading' : current);
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const [summaryResult, todayResult, providerResult] = await Promise.allSettled([
       fetchBankSummary(),
@@ -166,13 +173,19 @@ export default function TodayScreen() {
     if (todayResult.status === 'fulfilled') {
       setToday(todayResult.value);
       setTodayStatus(todayResult.value.burned.adjusted === null && todayResult.value.eaten.calories === null ? 'unavailable' : 'ready');
+    } else {
+      setTodayStatus('error');
     }
     if (providerResult.status === 'fulfilled') setProviderSelection(providerResult.value);
   }, []);
 
+  useEffect(() => subscribeToAccountLifecycleActivity((running) => {
+    setFirstRunCheckPending(running);
+    if (running) setHealthSyncDetail(null);
+  }), []);
+
   useEffect(() => subscribeToAccountLifecycle((result) => {
     setHealthSyncDetail(result.detail);
-    setFirstRunCheckPending(isAccountLifecycleRunning());
     void Promise.all([refreshVisibleReadModels(), fetchOnboardingStatus().then(setOnboardingStatus).catch(() => null)]);
   }), [refreshVisibleReadModels]);
 
@@ -187,6 +200,7 @@ export default function TodayScreen() {
   ) => {
     try {
       setRefreshingHealth(force);
+      setHealthSyncDetail(null);
       const result = await runAccountLifecycle({ force });
       setHealthSyncDetail(result.detail);
       await refreshVisibleReadModels();
@@ -261,7 +275,7 @@ export default function TodayScreen() {
               : 'ready',
           );
         } else if (generation === readGeneration.current) {
-          setTodayStatus((current) => current === 'ready' ? current : 'error');
+          setTodayStatus('error');
         }
 
         if (preferencesResult.status === 'fulfilled') {
@@ -534,7 +548,7 @@ export default function TodayScreen() {
           {todayStatus === 'loading' ? (
             <View style={styles.inlineState}>
               <ActivityIndicator color={colors.primary} />
-              <Text style={styles.supportingText}>Loading live values.</Text>
+              <Text style={styles.supportingText}>Loading today’s data…</Text>
             </View>
           ) : todayStatus === 'error' ? (
             <>
@@ -589,7 +603,7 @@ export default function TodayScreen() {
                 </View>
               </View>
               <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>
-              {today?.burned.status === 'not_connected' || today?.eaten.status === 'not_connected' ? (
+              {!firstRunCheckPending && needsConnectionRecovery(providerSelection) ? (
                 <Pressable
                   accessibilityRole="button"
                   onPress={(event) => {
@@ -601,7 +615,7 @@ export default function TodayScreen() {
                   <Text style={styles.retryButtonText}>Review Health Connections</Text>
                 </Pressable>
               ) : null}
-              {healthSyncDetail ? <Text style={styles.supportingText}>{healthSyncDetail}</Text> : null}
+              {!firstRunCheckPending && healthSyncDetail ? <Text style={styles.supportingText}>{healthSyncDetail}</Text> : null}
             </>
           )}
         </Pressable> : null}

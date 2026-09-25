@@ -170,7 +170,7 @@ describe('consumer Today states', () => {
   it('keeps provider attribution in stale, partial, and error states', () => {
     expect(emptyTodayValue('stale', 'intake')).toBe('Out of date');
     expect(emptyTodayValue('partial', 'steps')).toBe('Some steps unavailable');
-    expect(emptyTodayDetail('error', 'Fitbit', 'calories burned')).toBe('Fitbit needs attention');
+    expect(emptyTodayDetail('error', 'Fitbit', 'calories burned')).toBe('Fitbit couldn’t refresh. Try again.');
     expect(emptyTodayDetail('unavailable', 'FatSecret', 'calories eaten')).toContain('FatSecret');
   });
 
@@ -180,7 +180,7 @@ describe('consumer Today states', () => {
       source: 'Cronometer',
       noun: 'intake',
     })).toEqual({
-      value: 'Loading today’s calories…',
+      value: 'Loading…',
       detail: 'Checking Cronometer',
     });
     expect(firstRunTodayEmptyState({ checking: false, source: 'Cronometer', noun: 'intake' }))

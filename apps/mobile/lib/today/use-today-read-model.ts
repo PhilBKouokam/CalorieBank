@@ -3,6 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import type { TodayResponse } from '@caloriebank/schemas';
 import { fetchToday } from '@/lib/api/client';
 import { subscribeToAccountLifecycle } from '@/lib/lifecycle/account-lifecycle';
+import { currentDateSnapshot } from './current-date';
 import { subscribeToLocalDateChange } from './local-date-change';
 
 // Read-only consumers never initiate another provider refresh.
@@ -14,6 +15,7 @@ export function useTodayReadModel() {
     let mounted = true;
     async function load() {
       const request = ++generation;
+      setFailed(false);
       try {
         const value = await fetchToday(Intl.DateTimeFormat().resolvedOptions().timeZone);
         if (mounted && request === generation) { setToday(value); setFailed(false); }
@@ -24,5 +26,6 @@ export function useTodayReadModel() {
     const stopDate = subscribeToLocalDateChange(() => { setToday(null); void load(); });
     return () => { mounted = false; generation += 1; unsubscribe(); stopDate(); };
   }, []));
-  return { today, failed: !today && failed };
+  const current = currentDateSnapshot(today);
+  return { today: current, failed: !current && failed };
 }

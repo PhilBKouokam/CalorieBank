@@ -321,6 +321,9 @@ describe('consumer routes', () => {
     expect(source).toContain("textAlign: 'left'");
     expect(source).not.toContain("if (value < 0) return 'Withdrawn'");
     expect(source).not.toMatch(/Credited|% adjusted burn|goal deficit|goal surplus/);
-    expect(source).not.toMatch(/Adjusted from|May still update|Original contribution|Effective contribution|Sources:/);
+    expect(source).not.toMatch(/Adjusted from|Original contribution|Effective contribution|Sources:/);
+    // The freshness addendum allows a provisional note in details, not list rows.
+    expect(source.slice(0, source.indexOf('<View style={styles.breakdownPanel}>'))).not.toContain('May still update');
+    expect(source).toContain("selectedDay.status === 'provisional'");
   });
 });

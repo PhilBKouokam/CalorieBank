@@ -46,7 +46,7 @@ describe('Android B1 platform boundary', () => {
   it('keeps native permission copy scoped to its platform', () => {
     expect(JSON.stringify(androidCopy)).not.toMatch(/Apple Health|iOS/);
     expect(JSON.stringify(iosCopy)).not.toMatch(/Android|Health Connect/);
-    expect(androidCopy.sourceLabel('Apple Health')).toBe('Source on another device');
+    expect(androidCopy.sourceLabel('Apple Health')).toBe('Apple Health');
     expect(iosCopy.sourceLabel('Apple Health')).toBe('Apple Health');
     expect(androidCopy.sourceLabel('Fitbit')).toBe('Fitbit');
   });
@@ -84,11 +84,11 @@ describe('Android B1 platform boundary', () => {
     };
     expect(connectionsForNativeCapability(input, true)).toBe(input);
     const result = connectionsForNativeCapability(input, false);
-    expect(result.burned.selected).toMatchObject({ optionId: 'apple', status: 'needs_attention', primaryAction: null });
+    expect(result.burned.selected).toMatchObject({ optionId: 'apple', label: 'Apple Health', status: 'connected', primaryAction: null });
     expect(result.burned.alternatives).toEqual([fitbit]);
     expect(result.eaten.selected).toBe(fatsecret);
     expect(result.eaten.alternatives).toEqual([]);
-    expect(JSON.stringify(result)).not.toContain('Apple Health');
+    expect(result.burned.selected?.label).toBe('Apple Health');
     expect(input.burned.selected).toBe(native);
   });
   it('preserves the exact direct-FatSecret writer preference rather than matching names', () => {

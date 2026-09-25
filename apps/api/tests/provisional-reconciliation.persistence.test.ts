@@ -103,6 +103,54 @@ describe('provisional finalization and reconciliation persistence', () => {
     await prisma.$disconnect();
   });
 
+  it.each([true, false])('uses a late Fitbit revision with immutable ledger entries (revision before posting: %s)', async (beforePosting) => {
+    const user = testUser();
+    await configureCut(user);
+    await prisma.providerSelection.update({ where: { userId: user.id }, data: {
+      authoritativeExpenditureProvider: 'google_health_fitbit',
+      authoritativeActivityProvider: 'google_health_fitbit',
+    } });
+    let now = new Date('2026-07-22T05:01:00.000Z');
+    const bank = new PrismaBankHistoryRepository(prisma, { now: () => now });
+    const aggregates = new PrismaTodayAggregateRepository(prisma, { allowSyntheticProviders: false });
+    const writeBurn = (raw: number) => aggregates.upsertExpenditureAggregate(user,
+      providerExpenditure(user.id, 'google_health_fitbit', raw, now));
+    await writeBurn(5186);
+    await aggregates.upsertIntakeAggregate(user, intake(user.id, 3000, now));
+    if (!beforePosting) await bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago');
+    const originalLedger = await prisma.calorieLedgerTransaction.findMany({ where: { userId: user.id } });
+    now = new Date('2026-07-22T05:03:00.000Z');
+    await writeBurn(5271);
+    await bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago');
+    const detail = await bank.getDayDetail(user.id, '2026-07-21');
+    expect(detail).toMatchObject({ status: 'provisional', effectiveDailyBankChange: 717,
+      correctionCount: beforePosting ? 0 : 1 });
+    const snapshots = await prisma.bankCalculationSnapshot.findMany({ where: { userId: user.id }, orderBy: { version: 'asc' } });
+    expect(snapshots.map(row => row.importedTotalDailyExpenditure)).toEqual(beforePosting ? [5271] : [5186, 5271]);
+    expect(snapshots.at(-1)).toMatchObject({ adjustedExpenditure: 4217, expenditureProvider: 'google_health_fitbit' });
+    for (const row of originalLedger) {
+      expect(await prisma.calorieLedgerTransaction.findUnique({ where: { id: row.id } })).toEqual(row);
+    }
+    // Duplicate provider refresh and concurrent lifecycle retries cannot add another delta.
+    now = new Date('2026-07-22T05:04:00.000Z');
+    await writeBurn(5271);
+    await Promise.all([1, 2].map(() => bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago')));
+    expect(await prisma.bankCalculationSnapshot.findMany({ where: { userId: user.id }, orderBy: { version: 'asc' } })).toEqual(snapshots);
+    expect(await prisma.calorieLedgerTransaction.count({ where: { userId: user.id } })).toBe(beforePosting ? 1 : 2);
+    // Chicago's two-day correction boundary is local midnight, not UTC midnight.
+    now = new Date('2026-07-24T04:59:59.999Z');
+    expect((await bank.getDayDetail(user.id, '2026-07-21'))?.status).toBe('provisional');
+    now = new Date('2026-07-24T05:00:00.000Z');
+    await bank.lockExpired(user.id);
+    const lockedLedger = await prisma.calorieLedgerTransaction.findMany({ where: { userId: user.id }, orderBy: { id: 'asc' } });
+    now = new Date('2026-07-24T05:01:00.000Z');
+    await writeBurn(5400);
+    await bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago');
+    expect((await bank.getDayDetail(user.id, '2026-07-21'))).toMatchObject({ status: 'locked', effectiveDailyBankChange: 717 });
+    expect(await prisma.calorieLedgerTransaction.findMany({ where: { userId: user.id }, orderBy: { id: 'asc' } })).toEqual(lockedLedger);
+    expect(await prisma.bankCalculationSnapshot.findMany({ where: { userId: user.id }, orderBy: { version: 'asc' } })).toEqual(snapshots);
+  });
+
   it('posts immediately, appends positive and negative corrections, and ignores zero deltas', async () => {
     const user = testUser();
     await configureCut(user);

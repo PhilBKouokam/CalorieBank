@@ -13,7 +13,7 @@ const targetStore = vi.hoisted(() => ({ calories: 0, writes: [] as number[] }));
 const homeStore = vi.hoisted(() => ({ recovery: 0 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useFocusEffect: (callback: () => void) => React.useEffect(callback, [callback]), Link: 'Link' }));
 vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
-vi.mock('../../mobile/lib/lifecycle/account-lifecycle', () => ({ isAccountLifecycleRunning: () => false, subscribeToAccountLifecycle: () => () => {}, runAccountLifecycle: async () => ({ detail: null }) }));
+vi.mock('../../mobile/lib/lifecycle/account-lifecycle', () => ({ isAccountLifecycleRunning: () => false, subscribeToAccountLifecycleActivity: () => () => {}, subscribeToAccountLifecycle: () => () => {}, runAccountLifecycle: async () => ({ detail: null }) }));
 vi.mock('../../mobile/lib/api/client', () => ({
   getApiBaseUrl: () => 'https://fixture.invalid',
   fetchBankSummary: async () => ({ openingBankStatus: 'initialized', availableBankCalories: homeStore.recovery ? 0 : 2843, recoveryCalories: homeStore.recovery, latestCompletedDate: '2026-09-10', latestDailyBankChange: 547 }),

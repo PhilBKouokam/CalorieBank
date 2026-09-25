@@ -331,10 +331,11 @@ describe('Android qualified direct-provider journeys', () => {
     await mount(); await press('Connect Apple Health'); await press('Connect Cronometer');
     const before = structuredClone(data());
     await act(async () => screen!.unmount()); h.os = 'android'; await mountSettings();
-    expect(text(screen!.root)).toContain('Source on another device');
-    expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch|Managed by iOS/);
+    expect(text(screen!.root)).toContain('Cronometer');
+    expect(text(screen!.root)).toContain('Updates from Apple Health on iPhone');
+    expect(text(screen!.root)).not.toMatch(/Source on another device|Needs attention/);
     await press('Add food source');
-    expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch/);
+    expect(text(screen!.root)).toContain('Updates from Apple Health on iPhone');
     expect(data()).toEqual(before);
   });
 });
