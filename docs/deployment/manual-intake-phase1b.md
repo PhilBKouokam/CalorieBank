@@ -805,3 +805,84 @@ migration deployment and diff checks. Default Expo public configuration resolved
 a standalone hosted Play-profile config invocation lacked required hosted
 credentials in its local environment, so it is not recorded as a hosted config
 PASS. No remote build or deployment was performed for this correction checkpoint.
+
+### September 25: corrected replacement delivery in progress
+
+Source: `bad1750ae997f434c878b33b091ca3b678e70b5f` (clean worktree).
+Render auto-deploy `dep-darbhseq1p3s7383tpo0` succeeded and became live at
+18:12:29Z; cron build `bld-darbhsmq1p3s7383tq60` uses the same commit.
+The 35 existing migrations were checked with none pending; no new migration.
+Health and database readiness returned success. At 18:29:48Z a read-only
+transaction confirmed selection enablement false, zero manual boundaries and
+zero manual selections. At 18:30:12Z compiled provider repositories returned
+ready Fitbit burn and Apple Health intake without capability metadata.
+
+Both store configurations now validate using the actual EAS preview environment;
+this resolves the prior local hosted-environment validation limitation. Configured
+Health Connect permission remains READ_NUTRITION only. Submitted exactly one
+corrected replacement per platform from the same commit:
+
+- iOS 1.0.0 (7): `8174d032-8d2e-469e-863a-64524567f93a`, testflight profile.
+- Android 1.0.0 (6): `0f41a1e5-eab1-4be5-9b14-ff98396e563e`, play-testing AAB profile.
+
+Both were IN_PROGRESS at submission verification. Completion, compiled artifact
+inspection and private store availability are not yet claimed at this checkpoint.
+Manual Intake remains disabled. App Store Connect authentication expired; founder
+sign-in requested while builds continue. No public release or declaration changes.
+
+The normal lifecycle run triggered after deployment completed at 18:33:15Z:
+10 accounts completed, zero failed, five provider errors, matching the preceding
+18:01:54Z baseline count. Render reported successful completion at 18:33:17Z.
+Founder restored Apple authentication. iOS build 7 finished at 18:38:03Z; exact IPA
+inspection verifies bundle `com.caloriebank.mobile`, version 1.0.0, build 7,
+unchanged encryption declaration, and compiled capability/recovery code. Bundle
+SHA-256: `b8878847fcb08a004ce216c9e89117b0e5823ec47c2e5154137b4d49c538fb63`.
+
+EAS submission `5d65f877-9c62-4aa3-b96a-40d4b387784c` successfully uploaded
+build 7 to App Store Connect. Apple processing was observed; external-group
+availability remains pending until the console confirms Testing.
+
+App Store Connect build `2eeb4939-6bd7-4c24-9b4f-6a162b470950` was approved for
+Friends & Family. After the founder explicitly approved notifying the existing
+private group, Notify Testers was executed and the exact build 1.0.0 (7) row
+changed to Testing. No public tester link or App Store release was created.
+
+Read-only accounting inspection at 18:51:03Z matched the recorded post-Samsung
+baseline: Opening Bank 224, Available Bank 0, Recovery 725. All five fingerprints
+were unchanged: opening rows (5), finalized records (15), snapshots (17), ledger
+transactions (17), and authority boundaries (4). Active intake remains exact
+Apple Health Cronometer; September 24 retains exact Health Connect authority.
+
+Android build 6 finished at 18:55:06Z from the same `bad1750` source. The downloaded
+AAB contains package `com.caloriebank.mobile`, only
+`android.permission.health.READ_NUTRITION` among Health Connect permissions, and
+the compiled `intake-authority-v2` capability and recovery-message handling.
+Android JS bundle SHA-256:
+`f68b8665da0e8f8afd705a06981cb4f231c9ad558d5ed07977744300b6f379ea`.
+The exact AAB was uploaded to the existing Internal Testing track; processing
+and release publication are recorded separately below.
+
+Google Play parsed the uploaded artifact as 6 (1.0.0), API 26+, target SDK 36.
+The only validation warning was the missing deobfuscation file; no blocking
+validation error or device-support change was shown. Release
+`1.0.0 (6) - Source and navigation fixes` was published to existing Internal
+Testing track `4701187796213670867`, release `5`. The console confirmed
+**Available to internal testers** on September 25 at 2:00 PM (console display).
+No Production/Open Testing release, tester expansion, public link, or declaration
+change occurred. Store propagation to individual devices can take additional time.
+
+Delivery conclusion: iOS 1.0.0 (7) is Testing in Friends & Family; Android
+1.0.0 versionCode 6 is available to Internal Testing. Both use implementation
+commit `bad1750ae997f434c878b33b091ca3b678e70b5f`, as does the deployed backend.
+Manual Intake selection remains disabled. Actual store-installed replacement
+binaries still require physical qualification; previous binary evidence is not
+substituted. The Fitbit cloud/UI discrepancy remains an explicitly recorded
+limitation, not an asserted fix or guaranteed parity.
+
+**PHASE 1B REPLACEMENT BUILD: PASS CANDIDATE — actual iOS build 7 and Android
+versionCode 6 physical qualification remaining.**
+
+This delivery evidence is documentation-only and uses `[skip render]`; no further
+build or deployment is requested. The validated source release gate remains the
+936-test/86-file run above. Manual enablement and the remaining real-account,
+capability-rejection and completed-day finalization gates remain pending.
