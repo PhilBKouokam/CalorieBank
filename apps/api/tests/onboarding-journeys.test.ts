@@ -379,3 +379,23 @@ describe('manual source mobile parity', () => {
     expect(h.saves).toEqual([]);
   });
 });
+
+describe('Android Settings tracker-first chooser', () => {
+  it('shows recognizable trackers before requesting nutrition access and selects an exact writer', async () => {
+    h.os = 'android'; await mountSettings(); await press('Add food source');
+    const copy = text(screen!.root);
+    for (const name of ['Cronometer', 'MyFitnessPal', 'Lose It!', 'MacroFactor', 'FatSecret', 'Direct connection']) expect(copy).toContain(name);
+    expect(copy).not.toMatch(/Allow food access|Find food trackers|Open Health Connect settings|Health Connect food tracker/);
+    expect(data().intake.selected).toBe(false);
+    await press('Choose Cronometer');
+    expect(data().intake.authoritativeProvider).toBe('health_connect');
+    expect(data().intake.nativeIntakeSource?.id).toBe('com.cronometer.android.gold');
+    expect(h.router.push).not.toHaveBeenCalledWith('/native-food');
+  });
+  it('opens old route links into the chooser and reuses connected FatSecret directly', async () => {
+    h.os = 'android'; h.params = { foodChooser: '1' }; await mountSettings();
+    expect(text(screen!.root)).toContain('Choose your food tracker');
+    await press('FatSecret');
+    expect(data().intake.authoritativeProvider).toBe('fatsecret');
+  });
+});

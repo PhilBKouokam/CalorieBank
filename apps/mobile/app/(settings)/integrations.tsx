@@ -1,4 +1,5 @@
 import { connectionsForNativeCapability } from '@/lib/native-health/presentation';
+import { AndroidFoodChoices } from '@/components/caloriebank/AndroidFoodChoices';
 import { ManualSourceChoice } from '@/components/caloriebank/ManualSourceChoice';
 import { preferDirectFoodSources } from '@/lib/providers/intake-writer-policy';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -46,7 +47,7 @@ function roleError(option?: HealthConnectionOption) {
 
 export default function IntegrationsScreen() {
   const router = useRouter();
-  const { returnTo, fitbit, fatsecret } = useLocalSearchParams<{ returnTo?: string; fitbit?: string; fatsecret?: string }>();
+  const { returnTo, fitbit, fatsecret, foodChooser } = useLocalSearchParams<{ returnTo?: string; fitbit?: string; fatsecret?: string; foodChooser?: string }>();
   const androidProviderReturn = Platform.OS === 'android' && (typeof fitbit === 'string' || typeof fatsecret === 'string');
   const [connections, setConnections] = useState<HealthConnectionsResponse | null>(null);
   const [helpBundleId, setHelpBundleId] = useState<string | null>(null);
@@ -63,7 +64,7 @@ export default function IntegrationsScreen() {
   }
   const [messageTone, setMessageTone] = useState<'attention' | 'error' | 'success'>('error');
   const [roleSheet, setRoleSheet] = useState<Role | null>(null);
-  const [addRole, setAddRole] = useState<Role | null>(null);
+  const [addRole, setAddRole] = useState<Role | null>(foodChooser === '1' ? 'eaten' : null);
   const [service, setService] = useState<ServiceName | null>(null);
   const [serviceRole, setServiceRole] = useState<Role>('burned');
   const [intakeWriters, setIntakeWriters] = useState<AppleHealthIntakeWriter[]>([]);
@@ -123,7 +124,25 @@ export default function IntegrationsScreen() {
 
   function openNativeFood() {
     dismissSheets();
-    router.push('/native-food');
+    setAddRole('eaten');
+  }
+
+  function nativeChoiceBusy(value: boolean) {
+    if (value) { operations.current.begin('native-intake'); setBusy('native-intake'); }
+    else { operations.current.end(); setBusy(null); }
+  }
+  async function nativeChoiceSelected() {
+    closeSheets();
+    void retryIncompleteOpeningAfterSourceChange();
+    await load();
+  }
+  function chooseFatSecret() {
+    const option = [connections?.eaten.selected, ...(connections?.eaten.alternatives ?? [])]
+      .find((item) => item?.label === 'FatSecret' && item.status === 'connected');
+    if (option) {
+      if (connections?.eaten.selected?.optionId === option.optionId) dismissSheets();
+      else void selectRole('eaten', option);
+    } else void connectFatSecretForEaten();
   }
 
   function closeSheets() {
@@ -409,7 +428,7 @@ export default function IntegrationsScreen() {
         {message && !roleSheet && !addRole && !service ? <Text style={messageTone === 'success' ? styles.successText : messageTone === 'attention' ? styles.attentionText : styles.errorText}>{message}</Text> : null}
       </ScrollView>
       <RoleSelector onNativeDetails={openNativeFood} onReconnect={(name) => void reconnectService(name)} appleBurnState={appleBurnState} busy={busy !== null} data={roleSheet ? displayConnections?.[roleSheet] ?? null : null} message={message} messageTone={messageTone} onAdd={() => { setAddRole(roleSheet); setRoleSheet(null); setMessage(null); }} onAppleDetails={() => { operations.current.invalidate(); setMessage(null); setRoleSheet(null); setService('Apple Health'); }} onClose={dismissSheets} onRefreshApple={() => void refreshService('Apple Health')} onSelect={(option) => roleSheet ? void selectRole(roleSheet, option) : undefined} role={roleSheet} />
-      <AddSourceSheet onNativeIntake={openNativeFood} busy={busy} connections={displayConnections} intakeWriters={intakeWriters} message={message} messageTone={messageTone} onAppleBurn={() => void connectNativeHealthForBurn()} onAppleIntake={() => void discoverFoodTrackers()} onClose={dismissSheets} onFatSecret={() => void connectFatSecretForEaten()} onFitbit={() => void connectFitbitForBurn()} onWriter={(writer) => void selectFoodTracker(writer)} role={addRole} />
+      <AddSourceSheet onNativeSelected={nativeChoiceSelected} onNativeBusy={nativeChoiceBusy} busy={busy} connections={displayConnections} intakeWriters={intakeWriters} message={message} messageTone={messageTone} onAppleBurn={() => void connectNativeHealthForBurn()} onAppleIntake={() => void discoverFoodTrackers()} onClose={dismissSheets} onFatSecret={chooseFatSecret} onFitbit={() => void connectFitbitForBurn()} onWriter={(writer) => void selectFoodTracker(writer)} role={addRole} />
       <ServiceSheet role={serviceRole} onChooseTracker={() => { operations.current.invalidate(); setService(null); setRoleSheet(null); setAddRole('eaten'); setMessage(null); void discoverFoodTrackers(); }} appleBurnState={appleBurnState} busy={busy} connections={displayConnections} message={message} messageTone={messageTone} name={service} onChange={(role) => { setService(null); openRole(role); }} onClose={dismissSheets} onDiagnostics={openAppleHealthDiagnostics} onDisconnect={(name) => void disconnectService(name)} onReconnect={(name) => void reconnectService(name)} onRefresh={(name) => void refreshService(name)} />
     </SafeAreaView>
   );
@@ -548,7 +567,7 @@ function RoleSelector({ onNativeDetails, onReconnect, appleBurnState, busy, data
   </Sheet>;
 }
 
-function AddSourceSheet({ onNativeIntake, busy, connections, intakeWriters, message, messageTone, onAppleBurn, onAppleIntake, onClose, onFatSecret, onFitbit, onWriter, role }: { onNativeIntake: () => void; busy: string | null; connections: HealthConnectionsResponse | null; intakeWriters: AppleHealthIntakeWriter[]; message: string | null; messageTone: 'attention' | 'error' | 'success'; onAppleBurn: () => void; onAppleIntake: () => void; onClose: () => void; onFatSecret: () => void; onFitbit: () => void; onWriter: (writer: AppleHealthIntakeWriter) => void; role: Role | null }) {
+function AddSourceSheet({ onNativeSelected, onNativeBusy, busy, connections, intakeWriters, message, messageTone, onAppleBurn, onAppleIntake, onClose, onFatSecret, onFitbit, onWriter, role }: { onNativeSelected: () => Promise<void>; onNativeBusy: (busy: boolean) => void; busy: string | null; connections: HealthConnectionsResponse | null; intakeWriters: AppleHealthIntakeWriter[]; message: string | null; messageTone: 'attention' | 'error' | 'success'; onAppleBurn: () => void; onAppleIntake: () => void; onClose: () => void; onFatSecret: () => void; onFitbit: () => void; onWriter: (writer: AppleHealthIntakeWriter) => void; role: Role | null }) {
   const fitbitConnected = connections?.connectedServices.some((option) => option.label === 'Fitbit' && option.status === 'connected') ?? false;
   const fatSecretConnected = connections?.connectedServices.some((option) => option.label === 'FatSecret' && option.status === 'connected') ?? false;
   const appleAvailable = role ? [connections?.[role].selected, ...(connections?.[role].alternatives ?? [])]
@@ -556,9 +575,9 @@ function AddSourceSheet({ onNativeIntake, busy, connections, intakeWriters, mess
   const choosingWriters = intakeWriters.length > 0;
   const hasAddChoice = role === 'burned' ? !fitbitConnected || (nativeHealthCapability.supported && !appleAvailable) : !fatSecretConnected || nativeHealthCapability.supported || nativeIntake.supported;
   return <Sheet onClose={onClose} visible={role !== null}>
-    <SheetHeader onClose={onClose} title={choosingWriters ? 'Choose your food tracker' : role === 'burned' ? 'Add calories burned source' : 'Add calories eaten source'} />
+    <SheetHeader onClose={onClose} title={choosingWriters || (role === 'eaten' && nativeIntake.supported) ? 'Choose your food tracker' : role === 'burned' ? 'Add calories burned source' : 'Add calories eaten source'} />
     {role === 'eaten' && !choosingWriters ? <ManualSourceChoice disabled={busy !== null} onOpen={onClose} /> : null}
-    {choosingWriters ? intakeWriters.map((writer) => <SourceAction detail="via Apple Health" disabled={busy !== null} key={writer.bundleIdentifier} label={writer.displayName} onPress={() => onWriter(writer)} />) : role === 'burned' ? <>{!fitbitConnected ? <SourceAction disabled={busy !== null} label="Fitbit" onPress={onFitbit} /> : null}{nativeHealthCapability.supported && !appleAvailable ? <SourceAction disabled={busy !== null} label="Apple Health" onPress={onAppleBurn} /> : null}</> : <>{!fatSecretConnected ? <SourceAction disabled={busy !== null} label="FatSecret" onPress={onFatSecret} /> : null}{nativeHealthCapability.supported ? <SourceAction detail="Choose the food app you use with Apple Health" disabled={busy !== null} label="Apple Health food tracker" onPress={onAppleIntake} /> : null}{nativeIntake.supported ? <SourceAction disabled={busy !== null} label="Health Connect food tracker" detail="Choose the app that shares your calories eaten." onPress={onNativeIntake} /> : null}</>}
+    {choosingWriters ? intakeWriters.map((writer) => <SourceAction detail="via Apple Health" disabled={busy !== null} key={writer.bundleIdentifier} label={writer.displayName} onPress={() => onWriter(writer)} />) : role === 'burned' ? <>{!fitbitConnected ? <SourceAction disabled={busy !== null} label="Fitbit" onPress={onFitbit} /> : null}{nativeHealthCapability.supported && !appleAvailable ? <SourceAction disabled={busy !== null} label="Apple Health" onPress={onAppleBurn} /> : null}</> : nativeIntake.supported ? <><AndroidFoodChoices disabled={busy !== null && busy !== 'native-intake'} onSelected={onNativeSelected} onBusyChange={onNativeBusy} /><SourceAction disabled={busy !== null} label="FatSecret" detail="Direct connection" onPress={onFatSecret} /></> : <>{!fatSecretConnected ? <SourceAction disabled={busy !== null} label="FatSecret" onPress={onFatSecret} /> : null}{nativeHealthCapability.supported ? <SourceAction detail="Choose the food app you use with Apple Health" disabled={busy !== null} label="Apple Health food tracker" onPress={onAppleIntake} /> : null}</>}
     {!choosingWriters && !hasAddChoice ? <Text style={styles.emptyText}>All supported sources are connected.</Text> : null}
     {busy ? <ActivityIndicator color={colors.primary} style={styles.sheetSpinner} /> : null}{message ? <Text style={messageTone === 'success' ? styles.successText : messageTone === 'attention' ? styles.attentionText : styles.errorText}>{message}</Text> : null}<Pressable accessibilityRole="button" onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Cancel</Text></Pressable>
   </Sheet>;

@@ -366,3 +366,40 @@ This completes the exercised iPhone existing-provider round-trip on build 5.
 Navigation-fix replacement binary qualification and Android provider smoke remain
 pending. Manual enrollment is still disabled; no manual physical journey or
 Phase 1B PASS is claimed.
+
+### Samsung installation and Settings chooser defect — September 24
+
+Founder installed from the existing Google Play Internal Testing invitation using
+an already-approved tester account. ADB read-only inspection verified Samsung
+SM-A136U, Android 13, package `com.caloriebank.mobile`, versionName 1.0.0,
+versionCode 4, installer `com.android.vending`. The package requests only
+`READ_NUTRITION` among Health Connect permissions; this does not yet prove a
+runtime grant. Existing-account sign-in and Home succeeded. The shared account
+still selected Apple Health Cronometer, correctly requiring a local Android
+source selection rather than silently replacing authority.
+
+Physical Settings exposed a second real client defect: Add another source opened
+an old Android screen headed “Choose your food tracker” but presented permission
+and diagnostic actions instead of tracker choices. Onboarding already had the
+approved recognizable choices. Settings now reuses that same consumer component:
+Cronometer, MyFitnessPal, Lose It!, MacroFactor, another Health Connect app, then
+FatSecret labeled Direct connection. FatSecret reuses a connected selectable
+source through the existing role-selection path. Exact observed package identity
+is still required before a native tracker becomes authoritative. No query or
+source mutation occurs just from opening the chooser. Setup/permission guidance
+appears after an explicit tracker choice; setup-required devices have an action
+using the existing Health Connect settings/store handler. Old native-food route
+links redirect into this chooser instead of retaining a second UI.
+
+Tests cover the actual Settings journey, recognizable choices before permissions,
+exact Cronometer package selection, connected FatSecret reuse, old-route entry,
+and setup-required recovery without authority mutation. Prior shared chooser tests
+continue covering denial, missing exact package, failed query and unmount/stale
+work cancellation. Full release gate passed: 905 tests / 81 files, including
+TypeScript, lint, dedicated local persistence/migration, Prisma and builds.
+Isolated rendering used the actual sheet/choice components at 320/390 widths and
+200% text, with scrolling to FatSecret and setup controls. No overlap observed;
+scrolling is required for longer content. Native physical qualification remains
+pending the replacement binary. No backend deployment, permission expansion or
+manual enablement accompanies this fix. Consolidate it with the Back-button fix
+for replacement builds under the genuine-defect exception.

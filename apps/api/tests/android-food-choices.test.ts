@@ -43,3 +43,13 @@ it('discards discovery after unmount and cancels account-scoped native work', as
   await mount(); await choose(); await act(async () => view.unmount());
   await act(async () => resolve(discovery())); expect(api.select).not.toHaveBeenCalled(); expect(api.cancel).toHaveBeenCalled();
 });
+it('keeps trackers visible before permission and offers setup only after an explicit choice', async () => {
+  api.discover.mockResolvedValue({ access: { state: 'setup_required', granted: [], missing: ['nutrition'] }, sources: [] });
+  await mount();
+  expect(api.discover).not.toHaveBeenCalled();
+  expect(JSON.stringify(view.toJSON())).toContain('Cronometer');
+  expect(JSON.stringify(view.toJSON())).not.toContain('Set up Health Connect');
+  await choose();
+  expect(JSON.stringify(view.toJSON())).toContain('Set up Health Connect');
+  expect(api.select).not.toHaveBeenCalled();
+});
