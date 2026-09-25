@@ -1,8 +1,12 @@
 # Phase 1B implementation and private rollout
 
-Status: implementation committed and dormant backend deployed. iOS build 5 is Testing privately; Android build 4 is available in Internal Testing.
-Manual Intake selection remains disabled. No physical
-Phase 1B qualification is claimed.
+Current status (September 25): dormant backend `bad1750` deployed; private iOS
+1.0.0 (7) and Android 1.0.0 versionCode 6 provider baselines qualified. The
+[pre-enablement protocol/schema safety checkpoint](manual-intake-pre-enablement-checkpoint.md)
+passes. Manual Intake remains disabled. Native Back correction is held for the
+next consolidated feature binaries; real manual-account physical qualification
+and post-enablement safety/finalization gates remain outstanding. Earlier entries
+below are chronological evidence, not the current artifact/status summary.
 
 ## Protocol and route inventory
 
