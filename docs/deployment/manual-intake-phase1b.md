@@ -579,7 +579,7 @@ Exactly one replacement per platform was submitted from that implementation:
 
 | Platform | Version | EAS build | Submission state |
 | --- | --- | --- | --- |
-| iOS | 1.0.0 (6) | `a2129ff1-5105-4bd6-9d5d-9de7436a5bb3` | Build in progress; not yet qualified |
+| iOS | 1.0.0 (6) | `a2129ff1-5105-4bd6-9d5d-9de7436a5bb3` | Finished; Friends & Family Testing; physical qualification pending |
 | Android | 1.0.0 (5) | `896c9f4c-0a41-4186-9f28-a89f94d8f082` | Build in progress; not yet qualified |
 
 Manual Intake remains disabled. No public release has been made. Store
@@ -592,3 +592,15 @@ provider errors. The inspected existing Fitbit HTTP 409 warning remained present
 these counts do not imply every provider credential is healthy. The qualification
 account completed with zero errors and zero unresolved dates. Render reported the
 cron run finished successfully at 02:02:55Z.
+
+
+iOS build 6 completed and EAS submission
+`f49dc863-d50f-4586-a13e-1918227af1fc` uploaded it to App Store Connect.
+The exact IPA identifies `com.caloriebank.mobile`, marketing version 1.0.0 and
+build 6. Its compiled JavaScript contains `intake-authority-v2` and the new
+cross-device presentation; bundle SHA-256 is
+`960b1150393bf5e85cf58c460b36a9a7f0049085f9405fac0951b05f5db33eb8`.
+App Store Connect build `e6d4a4e1-8609-44b2-9e1b-c2d83aa2f862` reports Testing
+with Friends & Family assigned after the private beta review submission.
+The founder has been asked to update through TestFlight; no physical build-6
+result is claimed yet. No public App Store submission occurred.
