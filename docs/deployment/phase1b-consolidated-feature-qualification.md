@@ -154,3 +154,18 @@ included in this checkpoint. Manual Intake remains disabled; enabling requires a
 reviewed, passing checkpoint and separate explicit founder authorization. Fitbit
 accounting, the once-only 0.80 policy, finalized History, Opening Bank and ledger
 logic were not changed. The Google support case remains unsent. Phase 2 did not begin.
+
+## Replacement correction checkpoint — 2026-09-27
+
+TestFlight 1.0.0 (9), source `a97af1c5aec153ae03800fe6ab349de5168cf0e4`,
+is Testing in the existing Friends & Family group and founder-confirmed installed.
+Founder physical Back alignment result: **“Still too low or clipped” — FAIL**.
+Qualification stopped per the failure policy. No replacement keyboard physical
+PASS is claimed; prior build 8/Android 7 passing evidence above remains preserved.
+Android replacement 8 compiled but private delivery is incomplete. See
+[the correction evidence](phase1b-ios-keyboard-correction.md) for exact identities,
+delivery state and outstanding checks. Manual Intake remains disabled; no new
+production count verification followed the early stop.
+
+**PHASE 1B CONSOLIDATED FEATURE QUALIFICATION: BLOCKED — iPhone build 9 Back
+chevron remains too low or clipped.**

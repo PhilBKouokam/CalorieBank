@@ -1,7 +1,7 @@
 # Final consolidated UI correction
 
-Status: final local release qualification PASS; replacement artifact physical
-qualification pending. Exactly one replacement per platform has been submitted.
+Status: BLOCKED — replacement iPhone build 9 still fails physical Back alignment.
+Local release validation passed; keyboard physical qualification remains pending. Exactly one replacement per platform has been submitted.
 Manual Intake remains disabled. This continues, rather than repeats,
 the provider/capability qualifications recorded in
 [the consolidated artifact evidence](phase1b-consolidated-feature-qualification.md).
@@ -101,3 +101,48 @@ requested. No additional builds have been created.
 
 At the locked-Mac handoff, Android versionCode 8 remains IN_PROGRESS in EAS.
 Resume that existing job; do not create another build.
+
+## Additional Samsung physical evidence
+
+Founder photo shows Fitness Goal with Cut selected and the numeric keyboard open:
+the Daily deficit field/value and completion action are below the visible area.
+Read-only ADB at follow-up confirms the phone still runs Play-installed
+`com.caloriebank.mobile`, versionName 1.0.0, versionCode **7**, installer
+`com.android.vending`. This establishes a physical keyboard defect on the prior
+artifact; it does not invalidate its passing provider/capability checks or qualify
+the replacement. VersionCode 8 must demonstrate visible/reachable focused value,
+explanation and Save with the keyboard open, successful save, and normal Android
+Back dismissal before Android keyboard safety can pass. No additional build is
+created in response to this photo.
+
+## Replacement delivery and physical stop — 2026-09-27
+
+- Existing iOS 1.0.0 (9) completed Apple processing and was assigned to the existing
+  Friends & Family group (unchanged two testers). App Store Connect shows **Testing**;
+  ASC build ID `2b779679-7559-43d8-819a-51a696d2426c`.
+- Founder confirmed build 9 installed through TestFlight. On Settings → Health
+  Connections, founder answered **“Still too low or clipped”** when asked whether
+  the Back chevron was centered. This is authoritative physical **FAIL**, not a
+  rendered-test inference. No new screenshot/native hierarchy was captured.
+- Stop policy invoked immediately. Build 9 navigation, VoiceOver/tap-target smoke,
+  Fitness Goal 500, representative inputs and platform smoke remain **unqualified**.
+  The source-level Fabric omission was real, but correcting it did not resolve the
+  observed defect. Exact remaining native root cause is **not established**; native
+  hierarchy/layout evidence is required before another correction or build.
+- Existing Android EAS job finished successfully at `2026-09-27T03:17:52.717Z`.
+  Downloaded versionCode 8 AAB SHA-256:
+  `59ffc9668c5c174c5d960395f36ec096062719335ab0ce7ad535ba792fdaa1ea`.
+  Compiled consumer Health Connect permission remains READ_NUTRITION only.
+  Internal Testing release draft 7 was opened, but file selection was canceled
+  after the iPhone failure. No AAB upload/publication completed. Existing Play
+  release remains versionCode 7; versionCode 8 installation/provenance and physical
+  keyboard qualification remain pending. Resume the same artifact, not another job.
+- No new builds, product-code edits, backend deployment, accounting/Fitbit changes,
+  goal saves, manual account creation, support submission or public release occurred
+  during this delivery/qualification continuation. Prior passing evidence is preserved.
+  Manual Intake was not enabled. Latest production verification remains the recorded
+  `2026-09-27T02:33:10.669Z` disabled/zero checkpoint; no new final production query
+  was performed after this early physical stop.
+
+**PHASE 1B CONSOLIDATED FEATURE QUALIFICATION: BLOCKED — iPhone build 9 Back
+chevron remains too low or clipped.** Keyboard corrections are not physically proven.

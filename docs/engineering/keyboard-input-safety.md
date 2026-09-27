@@ -98,3 +98,15 @@ manual enrollment, restart onboarding or delete an account to manufacture covera
 Record untested state-specific behavior honestly. Android replacement needs numeric
 and normal keyboards, focus transfer, action reachability, Back dismissal, small
 screen/larger-text and safe-area checks on that exact Play version.
+
+## Physical qualification status — 2026-09-27
+
+The replacement iPhone build 9 failed the first, native Back visual check, and
+qualification stopped under the founder's explicit failure policy. Therefore
+Fitness Goal 500, Daily Bank Target, Banking Goal, Step Planning and representative
+settings/shared-host keyboard behavior remain physically unqualified on both
+replacement binaries. Automated inventory and rendered 320px/200% and 390px
+evidence are preserved; none constitutes a native keyboard PASS. Android 8 has
+compiled but is not yet Play-distributed. Manual forms remain rendered/component
+evidence only while enrollment is disabled. See
+[correction checkpoint](../deployment/phase1b-ios-keyboard-correction.md).
