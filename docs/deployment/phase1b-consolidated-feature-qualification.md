@@ -208,3 +208,13 @@ No physical iOS 10 Back or keyboard result is claimed.
 
 **PHASE 1B CONSOLIDATED FEATURE QUALIFICATION: BLOCKED — Android versionCode 8
 Fitness Goal keyboard content/action remains hidden or clipped in physical QA.**
+
+## Android diagnosis established — 2026-09-27
+
+[Existing Play8 runtime measurements](../engineering/android-keyboard-resize-diagnosis.md)
+prove missing Android IME ownership in the shared primitive under edge-to-edge.
+Numeric Fitness Goal and normal-text Banking Goal were measured without saving.
+No diagnostic artifact, production correction or new build was created.
+iOS10 finished processing and is Ready to Submit (Team Expo only); Friends &
+Family and physical qualification remain pending. Manual Intake remains disabled.
+The consolidated gate remains BLOCKED; diagnosis is not a correction PASS.

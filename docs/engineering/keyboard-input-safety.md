@@ -1,6 +1,8 @@
 # Keyboard and input safety
 
-Status: correction implemented; replacement artifact physical qualification pending.
+Status: Android 8 physically failed; Android IME ownership root cause established.
+The resize-only Android architecture below is historical implementation evidence,
+not an effective keyboard-safety guarantee. No further correction is implemented.
 The passing Phase 1B provider/capability checks on iOS 8 / Android 7 from `37b932d`
 remain preserved. Manual Intake stays disabled. This document grants no enablement.
 
@@ -137,3 +139,14 @@ No physical iOS 10 Back or keyboard result is claimed.
 
 **PHASE 1B CONSOLIDATED FEATURE QUALIFICATION: BLOCKED — Android versionCode 8
 Fitness Goal keyboard content/action remains hidden or clipped in physical QA.**
+
+## Android runtime diagnosis — 2026-09-27
+
+See [measured root cause and all-eight structural audit](android-keyboard-resize-diagnosis.md).
+On Play8, the app receives the672px IME inset but edge-to-edge leaves root720×1600
+and scroll height1315 unchanged. Fitness Goal content1838 yields max scroll523;
+Save requires1028 to clear keyboard top928. Banking Goal normal text reproduces
+the same mechanism, with zero native scroll range. Safe-area-context excludes
+IME by design. The shared Android primitive must own measured keyboard overlap;
+`adjustResize` alone is not a release invariant. No per-screen workaround or
+correction was implemented. Both unsaved diagnostic flows exited normally.
