@@ -60,3 +60,15 @@ production rejection, idempotency, unchanged correction methods, export privacy,
 required coordinates and route isolation. The complete Node 20 release gate and
 iOS Metro export are also run before the single remote artifact. Native compilation
 and founder runtime evidence remain distinct requirements.
+
+## Setup failure, not physical evidence
+
+Initial job `6f092511-a791-4b5f-85db-4ad834da9d56`, source `df52d4d`,
+failed during CocoaPods post-install before compilation and produced no artifact.
+The isolated configuration omitted Clerk's config plugin, which had supplied
+build 9's iOS 17.0 deployment target. Its native pod still registered its Swift
+package while the lower default target excluded the pod, producing a nil target
+in RN's SPM integration. The diagnostic plugin now explicitly restores 17.0 in
+both Podfile properties and Xcode configurations. Local prebuild verifies both.
+No Back correction or dependency version changed. A retry is for the same single
+diagnostic artifact, not a second installable variant.

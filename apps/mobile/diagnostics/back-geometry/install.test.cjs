@@ -50,3 +50,16 @@ test('isolated routes import no account/provider/API code and reuse unchanged Ba
   for(const f of files) assert.doesNotMatch(fs.readFileSync(path.join(root,f),'utf8'),/clerk|fetch\(|lib\/api|healthkit|health-connect|lifecycle/);
   assert.match(fs.readFileSync(path.join(root,'(settings)/_layout.tsx'),'utf8'),/NavigationBackButton fallback="\/settings"/);
 });
+test('diagnostic native target matches build 9 while health/push entitlements are removed',()=>{
+  const plugin = fs.readFileSync(path.join(__dirname,'with-diagnostic-entitlements.cjs'),'utf8');
+  const req = n => n === '@expo/config-plugins' ? {
+    withPodfileProperties: (c,f) => { c.pods=f({modResults:{}}).modResults;return c; },
+    withXcodeProject: (c,f) => { const sections={debug:{buildSettings:{}},release:{buildSettings:{}}};f({modResults:{pbxXCBuildConfigurationSection:()=>sections}});c.sections=sections;return c; },
+    withEntitlementsPlist: (c,f) => { c.entitlements=f({modResults:{'aps-environment':'development','com.apple.developer.healthkit':true}}).modResults;return c; }
+  } : require(n);
+  const module={exports:{}};vm.runInNewContext(plugin,{require:req,module});
+  const config=module.exports({});
+  assert.equal(config.pods['ios.deploymentTarget'],'17.0');
+  assert.equal(config.sections.release.buildSettings.IPHONEOS_DEPLOYMENT_TARGET,'17.0');
+  assert.equal(Object.keys(config.entitlements).length,0);
+});
