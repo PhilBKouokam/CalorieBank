@@ -72,3 +72,28 @@ in RN's SPM integration. The diagnostic plugin now explicitly restores 17.0 in
 both Podfile properties and Xcode configurations. Local prebuild verifies both.
 No Back correction or dependency version changed. A retry is for the same single
 diagnostic artifact, not a second installable variant.
+
+## Delivered diagnostic artifact — 2026-09-27
+
+- EAS `8aadc7de-0223-4971-91bb-ee84b7b2de5a`: FINISHED at
+  `2026-09-27T20:03:48.325Z`, INTERNAL ad hoc, version 1.0.0 (1).
+- Exact source: `8b2f6fe34b9dfff8b6729404f6275b7a955ba448`.
+- Install: https://expo.dev/accounts/philbk/projects/caloriebank/builds/8aadc7de-0223-4971-91bb-ee84b7b2de5a
+- IPA SHA-256: `80d5e307f9b137d35fcf2beee8ebaab18f2988de2f4ffd848c7864ab117214f0`.
+- IPA confirms separate bundle, name CB Back Geometry, iOS 17.0 minimum,
+  iphoneos26.0 SDK, native exporter/paint measurement strings and exact source SHA.
+  Embedded provisioning allows the two previously registered iPhones and has no
+  HealthKit or push entitlement. No Health usage descriptions. JS contains the
+  diagnostic UI, no production API URL and no `/v1/me/` route string.
+- Cloud compiled RNSScreenStackHeaderSubview.mm and archived successfully.
+  Install and post-build hashes match exactly:
+  native source `a5f03641f526f1b1d193b3e66b3946de57531a1b4bddcef4d929df93f59fc75d`;
+  instrumentation `1d70876bbc0d668e647b0a6b25df9287e1181e2478bcd06140eadd41281951c4`.
+- Validation: final complete Node 20 gate passed 944 tests / 89 files, lint,
+  type checks, local database checks and builds; five diagnostic tests passed;
+  local iOS Metro export and prebuild passed. No local Xcode compilation claimed.
+- Two jobs were attempted: first setup failure above, then this successful job.
+  Exactly one installable diagnostic artifact was produced. No production build
+  10, TestFlight submission, Android upload, backend deployment or enablement.
+- Founder installation confirmation, reproduction and exported runtime geometry
+  are pending. No root cause or physical success is claimed.
