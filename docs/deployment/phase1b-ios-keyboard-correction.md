@@ -1,7 +1,8 @@
 # Final consolidated UI correction
 
 Status: final local release qualification PASS; replacement artifact physical
-qualification pending. No replacement build created yet. Manual Intake remains disabled. This continues, rather than repeats,
+qualification pending. Exactly one replacement per platform has been submitted.
+Manual Intake remains disabled. This continues, rather than repeats,
 the provider/capability qualifications recorded in
 [the consolidated artifact evidence](phase1b-consolidated-feature-qualification.md).
 That evidence was committed and pushed first as `2f013d3`.
@@ -72,3 +73,31 @@ and dismissal are not simulated by those fixtures.
 - Exact-artifact founder physical checks mapped in the inventory.
 - Final read-only production enrollment/count check. No enablement, backend deploy,
   Fitbit/accounting change, Google support submission or Phase 2 work.
+
+## Replacement submissions
+
+Validated, clean source: `a97af1c5aec153ae03800fe6ab349de5168cf0e4`, pushed with
+`[skip render]`. No backend deployment requested.
+
+| Platform | Version | EAS build | Profile |
+| --- | --- | --- | --- |
+| iOS | 1.0.0 (9) | `561ad270-f732-4862-9a04-3e6f9d434275` | testflight |
+| Android | 1.0.0 / versionCode 8 | `9f98fceb-17e1-4d8c-88cf-1769cbf3a27f` | play-testing AAB |
+
+Both jobs identify that same source commit. Exactly one job per platform; no retry
+or speculative follow-up. Existing credentials retained. Online Expo dependency
+compatibility check passed. Store delivery and physical results will be added
+when verified.
+
+iOS build 9 finished at `2026-09-27T03:00:37.815Z`; cloud Node 20.19.4 ran the
+postinstall patch and compiled RNSScreenStackHeaderSubview.mm successfully.
+Exact IPA metadata confirms com.caloriebank.mobile / 1.0.0 / 9. Native wrapper
+symbol and JS capability token are present. IPA SHA-256:
+`1d7a6a87c2f14c03614ee41fee0ed07872d768f231d299a0fd02d26e5a02a15c`.
+EAS submission `f7bf760a-aa52-425f-aaf5-13e3ec82d68c` uploaded successfully to
+Apple. Friends & Family availability and physical QA are not yet confirmed.
+Store UI continuation is temporarily blocked by the locked Mac; founder unlock
+requested. No additional builds have been created.
+
+At the locked-Mac handoff, Android versionCode 8 remains IN_PROGRESS in EAS.
+Resume that existing job; do not create another build.

@@ -27,6 +27,17 @@ confirmed enrollment 0 and zero in all five manual-record categories. Manual
 Intake must remain disabled. No extra build, accounting change, support submission
 or Phase 2 work was performed. This is not full Phase 1B PASS.
 
+## Final UI correction follow-up
+
+The founder added the permanent keyboard/input invariant to the iOS Back correction.
+See [the scoped correction record](phase1b-ios-keyboard-correction.md) and
+[the complete input inventory](../engineering/keyboard-input-safety.md).
+Source `a97af1c` passed 944 tests / 89 files and the full Node 20 release gate.
+Exactly one iOS build 9 and one Android versionCode 8 replacement were submitted;
+Android is required because the shared keyboard behavior changes its code.
+Physical qualification is pending. Prior provider/capability PASS results are
+preserved; Manual Intake remains disabled.
+
 ## Protocol and route inventory
 
 New clients send `X-CalorieBank-Capabilities: intake-authority-v2` on the central
