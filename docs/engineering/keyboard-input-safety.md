@@ -110,3 +110,30 @@ evidence are preserved; none constitutes a native keyboard PASS. Android 8 has
 compiled but is not yet Play-distributed. Manual forms remain rendered/component
 evidence only while enrollment is disabled. See
 [correction checkpoint](../deployment/phase1b-ios-keyboard-correction.md).
+
+## Physical Android 8 keyboard failure — 2026-09-27
+
+Founder confirmed the Google Play update; ADB verified `com.caloriebank.mobile`,
+versionName `1.0.0`, versionCode **8**, installer `com.android.vending`.
+Original saved Fitness Goal: **Maintain**. Founder selected Cut without saving,
+confirmed the deficit field, then was asked to enter **500**, keep the keyboard
+open and scroll to field, explanation and Save Fitness Goal. Founder reported:
+**“Something remains hidden or clipped.”** Follow-up asked which part remained hidden even after scrolling. Founder
+confirmed: **“All of it, it hides the entire input field.”** The focused amount,
+context and completion action are not reachable. This is a physical failure,
+not a passing shared-primitive result.
+The test edit was explicitly not saved. Founder confirmed Android system Back
+dismisses the keyboard normally, and the screen Back arrow returns to Settings
+without saving. Original saved Maintain goal was not changed. Qualification
+stops under the failure
+policy. No additional patch/build is authorized by this failure. Manual Intake
+remains disabled; earlier passing provider/capability evidence remains preserved.
+
+iOS 10 (`bf42522f-de3b-469d-83ec-8103705b7d89`, source `98c236d`)
+finished compilation and its already-started TestFlight submission completed
+successfully. EAS confirms upload to App Store Connect; Apple processing and
+Friends & Family assignment have not been verified after this failure.
+No physical iOS 10 Back or keyboard result is claimed.
+
+**PHASE 1B CONSOLIDATED FEATURE QUALIFICATION: BLOCKED — Android versionCode 8
+Fitness Goal keyboard content/action remains hidden or clipped in physical QA.**

@@ -175,3 +175,52 @@ Android 8 AAB hash remains
 no Android rebuild is authorized or needed. Private-store delivery and exact
 artifact Back/keyboard physical qualification remain pending. Manual Intake
 stays disabled. No accounting/backend/provider change or deployment.
+
+## V3 private delivery — 2026-09-27
+
+Validated source: `98c236db9f577292cab523dffee526a036d5f4bd`. Exactly one
+new iOS job: `bf42522f-de3b-469d-83ec-8103705b7d89`, **1.0.0 (10)**,
+EAS FINISHED. Cloud logs show the production postinstall patch and compilation
+of RNSScreenStackHeaderSubview.mm / RNSScreenStackHeaderConfig.mm, followed by
+Archive Succeeded. TestFlight submission `787ed7c4-9770-408b-b778-0dd2fc7f3ad5`
+completed successfully; Apple processing/group availability and physical results
+remain pending.
+
+Existing Android job `9f98fceb-17e1-4d8c-88cf-1769cbf3a27f`, source
+`a97af1c5aec153ae03800fe6ab349de5168cf0e4`, was delivered without rebuilding.
+Play Internal Testing reports **1.0.0 (8) — Keyboard correction**, available to
+internal testers, released Sep 27. Existing tester scope retained. The only
+preview warning concerned a missing deobfuscation file; no release error.
+Founder updated through Play; ADB on Samsung SM_A136U confirms package
+`com.caloriebank.mobile`, versionName `1.0.0`, versionCode **8**, installer
+`com.android.vending`, and sole requested Health Connect permission
+`android.permission.health.READ_NUTRITION`. Physical keyboard QA is pending.
+No new Android build, public release, backend deployment or Manual Intake
+enablement occurred.
+
+## Physical Android 8 keyboard failure — 2026-09-27
+
+Founder confirmed the Google Play update; ADB verified `com.caloriebank.mobile`,
+versionName `1.0.0`, versionCode **8**, installer `com.android.vending`.
+Original saved Fitness Goal: **Maintain**. Founder selected Cut without saving,
+confirmed the deficit field, then was asked to enter **500**, keep the keyboard
+open and scroll to field, explanation and Save Fitness Goal. Founder reported:
+**“Something remains hidden or clipped.”** Follow-up asked which part remained hidden even after scrolling. Founder
+confirmed: **“All of it, it hides the entire input field.”** The focused amount,
+context and completion action are not reachable. This is a physical failure,
+not a passing shared-primitive result.
+The test edit was explicitly not saved. Founder confirmed Android system Back
+dismisses the keyboard normally, and the screen Back arrow returns to Settings
+without saving. Original saved Maintain goal was not changed. Qualification
+stops under the failure
+policy. No additional patch/build is authorized by this failure. Manual Intake
+remains disabled; earlier passing provider/capability evidence remains preserved.
+
+iOS 10 (`bf42522f-de3b-469d-83ec-8103705b7d89`, source `98c236d`)
+finished compilation and its already-started TestFlight submission completed
+successfully. EAS confirms upload to App Store Connect; Apple processing and
+Friends & Family assignment have not been verified after this failure.
+No physical iOS 10 Back or keyboard result is claimed.
+
+**PHASE 1B CONSOLIDATED FEATURE QUALIFICATION: BLOCKED — Android versionCode 8
+Fitness Goal keyboard content/action remains hidden or clipped in physical QA.**
