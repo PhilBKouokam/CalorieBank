@@ -146,3 +146,32 @@ created in response to this photo.
 
 **PHASE 1B CONSOLIDATED FEATURE QUALIFICATION: BLOCKED — iPhone build 9 Back
 chevron remains too low or clipped.** Keyboard corrections are not physically proven.
+
+
+## Authorized evidence-backed V3 correction — 2026-09-27
+
+The [physical resize trace and diagnosis](../engineering/ios-back-resize-diagnosis.md)
+are preserved on the release branch. Founder authorized only the iOS 26 left-header
+vertical compression-resistance change: **999**, above the wrapper height equality
+at **750**. The existing center anchors, intrinsic Fabric size, right items, older
+iOS path, Android, React 48×48 Back control and navigation remain unchanged. No
+pixel offsets, transforms or padding are added. The patch upgrades V2 installs
+and clean installs idempotently. Diagnostic routes, hooks, profiles and exporters
+are not included in the production branch.
+
+Focused native/navigation/keyboard regressions: **13 tests / 4 files PASS**.
+Full Node 20.20.2 release gate: **946 tests / 89 files PASS**, lint, type checks,
+Prisma validation/migrations on isolated localhost test database and builds.
+Initial focused invocation from repository root omitted the API Vitest alias
+configuration; rerunning from the correct API workspace passed. It was a test
+invocation failure, not evidence of a product navigation failure.
+The new constraint regression demonstrates the old 750/750 ambiguity and the
+unique 48-point solution with 999/750, centered by the existing anchors. It is a
+constraint model plus source contract, not native physical proof.
+
+Exactly one new TestFlight artifact is authorized after validation. Existing
+Android 8 AAB hash remains
+`59ffc9668c5c174c5d960395f36ec096062719335ab0ce7ad535ba792fdaa1ea`;
+no Android rebuild is authorized or needed. Private-store delivery and exact
+artifact Back/keyboard physical qualification remain pending. Manual Intake
+stays disabled. No accounting/backend/provider change or deployment.

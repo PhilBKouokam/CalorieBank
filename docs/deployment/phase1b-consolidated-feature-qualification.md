@@ -169,3 +169,15 @@ production count verification followed the early stop.
 
 **PHASE 1B CONSOLIDATED FEATURE QUALIFICATION: BLOCKED — iPhone build 9 Back
 chevron remains too low or clipped.**
+
+
+## V3 native correction authorized — physical gate still pending
+
+The founder authorized the measured compression-priority correction and one new
+iOS TestFlight artifact. See [V3 correction evidence](phase1b-ios-keyboard-correction.md).
+Full Node 20 validation now passes 946 tests / 89 files. This is not a physical
+PASS. Resume existing Android versionCode 8 delivery; no new Android build.
+First iPhone physical gate remains visible Back alignment, followed by navigation,
+tap target and VoiceOver, then the specified shared keyboard checks. Stop if Back
+still fails. Prior passing provider/capability/accounting evidence is preserved.
+Manual Intake remains disabled; final zero-state verification follows physical QA.

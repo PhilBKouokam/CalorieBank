@@ -37,8 +37,19 @@ function completeFabricMetrics(source) {
 #endif`);
   return source;
 }
+// Physical diagnostic build 2 proved a 750/750 height/compression tie.
+// Preserve Yoga content; the optional wrapper equality must yield first.
+function completeVerticalCompression(source) {
+  if (source.includes('CB_IOS_BACK_ALIGNMENT_V3')) return source;
+  return replaceOnce(source,
+    '    [self setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisVertical];',
+    `    [self setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisVertical];
+    // CB_IOS_BACK_ALIGNMENT_V3: 999 beats the wrapper height equality at 750.
+    [self setContentCompressionResistancePriority:UILayoutPriorityRequired - 1
+                                         forAxis:UILayoutConstraintAxisVertical];`);
+}
 function patchHeader(source) {
-  if (source.includes(marker)) return completeFabricMetrics(source);
+  if (source.includes(marker)) return completeVerticalCompression(completeFabricMetrics(source));
   source = replaceOnce(source, '@implementation RNSScreenStackHeaderSubview {', `@implementation RNSScreenStackHeaderSubview {
   // ${marker}: retain Yoga's content size separately from UIKit's bar-item bounds.
   CGSize _cbBackContentSize;
@@ -101,7 +112,7 @@ function patchHeader(source) {
 @end
 
 @implementation RNSScreenStackHeaderSubviewManager`);
-  return completeFabricMetrics(source);
+  return completeVerticalCompression(completeFabricMetrics(source));
 }
 function patchConfig(source) {
   if (source.includes(marker)) return source;
