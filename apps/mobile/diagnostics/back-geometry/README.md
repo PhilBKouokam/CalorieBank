@@ -1,0 +1,62 @@
+# Isolated native Back geometry diagnostic
+
+This is diagnostic-only source on `codex/ios-back-geometry-diagnostic`, not a
+production correction. The failing Back component and alignment patch remain
+unchanged from `a97af1c`. No code here belongs in the release branch by default.
+
+Profile `back-geometry-diagnostic` uses the same pinned dependency lockfile,
+Fabric, Xcode 26.0 image and Node 20.19.4 as iOS build 9. Distribution is internal
+ad hoc, separate bundle `com.caloriebank.mobile.backdiagnostic`. It opens an
+isolated Expo Router root with the same nested native-stack/header configuration
+and original NavigationBackButton. There is no Clerk, account, API, health,
+provider, notification or lifecycle import in that route tree. Diagnostic signing
+entitlements omit health and push; no OTA updates are enabled.
+
+Postinstall adds observation hooks to the already-patched 4.16.0 native header.
+These hooks do not modify frames, bounds, transforms, constraints or layout.
+Installation fails closed if diagnostic native source is encountered outside its
+explicit profile. Use a clean dependency installation before any future
+production build. Cloud installation logs source/payload SHA-256; the success
+hook reports hashes again after compilation to detect later source replacement.
+
+## Capture
+
+The founder opens the isolated Health Connections header, confirms whether the
+same visual defect reproduces, then presses Export geometry. The share sheet
+exports a local JSON file. The app performs no automatic network upload.
+
+Samples include mount, first layout callbacks, next main queue turn, four display
+frames, 0.25/1/2-second settled points, and the explicit export point. Diagnostic
+timers only observe; they do not trigger layout or apply offsets. View count,
+layer depth and sample count are bounded.
+
+The report includes navigation-bar descendants and its ancestor chain, stable
+within-report view IDs, parent-relative frames/bounds/centers and window-converted
+bounds/centers; intrinsic sizes, safe areas, layout/alignment insets, constraints,
+transforms, clipping, presentation-layer frames, native custom-view identity and
+incoming/stored Fabric metrics. UIKit glass/background/button view candidates
+include layer geometry. Candidate status is not proof of visual ownership.
+
+Only a one-character Ionicons U+F229 attributed string is inspected. No text
+content or accessibility label is serialized. Font metrics are included. Native
+view-layer rendering is scanned in memory for nontransparent painted bounds;
+no pixel image is exported. Empty/opaque render results are explicitly unavailable,
+not fabricated glyph bounds. Reconstructed TextKit baseline is labelled as such;
+it is not claimed as the actual RN draw-time baseline. Window-space painted bounds
+are the stronger glyph position evidence when available.
+
+If the defect does not reproduce, the isolated artifact cannot establish the
+production cause. If UIKit background ownership or glyph rendering remains
+ambiguous, report that missing evidence; do not infer a correction from an
+unverified candidate or unavailable paint bounds.
+
+No production correction, TestFlight submission, Android delivery, Manual Intake
+enablement, backend/accounting/provider change is authorized by this diagnostic.
+
+## Validation
+
+`node --test apps/mobile/diagnostics/back-geometry/install.test.cjs` exercises
+production rejection, idempotency, unchanged correction methods, export privacy,
+required coordinates and route isolation. The complete Node 20 release gate and
+iOS Metro export are also run before the single remote artifact. Native compilation
+and founder runtime evidence remain distinct requirements.

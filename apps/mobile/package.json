@@ -13,7 +13,8 @@
     "prelint": "npm --workspace @caloriebank/domain run build && npm --workspace @caloriebank/schemas run build",
     "lint": "expo lint",
     "pretypecheck": "npm --workspace @caloriebank/domain run build && npm --workspace @caloriebank/schemas run build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eas-build-on-success": "node diagnostics/back-geometry/verify.cjs"
   },
   "dependencies": {
     "@caloriebank/domain": "*",

@@ -61,6 +61,22 @@ function assertHostedBuildEnvironment() {
 }
 
 export default ({ config }: ConfigContext): ExpoConfig => {
+  if (process.env.CB_BACK_GEOMETRY_DIAGNOSTIC === '1') {
+    if (process.env.EAS_BUILD_PROFILE !== 'back-geometry-diagnostic') throw new Error('Back geometry is restricted to its isolated internal profile.');
+    return {
+      ...config,
+      name: 'CB Back Geometry',
+      slug: config.slug ?? 'caloriebank',
+      scheme: 'caloriebank-back-diagnostic',
+      updates: { enabled: false },
+      plugins: [['expo-router', { root: './diagnostic-app' }], './diagnostics/back-geometry/with-diagnostic-entitlements.cjs'],
+      ios: {
+        supportsTablet: true,
+        bundleIdentifier: 'com.caloriebank.mobile.backdiagnostic',
+        infoPlist: { ITSAppUsesNonExemptEncryption: false },
+      },
+    };
+  }
   assertHostedBuildEnvironment();
   const developmentLocalHttp = allowsDevelopmentLocalHttp();
   const health = healthConnectReleasePolicy(process.env.EAS_BUILD_PROFILE, process.env.EXPO_PUBLIC_HEALTH_CONNECT_QUALIFICATION);

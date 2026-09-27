@@ -4,6 +4,19 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "back-geometry-diagnostic": {
+      "distribution": "internal",
+      "environment": "preview",
+      "node": "20.19.4",
+      "autoIncrement": false,
+      "env": {
+        "CB_BACK_GEOMETRY_DIAGNOSTIC": "1"
+      },
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.0",
+        "resourceClass": "m-medium"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",
