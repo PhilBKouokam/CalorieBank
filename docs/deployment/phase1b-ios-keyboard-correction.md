@@ -224,3 +224,35 @@ No physical iOS 10 Back or keyboard result is claimed.
 
 **PHASE 1B CONSOLIDATED FEATURE QUALIFICATION: BLOCKED — Android versionCode 8
 Fitness Goal keyboard content/action remains hidden or clipped in physical QA.**
+
+## iOS10 delivery / physical Back check — 2026-09-27
+
+Existing build10 is now **Testing** in existing Friends & Family; no new iOS
+job created. Founder confirmed TestFlight10 installed, Back **centered without
+clipping**, comfortable edge-of-button activation and normal return to Settings.
+VoiceOver correctly announces the Back button, and founder confirmed double-tap
+activation returns normally to Settings. Back visual/navigation/tap/accessibility
+checks PASS on exact TestFlight10. Keyboard qualification remains pending; do not
+infer a full gate PASS.
+
+Android shared IME correction is implemented after the measured version8 failure.
+No Android build is requested until final release validation passes. Manual Intake
+remains disabled; no backend/accounting/provider changes.
+
+### Android IME implementation validation
+
+Final complete Node20.20.2 gate PASS: **960 tests /91files**, clean lint, all
+TypeScript checks, local-only Prisma validation/migrations, API/domain/schema
+builds and diff check (`/tmp/cb-ime-release-clean.log`). Focused input/presentation/
+onboarding suite:94tests/7files. Expo public/introspected configs, online pinned
+dependency check, local Android prebuild, Android module autolinking and canonical
+document links passed. Generated consumer manifest requests READ_NUTRITION only;
+compiled replacement manifest must still be checked after cloud compilation.
+No local Android toolchain compilation is claimed.
+
+Earlier validation iterations exposed missing native-module test mocks and
+TypeScript harness imports, both corrected. One unchanged goal API test returned
+401 rather than404 in an intermediate full run; subsequent complete runs passed
+without any API/auth/accounting change. This is preserved as an intermittent test
+observation, not an established product regression or a proven race diagnosis.
+The final run is clean.

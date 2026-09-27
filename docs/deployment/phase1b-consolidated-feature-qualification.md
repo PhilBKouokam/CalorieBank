@@ -218,3 +218,16 @@ No diagnostic artifact, production correction or new build was created.
 iOS10 finished processing and is Ready to Submit (Team Expo only); Friends &
 Family and physical qualification remain pending. Manual Intake remains disabled.
 The consolidated gate remains BLOCKED; diagnosis is not a correction PASS.
+
+## Authorized shared Android correction / iOS10 Back result — 2026-09-27
+
+Android implementation consumes native same-coordinate IME/host geometry in the
+shared primitive; all eight input owners remain unchanged. See
+[keyboard contract](../engineering/keyboard-input-safety.md). No Android replacement
+is yet physically qualified.
+
+Existing iOS10 is Testing in Friends & Family; founder confirmed installation.
+Physical Back: centered/no clipping, comfortable edge tap, normal navigation,
+VoiceOver meaningful Back announcement and activation all PASS. iOS keyboard
+physical checks continue. No new iOS build or backend deployment. Manual Intake
+remains disabled. Earlier iOS9/Android8 failures remain preserved.

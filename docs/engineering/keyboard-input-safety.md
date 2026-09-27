@@ -150,3 +150,37 @@ the same mechanism, with zero native scroll range. Safe-area-context excludes
 IME by design. The shared Android primitive must own measured keyboard overlap;
 `adjustResize` alone is not a release invariant. No per-screen workaround or
 correction was implemented. Both unsaved diagnostic flows exited normally.
+
+## Authorized Android IME correction — implementation, not physical PASS
+
+`KeyboardSafeScrollView` now dispatches Android to `AndroidKeyboardSafeScrollView`.
+The iOS branch retains its automatic inset/interactive-dismiss behavior. No input
+owner, card, formula or screen layout was edited. All eight inventoried inputs
+retain the same shared owner.
+
+The Android-only local Expo module `caloriebank-keyboard-geometry` reads native
+WindowInsetsCompat IME visibility/insets and `getLocationOnScreen` bounds for the
+host, scroll viewport and focused EditText. It uses current window metrics on
+API30+ and the visible display frame on supported older Android. Measurements
+are converted together to density-independent units; Fabric's visible-frame
+origin is never mixed with absolute screen Y. It never reads text, sends data
+externally, requests health permission, changes window flags or replaces another
+view's inset listener. Global layout/focus observers are removed on unmount.
+
+The stable outer host computes overlap = max(0, hostBottom − max(hostTop, IMETop)).
+Only the inner scroll viewport loses that overlap. Parents already resized or
+excluding keyboard space yield zero overlap; safe-area/header exclusions are
+already represented in the measured host frame. Hide restores zero extra space.
+After the new viewport lays out, focused-field bounds are remeasured and native
+scroll position supplies the minimal reveal delta. Content-size and native
+IME/focus changes also reassess geometry; stale async responses are rejected.
+No timed focus callback, screen spacer, fixed keyboard height or device offset.
+Android scrolling now keeps the keyboard open (`keyboardDismissMode=none`);
+Android Back/IME dismissal remains native, handled taps preserve Save behavior.
+
+Deterministic regressions encode the actual Samsung long-form shortfall, the
+short Banking Goal with no closed-state scrolling, density/window-coordinate
+translation, already/partially resized parents, different keyboard boundaries,
+large fields, show/layout/focus ordering, hide restoration and stale responses.
+The inventory continues to enforce shared ownership for onboarding, manual and
+deletion forms. These are not physical evidence: Android9 qualification is pending.

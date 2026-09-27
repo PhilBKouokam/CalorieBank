@@ -3,10 +3,11 @@ import { resolve } from 'node:path';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
+vi.mock('expo', () => ({ requireNativeModule: () => ({ watch: vi.fn(), unwatch: vi.fn(), measure: vi.fn(), addListener: () => ({ remove: vi.fn() }) }) }));
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
 const api = vi.hoisted(() => ({ fetch: vi.fn(), save: vi.fn() }));
 vi.mock('react-native', () => ({
-  Platform: platform, useWindowDimensions: () => ({ width: 320, fontScale: 2 }), ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text',
+  findNodeHandle: () => null, Platform: platform, useWindowDimensions: () => ({ width: 320, fontScale: 2 }), ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text',
   View: 'View', TextInput: 'TextInput', ActivityIndicator: 'ActivityIndicator',
   StyleSheet: { create: <T,>(x: T) => x },
 }));
@@ -27,7 +28,7 @@ it.each(['ios', 'android'])('keeps field, explanation and Save in the same nativ
   await act(async () => { view = create(React.createElement(KeyboardSafeScrollView, {}, React.createElement(GoalConfigurationForm, { mode: 'settings', onSaved: saved }))); });
   const scroll = view!.root.find(node => String(node.type) === 'ScrollView');
   expect(scroll.props.automaticallyAdjustKeyboardInsets).toBe(os === 'ios');
-  expect(scroll.props.keyboardDismissMode).toBe(os === 'ios' ? 'interactive' : 'on-drag');
+  expect(scroll.props.keyboardDismissMode).toBe(os === 'ios' ? 'interactive' : 'none');
   expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
   const input = scroll.find(node => String(node.type) === 'TextInput');
   expect(input.props.keyboardType).toBe('number-pad');

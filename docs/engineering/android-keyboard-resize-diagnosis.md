@@ -191,3 +191,12 @@ References: [Android edge-to-edge/inset ownership](https://developer.android.com
 [Android IME configuration](https://developer.android.com/develop/ui/compose/system/setup-e2e),
 [RN0.81 ScrollView: keyboard insets are iOS-only](https://reactnative.dev/docs/0.81/scrollview),
 [Expo54 configuration](https://docs.expo.dev/versions/v54.0.0/config/app/).
+
+## Subsequent founder-authorized implementation
+
+The diagnosis and version8 measurements above remain historical evidence. Founder
+subsequently authorized the shared Android correction described in
+[keyboard safety](keyboard-input-safety.md#authorized-android-ime-correction--implementation-not-physical-pass).
+An Android-only native geometry adapter resolves the coordinate-space boundary;
+no production screen-specific workaround or iOS keyboard change is included.
+Physical correction qualification remains pending.

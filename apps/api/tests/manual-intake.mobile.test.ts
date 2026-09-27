@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ManualIntakeState } from '@caloriebank/schemas';
+vi.mock('expo', () => ({ requireNativeModule: vi.fn() }));
 const api = vi.hoisted(() => ({ save: vi.fn() }));
 vi.mock('react-native', () => ({ KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'ios' }, Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: <T,>(x: T) => x } }));
 vi.mock('../../mobile/lib/api/client', () => ({ saveManualIntake: api.save, ApiHttpError: class extends Error {} }));

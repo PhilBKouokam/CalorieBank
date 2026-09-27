@@ -1,0 +1,7 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+group = 'com.caloriebank.keyboard'
+version = '1.0.0'
+android { namespace 'com.caloriebank.keyboard' }

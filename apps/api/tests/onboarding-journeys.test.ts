@@ -39,7 +39,9 @@ async function sync() {
   if (data().intake.selected) data().intake.status = h.empty ? 'unavailable' : 'ready';
   return { syncStatus: 'success' };
 }
+vi.mock('expo', () => ({ requireNativeModule: () => ({ watch: vi.fn(), unwatch: vi.fn(), measure: vi.fn(), addListener: () => ({ remove: vi.fn() }) }) }));
 vi.mock('react-native', () => ({
+  findNodeHandle: () => null,
   AppState: { addEventListener: () => ({ remove() {} }) },
   TextInput: 'TextInput', useWindowDimensions: () => ({ width: 390, fontScale: 1 }),
   ActivityIndicator: 'ActivityIndicator', KeyboardAvoidingView: 'KeyboardAvoidingView', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View',
