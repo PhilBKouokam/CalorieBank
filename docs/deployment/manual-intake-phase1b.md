@@ -1,12 +1,31 @@
 # Phase 1B implementation and private rollout
 
-Current status (September 25): dormant backend `bad1750` deployed; private iOS
-1.0.0 (7) and Android 1.0.0 versionCode 6 provider baselines qualified. The
+Current status (September 26): dormant backend `bad1750` remains deployed. Private
+iOS 1.0.0 (8) and Android 1.0.0 versionCode 7 passed provider baseline and capability
+checks, but the **pre-enablement artifact gate FAILED** because the iPhone Back
+chevron remains too low. The earlier
 [pre-enablement protocol/schema safety checkpoint](manual-intake-pre-enablement-checkpoint.md)
-passes. Manual Intake remains disabled. Native Back correction is held for the
-next consolidated feature binaries; real manual-account physical qualification
-and post-enablement safety/finalization gates remain outstanding. Earlier entries
-below are chronological evidence, not the current artifact/status summary.
+remains passed. Manual Intake is disabled with zero manual records. Real
+manual-account physical qualification and post-enablement safety/finalization gates
+remain outstanding. Earlier entries below are chronological evidence.
+
+## Consolidated feature qualification follow-up — September 26
+
+The [consolidated feature qualification record](phase1b-consolidated-feature-qualification.md)
+continues from `37b932d`. Node 20 current-source release validation passed 939 tests
+across 87 files. Exactly one iOS build 8 and Android versionCode 7 were built from
+that commit and distributed through Friends & Family and Play Internal Testing.
+Both installed artifacts passed existing-provider startup, source selection,
+History and real capability-protected read checks. Samsung ADB confirms version 7,
+Google Play provenance and READ_NUTRITION only; physical UI offers no Health Connect
+burn. Cancel returned normally on both platforms.
+
+**Pre-enablement artifact gate FAILED:** iPhone build 8 Back navigation works, but
+the chevron **still sits too low**. Native compile/symbol evidence does not qualify
+its physical appearance. Final production verification at 2026-09-27T02:33:10.669Z
+confirmed enrollment 0 and zero in all five manual-record categories. Manual
+Intake must remain disabled. No extra build, accounting change, support submission
+or Phase 2 work was performed. This is not full Phase 1B PASS.
 
 ## Protocol and route inventory
 
