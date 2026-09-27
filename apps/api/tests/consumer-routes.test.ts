@@ -25,8 +25,8 @@ describe('consumer routes', () => {
 
   it('keeps deletion controls scrollable above the keyboard and errors consumer-safe', () => {
     const deletion = mobileFile('app/(settings)/delete-account.tsx');
-    expect(deletion).toContain('automaticallyAdjustKeyboardInsets');
-    expect(deletion).toContain('keyboardShouldPersistTaps="handled"');
+    expect(deletion).toContain('<KeyboardSafeScrollView');
+    expect(mobileFile('components/caloriebank/KeyboardSafeScrollView.tsx')).toContain('keyboardShouldPersistTaps="handled"');
     expect(deletion).toContain('accessibilityLabel="Type DELETE to confirm"');
     expect(mobileFile('components/caloriebank/GoalConfigurationForm.tsx')).not.toContain('error.message');
     expect(mobileFile('app/(modals)/ledger.tsx')).toContain('<Redirect href="/history"');
@@ -255,8 +255,8 @@ describe('consumer routes', () => {
     expect(steps).not.toContain('Fitbit');
     expect(today).not.toContain('<Link href="/steps-detail" asChild>');
     expect(today).not.toContain('<Link href="/planned-treat" asChild>');
-    expect(steps).toContain('automaticallyAdjustKeyboardInsets');
-    expect(steps).toContain('keyboardDismissMode="interactive"');
+    expect(steps).toContain('<KeyboardSafeScrollView');
+    expect(mobileFile('components/caloriebank/KeyboardSafeScrollView.tsx')).toContain("'interactive'");
     expect(planning).toContain('If I walk…');
     expect(planning).not.toContain('What if I walk…');
     expect(planning.indexOf('If I want to burn…')).toBeLessThan(planning.indexOf('If I walk…'));
@@ -296,13 +296,9 @@ describe('consumer routes', () => {
     const plannedTreat = mobileFile('app/(settings)/planned-treat.tsx');
     const placeholder = mobileFile('components/caloriebank/PlaceholderScreen.tsx');
     expect(plannedTreat).toContain('keyboardAware');
-    expect(plannedTreat).toContain('scrollViewRef={scrollRef}');
-    expect(plannedTreat).toContain('scrollResponderScrollNativeHandleToKeyboard');
-    expect(plannedTreat).toContain('onFocus={() => revealInput(nameInputRef.current)}');
-    expect(plannedTreat).toContain('onFocus={() => revealInput(caloriesInputRef.current)}');
-    expect(placeholder).toContain('automaticallyAdjustKeyboardInsets={keyboardAware}');
-    expect(placeholder).toContain("keyboardDismissMode={keyboardAware ? 'interactive' : 'none'}");
-    expect(placeholder).toContain("keyboardShouldPersistTaps={keyboardAware ? 'handled' : 'never'}");
+    expect(plannedTreat).not.toContain('scrollResponderScrollNativeHandleToKeyboard');
+    expect(placeholder).toContain('keyboardAware ? KeyboardSafeScrollView : ScrollView');
+
   });
 
   it('keeps History rows free of lifecycle noise and explains the consumer calculation', () => {

@@ -108,6 +108,18 @@ Inspect alignment, spacing, hierarchy, clipping, overflow, text wrapping, typogr
 
 Ask: "Would this screen look intentional and trustworthy if a first-time user saw it in the App Store today?" Fix obvious visual defects before reporting completion; do not wait for the founder to discover them on a physical device.
 
+#### Permanent keyboard/input release invariant
+
+When a keyboard is open, the focused field, the information or result needed to
+understand that field, and the primary action required to complete the interaction
+must remain reachable by scrolling. Users must not have to discover a keyboard
+dismissal gesture to complete a form. Preserve the closed-keyboard design, native
+safe areas, navigation, accessibility and the locked Step Planning hierarchy.
+Qualify numeric and normal keyboards, focus/blur, dismissal, small screens and
+larger text on each affected platform. A rendered test is not a substitute for
+physical keyboard evidence. The audited input inventory, shared architecture and
+coverage mapping live in [keyboard/input safety](../engineering/keyboard-input-safety.md).
+
 ### Self-explanatory consumer interfaces
 
 If CalorieBank needs to walk the user through a feature, the feature is too complicated. A first-time user with no prior context must be able to navigate and understand normal consumer surfaces without guidance. Simplify the interface itself before adding tutorials, tooltips, modals, or explanatory copy.

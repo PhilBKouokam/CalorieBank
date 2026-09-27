@@ -1,10 +1,9 @@
 import { plannedTreatInputSchema, type PlannedTreatGetResponse } from '@caloriebank/schemas';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -36,9 +35,6 @@ export default function PlannedTreatScreen() {
   const [status, setStatus] = useState<FormStatus>('loading');
   const [message, setMessage] = useState('');
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
-  const nameInputRef = useRef<TextInput>(null);
-  const caloriesInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -123,12 +119,6 @@ export default function PlannedTreatScreen() {
 
   const activeTreat = isActivePlannedTreat(existingTreat) ? existingTreat : null;
   const isBusy = status === 'saving' || status === 'deleting';
-  const revealInput = (input: TextInput | null) => {
-    if (!input) return;
-    setTimeout(() => {
-      scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(input, spacing.lg, true);
-    }, 250);
-  };
 
   return (
     <PlaceholderScreen
@@ -136,7 +126,6 @@ export default function PlannedTreatScreen() {
       title={activeTreat ? 'Edit your plan' : 'Choose something to save for'}
       description="Name one food, meal, or event. CalorieBank compares it with your real Available Bank without spending it automatically."
       keyboardAware
-      scrollViewRef={scrollRef}
     >
         {status === 'loading' ? (
           <View style={styles.loadingPanel}>
@@ -170,10 +159,8 @@ export default function PlannedTreatScreen() {
               accessibilityLabel="Banking Goal name"
               autoCapitalize="sentences"
               onChangeText={setName}
-              onFocus={() => revealInput(nameInputRef.current)}
               placeholder="Cookies and milk"
               placeholderTextColor={colors.textMuted}
-              ref={nameInputRef}
               style={styles.input}
               value={name}
             />
@@ -183,10 +170,8 @@ export default function PlannedTreatScreen() {
               accessibilityLabel="Required calories"
               keyboardType="number-pad"
               onChangeText={setRequiredCalories}
-              onFocus={() => revealInput(caloriesInputRef.current)}
               placeholder="1500"
               placeholderTextColor={colors.textMuted}
-              ref={caloriesInputRef}
               style={styles.input}
               value={requiredCalories}
             />

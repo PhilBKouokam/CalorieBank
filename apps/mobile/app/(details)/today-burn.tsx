@@ -1,5 +1,6 @@
+import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { StepPlanningCards } from '@/components/caloriebank/StepPlanningCards';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,7 +17,7 @@ export default function TodayBurnDetailScreen() {
   const intakeSource = getConsumerSourceName(today?.eaten.source);
   return (
     <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-      <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={styles.container}>
+      <KeyboardSafeScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Today so far</Text>
         {!today && !failed ? <ActivityIndicator color={colors.primary} /> : null}
         {failed ? <Text style={styles.unavailable}>Today’s values could not load.</Text> : null}
@@ -91,7 +92,7 @@ export default function TodayBurnDetailScreen() {
             ) : null}
           </>
         ) : null}
-      </ScrollView>
+      </KeyboardSafeScrollView>
     </SafeAreaView>
   );
 }

@@ -1,8 +1,9 @@
+import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { deletionHealthNote } from '@/lib/native-health/copy';
 import { useClerk } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
@@ -29,7 +30,7 @@ export default function DeleteAccountScreen() {
   };
 
   return <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-    <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.container}>
+    <KeyboardSafeScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Delete your CalorieBank account?</Text>
       <Text style={styles.body}>This permanently removes your CalorieBank history, imported health data, goals, preferences, and connected services.{deletionHealthNote}</Text>
       <Text style={styles.label}>Type DELETE to confirm</Text>
@@ -38,7 +39,7 @@ export default function DeleteAccountScreen() {
       <Pressable accessibilityRole="button" disabled={confirmation !== 'DELETE' || status === 'deleting'} onPress={() => void remove()} style={({ pressed }) => [styles.button, (confirmation !== 'DELETE' || status === 'deleting') && styles.disabled, pressed && styles.pressed]}>
         {status === 'deleting' ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.buttonText}>Delete Account</Text>}
       </Pressable>
-    </ScrollView>
+    </KeyboardSafeScrollView>
   </SafeAreaView>;
 }
 

@@ -1,3 +1,4 @@
+import { KeyboardSafeScrollView } from './KeyboardSafeScrollView';
 import { Link, type Href } from 'expo-router';
 import { type ReactNode, type RefObject } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -48,13 +49,11 @@ export function PlaceholderScreen({
   keyboardAware = false,
   scrollViewRef,
 }: PlaceholderScreenProps) {
+  const ContentScrollView = keyboardAware ? KeyboardSafeScrollView : ScrollView;
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        automaticallyAdjustKeyboardInsets={keyboardAware}
+      <ContentScrollView
         contentContainerStyle={styles.container}
-        keyboardDismissMode={keyboardAware ? 'interactive' : 'none'}
-        keyboardShouldPersistTaps={keyboardAware ? 'handled' : 'never'}
         ref={scrollViewRef}
       >
         <View style={styles.brandRow}>
@@ -96,7 +95,7 @@ export function PlaceholderScreen({
             ))}
           </View>
         ) : null}
-      </ScrollView>
+      </ContentScrollView>
     </SafeAreaView>
   );
 }

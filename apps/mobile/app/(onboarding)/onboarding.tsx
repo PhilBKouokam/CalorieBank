@@ -1,3 +1,4 @@
+import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { isKnownIntakeProvider } from '@caloriebank/schemas';
 import { AndroidFoodChoices } from '@/components/caloriebank/AndroidFoodChoices';
 import { ManualSourceChoice } from '@/components/caloriebank/ManualSourceChoice';
@@ -10,10 +11,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -738,15 +737,13 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fill}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <KeyboardSafeScrollView contentContainerStyle={styles.container}>
           {progress > 0 && progress < 6 ? <Text accessibilityLabel={`Setup step ${progress} of 5`} style={styles.progress}>Step {progress} of 5</Text> : null}
           {stageContent}
           {nativeHealthCapability.supported && activeStage === 'calories_eaten' && (editingRole === 'intake' || !status.intake.connected) && foodHelpTracker ? <FoodTrackerHelp provider="apple_health" chosenTracker={foodHelpTracker} /> : null}
           {nativeHealthCapability.supported && activeStage === 'calories_eaten' && status.intake.provider === 'apple_health' && status.intake.readiness === 'connected_waiting_for_data' ? <FoodTrackerHelp provider="apple_health" bundleId={providerState?.intake.writerBundleIdentifier} /> : null}
           {message && messageStage === activeStage && !(setupIsReady(status) && (messageAction === 'preparing' || messageAction === 'loading')) ? <Text accessibilityLiveRegion="polite" style={messageTone === 'attention' ? styles.attention : styles.error}>{message}</Text> : null}
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardSafeScrollView>
     </SafeAreaView>
   );
 }

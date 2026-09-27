@@ -1,5 +1,6 @@
+import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { StepPlanningCards } from '@/components/caloriebank/StepPlanningCards';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
@@ -20,12 +21,7 @@ export default function StepsDetailScreen() {
   const actualContributionReady = actualContribution !== null && currentAdjustedBurn !== null;
   return (
     <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-      <ScrollView
-        automaticallyAdjustKeyboardInsets
-        contentContainerStyle={styles.container}
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-      >
+      <KeyboardSafeScrollView contentContainerStyle={styles.container}>
         {!today && !failed ? <ActivityIndicator color={colors.primary} /> : null}
         {failed ? <Text style={styles.unavailable}>Steps could not load.</Text> : null}
         {today ? (
@@ -78,7 +74,7 @@ export default function StepsDetailScreen() {
             <StepPlanningCards today={today} />
           </>
         ) : null}
-      </ScrollView>
+      </KeyboardSafeScrollView>
     </SafeAreaView>
   );
 }

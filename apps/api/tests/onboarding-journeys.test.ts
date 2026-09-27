@@ -41,7 +41,7 @@ async function sync() {
 }
 vi.mock('react-native', () => ({
   AppState: { addEventListener: () => ({ remove() {} }) },
-  TextInput: 'TextInput',
+  TextInput: 'TextInput', useWindowDimensions: () => ({ width: 390, fontScale: 1 }),
   ActivityIndicator: 'ActivityIndicator', KeyboardAvoidingView: 'KeyboardAvoidingView', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View',
   Platform: { get OS() { return h.os; } }, StyleSheet: { create: <T,>(styles: T) => styles, hairlineWidth: 1 },
   Modal: ({ visible, children }: { visible: boolean; children: React.ReactNode }) => visible ? children : null,

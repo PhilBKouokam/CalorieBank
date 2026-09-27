@@ -30,6 +30,7 @@ vi.mock('../../mobile/lib/api/client', () => ({
 beforeEach(() => { targetStore.calories = 0; targetStore.writes = []; });
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Text: 'Text', View: 'View', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView',
   ActivityIndicator: 'ActivityIndicator', RefreshControl: 'RefreshControl',
   useWindowDimensions: () => ({ width: 390, fontScale: 1 }),

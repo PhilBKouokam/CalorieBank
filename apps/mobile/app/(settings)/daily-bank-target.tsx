@@ -1,5 +1,6 @@
+import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DailyBankTargetInput } from '@/components/caloriebank/DailyBankTargetInput';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
@@ -26,13 +27,13 @@ export default function DailyBankTargetScreen() {
     finally { savingRef.current = false; setSaving(false); }
   }
   return <SafeAreaView edges={['bottom']} style={styles.screen}>
-    <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={styles.container}>
+    <KeyboardSafeScrollView contentContainerStyle={styles.container}>
       {loaded ? <DailyBankTargetInput value={value} onChange={(next) => { setValue(next); setMessage(null); }} disabled={saving} /> : !message ? <ActivityIndicator /> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
       <Pressable accessibilityRole="button" disabled={saving} onPress={() => void (loaded ? save() : load())} style={styles.button}>
         <Text style={styles.buttonText}>{saving ? 'Saving…' : loaded ? 'Save target' : 'Try again'}</Text>
       </Pressable>
-    </ScrollView>
+    </KeyboardSafeScrollView>
   </SafeAreaView>;
 }
 const styles = StyleSheet.create({

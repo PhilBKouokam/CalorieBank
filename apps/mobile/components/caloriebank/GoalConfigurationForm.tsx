@@ -14,6 +14,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -48,6 +49,7 @@ function defaultEstimatedOption(goalMode: GoalMode) {
 }
 
 export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormProps) {
+  const { fontScale } = useWindowDimensions();
   const [goalMode, setGoalMode] = useState<GoalMode>('maintain');
   const [adjustmentSource, setAdjustmentSource] = useState<AdjustmentSource>('manual_calories');
   const [manualAdjustmentText, setManualAdjustmentText] = useState('500');
@@ -213,7 +215,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
       {usesAdjustment ? (
         <>
           <Text style={styles.label}>Configure {goalMode === 'cut' ? 'deficit' : 'surplus'}</Text>
-          <View style={styles.optionRow}>
+          <View style={[styles.optionRow, fontScale > 1.3 && styles.accessibleOptionColumn]}>
             {sourceOptions.map((option) => {
               const selected = adjustmentSource === option.value;
               return (
@@ -222,7 +224,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
                   accessibilityState={{ selected }}
                   key={option.value}
                   onPress={() => setAdjustmentSource(option.value)}
-                  style={[styles.compactOption, selected && styles.selectedOption]}
+                  style={[styles.compactOption, fontScale > 1.3 && styles.accessibleCompactOption, selected && styles.selectedOption]}
                 >
                   <Text style={[styles.optionText, styles.modeText, selected && styles.selectedOptionText]}>{option.label}</Text>
                 </Pressable>
@@ -332,6 +334,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
+  accessibleOptionColumn: { flexDirection: 'column' },
+  accessibleCompactOption: { flex: 0, flexBasis: 'auto' },
   compactOption: {
     flex: 1,
     flexBasis: 0,

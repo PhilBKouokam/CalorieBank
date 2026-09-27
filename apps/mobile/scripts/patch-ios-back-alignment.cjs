@@ -11,8 +11,34 @@ function replaceOnce(source, from, to) {
   if (source.split(from).length !== 2) throw new Error('iOS Back patch anchor changed; review the upstream fix before building.');
   return source.replace(from, to);
 }
+// #3449 also updates Fabric's stored metrics, not only the wrapper constraints.
+// Upgrade already-patched installs as well as clean EAS installs.
+function completeFabricMetrics(source) {
+  if (source.includes('CB_IOS_BACK_ALIGNMENT_V2')) return source;
+  source = replaceOnce(source, `  } else {
+    _cbBackContentSize = frame.size;`, `  } else {
+    // CB_IOS_BACK_ALIGNMENT_V2: mirror upstream Fabric metrics ownership.
+    BOOL sizeHasChanged = _layoutMetrics.frame.size != layoutMetrics.frame.size;
+    if (@available(iOS 26.0, *)) {
+      if (self.type == RNSScreenStackHeaderSubviewTypeLeft) _layoutMetrics = layoutMetrics;
+    }
+    _cbBackContentSize = frame.size;`);
+  source = replaceOnce(source, `      if (self.type == RNSScreenStackHeaderSubviewTypeLeft) {
+        [self invalidateIntrinsicContentSize];
+      } else {
+        self.bounds`, `      if (self.type == RNSScreenStackHeaderSubviewTypeLeft) {
+        if (sizeHasChanged) [self invalidateIntrinsicContentSize];
+      } else {
+        self.bounds`);
+  source = replaceOnce(source, '      return _cbBackContentSize;', `#ifdef RCT_NEW_ARCH_ENABLED
+      return RCTCGSizeFromSize(_layoutMetrics.frame.size);
+#else
+      return _cbBackContentSize;
+#endif`);
+  return source;
+}
 function patchHeader(source) {
-  if (source.includes(marker)) return source;
+  if (source.includes(marker)) return completeFabricMetrics(source);
   source = replaceOnce(source, '@implementation RNSScreenStackHeaderSubview {', `@implementation RNSScreenStackHeaderSubview {
   // ${marker}: retain Yoga's content size separately from UIKit's bar-item bounds.
   CGSize _cbBackContentSize;
@@ -75,7 +101,7 @@ function patchHeader(source) {
 @end
 
 @implementation RNSScreenStackHeaderSubviewManager`);
-  return source;
+  return completeFabricMetrics(source);
 }
 function patchConfig(source) {
   if (source.includes(marker)) return source;

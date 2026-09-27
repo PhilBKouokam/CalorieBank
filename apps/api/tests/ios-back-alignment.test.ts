@@ -17,7 +17,9 @@ describe('iOS native Back alignment (not just the inner React box)', () => {
   it('centers both axes in UIKit-owned bounds, preserving intrinsic Yoga size and avoiding doubled offsets', () => {
     expect(header).toContain('[self.centerXAnchor constraintEqualToAnchor:wrapper.centerXAnchor].active = YES');
     expect(header).toContain('[self.centerYAnchor constraintEqualToAnchor:wrapper.centerYAnchor].active = YES');
-    expect(header).toContain('return _cbBackContentSize;');
+    expect(header).toContain('return RCTCGSizeFromSize(_layoutMetrics.frame.size);');
+    expect(header).toContain('self.type == RNSScreenStackHeaderSubviewTypeLeft) _layoutMetrics = layoutMetrics');
+    expect(header).toContain('if (sizeHasChanged) [self invalidateIntrinsicContentSize]');
     expect(header).toContain('_cbBackWrapper != nil ? self.bounds : self.frame');
     expect(header).toContain('width.priority = UILayoutPriorityDefaultHigh');
     expect(header).toContain('height.priority = UILayoutPriorityDefaultHigh');

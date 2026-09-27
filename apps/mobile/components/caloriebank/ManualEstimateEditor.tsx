@@ -1,5 +1,6 @@
+import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { ManualIntakeState } from '@caloriebank/schemas';
 import { ApiHttpError, saveManualIntake } from '@/lib/api/client';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
@@ -31,8 +32,7 @@ export function ManualEstimateEditor({ state, mode, onSaved, onCancel }: {
         : 'Couldn’t save your update. Try again.');
     } finally { locked.current = false; if (alive.current) setSaving(false); }
   }
-  return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+  return <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>{mode === 'today' ? 'Calories eaten today' : 'About how many calories do you usually eat in a day?'}</Text>
       <Text style={styles.detail}>{mode === 'today' ? 'Your best estimate for the whole day.' : 'We’ll use this as your daily estimate. Change today’s amount whenever you eat more or less.'}</Text>
       <TextInput accessibilityLabel={mode === 'today' ? 'Calories eaten today, kilocalories' : 'Usual daily estimate, kilocalories'} keyboardType="number-pad" selectTextOnFocus value={text} onChangeText={setText} editable={!saving} style={styles.input} />
@@ -41,8 +41,7 @@ export function ManualEstimateEditor({ state, mode, onSaved, onCancel }: {
       {mode === 'today' && state.estimate?.overridden ? <Pressable accessibilityRole="button" disabled={saving} style={styles.action} onPress={() => void save(true)}><Text style={styles.link}>Use my usual estimate</Text></Pressable> : null}
       <Pressable accessibilityRole="button" disabled={saving} style={styles.action} onPress={onCancel}><Text style={styles.link}>Cancel</Text></Pressable>
       <View style={{ height: spacing.lg }} />
-    </ScrollView>
-  </KeyboardAvoidingView>;
+  </KeyboardSafeScrollView>;
 }
 const styles = StyleSheet.create({
   container: { flex: 1 }, content: { padding: spacing.lg, gap: spacing.md },
