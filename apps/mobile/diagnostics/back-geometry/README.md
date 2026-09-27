@@ -152,3 +152,26 @@ local database owner (migration permission denied). Final run uses the existing
 local owner and passed. No production database access or permission changes.
 No local UIKit compile is claimed: this Mac has Command Line Tools, not Xcode.
 Cloud native compilation and founder reproduction/export remain required.
+
+
+## Phase 2 delivered artifact — 2026-09-27
+
+- Exactly one job/artifact: **CB Back Geometry 1.0.0 (2)**, INTERNAL ad hoc.
+- EAS `11973097-3d93-4b20-a12f-c793c06900f7`, FINISHED
+  `2026-09-27T20:57:54.880Z`.
+- Source `33d94d7d82c39cae30630c44aa733f62b211fbea` (pushed).
+- Install: https://expo.dev/accounts/philbk/projects/caloriebank/builds/11973097-3d93-4b20-a12f-c793c06900f7
+- IPA SHA-256 `d773c28d986ce8773d867cc8101d28e98dc19ac786521144058383a770a7c12a`.
+- IPA confirms `com.caloriebank.mobile.backdiagnostic`, build 2, iOS 17 minimum,
+  iphoneos26.0 SDK, exact source SHA and native resize/stack/constraint trace keys.
+  Provisioning retains two registered phones; health/push entitlements and Health
+  usage descriptions are absent. The JS bundle has no `/v1/me/` route.
+- Cloud compiled the instrumented native header and archived successfully.
+  Install and post-build source hashes are identical:
+  - `RNSScreenStackHeaderSubview.mm`: `e5299eebd51488b13463d17f381508ed5edd7cc0df2e53f1fdeab00761eb786a`
+  - `CBBackGeometry.inc`: `18499318d83ad64fc916b52c851546ccba36005e5d2ed768259bf8c813761a0e`
+  - `CBBackTrace.inc`: `e64aaeff33676f4c5ada2a54ec5fb4a0ff278d9e9a7222f2a45f2fd8568a88cb`
+- Physical reproduction and schema 2 export are pending. No responsible caller,
+  broken constraint, fitting result or production correction is claimed yet.
+- No CalorieBank build 10, Android upload, backend deployment or production fix.
+  Manual Intake remains disabled; no production mutation was performed.
