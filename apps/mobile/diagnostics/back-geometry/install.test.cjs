@@ -6,10 +6,11 @@ const vm = require('node:vm');
 const screens = path.dirname(require.resolve('react-native-screens/package.json'));
 const original = fs.readFileSync(path.join(screens,'ios/RNSScreenStackHeaderSubview.mm'),'utf8');
 const script = fs.readFileSync(path.join(__dirname,'install.cjs'),'utf8');
+const trace = fs.readFileSync(path.join(__dirname,'CBBackTrace.inc'),'utf8');
 const payload = fs.readFileSync(path.join(__dirname,'CBBackGeometry.inc'),'utf8');
 function run(env, input=original) {
   const writes = new Map();
-  const fakeFs = { readFileSync: p => p.endsWith('.inc') ? payload : input, writeFileSync: (p,v) => writes.set(p,v) };
+  const fakeFs = { readFileSync: p => p.endsWith('CBBackTrace.inc') ? trace : p.endsWith('.inc') ? payload : input, writeFileSync: (p,v) => writes.set(p,v) };
   const req = n => n === 'node:fs' ? fakeFs : require(n);
   req.resolve = require.resolve;
   const module = { exports: {} };
@@ -24,17 +25,18 @@ test('production installation never writes diagnostics and rejects contaminated 
 });
 test('diagnostic hooks preserve build-9 implementation and are idempotent',()=>{
   const env={CB_BACK_GEOMETRY_DIAGNOSTIC:'1',EAS_BUILD_PROFILE:'back-geometry-diagnostic',EAS_BUILD_GIT_COMMIT_HASH:'a'.repeat(40)};
-  const writes=run(env); assert.equal(writes.size,2);
+  const writes=run(env); assert.equal(writes.size,3);
   const native=[...writes].find(([p])=>p.endsWith('.mm'))[1];
   assert.match(native,/CBBackDidMount\(self\)/);
   assert.match(native,/CBBackDidLayout\(self\)/);
   assert.match(native,/CBFabricMetrics =/);
   assert.equal(run(env,native).size,0);
+  const withoutHooks=native.replace(/    CBTraceRegister\(self\); CBTraceRegister\(wrapper\);\n    CBTraceEvent\(self,@"wrapper.created",.*?\n/, '').replace(/      CGSize result = RCTCGSizeFromSize\(_layoutMetrics.frame.size\);\n      CBTraceEvent.*?\n      return result;/, '      return RCTCGSizeFromSize(_layoutMetrics.frame.size);');
   for (const method of ['cb_centeredBackBarItemView','intrinsicContentSize']) {
     const start=original.indexOf(method+'\n{');
     assert.ok(start>0);
     const end=original.indexOf('\n}\n',start)+3;
-    assert.ok(native.includes(original.slice(start,end)));
+    assert.ok(withoutHooks.includes(original.slice(start,end)));
   }
 });
 test('export omits text and identity; captures actual rendered paint and coordinate spaces',()=>{
@@ -62,4 +64,19 @@ test('diagnostic native target matches build 9 while health/push entitlements ar
   assert.equal(config.pods['ios.deploymentTarget'],'17.0');
   assert.equal(config.sections.release.buildSettings.IPHONEOS_DEPLOYMENT_TARGET,'17.0');
   assert.equal(Object.keys(config.entitlements).length,0);
+});
+
+test('resize trace preserves forwarded arguments and bounds stack capture to relevant transitions',()=>{
+  assert.match(trace,/CBIsTransition\(oldHeight,v.bounds.size.height\)/);
+  assert.match(trace,/CBTransitionStacks\+\+<8/);
+  assert.match(trace,/CBHeaderTransitionStacks\+\+<8/);
+  assert.match(trace,/callStackSymbols/);
+  assert.match(trace,/constraintsAffectingLayoutForAxis:UILayoutConstraintAxisVertical/);
+  for (const key of ['verticalCompressionResistance','verticalHugging','mountTimeSinceTraceStartMs','droppedEvents','constraintWarnings']) assert.ok(trace.includes('@"'+key+'"'));
+  assert.match(trace,/original\)\(v,selector,value\)/);
+  assert.match(trace,/original\)\(layer,selector,value\)/);
+  assert.doesNotMatch(trace,/constraintEqualTo|setNeedsLayout|layoutIfNeeded|setContentCompressionResistancePriority|setContentHuggingPriority/);
+  assert.match(trace,/entriesEnumeratorWithOptions/);
+  assert.match(trace,/store coverage is not guaranteed/);
+  assert.doesNotMatch(trace,/accessibilityLabel|attributedText|userId|authToken/);
 });

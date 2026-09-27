@@ -13,20 +13,29 @@ if (process.env.CB_BACK_GEOMETRY_DIAGNOSTIC !== '1') {
 }
 if (process.env.EAS_BUILD_PROFILE !== 'back-geometry-diagnostic') throw new Error('Diagnostic profile required.');
 if (!source.includes('CB_IOS_BACK_ALIGNMENT_V2')) throw new Error('Build-9 patch must precede diagnostics.');
-if (source.includes(marker)) return;
+if (source.includes(marker)) {
+  if (!source.includes('CB_BACK_RESIZE_TRACE_V2')) throw new Error('Restore clean dependencies before upgrading diagnostic instrumentation.');
+  return;
+}
 const commit = process.env.EAS_BUILD_GIT_COMMIT_HASH || execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error('Exact source commit required.');
 function replaceOnce(from,to) {
   if (source.split(from).length !== 2) throw new Error('Diagnostic source anchor changed.');
   source = source.replace(from,to);
 }
-replaceOnce('@implementation RNSScreenStackHeaderSubview {', `// ${marker}\n#include "CBBackGeometry.inc"\n\n@implementation RNSScreenStackHeaderSubview {`);
+replaceOnce('@implementation RNSScreenStackHeaderSubview {', `// ${marker} CB_BACK_RESIZE_TRACE_V2\n#include "CBBackGeometry.inc"\n\n@implementation RNSScreenStackHeaderSubview {`);
+replaceOnce('    UIView *wrapper = [UIView new];', '    UIView *wrapper = [UIView new];\n    CBTraceRegister(self); CBTraceRegister(wrapper);\n    CBTraceEvent(self,@"wrapper.created",@{ @"wrapperId": CBId(wrapper) },NO);');
+replaceOnce('  CGRect frame = RCTCGRectFromRect(layoutMetrics.frame);', '  CGRect frame = RCTCGRectFromRect(layoutMetrics.frame);\n  CBTraceEvent(self,@"Fabric.updateLayoutMetrics.enter",@{ @"incoming": CBRect(frame), @"previousStored": CBRect(RCTCGRectFromRect(_layoutMetrics.frame)) },NO);');
+replaceOnce('      return RCTCGSizeFromSize(_layoutMetrics.frame.size);', '      CGSize result = RCTCGSizeFromSize(_layoutMetrics.frame.size);\n      CBTraceEvent(self,@"header.intrinsicContentSize",@{ @"result": @[@(result.width),@(result.height)] },NO);\n      return result;');
 replaceOnce('- (void)layoutSubviews\n{\n  [super layoutSubviews];', '- (void)layoutSubviews\n{\n  [super layoutSubviews];\n  if (self.type == RNSScreenStackHeaderSubviewTypeLeft) CBBackDidLayout(self);');
-replaceOnce('    [self layoutNavigationBar];\n  }\n}\nRNS_IGNORE_SUPER_CALL_END', '    if (self.type == RNSScreenStackHeaderSubviewTypeLeft) CBFabricMetrics = @{ @"incoming": CBRect(frame), @"stored": CBRect(RCTCGRectFromRect(_layoutMetrics.frame)), @"elapsedSeconds": @(CACurrentMediaTime()-CBStarted) };\n    [self layoutNavigationBar];\n  }\n}\nRNS_IGNORE_SUPER_CALL_END');
+replaceOnce('    [self layoutNavigationBar];\n  }\n}\nRNS_IGNORE_SUPER_CALL_END', '    if (self.type == RNSScreenStackHeaderSubviewTypeLeft) CBFabricMetrics = @{ @"incoming": CBRect(frame), @"stored": CBRect(RCTCGRectFromRect(_layoutMetrics.frame)), @"elapsedSeconds": @(CBStarted ? CACurrentMediaTime()-CBStarted : 0) };\n    CBTraceEvent(self,@"Fabric.updateLayoutMetrics.beforeNativeLayout",CBFabricMetrics,NO);\n    [self layoutNavigationBar];\n  }\n}\nRNS_IGNORE_SUPER_CALL_END');
 replaceOnce('- (nullable UINavigationBar *)findNavigationBar', '- (void)didMoveToWindow\n{\n  [super didMoveToWindow];\n  if (self.type == RNSScreenStackHeaderSubviewTypeLeft) CBBackDidMount(self);\n}\n\n- (nullable UINavigationBar *)findNavigationBar');
 const payload = fs.readFileSync(path.join(__dirname,'CBBackGeometry.inc'),'utf8').replace('__CB_SOURCE_COMMIT__',commit);
 fs.writeFileSync(path.join(root,'ios/CBBackGeometry.inc'),payload);
+const trace = fs.readFileSync(path.join(__dirname,'CBBackTrace.inc'),'utf8');
+fs.writeFileSync(path.join(root,'ios/CBBackTrace.inc'),trace);
 fs.writeFileSync(target,source);
+console.log('Back resize trace SHA256:',crypto.createHash('sha256').update(trace).digest('hex'));
 console.log('Back geometry diagnostic source SHA256:',crypto.createHash('sha256').update(source).digest('hex'));
 console.log('Back geometry diagnostic payload SHA256:',crypto.createHash('sha256').update(payload).digest('hex'));
 

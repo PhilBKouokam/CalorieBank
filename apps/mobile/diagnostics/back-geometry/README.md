@@ -97,3 +97,58 @@ diagnostic artifact, not a second installable variant.
   10, TestFlight submission, Android upload, backend deployment or enablement.
 - Founder installation confirmation, reproduction and exported runtime geometry
   are pending. No root cause or physical success is claimed.
+
+
+## Phase 2 resize trace — preparation
+
+Founder installed 1.0.0 (1), confirmed the same visibly low chevron, and exported
+schema 1 geometry. Input SHA-256:
+`37c3a9aca1f36b22096de3e4f7f2151d1a90f39ddff96720e6c8efcc2ac8e9b7`.
+On iOS 26.6.2, header height changes 48 → 36 between mount and first layout
+(~11 ms), while the Pressable stays 48. UIKit glass center Y is 81; painted glyph
+center Y is 86.833. Glyph paint is centered in Text; incoming/stored Fabric size
+remains 48×48. A required 48-height constraint coexists with actual height 36 and
+ambiguous layout. This establishes the mismatch, not the responsible setter or
+constraint conflict. Build 9's physical failure remains unchanged.
+
+The founder authorizes one replacement INTERNAL diagnostic artifact to identify
+the caller. `CBBackTrace.inc` interposes UIView geometry, mask translation,
+layout, fitting and constraint APIs plus CALayer bounds/position and navigation
+item assignment. It records only the header and registered Back ancestor chain.
+All original methods execute once with unchanged arguments and return values;
+no layout requests, new constraints, sizing priorities, offsets or fixes are added.
+Existing private UIKit classes are not replaced or subclassed. Base-method
+interposition can miss subclass fitting overrides that do not call super; this
+coverage limitation is explicit in the export. CALayer tracing covers geometry
+changes that bypass public UIView setters.
+
+Schema 2 adds bounded events, separate reserved 48→36 header stack captures,
+vertical constraints and ancestor owners, intrinsic size, vertical hugging and
+compression resistance, ambiguous layout, autoresizing masks, fitting results,
+Fabric updates and native assignment/layout events. Trace time starts before
+mount and exports a mount-time offset; unlike schema 1, early Fabric events are
+not assigned a bogus elapsed-since-mount time. View IDs persist across mount.
+Constraint ownership not found in the ancestor chain is reported as unknown.
+
+Current-process OSLogStore export requests only unsatisfiable/broken-constraint
+warnings, without suppressing them. Store access errors and an empty query are
+reported honestly; an empty result is not proof that UIKit emitted no warnings.
+No general console, text field content, account, health or credentials are exported.
+The isolated route tree and separate signing identity remain unchanged.
+
+The diagnostic profile alone increments its remote build number. No production
+TestFlight build, Android upload, production correction or enablement is part of
+this work. Root-cause classification and any proposed production correction must
+wait for the replacement artifact's physical reproduction and exported caller trace.
+
+
+Phase 2 pre-build validation (Node 20.20.2): complete release gate PASS,
+944 tests / 89 files, lint, type checks, Prisma validation/migrations on the
+isolated localhost `caloriebank_test_phase1b_20260923` database, and builds.
+Six diagnostic installation/privacy/forwarding tests PASS. iOS Metro export PASS.
+`git diff --check` PASS. An initial run used an older RC test-database name
+(rejected by the manual persistence guard); the next attempt used the wrong
+local database owner (migration permission denied). Final run uses the existing
+local owner and passed. No production database access or permission changes.
+No local UIKit compile is claimed: this Mac has Command Line Tools, not Xcode.
+Cloud native compilation and founder reproduction/export remain required.

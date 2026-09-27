@@ -8,7 +8,7 @@
       "distribution": "internal",
       "environment": "preview",
       "node": "20.19.4",
-      "autoIncrement": false,
+      "autoIncrement": true,
       "env": {
         "CB_BACK_GEOMETRY_DIAGNOSTIC": "1"
       },

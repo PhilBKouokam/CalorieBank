@@ -29,6 +29,8 @@ static NSNumber *CBId(UIView *v) {
   if (!value) { value = @(++CBNextId); [CBViewIds setObject:value forKey:v]; }
   return value;
 }
+#include "CBBackTrace.inc"
+
 static NSDictionary *CBLayer(CALayer *layer, NSUInteger depth) {
   NSMutableArray *children = [NSMutableArray new];
   if (depth < 5) for (CALayer *child in layer.sublayers) {
@@ -210,8 +212,9 @@ static void CBCapture(NSString *moment, BOOL paint) {
 @end
 static void CBBackDidMount(UIView *back) {
   if (!back.window || CBObservedBack == back) return;
-  CBObservedBack = back; CBSamples = [NSMutableArray new]; CBViewIds = nil;
-  CBNextId = 0; CBLayoutCount = 0; CBStarted = CACurrentMediaTime();
+  CBObservedBack = back; CBSamples = [NSMutableArray new];
+  CBLayoutCount = 0; CBStarted = CACurrentMediaTime();
+  CBTraceAttach(back);
   CBCapture(@"didMoveToWindow",NO);
   __weak UIView *expected = back;
   dispatch_async(dispatch_get_main_queue(), ^{
@@ -227,6 +230,7 @@ static void CBBackDidMount(UIView *back) {
     });
 }
 static void CBBackDidLayout(UIView *back) {
+  CBTraceConstraintsEvent(back,@"header.layoutSubviews.afterSuper");
   if (back == CBObservedBack && ++CBLayoutCount <= 4) CBCapture(@"layoutSubviews",NO);
 }
 @interface CBBackGeometry : NSObject <RCTBridgeModule>
@@ -238,7 +242,7 @@ RCT_EXPORT_MODULE(CBBackGeometry)
 RCT_EXPORT_METHOD(exportGeometry:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
   if (!CBObservedBack.window || !CBSamples.count) { reject(@"no_header",@"Open the diagnostic Health Connections screen first.",nil); return; }
   CBCapture(@"founder-export-settled",YES);
-  NSDictionary *report = @{ @"schema": @1, @"sourceCommit": CBGeometrySource,
+  NSDictionary *report = @{ @"schema": @2, @"nativeResizeTrace": CBTraceReport(), @"sourceCommit": CBGeometrySource,
     @"osVersion": UIDevice.currentDevice.systemVersion, @"screenScale": @(CBObservedBack.window.screen.scale),
     @"samples": CBSamples, @"privacy": @"Geometry only. No account, health, text content or credentials.",
     @"baselineEvidence": @"TextKit baseline reconstructed; paintBounds are rendered layer measurements when available.",
