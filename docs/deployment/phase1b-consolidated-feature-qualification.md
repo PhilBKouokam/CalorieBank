@@ -231,3 +231,9 @@ Physical Back: centered/no clipping, comfortable edge tap, normal navigation,
 VoiceOver meaningful Back announcement and activation all PASS. iOS keyboard
 physical checks continue. No new iOS build or backend deployment. Manual Intake
 remains disabled. Earlier iOS9/Android8 failures remain preserved.
+
+Android9's sole authorized job failed Gradle configuration before producing an
+AAB (missing local-module versionName). Metadata is corrected and the complete
+960-test Node20 gate passes; another job remains unauthorized pending founder
+review. Play8 remains installed. iOS10 Back/accessibility and Fitness Goal500
+keyboard/save checks pass; Maintain restored. Remaining physical checks are pending.

@@ -4,4 +4,10 @@ plugins {
 }
 group = 'com.caloriebank.keyboard'
 version = '1.0.0'
-android { namespace 'com.caloriebank.keyboard' }
+android {
+  namespace 'com.caloriebank.keyboard'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}

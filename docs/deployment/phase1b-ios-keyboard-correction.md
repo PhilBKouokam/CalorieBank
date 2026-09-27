@@ -256,3 +256,23 @@ TypeScript harness imports, both corrected. One unchanged goal API test returned
 without any API/auth/accounting change. This is preserved as an intermittent test
 observation, not an established product regression or a proven race diagnosis.
 The final run is clean.
+
+### Android9 build failure; no AAB produced
+
+Single authorized job `b9a467e6-315c-4ec9-990d-1557f79a2db3`, app1.0.0/versionCode9,
+source `376502277cdcb9d997ffa264ce3663e872dc2ccc`, failed configuring
+`:caloriebank-keyboard-geometry` before Kotlin compilation:
+`'android.defaultConfig.versionName' is not defined`. The pinned Expo module
+Gradle plugin's MavenPublicationExtension requires this library metadata. No
+replacement AAB exists and Play remains version8. No retry has been requested.
+
+Corrected only the local library's Gradle defaultConfig metadata (versionName1.0.0,
+library versionCode1; independent of app versionCode). Complete Node20 release
+gate rerun PASS:960tests/91files, clean lint/types/builds/diff, log
+`/tmp/cb-ime-metadata-release.log`. Native Kotlin compilation remains unverified;
+there is no installed local Android Java/SDK toolchain. Another remote job needs
+founder authorization because the one-job allowance was consumed.
+
+iPhone10 Fitness Goal: founder confirmed500 input/context/Save reachable with
+keyboard open, Save succeeded, and Maintain was restored through normal UI.
+No test goal remains saved. Other shared-input checks continue.
