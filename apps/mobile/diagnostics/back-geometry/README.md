@@ -175,3 +175,13 @@ Cloud native compilation and founder reproduction/export remain required.
   broken constraint, fitting result or production correction is claimed yet.
 - No CalorieBank build 10, Android upload, backend deployment or production fix.
   Manual Intake remains disabled; no production mutation was performed.
+
+
+## Phase 2 physical export analyzed
+
+Founder installed build 2 and confirmed the same low Back chevron. The exported
+200-event trace (zero dropped events) establishes the native constraint-priority
+ambiguity and captures the 48→36 bounds mutation. See the
+[diagnostic report](../../../../docs/engineering/ios-back-resize-diagnosis.md)
+for the timeline, full-stack evidence link, private-symbol limitations and minimum
+proposed correction. No production correction or new build has been performed.

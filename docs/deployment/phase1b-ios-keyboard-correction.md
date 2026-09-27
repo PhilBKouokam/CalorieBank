@@ -146,3 +146,16 @@ created in response to this photo.
 
 **PHASE 1B CONSOLIDATED FEATURE QUALIFICATION: BLOCKED — iPhone build 9 Back
 chevron remains too low or clipped.** Keyboard corrections are not physically proven.
+
+
+## Diagnostic build 2: native resize cause established
+
+Founder reproduced the low chevron in CB Back Geometry 1.0.0 (2) and supplied its
+native trace. The [measured resize diagnosis](../engineering/ios-back-resize-diagnosis.md)
+records the 48→36 `setBounds:` transition during wrapper layout, equal 750
+compression/equality priorities, ambiguous layout and the before/after vertical
+constraint lists. It proposes a vertical compression-priority correction only;
+no production fix has been implemented. Private UIKit helper names remain
+unsymbolicated, with exact stack addresses preserved. This does not change build
+9's failed physical result or qualify the keyboard correction. Manual Intake
+remains disabled and Android 8 remains undistributed. Stop for founder review.
