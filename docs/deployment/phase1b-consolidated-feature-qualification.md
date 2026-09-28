@@ -237,3 +237,133 @@ AAB (missing local-module versionName). Metadata is corrected and the complete
 960-test Node20 gate passes; another job remains unauthorized pending founder
 review. Play8 remains installed. iOS10 Back/accessibility and Fitness Goal500
 keyboard/save checks pass; Maintain restored. Remaining physical checks are pending.
+
+
+## Authorized Android retry and iOS input progress — 2026-09-27
+
+Founder explicitly authorized one replacement job after Android9 produced no AAB.
+EAS job `fafa500b-fe82-40b5-b3a7-80775d101e94` was requested from validated
+`29753aaf639c06f38d6614df87b3effe023831b8`, version `1.0.0`, authoritative
+versionCode **10** (remote counter was 9). Initial status NEW; compilation,
+private Play delivery and physical qualification remain pending. No additional
+iOS build was requested.
+
+On exact TestFlight iOS10, founder confirmed Daily Bank Target numeric field,
+explanation/presets and Save are reachable with the keyboard open. Leaving
+without saving dismisses the keyboard and returns to Settings normally.
+Banking Goal and Step Planning representative checks remain pending.
+Manual Intake remains disabled; no new production zero-state query is claimed.
+
+Founder additionally confirmed the Banking Goal name field and primary Save
+action are reachable with the normal text keyboard open on iOS10, without
+editing or saving. Numeric-field and dismissal checks remain pending.
+
+
+## Final consolidated physical qualification — 2026-09-28 UTC
+
+This checkpoint supersedes the pending/blocked status above without erasing the
+failed iOS9 and Android8 evidence. Founder operated both store-installed phones
+one action at a time; acknowledgments of setup alone were followed by explicit
+reachability/result confirmation. No rendered result substitutes for these checks.
+
+### Exact artifacts
+
+| Platform | Store artifact | EAS build | Source |
+| --- | --- | --- | --- |
+| iPhone | TestFlight Friends & Family 1.0.0 (10), Testing; founder installed | `bf42522f-de3b-469d-83ec-8103705b7d89` | `98c236db9f577292cab523dffee526a036d5f4bd` |
+| Samsung SM_A136U, Android 13 / API 33 | Play Internal Testing 1.0.0, versionCode 10, available to existing testers | `fafa500b-fe82-40b5-b3a7-80775d101e94` | `29753aaf639c06f38d6614df87b3effe023831b8` |
+
+Android9's failed job consumed versionCode9 without an AAB. Founder explicitly
+authorized one retry; the authoritative replacement is **10**, not 9. It compiled
+successfully and was delivered to the existing Internal Testing track, release8.
+AAB SHA256: `a5688644e83b96480e96d816b67dda226f1e0ce5228834994eee2eadfcc5067c`.
+Google Play reported only the missing-deobfuscation-file warning, no blocking
+error or supported-device reduction. Tester scope was not changed. No public
+Production/Open Testing release occurred.
+
+ADB before keyboard QA and again afterward verified package
+`com.caloriebank.mobile`, versionName `1.0.0`, versionCode **10**, installer
+`com.android.vending`, minSdk26 / targetSdk36. Both compiled AAB manifest and
+installed package expose only `android.permission.health.READ_NUTRITION` among
+Health Connect permissions. Founder verified no Health Connect burn option in
+the burn-source chooser; burn remains disabled.
+
+### Physical results
+
+| Check | iPhone build10 | Samsung versionCode10 |
+| --- | --- | --- |
+| Back chevron | PASS: centered/no clipping relative to native background | Native navigation smoke PASS |
+| Back target / accessibility | PASS: comfortable edge tap, normal return, meaningful VoiceOver Back announcement and double-tap activation | Android Back keyboard dismissal and screen navigation PASS |
+| Fitness Goal exact500 reproduction | PASS: field, explanation and Save reachable with keyboard open; save succeeds | PASS: field, explanation and Save reachable with keyboard open; save succeeds |
+| Restore original Fitness Goal | Maintain restored through normal UI, founder confirmed | Maintain restored through normal UI, founder confirmed |
+| Daily Bank Target | PASS: numeric field, explanation/presets and Save reachable; dismiss/navigation normal, no save | PASS: same, no save |
+| Banking Goal | PASS: text name and numeric amount, supporting information and Save reachable; no edit/save | PASS: same; Android Back closes keyboard and screen Back returns normally |
+| Step Planning burn target | PASS: select-all, input and steps/time results reachable | PASS: same |
+| Step Planning steps target | PASS: select-all, input, burn estimate and walking-time results reachable | PASS: same |
+| Step Planning dismissal | PASS: Back dismisses keyboard and returns normally | PASS: Android Back dismisses keyboard, screen/results normal |
+| Today / bottom navigation | PASS: clean, no clipping or residual keyboard gap | PASS: same |
+| History | PASS: normal readable layout | PASS: same |
+| Settings / Health Connections | PASS: clean header spacing, source selections intact | PASS: normal, existing Fitbit/Cronometer selections intact |
+| Burn chooser | Earlier provider qualification preserved | PASS: normal chooser, burn-disabled state, closes normally without selection |
+
+The separately requested iPhone Banking Goal Back acknowledgment was not received;
+no separate result is invented. Shared dismissal/navigation is physically qualified
+on Fitness Goal, Daily Bank Target and Step Planning. No failed physical result
+remains. Existing startup, capability, provider round-trip and accounting baseline
+results remain preserved rather than unnecessarily repeated.
+
+### Inventory and evidence level
+
+All eight app-owned inputs remain governed by the one shared keyboard owner:
+Fitness Goal; Daily Bank Target; Banking Goal name/calories; Step Planning
+burn/steps; Manual estimate; deletion confirmation. The first six input types are
+physically qualified on both replacements. Onboarding reuses the qualified Fitness
+Goal/Daily Bank Target owners with route/component coverage; no account reset or
+new onboarding account was performed. Manual estimate remains disabled and has
+rendered/component plus inventory coverage, not physical manual-state evidence.
+Deletion shares the qualified primitive with deterministic/inventory evidence;
+no destructive deletion was performed. Existing 320/390/393px and 200% text
+rendered evidence is preserved; no new physical enlarged-text result is claimed.
+See [permanent inventory and invariant](../engineering/keyboard-input-safety.md).
+
+### Validation, production hold and scope
+
+Validated Android implementation `3765022` plus required library metadata
+`29753aa`: complete Node20 gate **960 tests / 91 files PASS**, focused keyboard
+suite **94 tests / 7 files PASS**, TypeScript, lint, API/domain/schema builds,
+Prisma validation/local migration checks, Expo configs, dependencies, autolinking,
+Android prebuild and documentation links. Successful EAS10 compilation now also
+confirms native compilation. Physical-qualification edits are documentation only;
+`git diff --check` is the required final check, not another full test run.
+
+At **2026-09-28T01:26:05.521Z**, a production REPEATABLE READ / READ ONLY
+transaction and the deployed compiled environment parser confirmed:
+
+| Production check | Result |
+| --- | --- |
+| Backend commit | `bad1750ae997f434c878b33b091ca3b678e70b5f` (unchanged) |
+| Effective Manual Intake enrollment | `0` / disabled |
+| Authentication | Clerk |
+| Manual authority boundaries | 0 |
+| Manual source selections | 0 |
+| Manual intake states/preferences | 0 |
+| Usual-estimate boundaries | 0 |
+| Today overrides | 0 |
+| Manual finalized calculation snapshots | 0 |
+| Manual Opening Bank calculation days | 0 |
+
+No real manual account was created. The only intentional account mutations in QA
+were Fitness Goal500 saves followed immediately by restoring Maintain through the
+normal UI. Other inputs/sources were not saved or changed. No direct DB mutation,
+accounting/Fitbit/backend implementation change, backend deployment, support case,
+Phase2 or public release occurred. Earlier accounting evidence is preserved; this
+focused qualification does not claim a new full historical ledger audit.
+
+Worktree: `/Users/kouok/Downloads/CalorieBank`, branch
+`codex/private-beta-release`. No additional build was created during physical QA.
+Final evidence is committed/pushed as a documentation-only `[skip render]` commit.
+
+**PHASE 1B CONSOLIDATED FEATURE QUALIFICATION: PASS — READY FOR FOUNDER AUTHORIZATION TO ENABLE MANUAL INTAKE**
+
+STOP. Enrollment remains disabled. Controlled enablement and real manual-account
+qualification require a separate explicit founder authorization.

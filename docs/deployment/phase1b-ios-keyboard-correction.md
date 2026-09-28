@@ -276,3 +276,24 @@ founder authorization because the one-job allowance was consumed.
 iPhone10 Fitness Goal: founder confirmed500 input/context/Save reachable with
 keyboard open, Save succeeded, and Maintain was restored through normal UI.
 No test goal remains saved. Other shared-input checks continue.
+
+
+## Final physical correction qualification — 2026-09-28 UTC
+
+Existing TestFlight Friends & Family1.0.0(10), EAS
+`bf42522f-de3b-469d-83ec-8103705b7d89`, source`98c236d`, physically passes the
+native Back correction: founder confirms centered/no clipping, comfortable edge
+tap, normal navigation, meaningful VoiceOver Back label and activation. No further
+iOS build was made. Fitness Goal500 field/context/Save reachability and saving
+pass; Maintain restored. Daily Bank Target, Banking Goal text/numeric and both
+Step Planning inputs/results pass; native dismissal/navigation and Today,
+History, Settings/Health Connections/header spacing smoke pass.
+
+Android replacement versionCode10 (not failed9) is Play-distributed, ADB-verified
+and physically passes the shared keyboard correction on the Samsung. Complete
+results, evidence limits and exact source/build IDs are in
+[final consolidated qualification](phase1b-consolidated-feature-qualification.md).
+Final production read-only check at2026-09-28T01:26:05.521Z confirms enrollment0
+and all seven manual-record categories0, unchanged backend. Manual Intake remains
+disabled; no accounting/Fitbit/backend change or public release occurred. Earlier
+iOS9/Android8 physical failures and diagnostic evidence remain preserved.

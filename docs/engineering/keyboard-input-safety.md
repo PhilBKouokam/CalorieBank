@@ -184,3 +184,27 @@ translation, already/partially resized parents, different keyboard boundaries,
 large fields, show/layout/focus ordering, hide restoration and stale responses.
 The inventory continues to enforce shared ownership for onboarding, manual and
 deletion forms. These are not physical evidence: Android9 qualification is pending.
+
+
+## Physical invariant qualified — 2026-09-28 UTC
+
+Exact TestFlight iOS1.0.0(10) and Play Android1.0.0/versionCode10 now physically
+pass Fitness Goal500 keyboard-open field/context/Save reachability and save, with
+Maintain restored. Daily Bank Target, Banking Goal text/numeric, and both Step
+Planning inputs/results also pass on both phones. Select-all, native dismissal,
+navigation, safe-area/bottom navigation and absence of residual keyboard space
+were confirmed. Android device: Samsung SM_A136U, Android13/API33.
+
+The six enabled input types have real physical evidence. The two remaining
+inputs (manual estimate and deletion confirmation) retain shared-owner inventory
+and rendered coverage; no manual enrollment or destructive deletion was performed.
+Onboarding reuses the qualified goal/target owners and retains composed-route
+regressions. 320/390/393px and200% evidence remains rendered, not a newly performed
+physical enlarged-text test. Full results and artifact identities are in
+[final qualification](../deployment/phase1b-consolidated-feature-qualification.md).
+
+Permanent release invariant: **when an input keyboard is open, the focused field,
+information/result needed to understand the interaction, and primary completion
+action must remain reachable.** Future inputs must use this qualified shared
+primitive or explicitly prove an equivalent keyboard-safe layout. No one-off
+screen offsets. Changes to the primitive require fresh real-device qualification.

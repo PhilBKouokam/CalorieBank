@@ -200,3 +200,19 @@ subsequently authorized the shared Android correction described in
 An Android-only native geometry adapter resolves the coordinate-space boundary;
 no production screen-specific workaround or iOS keyboard change is included.
 Physical correction qualification remains pending.
+
+
+## Measured correction physically closed — 2026-09-28 UTC
+
+The authorized metadata-corrected retry `fafa500b-fe82-40b5-b3a7-80775d101e94`
+compiled source `29753aaf639c06f38d6614df87b3effe023831b8` as Android1.0.0,
+versionCode10. Existing Play Internal Testing delivery and ADB installer
+`com.android.vending` verification preceded founder QA on the same Samsung.
+Fitness Goal500 with keyboard open now permits reaching field, explanation and
+Save; save succeeds and Maintain was restored. The zero-scroll-range Banking
+Goal class passes both normal text and numeric keyboards. Daily Bank Target and
+both Step Planning input/result layouts pass; Android Back, screen navigation,
+Today/History/Health Connections and bottom spacing smoke pass. No repeat numeric
+frame capture is claimed: these are authoritative founder physical observations.
+Prior version8 measured failure remains intact above. See
+[final evidence](../deployment/phase1b-consolidated-feature-qualification.md).
