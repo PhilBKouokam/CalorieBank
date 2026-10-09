@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { sourceLabel as iosSourceLabel } from '../../mobile/lib/native-health/copy';
+import { sourceLabel as androidSourceLabel } from '../../mobile/lib/native-health/copy.android';
+import { consumerProviderName } from '../src/modules/bank-history/day-source-authority';
 import type { HealthConnectionOption, HealthConnectionsResponse } from '@caloriebank/schemas';
 import { connectionsForNativeCapability, crossDeviceSourceHint } from '../../mobile/lib/native-health/presentation';
 import { composeAppleHealthConnections } from '../../mobile/lib/healthkit/health-connections-presentation';
@@ -11,6 +14,15 @@ function connections(selected: HealthConnectionOption): HealthConnectionsRespons
     eaten: { selected, alternatives: [], canChange: false, canAddSource: true }, connectedServices: [] };
 }
 describe('cross-device source presentation without authority writes', () => {
+  it('presents legacy manual labels consistently without relabeling tracker provenance', () => {
+    for (const label of [iosSourceLabel, androidSourceLabel]) {
+      expect(label('CalorieBank estimate')).toBe('Your estimate');
+      expect(label('Your estimate')).toBe('Your estimate');
+      expect(label('Cronometer')).toBe('Cronometer');
+    }
+    expect(consumerProviderName('manual_estimate', 'CalorieBank estimate')).toBe('Your estimate');
+    expect(consumerProviderName('apple_health', 'Cronometer')).toBe('Cronometer');
+  });
   it.each(['connected', 'no_data', 'needs_attention'] as const)('preserves server identity and actual %s state on Android', status => {
     const before = connections(option('Apple Health', status)); const original = structuredClone(before);
     const result = connectionsForNativeCapability(before, false, true, false);
@@ -29,7 +41,7 @@ describe('cross-device source presentation without authority writes', () => {
     expect(connectionsForNativeCapability(connections(option('Health Connect')), false, true, false).eaten.selected)
       .toMatchObject({ status: 'needs_attention', primaryAction: 'check_native_health' });
   });
-  it.each(['CalorieBank estimate', 'Another calorie source'])('never assigns remote-device state to %s', label => {
+  it.each(['Your estimate', 'Another calorie source'])('never assigns remote-device state to %s', label => {
     const input = connections({ ...option(null), label });
     for (const apple of [false, true]) {
       const result = connectionsForNativeCapability(input, apple, !apple);

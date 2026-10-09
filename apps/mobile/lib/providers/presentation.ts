@@ -1,8 +1,9 @@
 import { sourceLabel } from '../native-health/copy';
 
 const consumerSourceNames: Readonly<Record<string, string>> = {
-  manual_estimate: 'CalorieBank estimate',
-  'CalorieBank estimate': 'CalorieBank estimate',
+  manual_estimate: 'Your estimate',
+  'CalorieBank estimate': 'Your estimate',
+  'Your estimate': 'Your estimate',
   apple_health: 'Apple Health',
   'Apple Health': 'Apple Health',
   apple_watch: 'Apple Watch',

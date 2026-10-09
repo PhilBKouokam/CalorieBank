@@ -368,15 +368,15 @@ describe('manual source mobile parity', () => {
     expect(h.router.push).toHaveBeenCalledWith({ pathname: '/manual-estimate', params: { mode: 'select' } });
     expect(data()).toEqual(before); expect(h.saves).toEqual([]);
     await act(async () => screen!.unmount());
-    data().intake = { ...data().intake, selected: true, authoritativeProvider: 'manual_estimate', displayName: 'CalorieBank estimate', status: 'ready' };
+    data().intake = { ...data().intake, selected: true, authoritativeProvider: 'manual_estimate', displayName: 'Your estimate', status: 'ready' };
     await mount();
     expect(text(screen!.root)).toContain('Choose your goal');
     expect(text(screen!.root)).not.toContain('Connect a food tracker');
     await act(async () => screen!.unmount());
     await mountSettings();
-    expect(text(screen!.root)).toContain('CalorieBank estimate');
+    expect(text(screen!.root)).toContain('Your estimate');
     await press('Manage sources for calories eaten');
-    const manualRow = screen!.root.findAll(node => String(node.type) === 'View' && node.children.some(child => typeof child !== 'string' && text(child).includes('CalorieBank estimate')));
+    const manualRow = screen!.root.findAll(node => String(node.type) === 'View' && node.children.some(child => typeof child !== 'string' && text(child).includes('Your estimate')));
     expect(manualRow.length).toBeGreaterThan(0);
     expect(text(screen!.root)).not.toContain('Needs refresh');
     expect(h.saves).toEqual([]);

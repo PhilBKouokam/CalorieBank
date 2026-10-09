@@ -31,7 +31,7 @@ export async function manualAccountingEvidence(db: Prisma.TransactionClient, use
     id: resolved.value.evidenceVersion, userId, localDate, timezone,
     provider: 'manual_estimate', providerRecordId: `${resolved.value.localDate}:${resolved.value.evidenceVersion}`,
     totalCaloriesConsumed: resolved.value.calories,
-    writerBundleIdentifier: null, writerDisplayName: null, sourceId: '', sourceDisplayName: 'CalorieBank estimate',
+    writerBundleIdentifier: null, writerDisplayName: null, sourceId: '', sourceDisplayName: 'Your estimate',
     evidenceObservedAt: updatedAt, importedAt: updatedAt, providerUpdatedAt: null,
     syncStatus: 'ready', isCurrentDay: false, syncSessionId: null, createdAt: updatedAt, updatedAt,
   };

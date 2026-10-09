@@ -1,3 +1,4 @@
+import { sourceLabel } from '@/lib/native-health/copy';
 import { trackerChoices } from '@/lib/native-health/tracker-choices';
 import { connectionsForNativeCapability, crossDeviceSourceHint } from '@/lib/native-health/presentation';
 import { AndroidFoodChoices } from '@/components/caloriebank/AndroidFoodChoices';
@@ -519,7 +520,7 @@ function RoleCard({ role, data, onPress }: { role: Role; data: HealthConnections
   const action = remoteHint ? 'Change source' : selected ? 'Manage sources' : unselected ? 'Choose source' : 'Connect source';
   return <View style={styles.roleCard}>
     <Text style={styles.roleLabel}>{role === 'burned' ? 'Calories Burned' : 'Calories Eaten'}</Text>
-    <Text style={styles.roleValue}>{selected?.label ?? (unselected ? 'No source selected' : 'Not connected')}</Text>
+    <Text style={styles.roleValue}>{sourceLabel(selected?.label ?? (unselected ? 'No source selected' : 'Not connected'))}</Text>
     {remoteHint ? <Text style={styles.transport}>{remoteHint}</Text> : selected?.transportLabel ? <Text style={styles.transport}>via {selected.transportLabel}</Text> : null}
     <Text style={[styles.status, selected?.status === 'needs_attention' && styles.attention]}>{selected ? knownConnectionOption(selected) ? statusCopy(selected.status) : 'Selected' : unselected ? 'Choose a connected source to use here.' : 'Not connected'}</Text>
     <Pressable accessibilityLabel={`${action} for calories ${role}`} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}><Text style={styles.actionText}>{action}</Text></Pressable>
@@ -556,7 +557,7 @@ function RoleSelector({ onNativeDetails, onReconnect, appleBurnState, busy, data
       return <View key={option.optionId} style={styles.optionRow}>
         {selected ? <Ionicons color={colors.primary} name="checkmark" size={22} /> : <View style={{ width: 22 }} />}
         <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled: selected || busy || !usable }} disabled={selected || busy || !usable} onPress={() => onSelect(option)} style={styles.optionText}>
-          <Text style={styles.optionLabel}>{option.label}</Text>
+          <Text style={styles.optionLabel}>{sourceLabel(option.label)}</Text>
           {remoteHint ? <Text style={styles.optionDetail}>{remoteHint}</Text> : option.transportLabel ? <Text style={styles.optionDetail}>via {option.transportLabel}</Text> : null}
           {!remoteHint && !usable && option.status !== 'available' ? <Text style={styles.optionDetail}>{option.primaryAction === 'reconnect' ? 'Reconnect to use this source' : unavailableCopy}</Text> : null}
         </Pressable>

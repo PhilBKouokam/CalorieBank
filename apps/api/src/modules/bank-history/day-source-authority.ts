@@ -82,12 +82,13 @@ export type IntakeCandidate = {
 };
 
 export function consumerProviderName(provider: string, intakeDisplayName?: string | null) {
+  // Historical snapshots retain their original labels; normalize only presentation.
+  if (provider === 'manual_estimate') return 'Your estimate';
   if (intakeDisplayName) return intakeDisplayName;
   if (provider === 'google_health_fitbit') return 'Fitbit';
   if (provider === 'apple_health') return 'Apple Health';
   if (provider === 'health_connect') return 'Health Connect';
   if (provider === 'fatsecret') return 'FatSecret';
-  if (provider === 'manual_estimate') return 'CalorieBank estimate';
   return 'Calorie source';
 }
 
@@ -164,7 +165,7 @@ export async function resolveDaySourceAuthority(
   } : datedIntake;
   if (intakeIdentity.provider === 'manual_estimate') {
     const record = await manualAccountingEvidence(db, userId, localDate, timezone);
-    if (record) intake.push({ kind: 'intake', provider: 'manual_estimate', label: 'CalorieBank estimate',
+    if (record) intake.push({ kind: 'intake', provider: 'manual_estimate', label: 'Your estimate',
       optionId: historicalOptionId(userId, date, 'INTAKE', 'manual_estimate', null),
       writerBundleIdentifier: null, sourceId: null,
       record: snapshot ? { ...record, totalCaloriesConsumed: snapshot.importedCalorieIntake,

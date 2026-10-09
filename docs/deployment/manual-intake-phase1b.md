@@ -976,3 +976,509 @@ physical verification outstanding. Manual Intake remains disabled. Subsequent
 work resumes at pre-enablement capability/safety checks, then appropriate feature
 binaries, controlled enablement and all real-account/capability/finalization gates.
 This document-only task stops before that work; it is not full Phase 1B PASS.
+
+
+## Founder-authorized controlled enablement — 2026-09-28
+
+Consolidated physical gate passed in `7b1cea1`; founder explicitly authorized
+controlled enrollment and real-account qualification. Qualified clients are
+TestFlight iOS1.0.0(10) and Play Android1.0.0/versionCode10. No new binary.
+
+Pre-enablement: healthy `/health` and database-ready `/health/ready`; deployed
+compiled loopback-only harness passed 10/10 existing provider selection reads
+without capability. Synthetic manual response and write checks returned426 /
+`UPDATE_REQUIRED`, zero write-counter changes; capable equivalent read200.
+This is deployed protocol evidence, not authenticated real-manual-state evidence.
+The latter remains mandatory after physical onboarding.
+
+At2026-09-28T05:19:07.660Z, enrollment0 and all canonical manual categories0
+(authority, selections, states/preferences, usual boundaries, Today overrides),
+also manual finalized snapshots0. Aggregate-only read-only transaction captured
+six accounting/authority fingerprints. No raw account/health data was exported.
+
+Applied only `MANUAL_INTAKE_SELECTION_ENABLED=1` to existing private-beta web
+service via Render **Save and deploy** (reuse existing build). Configuration
+deployment `dep-dasvi0e0tbcc73996us0`, triggered05:20:01UTC, succeeded/live.
+Backend remains `bad1750ae997f434c878b33b091ca3b678e70b5f`; normal predeploy found
+35 migrations, none pending. No source build, schema change or public distribution.
+This is service-wide capable-request enrollment within the existing private-beta
+service/distribution, not an account allowlist or build-number authorization.
+Clerk authentication and `intake-authority-v2` request gating remain mandatory.
+
+At05:23:19.741UTC, parsed enrollment1, all manual counts still0 and all six
+fingerprints matched the immediately preceding baseline exactly. At05:23:31.787UTC,
+health/readiness, 10/10 legacy reads, unsupported read/write426 UPDATE_REQUIRED,
+zero write-counter changes and capable read200 all passed again.
+
+Founder designated a disposable test email privately and confirmed Fitbit access.
+No real manual account/state has yet been created by this qualification. Physical
+sign-out then disposable onboarding is next, one action at a time. No founder
+primary deletion. Real authenticated capability checks, edits/switching/parity,
+isolation/deletion and one legitimate completed local day remain unqualified.
+No fabricated past manual day or date manipulation is permitted. Full Phase1B
+PASS is not claimed. Fitbit/accounting code, support case and Phase2 untouched.
+
+
+### September 30 physical continuation: existing disposable account
+
+Founder confirmed the designated test email after sign-in went directly to Home.
+This is existing setup, not fresh onboarding evidence. iPhone Health Connections
+shows selected Fitbit needing attention, selected Cronometer via Android Health
+Connect, and the visible “I don’t track calories” choice. Manual-source discovery
+is physically confirmed; no manual selection/save is claimed yet.
+
+Founder completed the normal Fitbit reconnect flow. Screenshot shows Connected,
+Fitbit still selected for Calories Burned, and “Fitbit reconnected.” confirmation.
+Minor non-blocking presentation defect: this successful confirmation is red,
+miscommunicating an error. Use the existing success/neutral message treatment in
+a future scoped UI correction; no Fitbit behavior change or new binary is needed
+for current qualification. Evidence: founder screenshot attachment
+`989518F4-4D1F-49FE-A267-470BEF226415/1-Photo-1.jpg`.
+No fresh server ownership/accounting verification is implied by the screenshot.
+Fresh onboarding remains a separate outstanding gate.
+
+
+### September 30: first real manual selection and initialization hash investigation
+
+Designated existing test account: qualified iPhone10 manual estimate editor showed
+2500, context and Use my estimate above the open numeric keyboard (physical photo).
+Founder saved. Read-only account-scoped verification confirms manual authority and
+usual2500 effective2026-09-30 in America/Chicago, revision1, no writer/source ID,
+no override or manual finalized snapshot. This is existing-account selection,
+not fresh onboarding. Founder identified “CalorieBank estimate” as misleading
+attribution; approved presentation direction is user-entered amount plus “Your
+usual estimate” / “Your estimate”, with Today override separately labeled. This
+copy correction is recorded, not implemented in the qualified binaries.
+
+Before selection23:44:06.642UTC versus after23:50:23.454UTC: same account fingerprint,
+Available Bank10598 and Recovery0 unchanged. Opening day rows(5), finalized
+records(5), snapshots(5), ledger entries(5) matched byte fingerprints exactly.
+Manual authority count changed0→1 as intended. Initialization record hash differed.
+Read-only investigation found Opening Bank6213 still matches the unchanged five
+opening days; original initialization date and provider preparation key remain.
+Deployed commitbad1750's applyOpeningBankPeriodPolicy unconditionally updates the
+same derived opening totals/count, and Prisma marks updatedAt automatically.
+Current updatedAt23:53:06.949UTC is later than selection23:45:23.308UTC.
+This provides an existing metadata-touch mechanism; the earlier baseline retained
+only a full-row hash plus status/opening, so a field-by-field proof that *only*
+updatedAt changed is unavailable. Do not claim full initialization byte invariance.
+No changed accounting values/history/ledger are observed. Preserve this evidence
+limit; current detailed initialization is retained locally for subsequent checks.
+No production mutation or code change was made during investigation.
+
+
+Founder physical Today confirmation on iPhone10: Eaten2500 kcal and “Your daily
+estimate” display correctly. Screenshot
+`77D6CCFE-8154-4278-AD0F-820619C06765/1-Photo-1.jpg` shows the pencil below the
+provenance rather than beside Eaten. Founder requests the edit control at the
+right edge of the Eaten header row, preserving an accessible touch target and
+clear association with the Eaten value. Classify as a non-blocking presentation
+finding pending correction; edit interaction has not yet been qualified. No Home
+redesign or new build is authorized by recording this finding.
+
+
+### First Today override physical/server check
+
+Founder iPhone10 screenshot confirms2900 and “Your estimate for today” after
+Save. The preceding open-keyboard screenshot showed value, explanation and Save
+all visible. At2026-10-01T00:02:54.033Z (September30 America/Chicago), read-only
+account check confirms one logical September30 override2900, revision2; usual2500
+boundary remains revision1. Manual authority remains selected. Available Bank10598,
+Recovery0 and Opening Bank6213 unchanged. Opening day rows, finalized records,
+calculation snapshots and ledger fingerprints exactly match pre-selection baseline.
+No manual finalized snapshot exists yet. Initialization full-row timestamp caveat
+above remains; no unsupported claim of whole-row equality. Relaunch/reset and
+remaining qualification pending. Physical evidence: attachments
+`0E315731-F208-4AF8-8E9E-257092317F86/1-Photo-1.jpg` and
+`E42009C2-91AB-4186-9E07-8D32FDBE6FEB/1-Photo-1.jpg`.
+
+
+Relaunch physical PASS: founder confirmed2900 and “Your estimate for today”
+return without transient zero or provider warning. Reset action physically visible;
+founder selected Use my usual estimate, screenshot confirms2500 and “Your daily
+estimate”. Read-only verification2026-10-01T00:07:56.243Z confirms overrides0,
+usual2500 unchanged, same manual authority/account, Available Bank10598,
+Recovery0, Opening Bank6213. Opening days, finalized records, snapshots and ledger
+hashes remain identical to pre-selection baseline. Initialization timestamp
+limitation remains separately documented. Reset photo:
+`C6CA3F15-9924-4B37-915D-2017684B8553/1-Photo-1.jpg`.
+
+
+Founder confirms usual-estimate editor retains2500 after Today reset. Physical
+Settings finding: “Edit estimate” is embedded in muted descriptive text and wraps,
+so the available action is insufficiently prominent. Record as non-blocking
+usability/discoverability defect pending a distinct styled Edit estimate control,
+consistent with the approved user-attributed estimate presentation. No code/build
+change made during qualification. Evidence:
+`56CF51B5-0CD6-42EA-B6C4-14812321E247/1-Photo-1.jpg` and `2-Photo-2.jpg`.
+
+
+Usual change2500→2700: founder confirmed Save returns normally. Read-only check
+at2026-10-01T00:19:04.734Z confirms usual2700 revision4 effectiveSeptember30
+America/Chicago, no override, unchanged manual authority. Same-day preference
+boundary was updated rather than creating historical intake. Available Bank10598,
+Recovery0, Opening Bank6213 unchanged; opening days/finalized records/snapshots/
+ledger fingerprints still match pre-selection baseline. Physical Today2700
+confirmation remains pending at this checkpoint.
+
+### Active override and usual-editor verification
+
+Founder subsequently confirmed Today 2700, then saved a Today override of 2900
+(revision 5), physically shown with “Your estimate for today”. During the next
+requested usual-estimate change, the server instead showed override 2800
+(revision 6) with usual 2700 unchanged. The exact editor used for that earlier
+save is not established; do not classify this as a product defect or user error.
+
+Founder then supplied the usual-editor screenshot showing 2700
+(`C9310440-4E62-4EB4-8B6F-8C308FDA55E8/1-Photo-1.jpg`) and explicitly repeated
+2700 → 2800 on that screen. Server verification confirms usual 2800 revision 7,
+updated 2026-10-01T00:35:10.495Z; the existing Today override remains 2800
+revision 6. Thus this usual-editor operation did not modify the override.
+Read-only accounting check at 2026-10-01T00:38:49.035Z confirms Available Bank
+10598, Recovery 0, Opening Bank 6213, and unchanged fingerprints for opening-day
+rows, finalized records, calculation snapshots and ledger. The initialization
+whole-row evidence limitation above remains. A distinct-value physical check
+is still needed to finish the active-override/usual-change qualification.
+
+Distinct-value independence recheck: founder saved Today 2900 (override revision 8)
+while usual remained 2800 (revision 7). Founder then changed the usual editor from
+2800 to 2700. Server confirms usual 2700 revision 9, updated
+2026-10-01T00:42:00.820Z, while the September 30 Today override remains 2900
+revision 8, unchanged. This establishes preference/override independence for the
+real account; physical Today display confirmation remains the next check.
+At 2026-10-01T00:42:26.459Z, Available Bank 10598, Recovery 0 and Opening Bank
+6213 remain unchanged. Opening-day, finalized-record, calculation-snapshot and
+ledger fingerprints match the pre-selection baseline. No product code changed.
+
+Founder physically confirmed Today still shows 2900 with “Your estimate for
+today” after usual changed to 2700: distinct-value independence physical PASS.
+Explicit-zero save then verified at 2026-10-01T00:48:06.741Z: one September 30
+Today override exists with calories 0, revision 10; usual remains 2700 revision 9.
+Zero is persisted as a value, not missing state. Available Bank 10598, Recovery 0,
+Opening Bank 6213 and the four historical accounting fingerprints remain unchanged.
+Physical zero display and subsequent reset remain pending at this checkpoint.
+
+Founder confirmed explicit-zero Today display: 0 kcal with “Your estimate for
+today”. Then used Use my usual estimate. Read-only verification at
+2026-10-01T00:52:46.150Z confirms overrides empty and usual 2700 revision 9
+unchanged. Available Bank 10598, Recovery 0, Opening Bank 6213 and all four
+historical accounting fingerprints remain unchanged. Physical return to the
+2700 daily-estimate display remains the next confirmation.
+
+Founder confirmed reset displays 2700 with “Your daily estimate”. FatSecret was
+Connected / Not currently used; founder refreshed successfully before selecting
+FatSecret from Calories Eaten → Manage sources. Founder confirmed selection.
+Read-only check at 2026-10-01T01:01:44.514Z confirms current intake fatsecret,
+burn google_health_fitbit unchanged, usual estimate 2700 revision 9 retained,
+and no Today override. Available Bank 10598, Recovery 0, Opening Bank 6213 and
+opening-day/finalized-record/snapshot/ledger fingerprints remain unchanged.
+Physical provider Today value/provenance and non-summation remain pending.
+
+### Provider-to-manual return
+
+FatSecret Today initially displayed no intake and a refresh error; one physical
+pull-to-refresh cleared the error and displayed 2991 kcal, “Imported from
+FatSecret” (photo BC328853-6168-4836-82AA-7A2AE20631E8/1-Photo-1.jpg).
+The manual value was not carried into that displayed provider total. Independent
+provider aggregate comparison remains necessary for full server non-summation proof.
+
+The provider chooser does not offer manual selection while FatSecret is selected;
+manual enrollment is reached through the separate “I don’t track calories” card.
+Founder opened that card, confirmed the retained 2700 estimate, and selected
+Use my estimate. Read-only verification at 2026-10-01T01:19:26.036Z confirms
+manual_estimate authority effective September 30 America/Chicago, null writer/source
+IDs, usual 2700 revision 12, and no override. Fitbit burn remains selected.
+Available Bank 10598, Recovery 0, Opening Bank 6213 and opening-day/finalized-record/
+snapshot/ledger fingerprints remain unchanged against the pre-selection baseline.
+Physical Today display after return remains pending.
+
+### Android manual editing and cross-device baseline
+
+Founder confirmed iPhone Today returns to 2700 / “Your daily estimate” after
+provider-to-manual selection. On qualified Samsung Play versionCode 10, founder
+signed out of the other account and signed into the designated test account.
+Today displayed 2700 / “Your daily estimate” with pencil; editor prefilled 2700.
+Physical photo A3ECF827-E75C-4C1A-AD0C-6E50ACD64E68/1-Photo-1.jpg shows entered
+2900, explanatory context and Save all visible above the numeric keyboard.
+Manual-editor Android keyboard reachability PASS. Founder saved and returned.
+
+Read-only check at 2026-10-01T01:34:30.718Z confirms one September 30 override
+2900 revision 13, usual 2700 revision 12 unchanged, manual_estimate selected,
+and Fitbit burn unchanged. Available Bank 10598, Recovery 0, Opening Bank 6213
+and four historical accounting fingerprints remain unchanged. iPhone refresh
+of this Android-authored override is the next physical check.
+
+Founder confirmed iPhone refresh shows the Android-authored 2900 with “Your
+estimate for today”: Android-to-iPhone physical synchronization PASS.
+Founder then saved 2700 as an explicit Today override on iPhone. Read-only check
+at 2026-10-01T01:58:46.546Z confirms override 2700 revision 14, while usual 2700
+revision 12 is unchanged. Matching the usual value does not remove the override.
+Available Bank 10598, Recovery 0, Opening Bank 6213 and four historical accounting
+fingerprints remain unchanged. Samsung refresh confirmation is pending.
+
+Founder confirmed Samsung refresh receives the iPhone-authored 2700 override
+with “Your estimate for today”: iPhone-to-Android physical synchronization PASS.
+Both directions preserved displayed value and manual provenance; wire semantic-kind
+verification remains a separate server/API requirement.
+
+Samsung offline smoke PASS: founder enabled Airplane mode with Wi-Fi off, returned
+to Today and refreshed; 2700 / “Your estimate for today” remained visible without
+zero or provider fallback. After restoring connectivity, refresh returned normally
+with the same value/provenance and no connection error. No offline edit attempted.
+Founder also confirmed Android Health Connections shows manual intake selected
+and the retained usual estimate 2700. Manual-specific permission behavior and
+accessibility checks remain pending.
+
+### Manual permission and focused accessibility smoke
+
+Founder reports no Health Connect food/nutrition permission prompt while signing
+into the manual account and editing its estimate on Samsung. This is physical
+no-prompt evidence for that journey, not a fresh-install permission audit.
+
+Samsung TalkBack: Eaten edit control announced “eaten 2700 kcal your estimate
+today edit button”; activation opened the editor. Input announced “2700 edit
+box”, Save announced as a button, and Cancel returned normally without saving.
+Input announcement establishes value/editability but does not establish a
+purpose-specific accessible label on Android. Founder then disabled TalkBack.
+
+iPhone VoiceOver: edit control announced “Edit calories eaten. 2,700 kilocalories.
+Your estimate for today. button.” Activation opened the editor. Field announced
+“Calories eaten today. kilocalories 2,700. text field. double tap to edit”. Save
+announced “Save button.” Cancel returned normally without saving; founder disabled
+VoiceOver. Focused Today-editor accessibility smoke passes for these observed
+operations. Manual source-choice accessibility and physical enlarged-text evidence
+are not established by this smoke. No product code or account values changed.
+
+### Account switching and first completed manual day
+
+Samsung A→B showed 1787 / Imported from Cronometer; founder confirmed no transient
+2700 manual estimate appeared. B→A after the local-date rollover restored 2700 /
+Your daily estimate. This is physical account-isolation/restoration evidence,
+not a substitute for the pending authenticated capability matrix.
+
+September 30 History screenshot shows 3975 Fitbit burn × 0.8 = 3180,
+Maintenance, Eaten 2700, contribution +480, intake CalorieBank estimate.
+Read-only server check at 2026-10-01T21:10:10.234Z confirms one September 30
+record, version 1, PROVISIONAL, correctionCount 0; finalizedAt
+2026-10-01T05:02:15.205Z (after Chicago midnight). It has one manual_estimate
+snapshot with intake 2700 and null writer/source IDs, and one daily_finalization
+ledger transaction +480. The legitimate September 30 override 2700 revision 14
+remains stored; usual 2700 revision 12 remains intact. No fabricated date or
+manual finalization write was performed for this inspection.
+
+Available Bank 11734 reconciles to Opening Bank 6213 + ledger sum 5521
+(7 transactions), Recovery 0. The increase from 10598 is 1136 = September 30
+manual +480 plus September 24 provider +656. The latter is a separate Cronometer
+snapshot (intake 2498, adjusted burn 3154), finalized at
+2026-10-01T02:19:42.017Z; it is not a manual-history rewrite. Formal lifecycle
+rerun/idempotency and historical-row fingerprint comparison remain pending.
+Physical photos: 3C51530F-954D-439E-9DF7-344EA1C76E95/1-Photo-1.jpg and
+9B2809C0-9401-4503-9274-108970B4ED1C/1-Photo-1.jpg.
+
+After founder refreshed Samsung Today, read-only check at
+2026-10-01T21:28:26.625Z found all selected finalized-record, snapshot and ledger
+fields identical to the 21:10 check. September 30 remains one version-1 snapshot
+and one +480 ledger entry, with no corrections. Total ledger count remains 7,
+sum 5521, Opening Bank 6213. This establishes no duplicate effect after the
+observed foreground refresh; it does not by itself prove that the server-owned
+lifecycle was invoked again. Explicit lifecycle rerun evidence remains pending.
+
+### Missing Morning Bank Update investigation
+
+Founder reported no notification on either phone. iPhone OS permission was enabled;
+Samsung permission was disabled and founder enabled it, then reopened CalorieBank.
+At 2026-10-01T21:54:02.875Z, safe read-only production inspection confirms active
+Android registration lastRegisteredAt 21:51:49.517Z, no invalidation, and account
+Morning Bank Update preference enabled. September 30 delivery is NO_TOKEN,
+failureCode no_active_token, attemptCount 0, no deliveredAt or receipt: no delivery
+was attempted because there was no active registered destination at evaluation.
+No push tokens were exported. Physical notification delivery remains unqualified.
+
+Current schema/service supports one push registration per account (userId primary
+key); registerDevice replaces that account's destination, and unregisterDevice
+removes it by userId. Thus OS permission alone does not establish a server-registered
+iPhone destination, and concurrent-device delivery is not supported by this model.
+These facts do not prove the exact earlier registration-loss sequence. No notification
+code, timing or transport was changed, and no test notification was sent.
+
+### Real authenticated manual-state capability checks
+
+At 2026-10-02T02:01:53.677Z, controlled HTTPS requests to the deployed API used
+an existing active Clerk session for the designated disposable manual account.
+A session token was obtained through the installed Clerk SDK and held only in
+server process memory; no credentials/session identifiers were printed or saved.
+No authentication bypass or injected identity harness was used.
+
+Each of provider-selection, Today, September 30 bank-history detail,
+health-connections, onboarding and manual-intake returned HTTP 426 with
+error.details.code UPDATE_REQUIRED without the capability header. Each identical
+GET returned 200 with X-CalorieBank-Capabilities: intake-authority-v2.
+This includes real persisted manual History, not a synthetic fixture.
+
+At 02:02:32.324Z, an authenticated PUT attempting to select FatSecret without
+capability returned 426 UPDATE_REQUIRED. Before/after sorted-row SHA-256 checks
+were identical for providerSelection, intakeAuthorityBoundary, manualIntakeState,
+manualEstimateBoundary, manualIntakeOverride, finalizedDailyBankRecord,
+bankCalculationSnapshot, calorieLedgerTransaction and bankAccountInitialization.
+A subsequent capable manual-intake read returned 200 and selected=true.
+Rejected-write invariance and continued capable access PASS for this operation.
+Capable equivalent writes already worked physically in the source round-trip;
+a paired controlled capable write was not issued here to avoid another transition.
+Authenticated provider-only no-capability control remains pending (earlier
+loopback controls are not substituted for that evidence).
+
+### Authenticated provider-only legacy control
+
+Founder supplied a separate provider-account email and signed into it on Samsung.
+Two internal email matches required identity disambiguation: one Clerk identity
+returned 404; the other existed with matching email and, after founder sign-in,
+a unique active session. Only that existing Clerk session was used. API ownership
+was resolved by its verified subject, never by injecting an email-selected user ID.
+The current account's selected intake is apple_health; this is not treated as proof
+of identity for the earlier Cronometer screenshot/account-isolation observation.
+
+At 2026-10-02T02:14:52.534Z, provider-selection, Today, health-connections and
+onboarding each returned 200 without Manual Intake capability and again with it
+(8 authenticated read checks). Provider-only legacy control PASS: there is no
+global Update Required wall on these compatible responses. No source/configuration
+writes were sent and no credentials or subject/session identifiers were exported.
+
+### October 8 resumption: unexpected provider source
+
+Founder signed into the manual test email on Samsung but reported no intake today
+with Cronometer provenance. Read-only check at 2026-10-08T19:45:48.213Z matches
+the original account fingerprint. Its current saved intake is apple_health,
+updated 2026-10-02T15:10:19.914Z, with an October 2 apple_health authority boundary.
+September 30 manual authority and usual 2700 revision 12 remain stored. This is
+not merely inferred from the phone display. The initiator/reason for the October 2
+source change is unestablished; ask founder before any restoration or further
+qualification. No corrective write or source switch performed during inspection.
+
+October 8 Samsung manual-selection editor retains 2700. Founder photo
+1536E61D-B55A-4E73-97AA-C30E3EF930F5/1-Photo-1.jpg shows an extra dark underline
+inside the outlined input. Source inspection finds a standard React Native
+TextInput with an explicit border and no underlineColorAndroid override. This is
+consistent with an Android native underline; exact runtime origin is not yet
+proven. Classify as a non-blocking visual inconsistency, with value and action
+legible. No styling change or replacement build made during this qualification.
+Founder believes they changed the source during the intervening week, but does
+not recall definitively; retain uncertainty about the October 2 change initiator.
+
+October 8 manual reselection verified at 2026-10-08T20:00:24.005Z: same account
+fingerprint, manual_estimate selected, new October 8 authority boundary, and
+2700 usual boundary revision 15 effective October 8. September 30 usual boundary
+2700 revision 12 and prior authority boundaries remain present. This establishes
+prospective source/preference restoration; full accounting comparison was not
+performed in this source-only inspection. Physical Today confirmation pending.
+
+### Real disposable account deletion
+
+Founder explicitly reconfirmed the manual test account is safe to permanently
+delete and identified a different primary account to preserve. Samsung deletion
+form showed its consequences and required DELETE; founder confirmed input and
+Delete Account remained reachable with keyboard open. Founder deleted through
+the normal app UI and reported return to Sign In.
+
+Pre-deletion check at 2026-10-08T20:19:57.638Z matched the original test account
+fingerprint: manual state 1, usual boundaries 2, override 1, authority boundaries 5,
+finalized records/snapshots/ledger 13 each, push registration 1. Original internal
+identity was retained in a server-local mode-0600 temporary verification file,
+not printed, to avoid confusing later same-email recreation with the deleted user.
+
+Post-deletion read-only verification at 2026-10-08T20:26:03.375Z: Clerk identity
+lookup returned 404, internal user count 0. Every Prisma model with a scalar
+userId field returned 0 for the original ID, including all manual categories,
+finalized/accounting records, provider connections/OAuth attempts, notification
+registration/deliveries/preferences, profile/goals and ingestion records. No
+userId-owned orphan was found. This verifies database cleanup and Clerk removal;
+external provider revocation itself was not separately inspected. Cold relaunch
+and fresh recreation/onboarding remain pending. No agent-issued deletion or
+manual database cleanup was performed.
+
+### Same-email recreation and fresh manual onboarding: physical evidence
+
+After cold relaunch remained at Sign In, founder recreated using the disposable
+email. Fresh onboarding appeared. Fitbit showed Connected and ready. A Cronometer
+attempt reported no matching Health Connect calories despite the founder's
+Cronometer diary/connection screenshots; actual Health Connect nutrition records
+were not inspected, so no provider root cause or regression conclusion is made.
+Founder returned to manual onboarding. The manual option was visible first; its
+editor was empty, with no deleted 2700 restored. Entered 2500 with keyboard open:
+field/context/action remained reachable. The previously recorded Android underline
+remains visible. Saved estimate showed 2500; Fitness Goal Maintain and Daily Bank
+Target 0 proceeded to Preparation. Preparation marked the estimate Checked and
+finished with starting balance 0, waiting for the first completed day.
+
+Photo F4CAC8FB-F3AA-4310-B1B9-E7BFBB5D9E8E/1-Photo-1.jpg confirms Today 2500 /
+Your daily estimate, edit pencil, and no completed day yet. Fresh-onboarding
+physical journey succeeded. Server confirmation of distinct recreated identity,
+zero opening/history rows and absence of resurrected data remains pending because
+the browser connection became unavailable before the prepared read-only query
+could run. No server result is claimed from the screenshots alone.
+
+Fresh-account server check at 2026-10-08T21:42:43.150Z confirms both internal
+identity and Clerk subject differ from the deleted account; old internal account
+remains absent. Selected burn is google_health_fitbit, intake manual_estimate.
+Exactly one usual estimate 2500 revision 1 is effective October 8. Opening Bank
+is INITIALIZED at 0; goal maintain with adjustment 0. Opening calculation days,
+finalized daily records, snapshots, ledger transactions and Today overrides are
+all 0. Same-email recreation did not restore old manual or accounting state.
+Fresh manual setup physical/server evidence now agrees; no fabricated historical
+intake or Opening Bank rows were created by Preparation.
+
+### October 8 focused automated qualification
+
+Node 20.20.2: all 67 tests in five files passed: manual-intake.persistence,
+intake-authority.persistence, intake-capability, manual-date-rollover and
+morning-bank-update. Domain and schemas TypeScript builds passed as pretest.
+Used only localhost caloriebank_test_phase1b_20260923 with its existing owner.
+Initial attempts were blocked by sandbox listeners and then the application
+role's test-table permissions; the successful owner-role run exited 0. No
+production database was used for these tests and no database grants changed.
+
+The fresh-manual persistence test explicitly performs no Today read, daily
+confirmation or mobile intake upload, then reconciles the same completed day
+twice. It verifies manual 2500 provenance, one ledger entry, no override and
+correct Recovery. This is deterministic no-daily-open/idempotency evidence,
+not proof of production scheduler execution or a delivered physical notification.
+
+Qualification remains incomplete: the recreated account has not yet completed
+its first local day. Earlier production September 30 posting and unchanged
+post-refresh accounting remain valid evidence, but a confirmed executed live
+lifecycle retry was not captured before that account was deleted. Physical
+notification delivery, source-choice accessibility/enlarged text and the noted
+consumer visual issues are not promoted to PASS by these automated results.
+No implementation, deployment, account selection or main-account changes made.
+
+### October 9 founder-requested immediate notification test
+
+Physical History shows October 8 Fitbit 4337 × 0.8 rounded to 3470, Maintain,
+manual estimate 2500, contribution +970; Today Available Bank 970. Founder said
+notifications had been off, then enabled OS and Morning Bank Update settings.
+Explicitly requested immediate delivery rather than waiting until tomorrow.
+Server confirmed enabled preference, active Android registration (last registered
+2026-10-09T22:49:08.301Z), and exactly one completed record, October 8 +970.
+Sent one out-of-window diagnostic push through the existing Expo destination and
+payload shape, using the actual bank update copy. Expo accepted at
+2026-10-09T22:51:23.769Z, HTTP 200, status ok, ticket present. No token exported.
+Server-local exclusive-create audit file prevents accidental same-script resend.
+No accounting, schedule, preference or normal delivery-row changes. This is an
+explicit diagnostic send, not proof of automatic morning scheduling. Physical
+arrival remains pending founder confirmation.
+
+Founder confirmed the October 9 immediate notification arrived on Samsung.
+Physical delivery of the explicitly requested diagnostic push PASS. Automatic
+morning scheduling remains separately unverified; this manual send does not
+establish scheduler timing or once-only scheduled delivery.
+
+### Your estimate wording release — October 9
+
+Founder authorized replacement of CalorieBank estimate with Your estimate and
+private iOS/Android distribution. Mobile normalizes legacy server labels on
+Health Connections, setup and history, allowing the existing API deployment to
+remain unchanged. Source identifiers, stored historical records and accounting
+are unchanged. Local API copy is updated for its next release. Existing copy,
+persistence and history suite passed 89 tests; legacy presentation regression
+passed 8; final onboarding/presentation rerun passed 43. Type checks passed.
+Visual review so far is source/layout review only; physical wording/wrapping
+verification on the new store builds remains pending. No public distribution.

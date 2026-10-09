@@ -187,7 +187,7 @@ function toDetail(record: RecordWithSnapshots): BankHistoryDayDetailResponse {
       importedCalorieIntake: snapshot.importedCalorieIntake,
       expenditureProvider: snapshot.expenditureProvider,
       intakeProvider: snapshot.intakeProvider,
-      intakeSourceDisplayName: snapshot.intakeSourceDisplayName,
+      intakeSourceDisplayName: snapshot.intakeProvider === 'manual_estimate' ? 'Your estimate' : snapshot.intakeSourceDisplayName,
       createdAt: snapshot.createdAt.toISOString(),
     })),
   };
@@ -1322,7 +1322,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           intakeProviderRecordId: intake.providerRecordId,
           intakeSourceDisplayName: intake.provider === 'health_connect' ? intake.sourceDisplayName : intake.provider === 'apple_health'
             ? intake.writerDisplayName
-            : intake.provider === 'fatsecret' ? 'FatSecret' : intake.provider === 'manual_estimate' ? 'CalorieBank estimate' : null,
+            : intake.provider === 'fatsecret' ? 'FatSecret' : intake.provider === 'manual_estimate' ? 'Your estimate' : null,
           intakeSourceId: intake.provider === 'health_connect' ? intake.sourceId : null,
           intakeWriterBundleIdentifier: intake.provider === 'apple_health'
             ? intake.writerBundleIdentifier

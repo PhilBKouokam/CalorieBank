@@ -232,7 +232,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       intake: {
         selected: selection.intakeSelected && (selection.authoritativeIntakeProvider !== 'apple_health' || Boolean(selection.appleHealthIntakeWriterBundleId)),
         authoritativeProvider: selection.authoritativeIntakeProvider as 'apple_health' | 'fatsecret' | 'health_connect' | 'manual_estimate',
-        displayName: selection.authoritativeIntakeProvider === 'manual_estimate' ? 'CalorieBank estimate' : selection.authoritativeIntakeProvider === 'health_connect'
+        displayName: selection.authoritativeIntakeProvider === 'manual_estimate' ? 'Your estimate' : selection.authoritativeIntakeProvider === 'health_connect'
           ? nativeIntakeSourceName(selection.nativeIntakeSourceId ?? '')
           : selection.authoritativeIntakeProvider === 'fatsecret'
           ? 'FatSecret'
@@ -396,7 +396,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
     if (nativeOption && (selection.authoritativeIntakeProvider === 'health_connect' || selection.nativeIntakeSourceId !== 'com.fatsecret.android' || fatSecretStatus !== 'connected')) eatenOptions.push(nativeOption);
     requireIntakeCapability(selection.authoritativeIntakeProvider);
     const effectiveEatenSelected = selection.intakeSelected && selection.authoritativeIntakeProvider === 'manual_estimate'
-      ? roleOption('eaten-manual-estimate-v1', 'CalorieBank estimate', 'available')
+      ? roleOption('eaten-manual-estimate-v1', 'Your estimate', 'available')
       : selection.intakeSelected && selection.authoritativeIntakeProvider === 'health_connect' ? nativeOption : eatenSelected;
     const selectable = (option: HealthConnectionOption) => option.status === 'connected';
 

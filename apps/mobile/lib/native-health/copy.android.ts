@@ -3,7 +3,7 @@ export const deletionHealthNote = '';
 export const nativeRefreshFailure = 'Your saved health source cannot refresh on this phone.';
 // Historical provenance is not relabeled as Health Connect.
 export function sourceLabel(label: string) {
-  return label;
+  return label === 'CalorieBank estimate' ? 'Your estimate' : label;
 }
 
 export const nativeDiagnosticsTitle = 'Health Connect qualification';

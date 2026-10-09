@@ -98,7 +98,7 @@ describe('manual estimate persistence', () => {
     await repo.mutate(id, { operation: 'select', calories: 2500, expectedRevision: 0, selectionRevision: null });
     await repo.mutate(id, { operation: 'today', calories: 2900, expectedRevision: 1, localDate: '2026-09-23' });
     const today = await new PrismaTodayAggregateRepository(db).getTodayForUser(id, '2026-09-23', 'America/Chicago');
-    expect(today.eaten).toMatchObject({ calories: 2900, source: 'CalorieBank estimate', estimateKind: 'today', authoritative: { semanticKind: 'estimated_total_day_intake' } });
+    expect(today.eaten).toMatchObject({ calories: 2900, source: 'Your estimate', estimateKind: 'today', authoritative: { semanticKind: 'estimated_total_day_intake' } });
     await db.providerSelection.update({ where: { userId: id }, data: { authoritativeExpenditureProvider: 'google_health_fitbit', expenditureSelected: true } });
     await db.goalConfiguration.create({ data: { userId: id, goalMode, adjustmentSource: 'manual_calories', dailyEnergyAdjustment: adjustment } });
     await db.dailyExpenditureAggregate.create({ data: { userId: id, localDate: date('2026-09-23'), timezone: 'America/Chicago', provider: 'google_health_fitbit', providerRecordId: 'burn', rawTotalDailyExpenditure: 4250, adjustedDailyExpenditure: 3400, adjustmentFactor: 0.8, importedAt: new Date('2026-09-24T08:00:00Z'), syncStatus: 'ready', isCurrentDay: false } });

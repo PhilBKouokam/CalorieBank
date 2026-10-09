@@ -789,7 +789,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
           updatedAt: intake.updatedAt.toISOString(),
         } : null),
         ...(manual ? { estimateKind: manual.overridden ? 'today' as const : 'usual' as const } : {}),
-        source: manual ? 'CalorieBank estimate' : intake
+        source: manual ? 'Your estimate' : intake
           ? intake.provider === 'health_connect' ? intake.sourceDisplayName ?? 'Food tracker' : intake.provider === 'apple_health'
             ? intake.writerDisplayName
             : getProviderDisplayName(intake.provider)

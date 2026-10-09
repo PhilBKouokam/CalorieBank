@@ -17,7 +17,7 @@ export function ManualSourceChoice({ disabled = false, onOpen }: { disabled?: bo
     <Pressable accessibilityRole="button" accessibilityLabel={state.selected ? 'Edit usual daily estimate' : 'I don’t track calories'} disabled={disabled} style={styles.action} onPress={() => {
       onOpen?.(); router.push({ pathname: '/manual-estimate', params: { mode: state.selected ? 'usual' : 'select' } });
     }}>
-      <Text style={styles.title}>{state.selected ? 'CalorieBank estimate' : 'I don’t track calories'}</Text>
+      <Text style={styles.title}>{state.selected ? 'Your estimate' : 'I don’t track calories'}</Text>
       <Text style={styles.detail}>{state.selected
         ? `Usual daily estimate: ${state.estimate?.usualCalories.toLocaleString() ?? '—'} kcal. Edit estimate.`
         : 'Tell CalorieBank about how many calories you usually eat in a day. You can adjust today’s number anytime.'}</Text>

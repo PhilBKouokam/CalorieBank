@@ -31,7 +31,7 @@ function selectedSource(
   const connection = connectedProviders.find((item) => item.provider === role.authoritativeProvider);
   const state = deriveSourceState(sourceRole, role, connection?.status);
   if (sourceRole === 'eaten' && role.authoritativeProvider === 'manual_estimate') {
-    return { provider: role.authoritativeProvider, displayName: 'CalorieBank estimate', connected: false,
+    return { provider: role.authoritativeProvider, displayName: 'Your estimate', connected: false,
       status: role.status, readiness: role.status === 'ready' ? 'ready' as const : 'not_connected' as const };
   }
   return {

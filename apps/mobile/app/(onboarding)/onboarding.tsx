@@ -1,3 +1,4 @@
+import { sourceLabel } from '@/lib/native-health/copy';
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { isKnownIntakeProvider } from '@caloriebank/schemas';
 import { AndroidFoodChoices } from '@/components/caloriebank/AndroidFoodChoices';
@@ -629,7 +630,7 @@ export default function OnboardingScreen() {
           {status.intake.connected && nativeRecoveryStage !== 'calories_eaten' && editingRole !== 'intake' ? <ConnectedSource
             busy={intakeActionActive}
             canContinue={sourceSelectionSatisfiesOnboarding(status.intake)}
-            source={status.intake.displayName}
+            source={sourceLabel(status.intake.displayName)}
             state={intakeState}
             waitingDetail={`CalorieBank will use calories from ${status.intake.displayName} when they appear${status.intake.provider === 'apple_health' ? ' in Apple Health' : ''}.`}
             onBack={() => showStage(previousSetupStage(activeStage))}
@@ -689,7 +690,7 @@ export default function OnboardingScreen() {
             ? busy === 'preparing' ? 'Checking your activity data. Your daily estimate is ready.' : 'Your daily estimate is ready. Refresh your activity source to finish preparing your bank.'
             : busy === 'preparing' ? 'Checking your recent activity and nutrition data.' : 'Waiting for recent calorie data from your connected apps. You can refresh or review your connections below.'}</Text>
           <PreparationRow label="Calories burned" source={status.expenditure.displayName} state={status.preparation.expenditure} waitingLabel={status.expenditure.provider === 'apple_health' ? 'Waiting for Apple Health data' : undefined} />
-          <PreparationRow label="Calories eaten" source={status.intake.displayName} state={status.preparation.intake} waitingLabel={status.intake.provider === 'apple_health' ? 'Waiting for Apple Health data' : undefined} />
+          <PreparationRow label="Calories eaten" source={sourceLabel(status.intake.displayName)} state={status.preparation.intake} waitingLabel={status.intake.provider === 'apple_health' ? 'Waiting for Apple Health data' : undefined} />
           <PrimaryButton busy={busy === 'preparing'} label={status.expenditure.provider === 'apple_health' || status.intake.provider === 'apple_health' ? 'Refresh Apple Health' : 'Try again'} onPress={() => void prepareBank()} />
           <Pressable accessibilityRole="button" accessibilityLabel="Check connections" onPress={() => router.push({ pathname: '/integrations', params: { returnTo: 'onboarding' } })}><Text style={styles.linkText}>Check connections</Text></Pressable>
           <BackButton label="Edit setup" onPress={() => showStage(preparationEditStage(status))} />
