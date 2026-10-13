@@ -270,6 +270,7 @@ function createOrchestrationHarness(options: {
     },
     providerSelection: { findUnique: async () => null },
     intakeAuthorityBoundary: { findFirst: async () => null },
+    dailyIntakeAdjustment: { findUnique: async () => null },
     goalConfiguration: { findUnique: async () => ({ goalMode: 'maintain' }) },
     ingestionSyncSession: { findFirst: async () => ({ expenditureStatus: 'ready', intakeStatus: 'ready' }) },
     bankDayProcessingState: {

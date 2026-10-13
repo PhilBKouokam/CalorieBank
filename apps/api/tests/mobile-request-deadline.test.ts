@@ -42,7 +42,7 @@ it('advertises capability and treats update-required as compatibility, preservin
   expect(isUpdateRequired()).toBe(true);
   await expect(fetchPlannedTreat()).resolves.toEqual(emptyPlan);
   expect(fetcher.mock.calls[0]?.[1].headers).toMatchObject({
-    'x-caloriebank-capabilities': 'intake-authority-v2', Authorization: 'Bearer token',
+    'x-caloriebank-capabilities': 'intake-authority-v2,intake-adjustment-v1', Authorization: 'Bearer token',
   });
   setApiAccessTokenProvider(async () => 'B-token', { ready: true, activeSessionPresent: true }, 'B');
   expect(isUpdateRequired()).toBe(false);

@@ -1,3 +1,4 @@
+import { createIntakeAdjustmentRouter } from './modules/intake-adjustment/intake-adjustment.routes';
 import { createNativeIntakeRouter } from './modules/native-intake/native-intake.routes';
 import cors from 'cors';
 import { DailyBankTargetRepository } from './modules/daily-bank-target/daily-bank-target.repository';
@@ -253,6 +254,7 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
     createDashboardPreferencesRouter(dashboardPreferencesRepository, currentUser),
   );
   app.use('/v1/me/daily-bank-target', createDailyBankTargetRouter(new DailyBankTargetRepository(prisma), currentUser));
+  app.use('/v1/me/intake-adjustment', createIntakeAdjustmentRouter(prisma, currentUser));
   app.use('/v1/me/manual-intake', createManualIntakeRouter(prisma, currentUser, config.MANUAL_INTAKE_SELECTION_ENABLED === '1'));
   app.use(
     '/v1/me/ingestion/sync-sessions',

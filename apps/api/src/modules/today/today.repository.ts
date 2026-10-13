@@ -1,3 +1,6 @@
+import { activeAdjustment, adjustmentValue } from '../intake-adjustment/intake-adjustment.repository';
+import { adjustedIntakeCalories } from '@caloriebank/domain';
+import { requireAdjustmentCapability } from '../../security/intake-capability';
 import { intakeRefreshPlan, resolveIntakeAuthority } from '../provider-selection/intake-authority';
 import { resolveManualIntake } from '../manual-intake/manual-intake.repository';
 import { requireIntakeCapability } from '../../security/intake-capability';
@@ -674,6 +677,12 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       authoritativeProvider: syntheticIntake ? 'development' : datedIntake.provider,
       allowFallback: false,
     });
+    const adjustmentRow = activeAdjustment(await db.dailyIntakeAdjustment.findUnique({ where: { userId_localDate: { userId, localDate: date } } }), datedIntake);
+    const intakeAdjustment = adjustmentValue(adjustmentRow);
+    if (intakeAdjustment) requireAdjustmentCapability();
+    const effectiveCalories = adjustedIntakeCalories(manual?.value.calories ?? intake?.totalCaloriesConsumed ?? null, intakeAdjustment);
+    const adjustedUpdatedAt = adjustmentRow ? new Date(Math.max(adjustmentRow.updatedAt.getTime(),
+      intakeAdjustment?.mode === 'replace' ? 0 : intake?.updatedAt.getTime() ?? (manual ? new Date(manual.value.updatedAt).getTime() : 0))).toISOString() : null;
     const syntheticContext = this.options.allowSyntheticProviders &&
       (stepRecords.length > 0 || workoutRecords.length > 0) &&
       [...stepRecords, ...workoutRecords].every((record) => isSyntheticProvider(record.provider));
@@ -701,7 +710,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       expenditure ? syncStatus(expenditure.syncStatus) : categoryStatus(expenditureSession?.expenditureStatus, selection.expenditureSelected),
       expenditure?.updatedAt ?? expenditureSyncedAt,
     );
-    const eatenStatus = manual ? 'ready' : currentDayFreshness(
+    const eatenStatus = manual || intakeAdjustment?.mode === 'replace' ? 'ready' : currentDayFreshness(
       intake ? syncStatus(intake.syncStatus) : categoryStatus(intakeSession?.intakeStatus, selection.intakeSelected),
       intake?.updatedAt ?? intakeSyncedAt,
     );
@@ -781,20 +790,26 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         status: burnedStatus,
       },
       eaten: {
-        calories: manual?.value.calories ?? intake?.totalCaloriesConsumed ?? null,
-        authoritative: manual?.value ?? (intake ? {
+        calories: effectiveCalories,
+        intakeAdjustment,
+        authoritative: intakeAdjustment && effectiveCalories !== null ? {
+          localDate, calories: effectiveCalories, source: intakeAdjustment.mode === 'replace' ? 'manual_estimate' : datedIntake.provider,
+          semanticKind: intakeAdjustment.mode === 'replace' || manual ? 'estimated_total_day_intake' as const : 'observed_current_day_intake' as const,
+          evidenceVersion: `adjustment:${adjustmentRow!.revision}:${intake?.updatedAt.toISOString() ?? manual?.value.evidenceVersion ?? ''}`,
+          updatedAt: adjustedUpdatedAt!,
+        } : manual?.value ?? (intake ? {
           localDate, calories: intake.totalCaloriesConsumed, source: intake.provider,
           semanticKind: 'observed_current_day_intake' as const,
           evidenceVersion: `${intake.providerRecordId}:${intake.updatedAt.toISOString()}`,
           updatedAt: intake.updatedAt.toISOString(),
         } : null),
         ...(manual ? { estimateKind: manual.overridden ? 'today' as const : 'usual' as const } : {}),
-        source: manual ? 'Your estimate' : intake
+        source: intakeAdjustment?.mode === 'replace' ? 'Your total for today' : manual ? 'Your estimate' : intake
           ? intake.provider === 'health_connect' ? intake.sourceDisplayName ?? 'Food tracker' : intake.provider === 'apple_health'
             ? intake.writerDisplayName
             : getProviderDisplayName(intake.provider)
           : null,
-        lastSyncedAt: manual?.value.updatedAt ?? latestSyncedAt(intake),
+        lastSyncedAt: adjustedUpdatedAt ?? manual?.value.updatedAt ?? latestSyncedAt(intake),
         status: eatenStatus,
       },
       steps: {

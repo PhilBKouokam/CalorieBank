@@ -32,6 +32,7 @@ describe('permanent input surface inventory', () => {
       'app/(settings)/planned-treat.tsx: 2',
       'components/caloriebank/DailyBankTargetInput.tsx: 1',
       'components/caloriebank/GoalConfigurationForm.tsx: 1',
+      'components/caloriebank/IntakeAdjustmentEditor.tsx: 1',
       'components/caloriebank/ManualEstimateEditor.tsx: 1',
       'components/caloriebank/StepPlanningCards.tsx: 2',
     ]);

@@ -10,3 +10,8 @@ export function supportsIntakeAuthority(value: string | undefined): boolean {
   if (tokens.some((token) => !/^[a-z][a-z0-9-]{0,63}$/.test(token))) return false;
   return tokens.includes(INTAKE_AUTHORITY_CAPABILITY);
 }
+
+export const INTAKE_ADJUSTMENT_CAPABILITY = 'intake-adjustment-v1';
+export function supportsIntakeAdjustment(value: string | undefined) {
+  return supportsIntakeAuthority(value) && value!.split(',').map(token => token.trim()).includes(INTAKE_ADJUSTMENT_CAPABILITY);
+}

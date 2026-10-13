@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import { useTodayReadModel } from '@/lib/today/use-today-read-model';
-import { getConsumerSourceName } from '@/lib/providers/presentation';
+import { getConsumerSourceName, intakeAdjustmentDescription } from '@/lib/providers/presentation';
 
 export default function TodayBurnDetailScreen() {
   const router = useRouter();
@@ -36,16 +36,17 @@ export default function TodayBurnDetailScreen() {
                 </Text>
               </View>
               <View style={styles.metricBlock}>
-                <Text style={styles.metricLabel}>Eaten</Text>
+                <View style={styles.metricHeader}><Text style={styles.metricLabel}>Eaten</Text>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Edit calories eaten, ${today.eaten.calories ?? 0} kilocalories`}
+                    onPress={() => router.push('/edit-calories')} style={styles.editButton}>
+                    <Ionicons name="pencil-outline" size={20} color={colors.primary} />
+                  </Pressable>
+                </View>
                 <Text style={styles.metricValue}>{today.eaten.calories === null ? 'Unavailable' : `${today.eaten.calories.toLocaleString()} kcal`}</Text>
-                <Text style={styles.detail}>{today.eaten.authoritative?.semanticKind === 'estimated_total_day_intake'
+                <Text style={styles.detail}>{intakeAdjustmentDescription(today.eaten) ?? (today.eaten.authoritative?.semanticKind === 'estimated_total_day_intake'
                   ? today.eaten.estimateKind === 'today' ? 'Your estimate for today' : 'Your daily estimate'
-                  : `Imported from ${intakeSource}`}</Text>
-                {today.eaten.authoritative?.source === 'manual_estimate' ? <Pressable accessibilityRole="button"
-                  accessibilityLabel={`Edit calories eaten, ${today.eaten.calories ?? 0} kilocalories, your estimate for today`}
-                  onPress={() => router.push({ pathname: '/manual-estimate', params: { mode: 'today' } })}
-                  style={{ minHeight: 48, minWidth: 48, justifyContent: 'center', alignSelf: 'flex-start' }}
-                ><Ionicons name="pencil-outline" size={20} color={colors.primary} /></Pressable> : null}
+                  : `Imported from ${intakeSource}`)}</Text>
+
               </View>
               <View style={styles.metricBlock}><Text style={styles.metricLabel}>Steps</Text><Text style={styles.metricValue}>{today.steps.count?.toLocaleString() ?? 'Unavailable'}</Text></View>
             </View>
@@ -113,6 +114,8 @@ const styles = StyleSheet.create({
   sectionTitle: { color: colors.text, fontSize: typography.subheading, fontWeight: '800', marginTop: spacing.sm },
   card: { gap: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface, padding: spacing.lg },
   cardTitle: { color: colors.text, fontSize: typography.subheading, fontWeight: '800' },
+  metricHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 28 },
+  editButton: { width: 44, height: 44, marginVertical: -8, alignItems: 'center', justifyContent: 'center' },
   metricBlock: { gap: spacing.xs },
   metricLabel: { color: colors.textMuted, fontSize: typography.body, fontWeight: '700' },
   metricValue: { color: colors.text, fontSize: 30, fontWeight: '800', fontVariant: ['tabular-nums'] },

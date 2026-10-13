@@ -151,6 +151,7 @@ model User {
   manualIntakeState             ManualIntakeState?
   manualEstimateBoundaries      ManualEstimateBoundary[]
   manualIntakeOverrides         ManualIntakeOverride[]
+  dailyIntakeAdjustments        DailyIntakeAdjustment[]
   providerSelection             ProviderSelection?
   googleHealthConnection        GoogleHealthConnection?
   googleHealthOAuthAttempts     GoogleHealthOAuthAttempt[]
@@ -791,4 +792,20 @@ model CalorieLedgerTransaction {
   @@unique([userId, idempotencyKey])
   @@index([userId, logDate])
   @@map("calorie_ledger_transactions")
+}
+
+model DailyIntakeAdjustment {
+  userId String @map("user_id") @db.Uuid
+  localDate DateTime @map("local_date") @db.Date
+  mode String
+  calories Int
+  revision Int
+  provider String
+  writerId String? @map("writer_id")
+  sourceId String? @map("source_id")
+  timezone String
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([userId, localDate])
+  @@map("daily_intake_adjustments")
 }

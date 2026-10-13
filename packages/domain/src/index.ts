@@ -1,3 +1,4 @@
+export * from './intake-adjustment';
 export { estimateWalkingTime, walkingTimeFromPace, type WalkingTimeSample, type WalkingTimeEstimate } from './walking-time';
 
 export type BankGoalMode = 'cut' | 'maintain' | 'bulk';

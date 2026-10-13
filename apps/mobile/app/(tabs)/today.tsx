@@ -51,7 +51,7 @@ import {
   hasUsableBankSummary,
   completedContributionSentence,
 } from '@/lib/today/presentation';
-import { getConsumerSourceName } from '@/lib/providers/presentation';
+import { intakeAdjustmentDescription, getConsumerSourceName } from '@/lib/providers/presentation';
 
 function formatBankBalance(value: number) {
   return `${value.toLocaleString()} kcal`;
@@ -374,13 +374,13 @@ export default function TodayScreen() {
     : today?.burned.raw !== null && today?.burned.raw !== undefined && today.burned.source
       ? `${today.burned.raw.toLocaleString()} from ${getConsumerSourceName(today.burned.source)} × ${formatPercent(today.burned.adjustmentFactor)}`
       : emptyTodayDetail(today?.burned.status ?? 'unavailable', today?.burned.source ?? providerSelection?.expenditure.displayName ?? null, 'calories burned');
-  const eatenDetail = today?.eaten.authoritative?.semanticKind === 'estimated_total_day_intake'
+  const eatenDetail = (today ? intakeAdjustmentDescription(today.eaten) : null) ?? (today?.eaten.authoritative?.semanticKind === 'estimated_total_day_intake'
     ? today.eaten.estimateKind === 'today' ? 'Your estimate for today' : 'Your daily estimate'
     : firstRunIntakeState
     ? firstRunIntakeState.detail
     : today?.eaten.source
     ? `Imported from ${getConsumerSourceName(today.eaten.source)}`
-    : emptyTodayDetail(today?.eaten.status ?? 'unavailable', providerSelection?.intake.displayName ?? null, 'calories eaten');
+    : emptyTodayDetail(today?.eaten.status ?? 'unavailable', providerSelection?.intake.displayName ?? null, 'calories eaten'));
   const visibleCards = dashboardPreferences ?? {
     showLatestFinalizedContribution: true,
     showTodaySoFar: true,
@@ -569,7 +569,7 @@ export default function TodayScreen() {
             <>
               <View style={[styles.todayMetrics, fontScale > 1.3 && { flexDirection: 'column' }]}>
                 <View style={styles.todayMetric}>
-                  <Text style={styles.metricLabel}>Burned</Text>
+                  <View style={styles.metricHeader}><Text style={styles.metricLabel}>Burned</Text></View>
                   <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>
                     {burnedValue}
                   </Text>
@@ -591,15 +591,17 @@ export default function TodayScreen() {
                   </View>
                 </View>
                 <View style={styles.todayMetric}>
-                  <Text style={styles.metricLabel}>Eaten</Text>
+                  <View style={styles.metricHeader}>
+                    <Text style={styles.metricLabel}>Eaten</Text>
+                    {today ? <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit calories eaten. ${today.eaten.calories ?? 0} kilocalories. ${eatenDetail}.`}
+                      onPress={(event) => { event.stopPropagation(); router.push('/edit-calories'); }}
+                      style={({ pressed }) => [styles.editEstimateButton, pressed && styles.pressedCard]}
+                    ><Ionicons name="pencil" size={18} color={colors.primary} /></Pressable> : null}
+                  </View>
                   <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>{eatenValue}</Text>
                   <Text style={styles.metricDetail}>{eatenDetail}</Text>
-                  {today?.eaten.authoritative?.source === 'manual_estimate' ? <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Calories eaten, ${today.eaten.calories ?? 0} kilocalories, ${eatenDetail.toLowerCase()}. Edit.`}
-                    onPress={(event) => { event.stopPropagation(); router.push({ pathname: '/manual-estimate', params: { mode: 'today' } }); }}
-                    style={({ pressed }) => [styles.editEstimateButton, pressed && styles.pressedCard]}
-                  ><Text style={styles.editEstimateButtonText}>Edit</Text></Pressable> : null}
                 </View>
               </View>
               <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>
@@ -952,13 +954,11 @@ const styles = StyleSheet.create({
   },
   todayMetrics: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: spacing.md,
   },
   todayMetric: {
-    flexGrow: 1,
-    flexBasis: 144,
-    minWidth: 144,
+    flex: 1,
+    minWidth: 0,
     gap: spacing.xs,
   },
   metricLabel: {
@@ -979,8 +979,8 @@ const styles = StyleSheet.create({
   },
   burnDetailRow: { alignItems: 'flex-start', gap: spacing.xs },
   burnDetail: { flexShrink: 1 },
-  editEstimateButton: { minWidth: 64, minHeight: 48, justifyContent: 'center', alignItems: 'center', alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.primary, borderRadius: radii.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginTop: spacing.sm },
-  editEstimateButtonText: { color: colors.primary, fontSize: typography.body, fontWeight: '700' },
+  metricHeader: { minHeight: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  editEstimateButton: { width: 44, height: 44, marginVertical: -10, marginRight: -10, justifyContent: 'center', alignItems: 'center' },
   whyButton: { minHeight: 44, justifyContent: 'center' },
   whyButtonText: { color: colors.primaryDark, fontSize: typography.caption, fontWeight: '700' },
   modalBackdrop: {

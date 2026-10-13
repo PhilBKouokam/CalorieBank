@@ -32,7 +32,7 @@ import type { DevelopmentUser } from '../goal-configuration/goal-configuration.r
 import { readProviderSelection } from '../provider-selection/provider-selection.repository';
 import { openingPreparationSourceKey, readOpeningImportState } from './opening-bank-import';
 import { AppError } from '../../errors';
-import { requireIntakeCapability } from '../../security/intake-capability';
+import { requireIntakeCapability, requireAdjustmentCapability } from '../../security/intake-capability';
 import { getLocalDateForTimezone } from '../today/today.time';
 import {
   consumerProviderName,
@@ -187,7 +187,7 @@ function toDetail(record: RecordWithSnapshots): BankHistoryDayDetailResponse {
       importedCalorieIntake: snapshot.importedCalorieIntake,
       expenditureProvider: snapshot.expenditureProvider,
       intakeProvider: snapshot.intakeProvider,
-      intakeSourceDisplayName: snapshot.intakeProvider === 'manual_estimate' ? 'Your estimate' : snapshot.intakeSourceDisplayName,
+      intakeSourceDisplayName: snapshot.intakeProvider === 'manual_estimate' && !snapshot.intakeProviderRecordId.includes(':adjustment:') ? 'Your estimate' : snapshot.intakeSourceDisplayName,
       createdAt: snapshot.createdAt.toISOString(),
     })),
   };
@@ -906,7 +906,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           expenditureProviderRecordId: resolvedExpenditure.providerRecordId,
           intakeProvider: resolvedIntake.provider,
           intakeProviderRecordId: resolvedIntake.providerRecordId,
-          intakeSourceDisplayName: resolvedIntake.provider === 'health_connect' ? resolvedIntake.sourceDisplayName : resolvedIntake.provider === 'apple_health'
+          intakeSourceDisplayName: resolvedIntake.providerRecordId.includes(':adjustment:') ? resolvedIntake.sourceDisplayName : resolvedIntake.provider === 'health_connect' ? resolvedIntake.sourceDisplayName : resolvedIntake.provider === 'apple_health'
             ? resolvedIntake.writerDisplayName
             : resolvedIntake.provider === 'fatsecret' ? 'FatSecret' : null,
         });
@@ -1320,7 +1320,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           expenditureProviderRecordId: expenditure.providerRecordId,
           intakeProvider: intake.provider,
           intakeProviderRecordId: intake.providerRecordId,
-          intakeSourceDisplayName: intake.provider === 'health_connect' ? intake.sourceDisplayName : intake.provider === 'apple_health'
+          intakeSourceDisplayName: intake.providerRecordId.includes(':adjustment:') ? intake.sourceDisplayName : intake.provider === 'health_connect' ? intake.sourceDisplayName : intake.provider === 'apple_health'
             ? intake.writerDisplayName
             : intake.provider === 'fatsecret' ? 'FatSecret' : intake.provider === 'manual_estimate' ? 'Your estimate' : null,
           intakeSourceId: intake.provider === 'health_connect' ? intake.sourceId : null,
@@ -1571,6 +1571,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         include: { initialization: true },
       }),
     ]);
+    if (records.some(record => record.calculationSnapshots.some(snapshot => snapshot.intakeProviderRecordId.includes(':adjustment:')))) requireAdjustmentCapability();
     requireIntakeCapability(...records.flatMap((record) => record.calculationSnapshots.map((snapshot) => snapshot.intakeProvider)));
     const finalizedDays = records.map(toDaySummary);
     const days = [...finalizedDays, ...openingDays.map(openingDaySummary)]
@@ -1708,7 +1709,8 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
   }
 
   async getHistoricalSourceOptions(userId: string, logDate: string) {
-    const snapshot = await this.db.bankCalculationSnapshot.findFirst({ where: { userId, finalizedDailyBankRecord: { logDate: parseLogDate(logDate) } }, orderBy: { version: 'desc' }, select: { intakeProvider: true } });
+    const snapshot = await this.db.bankCalculationSnapshot.findFirst({ where: { userId, finalizedDailyBankRecord: { logDate: parseLogDate(logDate) } }, orderBy: { version: 'desc' }, select: { intakeProvider: true, intakeProviderRecordId: true } });
+    if (snapshot?.intakeProviderRecordId.includes(':adjustment:')) requireAdjustmentCapability();
     requireIntakeCapability(snapshot?.intakeProvider);
     const sources = await this.db.$transaction((transaction) =>
       this.sourceOptionsInTransaction(transaction, userId, logDate));
@@ -1761,6 +1763,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       const candidate = dbRole === 'EXPENDITURE'
         ? authority.expenditure.find((item) => item.optionId === input.optionId)
         : authority.intake.find((item) => item.optionId === input.optionId);
+      if (latestSnapshot?.intakeProviderRecordId.includes(':adjustment:') || candidate?.record.providerRecordId.includes(':adjustment:')) requireAdjustmentCapability();
       requireIntakeCapability(latestSnapshot?.intakeProvider, candidate?.provider);
       if (latestSnapshot?.intakeProvider === 'manual_estimate' || candidate?.provider === 'manual_estimate') {
         throw new AppError('This completed day cannot be edited.', 409, { code: 'DAY_NO_LONGER_CHANGEABLE' });
@@ -1881,7 +1884,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         expenditureProviderRecordId: expenditure.providerRecordId,
         intakeProvider: intake.provider,
         intakeProviderRecordId: intake.providerRecordId,
-        intakeSourceDisplayName: intake.provider === 'health_connect' ? intake.sourceDisplayName : intake.provider === 'apple_health' ? intake.writerDisplayName : intake.provider === 'fatsecret' ? 'FatSecret' : null,
+        intakeSourceDisplayName: intake.providerRecordId.includes(':adjustment:') ? intake.sourceDisplayName : intake.provider === 'health_connect' ? intake.sourceDisplayName : intake.provider === 'apple_health' ? intake.writerDisplayName : intake.provider === 'fatsecret' ? 'FatSecret' : null,
         intakeSourceId: intake.provider === 'health_connect' ? intake.sourceId : null,
         intakeWriterBundleIdentifier: intake.provider === 'apple_health' ? intake.writerBundleIdentifier : null,
         triggerSyncSessionId: expenditure.syncSessionId ?? intake.syncSessionId ?? null,
@@ -1923,6 +1926,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       include: { calculationSnapshots: { orderBy: { version: 'asc' } } },
     });
     if (record) {
+      if (record.calculationSnapshots.some(snapshot => snapshot.intakeProviderRecordId.includes(':adjustment:'))) requireAdjustmentCapability();
       requireIntakeCapability(...record.calculationSnapshots.map((snapshot) => snapshot.intakeProvider));
       return toDetail(record);
     }

@@ -1662,3 +1662,103 @@ Workspace lint and typecheck passed. Diff review preserved source authority,
 exact-writer isolation, intake semantics and accounting. No build/distribution.
 Physical Android permission lifecycle, real Cronometer import and native visual
 verification remain checks for the combined build, not claimed completed here.
+
+### Combined build 12 — October 13, 2026
+
+Founder authorized building and distributing this batch on both platforms and
+explicitly approved the private source upload to the existing Expo/EAS project.
+Source revision: `79ebac8`. Full friends-and-family release gate passed: 91 test
+files / 970 tests, lint, typecheck, schema/migration validation, API build and diff
+checks using the dedicated local test database.
+
+- Android EAS build: `2ce18466-84df-43b8-83bd-919b9a31ad35`, version code 12.
+- iOS EAS build: `57e98965-2d3f-4df9-8425-1db0e58370ac`, build number 12.
+- iOS submission: `95ddcda2-5852-48a9-bf14-364393d4b8d7`.
+
+Both builds started. Initial iOS auto-submission rejected the optional changelog
+parameter (Enterprise-only); submission was successfully scheduled for the same
+build without that parameter. No duplicate build was requested.
+
+Distribution completed October 13:
+- Both EAS builds finished successfully from `79ebac8`.
+- iOS submission finished; App Store Connect build
+  `a5f3c9e9-7bbb-4e27-8faf-ee183f055f8e` shows **Testing**, assigned to the existing
+  Team (Expo) and Friends & Family groups. Beta review submission included test
+  notes and automatic tester notification. No tester access was expanded.
+- Play Internal Testing release 10, `1.0.0 (12) — Estimates and Cronometer
+  connection`, shows **Available to internal testers**, released at 3:55 PM CDT.
+  Supported-device counts were unchanged. Play reported only the non-blocking
+  missing deobfuscation-file warning. Existing tester configuration was retained.
+- Screenshots: `/tmp/cb-testflight12-distributed.png` and
+  `/tmp/cb-play12-distributed.png`.
+
+Physical build-12 Cronometer import, first-permission return, Android underline,
+and native visual/keyboard checks remain to be performed on the phones.
+
+### Build 12 physical follow-up
+
+Founder confirmed Samsung Cronometer connects, Today shows matching calories with
+Imported from Cronometer, and selection/value persist after reopening and refresh
+without errors. The estimate editor still shows the black underline: visual FAIL.
+
+Follow-up moves the rounded border from TextInput to its surrounding View, leaving
+the native input background unwrapped by RN border styling so the transparent
+underline tint can apply directly. This is a candidate fix, not physical proof.
+Padding, minimum outer height, accessible input label and shared keyboard owner
+are preserved. Lint, typecheck and 9 estimate/keyboard tests passed. RN Web editor
+rendering inspected at 320/390px: field, copy and actions align without clipping.
+Android rendering remains unverified; no additional build started.
+
+Founder confirmed Change sources/Edit clarity on iPhone but rejected the stacked
+Today metrics and added Edit row. Follow-up restores equal-width Burned/Eaten
+columns without the 144px wrapping threshold and places an estimate-only pencil
+at the top-right of Eaten. The accessible edit label, route and 44px button remain;
+existing large-accessibility-text stacking above fontScale 1.3 is preserved.
+320/390px RN Web layout inspected (icon stand-in): both metrics remain side by
+side; narrow values may wrap units within their own column. Lint/typecheck and
+44 estimate/presentation tests passed. No new build; native qualification pending.
+
+### Pending daily-correction batch (not built or deployed)
+
+Founder requested always-visible Today Eaten pencil and two options: Add untracked
+calories / Replace today’s total. Both are current-date adjustments retaining the
+selected provider. Added dedicated correction API/schema/table, exact-source and
+revision guards, accounting adaptation, older-client capability gate, and shared
+keyboard-safe editor. Migration applied only to the local test database. Production
+migration/API deployment must precede a future client release. No build requested.
+
+Verification: full API regression suite passed 980 tests across 93 files using
+one worker against the dedicated localhost test database (parallel execution had
+an existing shared development-account 401 fixture race). Repository lint and
+all workspace type checks passed. Adjustment persistence/editor tests cover
+addition/replacement/removal, live provider updates, missing data, duplicate and
+stale requests, exact date/account ownership, source changes, finalization,
+provisional corrections, permanent locking and older-client rejection. RN Web
+previews of the actual editor were inspected at 320px and 390px in both modes:
+labels, input, calculation, Save and removal/cancel actions wrap without clipping.
+Compact Today preview used actual extracted styles/markup with an icon stand-in;
+physical pencil glyph, large-text/native keyboard and Android underline remain
+next-build checks. No production migration, deployment or build performed.
+
+### October 13 final pre-build audit
+
+- Fixed expanded Today so far: Eaten always opens the new correction editor;
+  it no longer mislabels replacements as daily estimates or adjusted tracker
+  values as entirely imported. Summary and detail share correction copy.
+- Missing tracker data now states that the addition is saved while waiting for
+  source calories; no missing-as-zero total is displayed.
+- Added real-database two-editor concurrency/stale-removal, midnight rollover,
+  source-change conflict tests and rendered offline-addition retry coverage.
+  These simulate independent clients; they are not physical two-phone evidence.
+- Corrected the new adjustment foreign key's update policy with a follow-up
+  migration. Local test migration deploy succeeded; schema diff has no remaining
+  daily_intake_adjustments changes. Existing unrelated schema drift (older
+  defaults/index names) was left outside this batch.
+- Full suite: 985 tests / 94 files passed serially; lint and workspace type checks
+  passed. Post-migration focused adjustment suite: 15 tests passed.
+- Visual inspection: RN Web extracted Today markup/styles at 320/390px and
+  simulated 200% text, including large totals and MyFitnessPal addition labels;
+  actual expanded Today screen at 320px with mocked data and icon stand-in.
+  Normal text remains side-by-side; existing large-text stacking stays readable.
+  Physical iOS/Android sync, keyboard geometry, pencil glyph and Android underline
+  remain next-build qualification items. No production writes or build started.

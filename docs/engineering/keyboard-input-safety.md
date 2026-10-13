@@ -208,3 +208,15 @@ information/result needed to understand the interaction, and primary completion
 action must remain reachable.** Future inputs must use this qualified shared
 primitive or explicitly prove an equivalent keyboard-safe layout. No one-off
 screen offsets. Changes to the primitive require fresh real-device qualification.
+
+## October 13 follow-up input inventory
+
+`IntakeAdjustmentEditor` adds one numeric TextInput, reached from Today’s Eaten
+pencil via `(settings)/edit-calories`. The editor directly owns one shared
+`KeyboardSafeScrollView`; choices, field, result, error, Save, Remove adjustment,
+and Cancel are inside it. Select-all-on-focus and number-pad are preserved.
+The custom outline is on a wrapper View, with a transparent native underline.
+The inventory regression now covers seven input-owning files and nine inputs.
+RN Web narrow previews are not proof of physical iOS/Android keyboard geometry;
+verify both modes, scrolling to Save with the keyboard open, and the Android
+underline on the next authorized test build.

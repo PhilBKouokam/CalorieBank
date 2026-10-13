@@ -1,3 +1,4 @@
+import { activeAdjustment } from '../intake-adjustment/intake-adjustment.repository';
 import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import { resolveIntakeAuthority } from '../provider-selection/intake-authority';
 import { resolveManualIntake } from '../manual-intake/manual-intake.repository';
@@ -88,7 +89,8 @@ export class FinalizationOrchestrationService implements FinalizationScheduler {
     });
     const datedIntake = await resolveIntakeAuthority(this.db, userId, date, selection);
     const manual = datedIntake.provider === 'manual_estimate' ? await resolveManualIntake(this.db, userId, date) : null;
-    const intake = manual ?? resolveAuthoritativeProviderRecord(intakeRecords.filter((record) =>
+    const correction = activeAdjustment(await this.db.dailyIntakeAdjustment.findUnique({ where: { userId_localDate: { userId, localDate: date } } }), datedIntake);
+    const intake = (correction?.mode === 'replace' ? correction : null) ?? manual ?? resolveAuthoritativeProviderRecord(intakeRecords.filter((record) =>
       (record.syncStatus === 'ready' || record.syncStatus === 'stale' || record.syncStatus === 'partial') &&
       matchesSelectedIntakeSource(record, { appleHealthIntakeWriterBundleId: datedIntake.writerId, nativeIntakeSourceId: datedIntake.sourceId }),
     ), {

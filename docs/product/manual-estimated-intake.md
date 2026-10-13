@@ -162,3 +162,32 @@ Travel updates prospective context through the existing foreground lifecycle;
 stored date keys are never moved. Backtracking into an already-recorded or earlier
 preference boundary rejects edits. The client refreshes on date rollover and clears
 yesterday’s visible value rather than presenting its override as today while offline.
+
+## Founder-approved daily corrections — October 13, 2026
+
+Today’s Eaten pencil remains available for both manual and connected intake.
+The editor offers **Add untracked calories** and **Replace today’s total**.
+An addition is one date-specific amount above the authoritative source; editing
+it changes that amount rather than adding it a second time. Later source updates
+change the base, preserving the addition. Missing source evidence remains missing,
+not zero. A replacement supplies the entire day’s total and ignores source changes
+until removed. Zero is valid. Removing the adjustment restores the selected source.
+Neither operation switches or disconnects the provider, changes the usual estimate,
+writes to HealthKit/Health Connect, or directly changes the bank. Tomorrow starts
+without the previous day’s adjustment.
+
+This explicitly authorizes a correction above one selected provider; it does not
+authorize adding multiple providers or food-item logging. The daily row is bound
+to the exact provider/writer and canonical local date. An explicit source change
+clears the current adjustment. Old dates cannot be edited through this endpoint.
+Completed days use the existing provisional correction/locking process: additions
+follow same-source late evidence; replacements stay fixed. Snapshot provenance
+retains the correction revision and labeled source. Opening Bank and locked records
+remain immutable. Concurrent editors use revision/date/source guards and the same
+account lock as finalization. Account deletion cascades these rows.
+
+The new client declares `intake-adjustment-v1` in addition to
+`intake-authority-v2`. Unsupported clients receive update-required before reading
+adjusted Today/History or mutating affected source authority. Deploy the migration
+and API before distributing clients. Physical keyboard and Android underline
+qualification remain required; this document does not authorize a new build.

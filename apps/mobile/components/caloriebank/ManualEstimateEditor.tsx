@@ -35,7 +35,10 @@ export function ManualEstimateEditor({ state, mode, onSaved, onCancel }: {
   return <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>{mode === 'today' ? 'Calories eaten today' : 'About how many calories do you usually eat in a day?'}</Text>
       <Text style={styles.detail}>{mode === 'today' ? 'Your best estimate for the whole day.' : 'We’ll use this as your daily estimate. Change today’s amount whenever you eat more or less.'}</Text>
-      <TextInput accessibilityLabel={mode === 'today' ? 'Calories eaten today, kilocalories' : 'Usual daily estimate, kilocalories'} keyboardType="number-pad" underlineColorAndroid="transparent" selectTextOnFocus value={text} onChangeText={setText} editable={!saving} style={styles.input} />
+      {/* Keep the custom border off Android's native input background drawable. */}
+      <View style={styles.inputFrame}>
+        <TextInput accessibilityLabel={mode === 'today' ? 'Calories eaten today, kilocalories' : 'Usual daily estimate, kilocalories'} keyboardType="number-pad" underlineColorAndroid="transparent" selectTextOnFocus value={text} onChangeText={setText} editable={!saving} style={styles.input} />
+      </View>
       {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
       <Pressable accessibilityRole="button" disabled={saving} style={styles.save} onPress={() => void save()}><Text style={styles.saveText}>{saving ? 'Saving…' : mode === 'select' ? 'Use my estimate' : 'Save'}</Text></Pressable>
       {mode === 'today' && state.estimate?.overridden ? <Pressable accessibilityRole="button" disabled={saving} style={styles.action} onPress={() => void save(true)}><Text style={styles.link}>Use my usual estimate</Text></Pressable> : null}
@@ -47,7 +50,8 @@ const styles = StyleSheet.create({
   container: { flex: 1 }, content: { padding: spacing.lg, gap: spacing.md },
   title: { fontSize: typography.heading, fontWeight: '700', color: colors.text },
   detail: { fontSize: typography.body, color: colors.textMuted },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.sm, padding: spacing.md, fontSize: 24, color: colors.text, minHeight: 52 },
+  inputFrame: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.sm, minHeight: 52 },
+  input: { padding: spacing.md, fontSize: 24, color: colors.text, minHeight: 50 },
   save: { minHeight: 48, backgroundColor: colors.primary, borderRadius: radii.sm, padding: spacing.md, alignItems: 'center' },
   saveText: { color: colors.surface, fontSize: typography.body, fontWeight: '700' },
   action: { minHeight: 48, padding: spacing.md, alignItems: 'center' }, link: { color: colors.primary, fontSize: typography.body, fontWeight: '600' },

@@ -1,3 +1,5 @@
+export * from './intake-adjustment';
+import { intakeAdjustmentSchema } from './intake-adjustment';
 export { nativeIntakeSourceName } from './native-intake-source';
 export * from './client-capabilities';
 export * from './manual-intake';
@@ -626,6 +628,7 @@ export const todayResponseSchema = z.object({
     calories: z.number().int().nonnegative().nullable(),
     authoritative: authoritativeEatenSchema.nullable().optional(),
     estimateKind: z.enum(['usual', 'today']).optional(),
+    intakeAdjustment: intakeAdjustmentSchema.nullable().optional(),
     source: z.string().min(1).nullable(),
     lastSyncedAt: z.string().datetime().nullable(),
     status: todaySourceStatusSchema,

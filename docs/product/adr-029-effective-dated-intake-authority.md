@@ -113,3 +113,15 @@ qualification remain mandatory. This contract is not evidence that those gates p
 ### Hosted cutover
 
 Hosted material intake transitions default to a temporary rollout hold until both API and lifecycle execute the period-aware release. A migration-only baseline follows legacy selection until the first dated transition, which atomically freezes the prior identity; this accommodates in-flight old-instance writes during deployment. Once a dated boundary exists, baseline and dated rows determine unresolved historical authority. See the deployment plan for the activation and rollback boundary.
+
+### October 13, 2026 extension: explicit daily corrections
+
+The founder approved both total replacement and an untracked-calorie addition
+for any selected intake source. See `manual-estimated-intake.md` for the behavior.
+`DailyIntakeAdjustment` stores one revisioned correction per user/local date,
+bound to the exact source identity. Provider aggregates remain untouched.
+Accounting adapts a replacement to manual evidence, or applies one addition to
+one authoritative aggregate; it never sums trackers. Correction provenance is
+retained in snapshot record identity and consumer source labeling. This narrow
+exception supersedes the no-manual/provider-sum wording only for an explicit
+user-entered correction. No bank ledger mutation occurs during a Today edit.

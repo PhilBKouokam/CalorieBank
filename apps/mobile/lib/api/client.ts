@@ -1,6 +1,7 @@
+import { intakeAdjustmentStateSchema, intakeAdjustmentMutationSchema, type IntakeAdjustmentMutation } from '@caloriebank/schemas';
 import { nativeIntakeBatchSchema, type NativeIntakeBatch } from '@caloriebank/schemas';
 import { setUpdateRequired } from './protocol-state';
-import { CLIENT_CAPABILITIES_HEADER, INTAKE_AUTHORITY_CAPABILITY, UPDATE_REQUIRED_MESSAGE } from '@caloriebank/schemas';
+import { CLIENT_CAPABILITIES_HEADER, INTAKE_AUTHORITY_CAPABILITY, INTAKE_ADJUSTMENT_CAPABILITY, UPDATE_REQUIRED_MESSAGE } from '@caloriebank/schemas';
 import { manualIntakeStateSchema, manualIntakeMutationSchema, manualIntakeSaveSchema, type ManualIntakeMutation } from '@caloriebank/schemas';
 import {
   dailyBankTargetInputSchema,
@@ -333,7 +334,7 @@ async function apiRequest(path: string, init?: RequestInit, timeoutMs = 20000) {
         ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
-        [CLIENT_CAPABILITIES_HEADER]: INTAKE_AUTHORITY_CAPABILITY,
+        [CLIENT_CAPABILITIES_HEADER]: `${INTAKE_AUTHORITY_CAPABILITY},${INTAKE_ADJUSTMENT_CAPABILITY}`,
       },
       signal: controller.signal,
     }), deadline]);
@@ -884,4 +885,15 @@ export async function unregisterMorningBankUpdateDevice(): Promise<void> {
 export async function uploadNativeIntake(input: NativeIntakeBatch): Promise<void> {
   const response = await apiRequest('/v1/me/ingestion/native-intake', { method: 'POST', body: JSON.stringify(nativeIntakeBatchSchema.parse(input)) });
   if (!response.ok) throw new Error('Your food data could not refresh. Try again.');
+}
+
+export async function fetchIntakeAdjustment() {
+  const response = await apiRequest('/v1/me/intake-adjustment');
+  if (!response.ok) throw await responseError(response);
+  return intakeAdjustmentStateSchema.parse(await response.json());
+}
+export async function saveIntakeAdjustment(input: IntakeAdjustmentMutation) {
+  const response = await apiRequest('/v1/me/intake-adjustment', { method: 'PUT', body: JSON.stringify(intakeAdjustmentMutationSchema.parse(input)) });
+  if (!response.ok) throw await responseError(response);
+  return intakeAdjustmentStateSchema.parse(await response.json());
 }

@@ -1,3 +1,4 @@
+import type { TodayResponse } from '@caloriebank/schemas';
 import { sourceLabel } from '../native-health/copy';
 
 const consumerSourceNames: Readonly<Record<string, string>> = {
@@ -38,4 +39,14 @@ export function currentIntakeSourceLabel(label: string, usualCalories: number | 
   return label === 'manual_estimate' || label === 'CalorieBank estimate' || label === 'Your estimate'
     ? usualEstimateSourceLabel(usualCalories)
     : sourceLabel(label);
+}
+
+/** Keep correction provenance identical in the summary and expanded view. */
+export function intakeAdjustmentDescription(eaten: TodayResponse['eaten']): string | null {
+  const adjustment = eaten.intakeAdjustment;
+  if (!adjustment) return null;
+  if (adjustment.mode === 'replace') return 'Your total for today';
+  const amount = adjustment.calories.toLocaleString();
+  if (eaten.calories === null) return `Waiting for source calories. Your ${amount} kcal addition is saved.`;
+  return `${getConsumerSourceName(eaten.source)} + ${amount} kcal added`;
 }

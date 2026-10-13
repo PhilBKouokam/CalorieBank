@@ -1,7 +1,7 @@
 import type { DailyIntakeAggregate, Prisma, PrismaClient } from '@prisma/client';
 import { manualIntakeMutationSchema, type ManualIntakeMutation, type AuthoritativeEaten } from '@caloriebank/schemas';
 import { AppError } from '../../errors';
-import { requireIntakeCapability } from '../../security/intake-capability';
+import { requireIntakeCapability, requireCompatibleSourceMutation } from '../../security/intake-capability';
 import { lockIntakeAuthority, resolveIntakeAuthority, transitionIntakeAuthority } from '../provider-selection/intake-authority';
 import { getLocalDateForTimezone } from '../today/today.time';
 
@@ -47,6 +47,7 @@ export class ManualIntakeRepository {
     const input = parsed.data;
     return this.db.$transaction(async (tx) => {
       await lockIntakeAuthority(tx, userId);
+      await requireCompatibleSourceMutation(tx, userId);
       const [profile, selection, state] = await Promise.all([
         tx.userProfile.findUnique({ where: { userId }, select: { timezone: true } }),
         tx.providerSelection.findUnique({ where: { userId } }),

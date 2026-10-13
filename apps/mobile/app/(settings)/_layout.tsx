@@ -20,6 +20,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="planned-treat" options={{ title: 'Banking Goal' }} />
       <Stack.Screen name="integrations" options={{ title: 'Health Connections' }} />
       <Stack.Screen name="native-food" options={{ title: 'Food tracker' }} />
+      <Stack.Screen name="edit-calories" options={{ title: 'Calories eaten' }} />
       <Stack.Screen name="manual-estimate" options={{ title: 'Your estimate' }} />
       <Stack.Screen name="health-diagnostics" options={{ title: nativeDiagnosticsTitle }} />
       <Stack.Screen name="customize-today" options={{ title: 'Customize Today' }} />

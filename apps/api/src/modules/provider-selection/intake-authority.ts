@@ -66,6 +66,7 @@ export async function transitionIntakeAuthority(
     throw new AppError('Your local day has already been recorded. Try changing sources on your next day.', 409, { code: 'INTAKE_AUTHORITY_DATE_CONFLICT' });
   }
   if (prior && sameIntakeIdentity(selectionIdentity(prior), next)) return;
+  await db.dailyIntakeAdjustment.updateMany({ where: { userId, localDate: effectiveFrom, mode: { not: 'none' } }, data: { mode: 'none', calories: 0, revision: { increment: 1 }, updatedAt: now } });
   if (!latest) {
     const identity = prior ? selectionIdentity(prior) : { provider: 'unselected', writerId: null, sourceId: null };
     const valid = identity.provider === 'apple_health' ? Boolean(identity.writerId)

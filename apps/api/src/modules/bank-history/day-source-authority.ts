@@ -1,3 +1,4 @@
+import { activeAdjustment, adjustAccountingRecord } from '../intake-adjustment/intake-adjustment.repository';
 import { resolveIntakeAuthority } from '../provider-selection/intake-authority';
 import { manualAccountingEvidence } from '../manual-intake/manual-intake.repository';
 import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
@@ -150,15 +151,16 @@ export async function resolveDaySourceAuthority(
       record,
     }));
 
-  const [datedIntake, snapshot] = await Promise.all([
+  const [datedIntake, snapshot, adjustment] = await Promise.all([
     resolveIntakeAuthority(db, userId, localDate, selection),
     db.bankCalculationSnapshot.findFirst({
       where: { userId, finalizedDailyBankRecord: { logDate: localDate } },
       orderBy: { version: 'desc' },
     }),
+    db.dailyIntakeAdjustment.findUnique({ where: { userId_localDate: { userId, localDate } } }),
   ]);
   // Posted authority is stable; only evidence from that exact identity may revise.
-  const intakeIdentity = snapshot ? {
+  const intakeIdentity = snapshot?.intakeProviderRecordId.startsWith('replacement:adjustment:') && adjustment ? { provider: adjustment.provider, writerId: adjustment.writerId, sourceId: adjustment.sourceId } : snapshot ? {
     provider: snapshot.intakeProvider,
     writerId: snapshot.intakeWriterBundleIdentifier,
     sourceId: snapshot.intakeSourceId,
@@ -168,7 +170,7 @@ export async function resolveDaySourceAuthority(
     if (record) intake.push({ kind: 'intake', provider: 'manual_estimate', label: 'Your estimate',
       optionId: historicalOptionId(userId, date, 'INTAKE', 'manual_estimate', null),
       writerBundleIdentifier: null, sourceId: null,
-      record: snapshot ? { ...record, totalCaloriesConsumed: snapshot.importedCalorieIntake,
+      record: snapshot && !snapshot.intakeProviderRecordId.includes(':adjustment:') ? { ...record, totalCaloriesConsumed: snapshot.importedCalorieIntake,
         providerRecordId: snapshot.intakeProviderRecordId } : record });
   }
   const expenditureOverride = overrides.find((item) => item.role === 'EXPENDITURE');
@@ -176,7 +178,7 @@ export async function resolveDaySourceAuthority(
   const selectedExpenditure = expenditureOverride
     ? expenditure.find((item) => item.provider === expenditureOverride.provider) ?? null
     : expenditure.find((item) => item.provider === selection.authoritativeExpenditureProvider) ?? null;
-  const selectedIntake = intakeOverride
+  let selectedIntake = intakeOverride
     ? intake.find((item) =>
         item.provider === intakeOverride.provider &&
         item.writerBundleIdentifier === intakeOverride.intakeWriterBundleIdentifier &&
@@ -187,6 +189,19 @@ export async function resolveDaySourceAuthority(
         matchesSelectedIntakeSource(item, { appleHealthIntakeWriterBundleId: intakeIdentity.writerId, nativeIntakeSourceId: intakeIdentity.sourceId }),
       ) ?? null;
 
+  const correction = activeAdjustment(adjustment, intakeOverride ? {
+    provider: intakeOverride.provider, writerId: intakeOverride.intakeWriterBundleIdentifier, sourceId: intakeOverride.intakeSourceId,
+  } : intakeIdentity);
+  const corrected = adjustAccountingRecord(selectedIntake?.record ?? null, correction);
+  if (corrected && correction) {
+    selectedIntake = { kind: 'intake', provider: corrected.provider,
+      label: corrected.sourceDisplayName ?? 'Your total for today',
+      optionId: historicalOptionId(userId, date, 'INTAKE', corrected.provider, corrected.provider === 'health_connect' ? corrected.sourceId : corrected.writerBundleIdentifier),
+      writerBundleIdentifier: corrected.writerBundleIdentifier, sourceId: corrected.provider === 'health_connect' ? corrected.sourceId : null,
+      record: corrected };
+    const existing = intake.findIndex(item => item.optionId === selectedIntake!.optionId);
+    if (existing >= 0) intake[existing] = selectedIntake; else intake.push(selectedIntake);
+  }
   return {
     expenditure,
     intake,

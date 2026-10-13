@@ -13,7 +13,7 @@ export type ManualIntakeMutation = z.infer<typeof manualIntakeMutationSchema>;
 
 export const authoritativeEatenSchema = z.object({
   localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  calories: manualCaloriesSchema,
+  calories: z.number().int().min(0).max(200_000),
   source: z.string().min(1),
   semanticKind: z.enum(['observed_current_day_intake', 'estimated_total_day_intake']),
   evidenceVersion: z.string().min(1),

@@ -2,12 +2,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { RequestHandler } from 'express';
 import type { Prisma } from '@prisma/client';
 import {
-  CLIENT_CAPABILITIES_HEADER, supportsIntakeAuthority,
+  CLIENT_CAPABILITIES_HEADER, supportsIntakeAuthority, supportsIntakeAdjustment,
   UPDATE_REQUIRED_CODE, UPDATE_REQUIRED_MESSAGE,
 } from '@caloriebank/schemas';
 import { AppError } from '../errors';
 
-const requestProtocol = new AsyncLocalStorage<{ supportsIntakeAuthority: boolean }>();
+const requestProtocol = new AsyncLocalStorage<{ supportsIntakeAuthority: boolean; supportsIntakeAdjustment: boolean }>();
 
 export function updateRequired() {
   return new AppError(UPDATE_REQUIRED_MESSAGE, 426, { code: UPDATE_REQUIRED_CODE });
@@ -20,10 +20,18 @@ export function requireIntakeCapability(...sources: (string | null | undefined)[
   }
 }
 
+export function requireAdjustmentCapability() {
+  if (requestProtocol.getStore()?.supportsIntakeAdjustment === false) throw updateRequired();
+}
+
 /** Source writes can return a rolling refresh plan containing prior manual days.
  * Reject before changing anything, including after the account returns to a
  * provider. Unrelated account preferences and deletion are deliberately ungated. */
 export async function requireCompatibleSourceMutation(db: Prisma.TransactionClient, userId: string) {
+  if (requestProtocol.getStore()?.supportsIntakeAdjustment === false) {
+    const adjustment = await db.dailyIntakeAdjustment.findFirst({ where: { userId, mode: { not: 'none' } }, select: { userId: true } });
+    if (adjustment) throw updateRequired();
+  }
   if (requestProtocol.getStore()?.supportsIntakeAuthority !== false) return;
   const [period, snapshot] = await Promise.all([
     db.intakeAuthorityBoundary.findFirst({ where: { userId, provider: 'manual_estimate' }, select: { id: true } }),
@@ -44,14 +52,21 @@ export function containsManualSource(value: unknown): boolean {
 
 export const intakeCapabilityBoundary: RequestHandler = (req, res, next) => {
   const supported = supportsIntakeAuthority(req.get(CLIENT_CAPABILITIES_HEADER));
+  const adjustmentsSupported = supportsIntakeAdjustment(req.get(CLIENT_CAPABILITIES_HEADER));
   const json = res.json.bind(res);
   res.json = (body: unknown) => {
-    if (!supported && containsManualSource(body)) {
+    if ((!supported && containsManualSource(body)) || (!adjustmentsSupported && containsAdjustment(body))) {
       // Replace the entire payload before Express serializes any of it.
       res.status(426);
       return json({ error: { message: UPDATE_REQUIRED_MESSAGE, details: { code: UPDATE_REQUIRED_CODE } } });
     }
     return json(body);
   };
-  requestProtocol.run({ supportsIntakeAuthority: supported }, next);
+  requestProtocol.run({ supportsIntakeAuthority: supported, supportsIntakeAdjustment: adjustmentsSupported }, next);
 };
+
+function containsAdjustment(value: unknown): boolean {
+  if (typeof value === 'string') return value.includes(':adjustment:') || / \+ [\d,]+ kcal added$/.test(value) || value === 'Your total for today';
+  if (!value || typeof value !== 'object') return false;
+  return Object.entries(value).some(([key, item]) => (key === 'intakeAdjustment' && item !== null) || containsAdjustment(item));
+}
