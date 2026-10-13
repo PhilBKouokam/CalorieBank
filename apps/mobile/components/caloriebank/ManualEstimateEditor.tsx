@@ -35,7 +35,7 @@ export function ManualEstimateEditor({ state, mode, onSaved, onCancel }: {
   return <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>{mode === 'today' ? 'Calories eaten today' : 'About how many calories do you usually eat in a day?'}</Text>
       <Text style={styles.detail}>{mode === 'today' ? 'Your best estimate for the whole day.' : 'We’ll use this as your daily estimate. Change today’s amount whenever you eat more or less.'}</Text>
-      <TextInput accessibilityLabel={mode === 'today' ? 'Calories eaten today, kilocalories' : 'Usual daily estimate, kilocalories'} keyboardType="number-pad" selectTextOnFocus value={text} onChangeText={setText} editable={!saving} style={styles.input} />
+      <TextInput accessibilityLabel={mode === 'today' ? 'Calories eaten today, kilocalories' : 'Usual daily estimate, kilocalories'} keyboardType="number-pad" underlineColorAndroid="transparent" selectTextOnFocus value={text} onChangeText={setText} editable={!saving} style={styles.input} />
       {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
       <Pressable accessibilityRole="button" disabled={saving} style={styles.save} onPress={() => void save()}><Text style={styles.saveText}>{saving ? 'Saving…' : mode === 'select' ? 'Use my estimate' : 'Save'}</Text></Pressable>
       {mode === 'today' && state.estimate?.overridden ? <Pressable accessibilityRole="button" disabled={saving} style={styles.action} onPress={() => void save(true)}><Text style={styles.link}>Use my usual estimate</Text></Pressable> : null}

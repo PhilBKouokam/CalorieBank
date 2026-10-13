@@ -1482,3 +1482,183 @@ persistence and history suite passed 89 tests; legacy presentation regression
 passed 8; final onboarding/presentation rerun passed 43. Type checks passed.
 Visual review so far is source/layout review only; physical wording/wrapping
 verification on the new store builds remains pending. No public distribution.
+
+Private build requests from commit 4745ef2 (October 9): iOS 1.0.0 (11),
+EAS c94ecbc5-643c-4693-8bba-af16b7f6b896, automatic submission
+586a4026-bf39-45d9-bdf6-ef042e1b8e26; Android versionCode 11,
+EAS 1b9d98d8-5e18-4e7d-a5f8-c8d7acf9c472. Both initially IN_PROGRESS.
+Play Internal Testing draft release 9 prepared with wording-change notes.
+Lint/typecheck passed after mobile legacy-label compatibility edits.
+Git push was rejected by automatic approval review as export to an unverified
+remote; no workaround push attempted. Local source commit and EAS upload exist.
+
+Founder explicitly authorized pushing source commit 4745ef2 to origin; it succeeded.
+Both EAS builds finished. Android build 11 published to existing Internal Testing
+release 9 on October 9 at 7:01 PM CDT; Play confirmed Available to internal testers.
+iOS build 11 finished with automatic submission scheduled. Friends & Family
+assignment remains unverified because App Store Connect browser sign-in expired.
+Founder sign-in requested. No public release or tester-list changes.
+Additional documentation push was blocked by automatic review as outside the
+source-commit-specific approval. This status evidence remains local.
+
+### Android automatic morning delivery — October 10
+
+Founder reported the automatic morning update and supplied a physical Samsung
+notification screenshot dated Saturday, October 10. The CalorieBank notification
+is timestamped 7:43 AM and reads “Available Bank: 1,853 kcal” and “You banked
+883 kcal yesterday.” Physical automatic morning notification arrival PASS.
+The displayed balance is consistent with the previously observed 970 kcal plus
+883 kcal. This evidence does not establish scheduler execution details, retry
+idempotency, the installed build version, or the underlying ledger calculation.
+No additional diagnostic notification was sent for this check.
+
+### Usual estimate in source labels — October 13
+
+Founder confirmed build 11 installed on both phones and both showed Your estimate.
+Founder then approved `2,500 kcal (Your estimate)` using the actual saved usual
+estimate, with the editor title remaining Your estimate. Mobile source cards and
+Health Connections selected/chooser labels now format `estimate.usualCalories`,
+never the Today override. Missing estimate data falls back to Your estimate.
+The shared selected manual card also covers setup. History and Today amounts,
+source authority, accounting, and editor title are unchanged.
+
+Node 20 workspace lint and typecheck passed; three existing presentation/manual
+editor test files passed 16 tests. Direct formatter checks covered saved values,
+legacy labels, missing values, and non-manual sources. Source-level visual review
+checked wrapping (no line caps/fixed text heights), flexible chooser rows, existing
+44/48px touch targets, and accessible estimate text. No rendered screen or physical
+narrow-screen/large-text visual verification performed for this revision yet; that
+release check remains pending. No new store build distributed for this revision.
+
+Founder requested batching further UI changes before another build. Selected
+Health Connections actions now say Change sources, including accessibility labels.
+The selected manual estimate card now has a separate full-width outlined Edit
+estimate button, a 48px minimum touch target, pressed/disabled feedback, and an
+accessible hint explaining that it changes the usual daily estimate. The card's
+summary is no longer itself an edit button. This shared card also covers setup.
+Editor routing and inputs remain unchanged. No build started.
+
+Workspace lint/typecheck passed; onboarding journey and manual editor suites
+passed 39 tests. Source review checked flexible height/wrapping, button contrast
+against the existing surface, spacing, and touch-target sizing. Rendered/physical
+visual qualification remains pending for the combined batch.
+
+Android estimate underline fix added to the same unbuilt batch: the shared
+ManualEstimateEditor explicitly sets underlineColorAndroid to transparent,
+suppressing the native underline within the existing bordered field for setup,
+usual, and Today modes. Verified property support in the pinned React Native
+TextInput declaration. Border, numeric keyboard, select-all behavior, accessibility,
+and KeyboardSafeScrollView remain unchanged. Workspace lint/typecheck and all
+four existing manual editor tests passed. Physical Android confirmation of the
+underline removal remains pending with the combined build; no build started.
+
+### Today Edit and combined-batch checks — October 13
+
+Founder authorized replacing Today's pencil with Edit and visual/consistency
+checks, explicitly without a build. Today now uses an outlined Edit button with
+a 48px minimum height, preserving its accessible calorie/value label, Today-mode
+route, and event propagation handling. Narrow Today metric rows can wrap into
+stacked Burned/Eaten sections (144px minimum column width) after a component
+preview exposed cramped text at narrow widths and enlarged text.
+
+100 tests passed across manual persistence, manual editor, onboarding journeys,
+and phase-one presentation using the dedicated localhost Phase 1B test database.
+These cover usual changes, preserved Today overrides, reset/zero/date rollover,
+and historical authority/ledger boundaries. Workspace lint/typecheck passed;
+phase-one presentation rerun passed after the Today button/layout change.
+
+Visual inspection used a local React Native Web component harness: actual shared
+ManualSourceChoice, extracted RoleCard and Today Eaten JSX/styles, mocked data
+and navigation. Checked 320px/390px containers and simulated 1.5x text at 320px,
+including 100,000 kcal label wrapping. Final inspected cards/buttons had no
+clipping or overlap. Evidence: /tmp/caloriebank-batch-visual.png. This is component
+layout evidence, not native full-screen or physical-device proof. Native font
+scaling, keyboard interactions and Android underline removal still require the
+combined build's physical check. No build or distribution started.
+
+### Cronometer investigation — October 13 (unresolved)
+
+Reviewed AndroidFoodChoices, native intake discovery/selection, Health Connect
+bridge, bounded eight-local-day paginated qualification, decoding and exact
+writer discovery. The configured com.cronometer.android.gold matches the official
+Play listing. Cronometer documents Nutrition export to Health Connect:
+https://cronometer.com/blog/health-connect/
+https://play.google.com/store/apps/details?id=com.cronometer.android.gold
+
+55 tests passed across Android food chooser, native intake client, qualification,
+food origins and native contract. The consumer no-Cronometer message follows a
+successful query without that exact writer; query failure/permission denial use
+separate messages. Prior screenshots establish diary calories and a connection,
+not exported Nutrition entries visible to CalorieBank. Requested a Samsung Health
+Connect Nutrition entry/source check to distinguish export/access from app reads.
+Root cause remains unconfirmed; no speculative connection fix or build started.
+
+Cronometer follow-up: founder refreshed the Samsung Cronometer diary, then saw
+October 13 Nutrition records attributed to Cronometer, including 52 and 40 Cal
+entries at 00:00–00:01. Both Cronometer write and CalorieBank read Nutrition
+permissions are enabled. Generic food discovery also reported no data. Health
+Connect Recent access screenshot showed Cronometer writing Nutrition at 14:57,
+but no CalorieBank access. This narrows investigation but does not prove the
+precise native execution path or an SDK failure.
+
+Confirmed independent reporting defect: native intake discovery returned an
+unqualified empty source list when account scope/generation changed before the
+read or before publication. The UI treated missing queryState as successful
+absence. Early exits now return failed; the chooser requires explicit complete
+or empty before showing missing food. Added regressions for a pre-read account
+interruption and unconfirmed discovery. Four suites passed 50 tests; workspace
+lint/typecheck and diff check passed. Uses existing query-failure copy/layout.
+This fixes misleading error reporting, not a proven Cronometer ingestion root
+cause. Physical resolution remains unconfirmed; no build started.
+
+### Cronometer discovery cancellation fix — October 13
+
+Found a reproducible pre-read cancellation path consistent with the physical
+symptoms. AndroidFoodChoices always calls discover(true); discovery previously
+called access(true) unconditionally. The pinned native permission delegate
+unconditionally launches its permission Activity. Root refreshOnAppState cancels
+native intake on non-active states, invalidating the discovery generation before
+inspect can read Nutrition. Thus already-granted permission could still lead to
+no read and the old misleading absence message.
+
+Discovery now checks current access without a permission Activity, verifies the
+same account/generation, and requests permission only when Nutrition is missing
+and the caller explicitly requested permission. Existing granted access proceeds
+to the exact-writer read. Account-switch/background cancellation remains intact;
+no scope bypass, authority change or invented intake. A missing-permission prompt
+interrupted by lifecycle cancellation may still require Check again after return.
+
+Regression reproducing granted-permission Activity cancellation failed before
+and passed after this change. Added missing-permission denial coverage. Workspace
+lint/typecheck passed. Physical Samsung confirmation still requires the combined
+build; do not treat the reproduced path as on-device trace proof. No build started.
+
+### First permission return and final batch checks — October 13
+
+Founder authorized first-time permission interruption fix and combined automated
+checks, explicitly without a build. Lifecycle background cancellation now passes
+a reason. Android discovery retains only the initiating generation while its
+explicit permission request is pending, waits for active foreground after approval
+(bounded 15-second return wait), then checks generation/account validity before
+reading. Ordinary background work still cancels; explicit chooser unmount/cancel,
+sign-out and account changes always invalidate discovery. Foreground automatic
+refresh and competing discovery are withheld while the prompt owner is pending.
+This supersedes the earlier known requirement to tap Check again after approval.
+
+Client regressions now use the exact Cronometer origin and cover discovery,
+selection and normalized upload, granted permission reuse, first approval with
+background transition, denial, sign-out, account switch, unmount, and waiting for
+foreground before read/upload. Backend persistence separately covers exact source,
+selection revision, ownership, normalized evidence and orchestration. These are
+automated boundaries with mocked native transport, not physical end-to-end proof.
+
+Initial broader run exposed outdated chooser mocks without queryState and a
+persistence suite using DATABASE_URL instead of TEST_DATABASE_URL. Updated the
+mock to explicit successful completion and reran with both variables set to the
+dedicated localhost caloriebank_test_phase1b_20260923 database. Final run: 16 files,
+200 tests passed (native intake, permissions, qualification, lifecycle, account
+safety, manual history, onboarding, presentation and keyboard regression suites).
+Workspace lint and typecheck passed. Diff review preserved source authority,
+exact-writer isolation, intake semantics and accounting. No build/distribution.
+Physical Android permission lifecycle, real Cronometer import and native visual
+verification remain checks for the combined build, not claimed completed here.

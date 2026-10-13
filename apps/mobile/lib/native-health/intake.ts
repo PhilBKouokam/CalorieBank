@@ -8,7 +8,7 @@ export interface NativeIntakeService {
   select(source: SourceIdentity): Promise<NativeIntakeResult>;
   refresh(): Promise<NativeIntakeResult>;
   openSettings(): Promise<boolean>;
-  cancel(): void;
+  cancel(reason?: 'background'): void;
 }
 const unavailable: NativeAccess = { state: 'unavailable', granted: [], missing: ['nutrition'] };
 export const nativeIntake: NativeIntakeService = {

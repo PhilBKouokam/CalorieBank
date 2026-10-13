@@ -1,4 +1,4 @@
-import { sourceLabel } from '@/lib/native-health/copy';
+import { currentIntakeSourceLabel } from '@/lib/providers/presentation';
 import { trackerChoices } from '@/lib/native-health/tracker-choices';
 import { connectionsForNativeCapability, crossDeviceSourceHint } from '@/lib/native-health/presentation';
 import { AndroidFoodChoices } from '@/components/caloriebank/AndroidFoodChoices';
@@ -19,7 +19,7 @@ import { composeAppleHealthConnections } from '@/lib/healthkit/health-connection
 import { appleHealthIntakeRefreshMessage } from '@/lib/healthkit/connection-feedback';
 import { refreshFatSecretWithFeedback } from '@/lib/healthkit/fatsecret-feedback';
 import { createSourceOperationGate } from '@/lib/healthkit/source-operation';
-import { ApiHttpError, disconnectFatSecret, disconnectFitbit, fetchHealthConnections, fetchOnboardingStatus, fetchProviderSelection, saveProviderSelection, selectHealthConnectionRole, startFatSecretAuthorization, startFitbitAuthorization, syncFatSecret, syncFitbit } from '@/lib/api/client';
+import { ApiHttpError, disconnectFatSecret, disconnectFitbit, fetchHealthConnections, fetchManualIntake, fetchOnboardingStatus, fetchProviderSelection, saveProviderSelection, selectHealthConnectionRole, startFatSecretAuthorization, startFitbitAuthorization, syncFatSecret, syncFitbit } from '@/lib/api/client';
 import { retryIncompleteOpeningAfterSourceChange } from '@/lib/lifecycle/account-lifecycle';
 import type { HealthConnectionOption, HealthConnectionsResponse } from '@caloriebank/schemas';
 
@@ -52,6 +52,7 @@ export default function IntegrationsScreen() {
   const { returnTo, fitbit, fatsecret, foodChooser } = useLocalSearchParams<{ returnTo?: string; fitbit?: string; fatsecret?: string; foodChooser?: string }>();
   const androidProviderReturn = Platform.OS === 'android' && (typeof fitbit === 'string' || typeof fatsecret === 'string');
   const [connections, setConnections] = useState<HealthConnectionsResponse | null>(null);
+  const [usualCalories, setUsualCalories] = useState<number | null>(null);
   const [helpBundleId, setHelpBundleId] = useState<string | null>(null);
   const [appleState, setAppleState] = useState<AppleState>('loading');
   const [appleBurnState, setAppleBurnState] = useState<AppleHealthBurnState>('needs_refresh');
@@ -90,13 +91,14 @@ export default function IntegrationsScreen() {
       if (generation !== loadGeneration.current) return;
       if (!setup.completed) { router.replace('/onboarding'); return; }
     }
-    const [healthConnections, localStatus, diagnostics, selection, nativeAccess] = await Promise.all([
+    const [healthConnections, localStatus, diagnostics, selection, nativeAccess, manualIntake] = await Promise.all([
       fetchHealthConnections(), getNativeHealthConnectionStatus().catch(() => 'not_connected' as const), getNativeHealthDiagnostics().catch(() => null),
-      fetchProviderSelection(), nativeIntake.supported ? nativeIntake.access() : null,
+      fetchProviderSelection(), nativeIntake.supported ? nativeIntake.access() : null, fetchManualIntake().catch(() => null),
     ]);
     if (generation !== loadGeneration.current) return;
     setNativeFoodAccess(nativeAccess?.granted.includes('nutrition') ?? false);
     setConnections(healthConnections);
+    setUsualCalories(manualIntake?.estimate?.usualCalories ?? null);
     setHelpBundleId(selection.intake.writerBundleIdentifier);
     setAppleState(deriveAppleHealthPresentationState(localStatus, diagnostics));
     setAppleBurnState(deriveAppleHealthBurnState(localStatus, diagnostics));
@@ -404,7 +406,7 @@ export default function IntegrationsScreen() {
           <Text style={styles.body}>Choose where CalorieBank gets your calories.</Text>
         </View>
         <RoleCard data={displayConnections?.burned ?? null} onPress={() => openRole('burned')} role="burned" />
-        <RoleCard data={displayConnections?.eaten ?? null} onPress={() => openRole('eaten')} role="eaten" />
+        <RoleCard usualCalories={usualCalories} data={displayConnections?.eaten ?? null} onPress={() => openRole('eaten')} role="eaten" />
         <ManualSourceChoice disabled={busy !== null} onOpen={dismissSheets} />
         {appleUsable && displayConnections?.eaten.selected?.transportLabel === 'Apple Health' && displayConnections.eaten.selected.status === 'no_data' ? <FoodTrackerHelp provider="apple_health" bundleId={helpBundleId} /> : null}
         <InventorySection
@@ -429,7 +431,7 @@ export default function IntegrationsScreen() {
         />
         {message && !roleSheet && !addRole && !service ? <Text style={messageTone === 'success' ? styles.successText : messageTone === 'attention' ? styles.attentionText : styles.errorText}>{message}</Text> : null}
       </ScrollView>
-      <RoleSelector onNativeDetails={openNativeFood} onReconnect={(name) => void reconnectService(name)} appleBurnState={appleBurnState} busy={busy !== null} data={roleSheet ? displayConnections?.[roleSheet] ?? null : null} message={message} messageTone={messageTone} onAdd={() => { setAddRole(roleSheet); setRoleSheet(null); setMessage(null); }} onAppleDetails={() => { operations.current.invalidate(); setMessage(null); setRoleSheet(null); setService('Apple Health'); }} onClose={dismissSheets} onRefreshApple={() => void refreshService('Apple Health')} onSelect={(option) => roleSheet ? void selectRole(roleSheet, option) : undefined} role={roleSheet} />
+      <RoleSelector usualCalories={usualCalories} onNativeDetails={openNativeFood} onReconnect={(name) => void reconnectService(name)} appleBurnState={appleBurnState} busy={busy !== null} data={roleSheet ? displayConnections?.[roleSheet] ?? null : null} message={message} messageTone={messageTone} onAdd={() => { setAddRole(roleSheet); setRoleSheet(null); setMessage(null); }} onAppleDetails={() => { operations.current.invalidate(); setMessage(null); setRoleSheet(null); setService('Apple Health'); }} onClose={dismissSheets} onRefreshApple={() => void refreshService('Apple Health')} onSelect={(option) => roleSheet ? void selectRole(roleSheet, option) : undefined} role={roleSheet} />
       <AddSourceSheet onNativeSelected={nativeChoiceSelected} onNativeBusy={nativeChoiceBusy} busy={busy} connections={displayConnections} intakeWriters={intakeWriters} message={message} messageTone={messageTone} onAppleBurn={() => void connectNativeHealthForBurn()} onAppleIntake={() => void discoverFoodTrackers()} onClose={dismissSheets} onFatSecret={chooseFatSecret} onFitbit={() => void connectFitbitForBurn()} onWriter={(writer) => void selectFoodTracker(writer)} role={addRole} />
       <ServiceSheet role={serviceRole} onChooseTracker={() => { operations.current.invalidate(); setService(null); setRoleSheet(null); setAddRole('eaten'); setMessage(null); void discoverFoodTrackers(); }} appleBurnState={appleBurnState} busy={busy} connections={displayConnections} message={message} messageTone={messageTone} name={service} onChange={(role) => { setService(null); openRole(role); }} onClose={dismissSheets} onDiagnostics={openAppleHealthDiagnostics} onDisconnect={(name) => void disconnectService(name)} onReconnect={(name) => void reconnectService(name)} onRefresh={(name) => void refreshService(name)} />
     </SafeAreaView>
@@ -513,14 +515,14 @@ function knownConnectionOption(option: HealthConnectionOption) {
   return ['apple_health', 'google_health_fitbit', 'fatsecret', 'health_connect', 'service-apple', 'service-fitbit', 'burned-apple-health-v1', 'burned-fitbit-v1', 'eaten-apple-health-writer-v1', 'eaten-fatsecret-v1', 'eaten-health-connect-v1', 'service-apple-health-v1', 'service-fitbit-v1', 'service-fatsecret-v1'].includes(option.optionId);
 }
 
-function RoleCard({ role, data, onPress }: { role: Role; data: HealthConnectionsResponse[Role] | null; onPress: () => void }) {
+function RoleCard({ role, data, onPress, usualCalories }: { usualCalories?: number | null; role: Role; data: HealthConnectionsResponse[Role] | null; onPress: () => void }) {
   const selected = data?.selected;
   const unselected = Platform.OS === 'android' && !selected && data?.alternatives.some((option) => option.status === 'connected');
   const remoteHint = crossDeviceSourceHint(selected, nativeHealthCapability.supported);
-  const action = remoteHint ? 'Change source' : selected ? 'Manage sources' : unselected ? 'Choose source' : 'Connect source';
+  const action = remoteHint ? 'Change source' : selected ? 'Change sources' : unselected ? 'Choose source' : 'Connect source';
   return <View style={styles.roleCard}>
     <Text style={styles.roleLabel}>{role === 'burned' ? 'Calories Burned' : 'Calories Eaten'}</Text>
-    <Text style={styles.roleValue}>{sourceLabel(selected?.label ?? (unselected ? 'No source selected' : 'Not connected'))}</Text>
+    <Text style={styles.roleValue}>{currentIntakeSourceLabel(selected?.label ?? (unselected ? 'No source selected' : 'Not connected'), usualCalories)}</Text>
     {remoteHint ? <Text style={styles.transport}>{remoteHint}</Text> : selected?.transportLabel ? <Text style={styles.transport}>via {selected.transportLabel}</Text> : null}
     <Text style={[styles.status, selected?.status === 'needs_attention' && styles.attention]}>{selected ? knownConnectionOption(selected) ? statusCopy(selected.status) : 'Selected' : unselected ? 'Choose a connected source to use here.' : 'Not connected'}</Text>
     <Pressable accessibilityLabel={`${action} for calories ${role}`} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}><Text style={styles.actionText}>{action}</Text></Pressable>
@@ -535,7 +537,7 @@ function SheetHeader({ title, onClose }: { title: string; onClose: () => void })
   return <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>{title}</Text><Pressable accessibilityLabel="Close" accessibilityRole="button" hitSlop={12} onPress={onClose}><Ionicons color={colors.text} name="close" size={24} /></Pressable></View>;
 }
 
-function RoleSelector({ onNativeDetails, onReconnect, appleBurnState, busy, data, message, messageTone, onAdd, onAppleDetails, onClose, onRefreshApple, onSelect, role }: { onNativeDetails: () => void; onReconnect: (name: 'Fitbit' | 'FatSecret') => void; appleBurnState: AppleHealthBurnState; busy: boolean; data: HealthConnectionsResponse[Role] | null; message: string | null; messageTone: 'attention' | 'error' | 'success'; onAdd: () => void; onAppleDetails: () => void; onClose: () => void; onRefreshApple: () => void; onSelect: (option: HealthConnectionOption) => void; role: Role | null }) {
+function RoleSelector({ usualCalories, onNativeDetails, onReconnect, appleBurnState, busy, data, message, messageTone, onAdd, onAppleDetails, onClose, onRefreshApple, onSelect, role }: { usualCalories?: number | null; onNativeDetails: () => void; onReconnect: (name: 'Fitbit' | 'FatSecret') => void; appleBurnState: AppleHealthBurnState; busy: boolean; data: HealthConnectionsResponse[Role] | null; message: string | null; messageTone: 'attention' | 'error' | 'success'; onAdd: () => void; onAppleDetails: () => void; onClose: () => void; onRefreshApple: () => void; onSelect: (option: HealthConnectionOption) => void; role: Role | null }) {
   const options = data ? trackerChoices(data.alternatives, data.selected) : [];
   return <Sheet onClose={onClose} visible={role !== null}>
     <SheetHeader onClose={onClose} title={role === 'burned' ? 'Calories burned' : 'Calories eaten'} />
@@ -557,7 +559,7 @@ function RoleSelector({ onNativeDetails, onReconnect, appleBurnState, busy, data
       return <View key={option.optionId} style={styles.optionRow}>
         {selected ? <Ionicons color={colors.primary} name="checkmark" size={22} /> : <View style={{ width: 22 }} />}
         <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled: selected || busy || !usable }} disabled={selected || busy || !usable} onPress={() => onSelect(option)} style={styles.optionText}>
-          <Text style={styles.optionLabel}>{sourceLabel(option.label)}</Text>
+          <Text style={styles.optionLabel}>{currentIntakeSourceLabel(option.label, usualCalories)}</Text>
           {remoteHint ? <Text style={styles.optionDetail}>{remoteHint}</Text> : option.transportLabel ? <Text style={styles.optionDetail}>via {option.transportLabel}</Text> : null}
           {!remoteHint && !usable && option.status !== 'available' ? <Text style={styles.optionDetail}>{option.primaryAction === 'reconnect' ? 'Reconnect to use this source' : unavailableCopy}</Text> : null}
         </Pressable>

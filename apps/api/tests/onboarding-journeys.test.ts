@@ -86,7 +86,7 @@ vi.mock('@/lib/native-health', async (importOriginal) => {
   const android = await import('../../mobile/lib/native-health/index.android');
   return {
     get nativeIntake() { return h.os === 'android' ? { ...android.nativeIntake, refresh: h.nativeRefresh,
-      discover: async () => ({ access: { state: 'available', granted: ['nutrition'], missing: [] }, sources: [
+      discover: async () => ({ queryState: 'complete', access: { state: 'available', granted: ['nutrition'], missing: [] }, sources: [
         { source: { namespace: 'android_package', id: 'com.cronometer.android.gold' }, displayName: 'Cronometer' },
         { source: { namespace: 'android_package', id: 'com.sbs.diet' }, displayName: 'MacroFactor' },
       ] }),
@@ -202,7 +202,7 @@ describe('actual onboarding component journeys', () => {
     await press('Cronometer');
     expect(data().intake.authoritativeProvider).toBe('apple_health');
     expect(data().intake.writerDisplayName).toBe('Cronometer');
-    await press('Manage sources for calories eaten'); await press('FatSecret');
+    await press('Change sources for calories eaten'); await press('FatSecret');
     expect(data().intake.authoritativeProvider).toBe('fatsecret');
     expect(data().expenditure).toEqual(burn);
     await act(async () => screen!.unmount()); await mount();
@@ -233,7 +233,7 @@ describe('actual onboarding component journeys', () => {
     await mount(); await press('Connect Fitbit'); await press('Connect Cronometer');
     const burn = structuredClone(data().expenditure);
     await act(async () => screen!.unmount()); h.healthUnavailable = true; await mountSettings();
-    await press('Manage sources for calories eaten'); await press('FatSecret');
+    await press('Change sources for calories eaten'); await press('FatSecret');
     expect(data().intake.authoritativeProvider).toBe('fatsecret');
     expect(data().expenditure).toEqual(burn);
     expect(text(screen!.root)).not.toMatch(/Refresh Apple Health and try again|couldn.t select FatSecret/i);
@@ -375,7 +375,7 @@ describe('manual source mobile parity', () => {
     await act(async () => screen!.unmount());
     await mountSettings();
     expect(text(screen!.root)).toContain('Your estimate');
-    await press('Manage sources for calories eaten');
+    await press('Change sources for calories eaten');
     const manualRow = screen!.root.findAll(node => String(node.type) === 'View' && node.children.some(child => typeof child !== 'string' && text(child).includes('Your estimate')));
     expect(manualRow.length).toBeGreaterThan(0);
     expect(text(screen!.root)).not.toContain('Needs refresh');

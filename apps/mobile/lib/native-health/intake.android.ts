@@ -1,17 +1,29 @@
+import { AppState } from 'react-native';
 import { fetchProviderSelection, saveProviderSelection, uploadNativeIntake } from '../api/client';
 import { nativeNutritionQualification } from '../health-connect/bridge.android';
 import { discoverFoodOrigins } from '../health-connect/food-origins';
 import type { NativeIntakeService, NativeIntakeResult } from './intake';
 import type { NativeIntakeBatch, ProviderSelectionResponse } from '@caloriebank/schemas';
 let scope: string | null = null, generation = 0;
+let permissionOwner: number | null = null;
 let discovered = new Set<string>();
 export function setNativeIntakeScope(next: string | null) {
   if (scope !== next) { scope = next; generation++; discovered.clear(); nativeNutritionQualification.cancel(); }
 }
+async function waitForForeground(): Promise<boolean> {
+  if (AppState.currentState === 'active') return true;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => { subscription.remove(); resolve(false); }, 15000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') { clearTimeout(timer); subscription.remove(); resolve(true); }
+    });
+    if (AppState.currentState === 'active') { clearTimeout(timer); subscription.remove(); resolve(true); }
+  });
+}
 const stillCurrent = (run: number) => Boolean(scope) && run === generation;
 async function refresh(): Promise<NativeIntakeResult> {
   const run = generation;
-  if (!scope) return 'skipped';
+  if (!scope || permissionOwner !== null) return 'skipped';
   const selection = await fetchProviderSelection();
   if (!stillCurrent(run)) return 'skipped';
   if (!selection.intake.selectionRevision) return 'skipped';
@@ -49,14 +61,33 @@ async function refreshSource(run: number, selection: ProviderSelectionResponse, 
 export const nativeIntake: NativeIntakeService = {
   supported: true,
   access: () => nativeNutritionQualification.access(),
-  cancel() { generation++; discovered.clear(); nativeNutritionQualification.cancel(); },
+  cancel(reason) {
+    // The OS permission activity temporarily backgrounds its initiating screen.
+    // Explicit cancellation/unmount and account changes always invalidate it.
+    if (reason !== 'background' || permissionOwner !== generation) generation++;
+    discovered.clear(); nativeNutritionQualification.cancel();
+  },
   async discover(requestPermissions = false) {
     const run = generation;
-    const access = await nativeNutritionQualification.access(requestPermissions);
-    if (!stillCurrent(run) || !access.granted.includes('nutrition')) return { access, sources: [] };
+    // Reopening Android's permission activity can background the app and cancel
+    // this discovery before it reads. Check existing permission first.
+    let access = await nativeNutritionQualification.access();
+    if (!stillCurrent(run) || permissionOwner !== null) return { access, sources: [], queryState: 'failed' };
+    if (requestPermissions && !access.granted.includes('nutrition')) {
+      if (permissionOwner !== null) return { access, sources: [], queryState: 'failed' };
+      permissionOwner = run;
+      try {
+        access = await nativeNutritionQualification.access(true);
+        if (stillCurrent(run) && access.granted.includes('nutrition')) {
+          const active = await waitForForeground();
+          if (!active) return { access, sources: [], queryState: 'failed' };
+        }
+      } finally { if (permissionOwner === run) permissionOwner = null; }
+    }
+    if (!stillCurrent(run) || !access.granted.includes('nutrition')) return { access, sources: [], queryState: 'failed' };
     const report = await nativeNutritionQualification.inspect();
     const providers = await fetchProviderSelection();
-    if (!stillCurrent(run)) return { access, sources: [] };
+    if (!stillCurrent(run)) return { access, sources: [], queryState: 'failed' };
     const sources = discoverFoodOrigins(report, providers.connectedProviders);
     discovered = new Set(sources.map((s) => s.source.id));
     return { access: report.access, sources, queryState: report.state === 'complete' ? 'complete' : report.state === 'no_records' ? 'empty' : 'failed' };

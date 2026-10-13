@@ -37,7 +37,7 @@ export function resumeAccountLifecycle() { suspended = false; }
 
 // The root owns this transition; screen mounts only read cached/server models.
 export function refreshOnAppState(next: string) {
-  if (next !== 'active' && nativeIntake.supported) nativeIntake.cancel();
+  if (next !== 'active' && nativeIntake.supported) nativeIntake.cancel('background');
   const entering = next === 'active' && appState !== 'active';
   appState = next;
   return entering ? runAccountLifecycle({ foreground: true }) : Promise.resolve<AccountLifecycleResult>({ status: 'skipped', detail: null });

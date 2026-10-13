@@ -26,3 +26,16 @@ export function getConsumerSourceName(source: string | null | undefined) {
   if (!source) return 'Connected source';
   return sourceLabel(consumerSourceNames[source] ?? 'Calorie source');
 }
+
+/** Current source-choice label only; never use a usual estimate for historical intake. */
+export function usualEstimateSourceLabel(calories: number | null | undefined) {
+  return calories != null && Number.isFinite(calories) && calories > 0
+    ? `${calories.toLocaleString('en-US')} kcal (Your estimate)`
+    : 'Your estimate';
+}
+
+export function currentIntakeSourceLabel(label: string, usualCalories: number | null | undefined) {
+  return label === 'manual_estimate' || label === 'CalorieBank estimate' || label === 'Your estimate'
+    ? usualEstimateSourceLabel(usualCalories)
+    : sourceLabel(label);
+}

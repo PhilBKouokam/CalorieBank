@@ -53,3 +53,11 @@ it('keeps trackers visible before permission and offers setup only after an expl
   expect(JSON.stringify(view.toJSON())).toContain('Set up Health Connect');
   expect(api.select).not.toHaveBeenCalled();
 });
+
+it('never describes an interrupted or unconfirmed discovery as missing food', async () => {
+  api.discover.mockResolvedValue({ access: { state: 'available', granted: ['nutrition'], missing: [] }, sources: [] });
+  await mount(); await choose();
+  expect(JSON.stringify(view.toJSON())).toContain('couldn’t check');
+  expect(JSON.stringify(view.toJSON())).not.toContain('No Cronometer calories');
+  expect(api.select).not.toHaveBeenCalled();
+});

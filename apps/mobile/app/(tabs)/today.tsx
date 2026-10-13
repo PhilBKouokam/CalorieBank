@@ -598,8 +598,8 @@ export default function TodayScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Calories eaten, ${today.eaten.calories ?? 0} kilocalories, ${eatenDetail.toLowerCase()}. Edit.`}
                     onPress={(event) => { event.stopPropagation(); router.push({ pathname: '/manual-estimate', params: { mode: 'today' } }); }}
-                    style={{ minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center', alignSelf: 'flex-start' }}
-                  ><Ionicons name="pencil-outline" size={20} color={colors.primary} /></Pressable> : null}
+                    style={({ pressed }) => [styles.editEstimateButton, pressed && styles.pressedCard]}
+                  ><Text style={styles.editEstimateButtonText}>Edit</Text></Pressable> : null}
                 </View>
               </View>
               <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>
@@ -952,10 +952,13 @@ const styles = StyleSheet.create({
   },
   todayMetrics: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.md,
   },
   todayMetric: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 144,
+    minWidth: 144,
     gap: spacing.xs,
   },
   metricLabel: {
@@ -976,6 +979,8 @@ const styles = StyleSheet.create({
   },
   burnDetailRow: { alignItems: 'flex-start', gap: spacing.xs },
   burnDetail: { flexShrink: 1 },
+  editEstimateButton: { minWidth: 64, minHeight: 48, justifyContent: 'center', alignItems: 'center', alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.primary, borderRadius: radii.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginTop: spacing.sm },
+  editEstimateButtonText: { color: colors.primary, fontSize: typography.body, fontWeight: '700' },
   whyButton: { minHeight: 44, justifyContent: 'center' },
   whyButtonText: { color: colors.primaryDark, fontSize: typography.caption, fontWeight: '700' },
   modalBackdrop: {

@@ -41,7 +41,7 @@ export function AndroidFoodChoices({ onSelected, onBusyChange, disabled = false 
         setMessage('Health Connect needs to be available on this phone. You can choose FatSecret instead.');
       } else if (!discovered.access.granted.includes('nutrition')) {
         setMessage('Allow CalorieBank to read nutrition in Health Connect, then check again.');
-      } else if (discovered.queryState === 'failed') {
+      } else if (discovered.queryState !== 'complete' && discovered.queryState !== 'empty') {
         setMessage('We couldn’t check your food data. Try again.');
       } else if (id) {
         const source = discovered.sources.find((item) => item.source.id === id);
