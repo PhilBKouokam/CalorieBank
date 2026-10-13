@@ -1762,3 +1762,37 @@ next-build checks. No production migration, deployment or build performed.
   Normal text remains side-by-side; existing large-text stacking stays readable.
   Physical iOS/Android sync, keyboard geometry, pencil glyph and Android underline
   remain next-build qualification items. No production writes or build started.
+
+### October 13 build 13 release in progress
+
+Founder authorized the combined Android/iOS test release and explicitly approved
+pushing `3de0609` and deploying the shared API with both migrations. Source commit
+`3de06090e417240731bcecfbd6e7ccb728816078` is pushed to the private-beta branch.
+
+- Render API deploy `dep-db7bpqvavr4c73f4667g` is Live. Logs confirm both
+  `20261014000000_daily_intake_adjustments` and
+  `20261014000100_intake_adjustment_foreign_key` applied successfully.
+  `/health/ready` returned status ok / database ready after deployment.
+- Lifecycle service reports the same commit as its last successfully deployed
+  source, build `bld-db7bpr7avr4c73f466kg`; no manual lifecycle run was triggered.
+- Android versionCode 13: EAS `6bbc861a-1b81-4cec-88d1-25841c27b00b`.
+- iOS build 13: EAS `1b6de8ec-5f7a-4440-baa3-4d07e3909deb`; automatic submission
+  `02c9aea9-f1dc-4602-9e47-774216caa283` scheduled.
+- Store distribution and native qualification are still pending at this entry.
+
+TestFlight build 13 (`2220afc9-d74c-4e65-bb6c-3124ea66574c`) has finished
+processing and is **Testing** for the existing Team (Expo) and Friends & Family
+groups (3 invites). What to Test notes saved, automatic tester notification
+retained. Android distribution remains pending build completion.
+
+Android EAS build completed successfully. Uploaded its AAB to existing Play
+Internal Testing release 11, versionCode 13, named
+`1.0.0 (13) — Daily calorie corrections`. Console confirms **Available to internal
+testers**, released October 13 at 6:46 PM CDT. Supported-device counts are unchanged.
+Only non-blocking validation warning: no deobfuscation mapping file. Existing
+track/tester configuration preserved; no production-track rollout.
+
+Both test channels are now distributed. Evidence screenshots:
+`/tmp/cb-testflight13-distributed.png`, `/tmp/cb-play13-distributed.png`, and
+`/tmp/cb-render13-live.png`. Physical correction flows, native keyboard reachability,
+compact Today/pencil appearance and Android underline remain phone checks.
