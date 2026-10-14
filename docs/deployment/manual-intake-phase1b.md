@@ -1796,3 +1796,23 @@ Both test channels are now distributed. Evidence screenshots:
 `/tmp/cb-testflight13-distributed.png`, `/tmp/cb-play13-distributed.png`, and
 `/tmp/cb-render13-live.png`. Physical correction flows, native keyboard reachability,
 compact Today/pencil appearance and Android underline remain phone checks.
+
+### Build 13 physical save failure and API correction
+
+Founder installed build 13 on both phones. Samsung shows both correction modes
+and no longer displays the black input underline. Adding 100 to Cronometer's
+1,535-kcal total previews 1,635 correctly but Save returned a generic error.
+Render logs show PUT /v1/me/intake-adjustment HTTP 500 at 7:10 PM CDT.
+
+Reproduced locally with a persisted dated intake-authority boundary: the resolver
+returned the entire boundary row, and the correction write spread its `id`,
+`effectiveFrom` and `createdAt` into a different Prisma model. Prisma rejected
+unknown argument `id`. The original regression fixtures had only a legacy source
+selection, so they missed this state. The resolver now returns exactly provider,
+writerId and sourceId, preserving authority behavior. Added a real-database
+regression for addition, replacement and removal after dated Cronometer selection.
+No mobile changes or new migration are required.
+
+Correction verification: 986 tests / 94 files passed serially, repository lint,
+all workspace typechecks, API compilation and git diff whitespace checks passed.
+The new dated-selection regression failed before the fix and passes after it.

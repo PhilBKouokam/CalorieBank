@@ -133,6 +133,16 @@ describe('daily intake adjustments', () => {
     expect(await repo.read(id)).toMatchObject({ localDate: '2026-10-14', adjustment: null, calories: null });
     expect((await db.dailyIntakeAdjustment.findUniqueOrThrow({ where: { userId_localDate: { userId: id, localDate: date } } })).calories).toBe(300);
   });
+  it('saves additions, replacements and removal after a dated tracker selection', async () => {
+    const { id, repo } = await fixture();
+    await db.intakeAuthorityBoundary.create({ data: {
+      userId: id, effectiveFrom: date, provider: 'health_connect',
+      sourceId: 'com.cronometer.android.gold', timezone,
+    } });
+    expect(await repo.mutate(id, input(await repo.read(id), 'add', 100))).toMatchObject({ calories: 1900 });
+    expect(await repo.mutate(id, input(await repo.read(id), 'replace', 2500))).toMatchObject({ calories: 2500 });
+    expect(await repo.mutate(id, input(await repo.read(id), 'none', 0))).toMatchObject({ calories: 1800, adjustment: null });
+  });
   it('rejects an editor opened before a source change, even if the adjustment revision still matches', async () => {
     const { id, user, repo } = await fixture();
     const stale = await repo.read(id);

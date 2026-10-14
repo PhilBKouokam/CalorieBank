@@ -43,7 +43,11 @@ export async function resolveIntakeAuthority(
   const dated = boundary?.effectiveFrom ?? await db.intakeAuthorityBoundary.findFirst({
     where: { userId, effectiveFrom: { not: null } }, select: { id: true },
   });
-  return dated ? boundary ?? selectionIdentity(legacy) : selectionIdentity(legacy);
+  // Return only identity fields; a persisted boundary also contains history
+  // metadata that must never leak into another model's write payload.
+  return dated && boundary
+    ? { provider: boundary.provider, writerId: boundary.writerId, sourceId: boundary.sourceId }
+    : selectionIdentity(legacy);
 }
 
 /** Called inside the source projection transaction with the account lock held. */
