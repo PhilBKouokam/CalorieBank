@@ -276,3 +276,97 @@ production migration, or manual accounting mutation was performed in this
 correction release. Android physical startup/accessibility and both devices'
 forecasting qualification remain pending; no physical success is inferred from
 artifact compilation or store availability.
+
+### Final accessibility release — backend qualification, October 15
+
+Validated source `3ff8b90438bd4851de74d6d009d8f4fcb4a4d3db` was committed
+and pushed after scope and sensitive-data review. The full pinned Node 20
+release gate was rerun successfully: 1,106 tests across 107 files, TypeScript,
+lint, Prisma/local migrations and workspace builds. An unrelated untracked
+root `app.json` was excluded from the source commit.
+
+The immediate pre-deployment read-only accounting capture at
+2026-10-15T20:36:25.323Z contains all 10 accounts and zero consistency failures.
+Its canonical JSON SHA-256 is
+`707893742f801ec767598fac86cb04fe86445dbfb01a032083aa4bf3c0277191`.
+Compared with the original 01:37 baseline, all initialization fields and Opening
+Bank evidence remain exact matches. One October 14 finalization and three
+scheduled October 12 locks explain later ledger/History changes. Filtering
+newly created records and reversing only the later lock metadata reconstructs
+the original evidence hashes exactly. This does not resolve or relabel the
+older historical whole-table fingerprint discrepancy.
+
+Render API deployment `dep-db8jl7g473hc73802s20` became live at 20:45:06 UTC
+on the exact validated commit. Predeploy applied only
+`20261016000000_settings_revisions`, bringing the migration count to 40.
+Readiness returned HTTP 200 with database ready.
+
+The post-API read-only capture at 20:45:38.524Z matches the immediate baseline
+for every account field, accounting evidence fingerprint and derived balance.
+Zero inconsistent accounts. Canonical SHA-256:
+`d339833caac72902dd73d26e978e41b837450606b7bd46aac40c0d92e4c40c0f`.
+Private snapshots remain owner-only outside Git.
+
+Lifecycle, live protected-contract checks, mobile distribution and physical
+qualification remain pending at this entry; automated/diagnostic evidence is
+not a claim that replacement store artifacts have passed physical testing.
+
+Lifecycle build `bld-db8jo1g473hc7380cg6g` succeeded at 20:49:30 UTC on
+`3ff8b90438bd4851de74d6d009d8f4fcb4a4d3db`. The qualification run has not yet
+been triggered/verified: computer control paused when the Mac locked. No mobile
+builds started at this checkpoint.
+
+The subsequent scheduled lifecycle run completed at approximately 21:02:40 UTC:
+10 accounts, 10 completed, zero failed jobs, eight provider errors. The preceding
+scheduled run reported seven provider errors. A newly observed Fitbit HTTP 409
+requires read-only connection-status investigation; causality is not established.
+No reconnection, credential change or provider repair has been attempted.
+Mobile builds are held under the release failure policy.
+
+The post-lifecycle read-only accounting capture at 2026-10-15T21:03:20.371Z
+exactly matches every account in the post-API capture, with zero inconsistent
+accounts. Its canonical JSON SHA-256 is
+`9525efc5699b97962fd9866eae9976072b98d2373c25bcafa0daa895246750a5`.
+The verified snapshot remains outside Git. This accounting result does not
+resolve the additional provider failure. Live settings-contract qualification,
+new private binaries and their physical qualification remain outstanding.
+
+Read-only follow-up established that the additional failure belongs to the
+founder-designated test account (identity retained outside this document).
+Connection metadata: last successful sync 20:02:26.711 UTC; last token refresh
+19:03:13.326 UTC; access-token expiry 20:03:12.326 UTC; recorded refresh-token
+expiry 20:36:03.326 UTC. At 21:02:39.952 UTC the connection was updated to
+`needs_reconnect` with `token_refresh_failed`. The existing accessToken guard
+then explains HTTP 409 for subsequent requests. The Google Health service has
+no diff between checkpoint 083f995 and this release source. Recorded expiry
+supports expired authorization but does not establish the provider's exact
+refresh rejection response. No tokens were printed or changed by investigation.
+
+Release remains BLOCKED on this genuine connection failure under the founder's
+failure policy. Reauthorization and successful provider qualification are needed
+before resuming mobile delivery. No repair, permission expansion or replacement
+build was performed. Accounting remains verified unchanged as recorded above.
+
+Founder completed the existing Fitbit reconnection flow. Read-only verification
+confirmed the designated test account owns the connected record, error code is
+null, and successful synchronization completed at 21:56:54.031 UTC. New recorded
+refresh-token expiry is October 22 at 21:56:43.725 UTC. Today has ready expenditure
+and steps aggregates with coherent sync-session identity and reported-interval
+planning evidence. Founder confirmed the reconnect warning cleared and Today
+shows updated Burned and Steps. No credentials, permissions or connection records
+were manually changed by the release investigation.
+
+Post-reconnection accounting capture: 21:57:50.758 UTC, ten accounts, zero
+consistency failures, canonical SHA-256
+`db108cb6d4a989d0efb191e3cee4e3622ed35a0b5ae857fd42972c23220873f2`.
+All initialization and Opening Bank evidence remains unchanged. One newly
+finalized October 14 day explains the sole account difference. Removing only
+records created after the earlier capture reproduces all previous History,
+ledger and calculation fingerprints exactly. The new snapshot remains private
+on the service; export through console was blocked by automatic approval review
+and was not retried. Earlier secured local baselines remain intact.
+
+The reconnection blocker is resolved. Private artifact preparation may resume;
+new-artifact physical startup, settings conflict UI, accessibility and forecasting
+qualification remain pending. Successful reconnect does not by itself prove the
+next eventual token refresh will succeed.
