@@ -174,3 +174,27 @@ One build per platform was requested only after backend qualification passed:
 iOS build 14 `c4bc8a91-7e65-44a9-97cf-41f368ef66fe`; Android versionCode 14
 `18f39fd7-fbf1-4403-83b7-4614afa63427`. Both use the exact correction commit.
 Store distribution and physical qualification are not established by this entry.
+
+### Physical qualification failure — build 14
+
+Both EAS build jobs finished successfully from `bca23fb`.
+iOS submission `9e00544d-9d74-449e-90d6-939761d19c51` uploaded successfully;
+App Store Connect build `10a14368-d4c1-4070-aa39-067764fd6553` showed Testing
+with Friends & Family assigned. No public release was performed.
+
+The founder then reported that iPhone build 14 crashes immediately on launch.
+This is physical failure evidence, despite the passing automated/backend gates.
+Step Planning and live-text qualification could not proceed. App Store Connect
+Crash Feedback showed no report at inspection; exact crash time, device/OS,
+repeatability and native stack remain uncollected. Root cause is not established.
+
+Android versionCode 14 completed and its signed AAB was downloaded. Its Play
+Internal Testing draft contains release notes, but the artifact was NOT uploaded
+and the release was NOT published before the iPhone crash report. Publication
+is paused. Android physical qualification is pending. No replacement build,
+speculative code correction, rollback or accounting mutation was performed.
+
+Verdict: PHASE 2A: BLOCKED — iPhone build 14 crashes immediately on launch;
+crash diagnosis is required before resuming physical qualification and Android
+publication. Backend/accounting evidence above remains valid and separate from
+this mobile failure. Preserve the historically unresolved fingerprint limitation.
