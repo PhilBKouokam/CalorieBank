@@ -198,3 +198,44 @@ Verdict: PHASE 2A: BLOCKED — iPhone build 14 crashes immediately on launch;
 crash diagnosis is required before resuming physical qualification and Android
 publication. Backend/accounting evidence above remains valid and separate from
 this mobile failure. Preserve the historically unresolved fingerprint limitation.
+
+### Build 14 crash established and narrow correction — 2026-10-14 CDT
+
+Four retained iPhone crash reports and the connected-device console establish a
+JavaScript invalid-hook-call failure. Live launch at 21:53:43 CDT reported
+`ScaleAwareTabBar -> useTextLayoutScale -> useContext`; the fatal error then
+passed through `ExceptionsManager.reportException` to the TurboModule abort.
+The callback was passed as `tabBar={ScaleAwareTabBar}`. BottomTabView invokes
+that callback directly inside SafeAreaInsetsContext.Consumer, outside a function
+component hook boundary. This is the accessibility tab-label refresh change,
+not evidence of a HealthKit, forecasting, provider or accounting failure.
+
+The founder-approved correction renders the component from the callback:
+`tabBar={(props) => <ScaleAwareTabBar {...props} />}`. Navigator and screen keys,
+text refresh behavior, screen state and consumer layout remain unchanged.
+
+The previous regression incorrectly used React.createElement on the callback,
+masking the failure. The corrected harness invokes the callback directly inside
+a context Consumer, matching the library contract. It reproduced the original
+invalid-hook-call failure before the one-line correction and passes afterward.
+An additional test invokes the callback outside rendering and verifies it returns
+a React element without executing hooks. Focused coverage also verifies initial
+bar rendering, selected route and navigator identity through font-size changes,
+and real calorie-correction (add/replace) and usual-estimate editor draft/input
+preservation. These rendered tests do not establish physical accessibility.
+
+Android 14 contains the shared ScaleAwareTabBar code and must not be distributed.
+Retain its existing AAB; replacement delivery requires corrected source. No
+backend deployment, production migration or accounting mutation belongs to this
+mobile correction. Existing backend qualification remains separate evidence.
+
+Correction validation: Node 20.20.2 full release gate passed (1,054 tests across
+100 files), including TypeScript, lint, Prisma validation/generation, migrations
+against the dedicated localhost test database, domain/schema/API compilation and
+`git diff --check`. Focused accessibility/navigation suite: 6 tests in 2 files.
+Expo public configuration resolves SDK 54.0.0 with New Architecture enabled;
+no lockfile, native dependency, entitlement, permission or backend change.
+Android EAS metadata confirms versionCode 14 source is `bca23fb2940a6779d2340041f679126eb4b2f609`;
+its compiled bundle contains ScaleAwareTabBar. It is affected shared source and
+remains undistributed. Physical launch, forecasting and live text qualification
+remain pending corrected artifacts; automated checks are not physical proof.

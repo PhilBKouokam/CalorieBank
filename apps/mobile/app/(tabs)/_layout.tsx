@@ -20,7 +20,7 @@ function TabIcon({ name, color }: { name: TabIconName; color: string }) {
 export default function TabLayout() {
   return (
     <Tabs
-      tabBar={ScaleAwareTabBar}
+      tabBar={(props) => <ScaleAwareTabBar {...props} />}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
