@@ -521,14 +521,23 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
     if (discardedIds.length > 0) {
       await transaction.openingBankCalculationDay.deleteMany({ where: { id: { in: discardedIds } } });
     }
-    await transaction.bankAccountInitialization.update({
-      where: { userId },
-      data: {
-        historicalOpeningNetCalories: period.openingNetCalories,
-        openingEffectiveBalanceCalories: period.openingNetCalories,
-        eligibleDayCount: period.selectedDays.length,
-      },
-    });
+    // The caller holds the account's opening-bank transaction lock. Re-read after
+    // any bounded repair so a repeated check does not manufacture a new updatedAt.
+    const initialization = await transaction.bankAccountInitialization.findUniqueOrThrow({ where: { userId } });
+    if (
+      initialization.historicalOpeningNetCalories !== period.openingNetCalories
+      || initialization.openingEffectiveBalanceCalories !== period.openingNetCalories
+      || initialization.eligibleDayCount !== period.selectedDays.length
+    ) {
+      await transaction.bankAccountInitialization.update({
+        where: { userId },
+        data: {
+          historicalOpeningNetCalories: period.openingNetCalories,
+          openingEffectiveBalanceCalories: period.openingNetCalories,
+          eligibleDayCount: period.selectedDays.length,
+        },
+      });
+    }
     return period.openingNetCalories;
   }
 

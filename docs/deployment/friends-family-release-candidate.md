@@ -58,3 +58,65 @@ Before another preview, run `npm run release:friends-family` against an explicit
 configured localhost `TEST_DATABASE_URL`. See the [state-machine gate](../engineering/source-selection-state-machine.md)
 for automation, migration scope and the five remaining device journeys. Automated
 success alone does not remove the physical release hold.
+
+## Phase 2A initialization idempotency and accounting evidence (2026-10-15)
+
+The previous initialization whole-table fingerprint difference remains
+**HISTORICALLY UNRESOLVED — NO CURRENT ACCOUNTING DISCREPANCY DETECTED**.
+Do not reinterpret a consistent new baseline as proof that the earlier change
+was harmless. The old capture did not preserve field-level before-values.
+
+The narrow local correction compares historicalOpeningNetCalories,
+openingEffectiveBalanceCalories and eligibleDayCount under the existing account
+transaction lock. Matching values issue no UPDATE and preserve updatedAt.
+Legitimate bounded repair and opening-period selection remain unchanged. Tests
+cover all 13 fields, whole-row hashes, absence of UPDATE queries, repeated and
+concurrent checks, account isolation, deletion, and a required historical repair
+followed by an idempotent check.
+
+### Reusable read-only snapshot
+
+Use `apps/api/src/scripts/capture-accounting-snapshot.ts` (or its compiled
+`apps/api/dist/scripts/capture-accounting-snapshot.js`) with the service's
+existing database configuration. Set `ACCOUNTING_SNAPSHOT_PATH` to a unique
+absolute path outside the checkout, inside an owner-only directory. Set
+`ACCOUNTING_SOURCE_COMMIT` to the exact deployed commit when RENDER_GIT_COMMIT
+is unavailable. Run with Node 20. Never print, attach publicly, or commit the
+result: it contains private account IDs and accounting values.
+
+The procedure uses a RepeatableRead transaction with SET TRANSACTION READ ONLY;
+it never calls application read methods that may trigger reconciliation or
+locking writes. It exclusively creates a mode-0600 JSON file containing:
+
+- Stable user identity and every initialization scalar field.
+- Whole-row, accounting/state, and separate createdAt/updatedAt fingerprints.
+- Per-account Opening Bank, finalized History, ledger and calculation-snapshot
+  counts and fingerprints.
+- Opening sums/counts, initialized-state requirements, date boundaries, ledger
+  ownership and finalized-to-ledger reconciliation checks.
+- Derived effective balance, Available Bank and Recovery using the existing
+  formulas, without persisting or recalculating accounting.
+- Database capture time, exact deployed source commit, and migration names,
+  checksums and execution timestamps.
+
+The first baseline was captured at 2026-10-15T01:37:15.653Z against deployed
+360048ac5afcabf2ff0f4c2eeb61e25528b699ce: 10 accounts, zero consistency failures.
+Canonical snapshot SHA-256:
+`12a067068162c7d73b1e91916ce3b0301fe3d5f17fceeace5346a70b835b7060`.
+An owner-only copy was retrieved outside Git and checksum-verified. The raw
+snapshot and account values are intentionally absent from this document.
+
+Before and after an authorized deployment, compare row identity sets and all
+13 initialization fields. Report operational timestamp differences separately;
+never simply exclude the initialization table. Investigate every significant
+field change and related accounting fingerprint difference. Concurrent normal
+activity can change records legitimately; do not suppress or presume such
+changes harmless. Preserve both snapshots securely. A fresh capture may be
+needed immediately before a later deployment; it does not replace this baseline.
+
+Local validation: 37 focused tests across 4 files; full Node 20 release gate
+1,053 tests across 100 files, TypeScript, lint, Prisma validation, safe local
+migrations and API compilation passed. No new migration is required. This
+correction remains local; no further deployment, lifecycle deployment or mobile
+build is authorized by this evidence record alone. Resume only after founder
+review of this checkpoint.

@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { DailyBankTargetRepository } from '../src/modules/daily-bank-target/daily-bank-target.repository';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
 import { PrismaBankHistoryRepository } from '../src/modules/bank-history/bank-history.repository';
@@ -8,7 +8,11 @@ import { PrismaPlannedTreatRepository } from '../src/modules/planned-treat/plann
 import { PrismaTodayAggregateRepository } from '../src/modules/today/today.repository';
 import { calculateBurnToStepPlan, walkingTimeFromPace } from '@caloriebank/domain';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ log: [{ emit: 'event', level: 'query' }] });
+const initializationUpdates: string[] = [];
+prisma.$on('query', (event) => {
+  if (/UPDATE "public"\."bank_account_initializations"/.test(event.query)) initializationUpdates.push(event.query);
+});
 const userIds: string[] = [];
 
 function dateOnly(value: string) {
@@ -167,6 +171,38 @@ describe('Opening Bank and Recovery persistence', () => {
 
   afterAll(async () => {
     await prisma.$disconnect();
+  });
+
+  it.each([0, 300])('preserves all 13 fields and issues no UPDATE for repeated/concurrent initialized checks (%i kcal)', async (opening) => {
+    const user = await createUser({ openingPolicy: true });
+    const other = await createUser({ openingPolicy: true });
+    const repository = new PrismaBankHistoryRepository(prisma, { allowSyntheticProviders: false });
+    if (opening) await addProviderDay(user.id, '2026-08-18', opening);
+    await repository.initializeOpeningBank(user, '2026-08-19', 'America/Chicago');
+    if (!opening) await repository.initializeOpeningBank(user, '2026-08-20', 'America/Chicago');
+    const read = () => prisma.bankAccountInitialization.findUniqueOrThrow({ where: { userId: user.id } });
+    const before = await read();
+    const otherBefore = await prisma.bankAccountInitialization.findUniqueOrThrow({ where: { userId: other.id } });
+    const fingerprint = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+    expect(Object.keys(before)).toHaveLength(13);
+    initializationUpdates.length = 0;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await expect(repository.initializeOpeningBank(user, '2026-08-21', 'America/Chicago'))
+        .resolves.toMatchObject({ outcome: 'already_initialized', openingEffectiveBalanceCalories: opening });
+      const after = await read();
+      expect(after).toEqual(before);
+      expect(fingerprint(after)).toBe(fingerprint(before));
+      expect(initializationUpdates).toHaveLength(0);
+    }
+    const results = await Promise.all(Array.from({ length: 4 }, () => repository.initializeOpeningBank(user, '2026-08-21', 'America/Chicago')));
+    expect(results.every((result) => result.outcome === 'already_initialized')).toBe(true);
+    expect(await read()).toEqual(before);
+    expect(initializationUpdates).toHaveLength(0);
+    expect(await prisma.bankAccountInitialization.findUniqueOrThrow({ where: { userId: other.id } })).toEqual(otherBefore);
+    await prisma.user.delete({ where: { id: user.id } });
+    expect(await prisma.bankAccountInitialization.findUnique({ where: { userId: user.id } })).toBeNull();
+    expect(await prisma.openingBankCalculationDay.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.bankAccountInitialization.findUniqueOrThrow({ where: { userId: other.id } })).toEqual(otherBefore);
   });
 
   it('does not initialize from an early matching day before the full import attempt completes', async () => {
@@ -481,8 +517,17 @@ describe('Opening Bank and Recovery persistence', () => {
       prisma.dailyIntakeAggregate.updateMany({ where: { userId: user.id }, data: { importedAt: recoveredAt } }),
     ]);
 
+    initializationUpdates.length = 0;
     await expect(repository.initializeOpeningBank(user, '2026-08-21', 'America/Chicago'))
       .resolves.toMatchObject({ outcome: 'already_initialized', openingEffectiveBalanceCalories: 519 });
+    expect(initializationUpdates).toHaveLength(1);
+    const repaired = await prisma.bankAccountInitialization.findUniqueOrThrow({ where: { userId: user.id } });
+    expect(repaired.updatedAt.getTime()).toBeGreaterThan(initialized.updatedAt.getTime());
+    expect(repaired).toMatchObject({ historicalOpeningNetCalories: 519, openingEffectiveBalanceCalories: 519, eligibleDayCount: 2 });
+    initializationUpdates.length = 0;
+    await repository.initializeOpeningBank(user, '2026-08-21', 'America/Chicago');
+    expect(initializationUpdates).toHaveLength(0);
+    expect(await prisma.bankAccountInitialization.findUniqueOrThrow({ where: { userId: user.id } })).toEqual(repaired);
     expect((await repository.getHistory(user.id, 'ALL')).days.map((day) => [
       day.logDate, day.dailyBankChange, day.provenance,
     ])).toEqual([
