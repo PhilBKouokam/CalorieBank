@@ -48,7 +48,8 @@ describe('A2 progressive detail projections', () => {
       });
     });
 
-    it('inverts the same provider-level model and rounds steps to the nearest 100', () => {
+    // 6,389 * .078 = 498.342 kcal: the old nearest-100 target missed 500 kcal.
+    it('inverts the same provider-level model and rounds required total steps upward to the next 100', () => {
       expect(calculateBurnToStepPlan({
         currentSteps: 31_611,
         targetActualBurnCalories: 3_600,
@@ -59,8 +60,8 @@ describe('A2 progressive detail projections', () => {
         alreadyOnTrack: false,
         requiredProviderBurnCalories: 4_500,
         additionalProviderCaloriesNeeded: 500,
-        totalDailyStepsNeeded: 38_000,
-        remainingSteps: 6_389,
+        totalDailyStepsNeeded: 38_100,
+        remainingSteps: 6_489,
       });
     });
 

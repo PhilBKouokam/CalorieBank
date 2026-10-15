@@ -12,11 +12,11 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import { fetchGoalConfiguration, saveGoalConfiguration } from '@/lib/api/client';

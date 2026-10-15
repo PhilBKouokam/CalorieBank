@@ -519,6 +519,15 @@ model DailyExpenditureAggregate {
   rawTotalDailyExpenditure Int                   @map("raw_total_daily_expenditure")
   adjustedDailyExpenditure Int                   @map("adjusted_daily_expenditure")
   adjustmentFactor         Decimal               @map("adjustment_factor") @db.Decimal(4, 2)
+  retrievedAt              DateTime?             @map("retrieved_at") @db.Timestamptz
+  forecastCoverageAt       DateTime?             @map("forecast_coverage_at") @db.Timestamptz
+  activeSampleEndAt        DateTime?             @map("active_sample_end_at") @db.Timestamptz
+  basalSampleEndAt         DateTime?             @map("basal_sample_end_at") @db.Timestamptz
+  reportedIntervalEndAt    DateTime?             @map("reported_interval_end_at") @db.Timestamptz
+  planningAnchorAt         DateTime?             @map("planning_anchor_at") @db.Timestamptz
+  planningExpiresAt        DateTime?             @map("planning_expires_at") @db.Timestamptz
+  planningProgressAt       DateTime?             @map("planning_progress_at") @db.Timestamptz
+  planningAnchorKind       String?               @map("planning_anchor_kind")
   importedAt               DateTime              @map("imported_at") @db.Timestamptz
   providerUpdatedAt        DateTime?             @map("provider_updated_at") @db.Timestamptz
   syncStatus               AggregateSyncStatus   @map("sync_status")

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { openBrowserAsync } from 'expo-web-browser';
 
 import { colors, spacing, typography } from '@/constants/caloriebank-theme';

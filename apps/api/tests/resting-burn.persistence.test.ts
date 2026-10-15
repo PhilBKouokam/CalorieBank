@@ -44,6 +44,7 @@ describe('resting-burn model persistence', () => {
             adjustmentFactor: 0.8,
             importedAt: now,
             providerUpdatedAt: now,
+            forecastCoverageAt: now,
             syncStatus: 'ready',
             isCurrentDay: true,
           },

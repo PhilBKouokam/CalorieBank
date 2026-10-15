@@ -19,7 +19,7 @@ describe('persisted planning snapshot', () => {
       await db.user.create({ data: { id: userId, email: `forecast-${userId}@caloriebank.local`, providerSelection: { create: { authoritativeExpenditureProvider: provider, authoritativeActivityProvider: provider, authoritativeIntakeProvider: 'fatsecret' } } } });
       const session = await db.ingestionSyncSession.create({ data: { userId, provider, localDate, timezone: 'UTC', trigger: 'app_foreground', startedAt: now, completedAt: now, status: 'completed' } });
       const common = { userId, provider, localDate, timezone: 'UTC', importedAt: now, providerUpdatedAt: now, isCurrentDay: true, syncStatus: 'ready' as const, syncSessionId: session.id };
-      const burn = await db.dailyExpenditureAggregate.create({ data: { ...common, providerRecordId: 'burn', rawTotalDailyExpenditure: 3000, adjustedDailyExpenditure: 2400, adjustmentFactor: .8 } });
+      const burn = await db.dailyExpenditureAggregate.create({ data: { ...common, forecastCoverageAt: now, providerRecordId: 'burn', rawTotalDailyExpenditure: 3000, adjustedDailyExpenditure: 2400, adjustmentFactor: .8 } });
       const steps = await db.dailyStepAggregate.create({ data: { ...common, providerRecordId: 'steps', totalSteps: 10000 } });
       await db.restingBurnEstimate.create({ data: { userId, provider, providerKcalPerHour: 80, evidenceType: 'historical_low_activity_hours', observationCount: 20, lookbackStartDate: localDate, lookbackEndDate: localDate, calculatedAt: now } });
       const accounting = () => Promise.all([

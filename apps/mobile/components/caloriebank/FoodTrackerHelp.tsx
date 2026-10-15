@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { foodTrackerGuidance } from '@/lib/healthkit/food-tracker-guidance';
 import { colors, spacing, typography } from '@/constants/caloriebank-theme';

@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AppState, View } from 'react-native';
 import 'react-native-reanimated';
+import { FontScaleProvider } from '@/components/caloriebank/ScaleAwareText';
 
 import { colors } from '@/constants/caloriebank-theme';
 import { ProtocolUpdateNotice } from '@/components/caloriebank/ProtocolUpdateNotice';
@@ -16,25 +17,27 @@ import { setNotificationAccountScope, syncMorningBankUpdateDevice } from '@/lib/
 
 function AppStack() {
   return (
-    <View style={{ flex: 1 }}>
-      <ProtocolUpdateNotice />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.text,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      >
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="(details)" options={{ headerShown: false }} />
-        <Stack.Screen name="(settings)" options={{ headerShown: false }} />
-        <Stack.Screen name="(modals)" options={{ presentation: 'modal', headerShown: false }} />
-      </Stack>
-      <StatusBar style="dark" />
-    </View>
+    <FontScaleProvider>
+      <View style={{ flex: 1 }}>
+        <ProtocolUpdateNotice />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        >
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(details)" options={{ headerShown: false }} />
+          <Stack.Screen name="(settings)" options={{ headerShown: false }} />
+          <Stack.Screen name="(modals)" options={{ presentation: 'modal', headerShown: false }} />
+        </Stack>
+        <StatusBar style="dark" />
+      </View>
+    </FontScaleProvider>
   );
 }
 

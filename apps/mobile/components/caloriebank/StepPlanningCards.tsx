@@ -1,7 +1,9 @@
-import { calculateBurnToStepPlan, calculateStepToBurnPlan, suggestNextStepTarget, walkingTimeFromPace } from '@caloriebank/domain';
+import { calculateBurnToStepPlan, calculateStepToBurnPlan, suggestNextStepTarget, walkingTimeFromPace, walkingMidnightFeasibility } from '@caloriebank/domain';
 import type { TodayResponse } from '@caloriebank/schemas';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { usePlanningClock } from '@/lib/today/use-planning-clock';
+import { StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import { getConsumerSourceName } from '@/lib/providers/presentation';
 
@@ -15,13 +17,23 @@ export function WalkingTime({ steps, pace }: { steps: number; pace: TodayRespons
   </View>;
 }
 
+function DeadlineNotice({ steps, today, now }: { steps: number; today: TodayResponse; now: Date }) {
+  const result = walkingMidnightFeasibility({ remainingSteps: steps, stepsPerMinute: today.steps.walkingPace?.stepsPerMinute ?? null,
+    localDate: today.date, timezone: today.timezone, now });
+  return result === 'insufficient_time' ? <Text accessibilityLiveRegion="polite" style={styles.detail}>At your estimated pace, these steps won’t fit before midnight.</Text> : null;
+}
+
 export function StepPlanningCards({ today }: { today: TodayResponse }) {
   const { fontScale } = useWindowDimensions();
+  const { now, expired: coverageExpired } = usePlanningClock(today.restOfDayProjection);
   const inputStyle = [styles.input, { width: 132 * Math.max(1, fontScale) }];
-  const baseline = today.restOfDayProjection.projectedProviderBurnCalories;
+  // Old servers expose a nearest-10 value: its lower bound is safe for targets.
+  const displayedBaseline = today.restOfDayProjection.projectedProviderBurnCalories;
+  const baseline = today.restOfDayProjection.unroundedProjectedProviderBurnCalories
+    ?? (displayedBaseline === null ? null : Math.max(0, displayedBaseline - 5));
   const [burn, setBurn] = useState(String(baseline === null ? 0 : Math.ceil((baseline * today.burned.adjustmentFactor + 1) / 500) * 500));
   const [steps, setSteps] = useState(String(today.steps.count === null ? 0 : suggestNextStepTarget(today.steps.count)));
-  const ready = today.steps.status === 'ready' && today.burned.status === 'ready'
+  const ready = !coverageExpired && today.steps.status === 'ready' && today.burned.status === 'ready'
     && today.steps.planningSnapshotReady !== false
     && today.restOfDayProjection.status === 'ready' && baseline !== null
     && today.steps.count !== null && today.steps.caloriesPerStep !== null;
@@ -41,7 +53,8 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         <Text style={styles.result}>{inverse.alreadyOnTrack ? 'You’re already on track without extra steps.' : `${inverse.totalDailyStepsNeeded.toLocaleString()} total steps`}</Text>
         {!inverse.alreadyOnTrack ? <Text style={styles.remainingSteps}>{inverse.remainingSteps.toLocaleString()} steps remaining</Text> : null}
         <WalkingTime steps={inverse.remainingSteps} pace={today.steps.walkingPace} />
-      </View> : <Text style={styles.detail}>{today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
+        <DeadlineNotice steps={inverse.remainingSteps} today={today} now={now} />
+      </View> : <Text style={styles.detail}>{coverageExpired || today.restOfDayProjection.coverageStatus === 'uncertain' ? 'Waiting for newer activity data.' : today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
     </View>
     <View style={styles.card}>
       <Text style={styles.title}>If I walk…</Text>
@@ -59,7 +72,8 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         </View>
         <Text style={styles.remainingSteps}>About {forward.additionalSteps.toLocaleString()} more steps</Text>
         <WalkingTime steps={forward.additionalSteps} pace={today.steps.walkingPace} />
-      </View> : <Text style={styles.detail}>{today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
+        <DeadlineNotice steps={forward.additionalSteps} today={today} now={now} />
+      </View> : <Text style={styles.detail}>{coverageExpired || today.restOfDayProjection.coverageStatus === 'uncertain' ? 'Waiting for newer activity data.' : today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
     </View>
   </>;
 }

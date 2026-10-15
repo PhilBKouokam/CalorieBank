@@ -3,7 +3,8 @@ import { deletionHealthNote } from '@/lib/native-health/copy';
 import { useClerk } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';

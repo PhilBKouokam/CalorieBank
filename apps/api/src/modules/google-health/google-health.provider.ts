@@ -1,5 +1,6 @@
 import {
   normalizeDailyExpenditureAggregate,
+  getLocalDateUtcBounds,
   normalizeDailyStepAggregate,
   normalizeCurrentDayWorkout,
   type ExpenditureProvider,
@@ -75,6 +76,7 @@ const GoogleHealthExerciseListSchema = z.object({
 
 export interface GoogleHealthTotalCaloriesTransport {
   fetchDailyTotalCalories(localDate: string): Promise<unknown>;
+  fetchMinuteTotalCalories?(input: { start: Date; end: Date; pageToken?: string }): Promise<unknown>;
 }
 
 export interface GoogleHealthStepsTransport {
@@ -89,6 +91,43 @@ function civilDate(value: { year: number; month: number; day: number }) {
   return `${String(value.year).padStart(4, '0')}-${String(value.month).padStart(2, '0')}-${String(value.day).padStart(2, '0')}`;
 }
 
+/** Complete bounded pagination, explicit zero support, no interpolation over gaps.
+ * Failure of this optional planning query must not discard daily accounting evidence.
+ */
+export async function fetchMinuteExpenditureEvidence(transport: GoogleHealthTotalCaloriesTransport, input: FetchDailyAggregateInput, now: Date) {
+  if (!transport.fetchMinuteTotalCalories) return null;
+  const bounds = getLocalDateUtcBounds(input.localDate, input.timezone);
+  const end = new Date(Math.min(now.getTime(), bounds.end.getTime()));
+  if (end <= bounds.start) return null;
+  const tokens = new Set<string>();
+  const intervals = new Map<string, { end: Date; calories: number }>();
+  let pageToken: string | undefined;
+  try {
+    for (let page = 0; page < 100; page++) {
+      const payload = GoogleHealthHourlyRollupSchema.parse(await transport.fetchMinuteTotalCalories({ start: bounds.start, end, ...(pageToken ? { pageToken } : {}) }));
+      for (const point of payload.rollupDataPoints) {
+        if (!point.totalCalories) continue; // A missing interval is not an explicit zero.
+        const start = new Date(point.startTime);
+        const pointEnd = new Date(point.endTime);
+        if (start < bounds.start || pointEnd > end || pointEnd <= start || pointEnd.getTime() - start.getTime() > 60000) return null;
+        const key = point.startTime;
+        const prior = intervals.get(key);
+        if (prior && (prior.end.getTime() !== pointEnd.getTime() || prior.calories !== point.totalCalories.kcalSum)) return null;
+        intervals.set(key, { end: pointEnd, calories: point.totalCalories.kcalSum });
+      }
+      pageToken = payload.nextPageToken;
+      if (!pageToken) {
+        const ordered = [...intervals.entries()].sort(([a], [b]) => a.localeCompare(b));
+        if (ordered.some(([start], index) => index > 0 && new Date(start) < ordered[index - 1]![1].end)) return null;
+        return ordered.length ? { horizon: ordered[ordered.length - 1]![1].end, calories: ordered.reduce((sum, [, point]) => sum + point.calories, 0) } : null;
+      }
+      if (tokens.has(pageToken)) return null;
+      tokens.add(pageToken);
+    }
+  } catch { return null; }
+  return null;
+}
+
 export class GoogleHealthFitbitExpenditureProvider implements ExpenditureProvider {
   constructor(
     private readonly transport: GoogleHealthTotalCaloriesTransport,
@@ -98,6 +137,7 @@ export class GoogleHealthFitbitExpenditureProvider implements ExpenditureProvide
   async fetchDailyExpenditureAggregate(
     input: FetchDailyAggregateInput,
   ): Promise<NormalizedDailyExpenditureAggregate | null> {
+    const minuteEvidence = input.isCurrentDay ? await fetchMinuteExpenditureEvidence(this.transport, input, this.now()) : null;
     const payload = GoogleHealthDailyRollupSchema.parse(
       await this.transport.fetchDailyTotalCalories(input.localDate),
     );
@@ -113,7 +153,14 @@ export class GoogleHealthFitbitExpenditureProvider implements ExpenditureProvide
       providerRecordId: `${GOOGLE_HEALTH_FITBIT_PROVIDER_ID}:expenditure:${input.localDate}`,
       rawTotalDailyExpenditure: Math.round(point.totalCalories.kcalSum),
       importedAt,
+      // Compatibility timestamp for ingestion ordering, NOT measured coverage.
       providerUpdatedAt: importedAt,
+      // This aggregate API supplies no verified cumulative coverage watermark.
+      forecastCoverageAt: null,
+      retrievedAt: importedAt,
+      // Same source family and matching aggregate; still only reported bucket metadata.
+      reportedIntervalEndAt: minuteEvidence && Math.round(minuteEvidence.calories) === Math.round(point.totalCalories.kcalSum)
+        ? minuteEvidence.horizon : null,
       syncStatus: 'ready',
     });
   }

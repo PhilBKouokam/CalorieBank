@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import type { IntakeAdjustmentState } from '@caloriebank/schemas';
 import { KeyboardSafeScrollView } from './KeyboardSafeScrollView';
 import { ApiHttpError, saveIntakeAdjustment } from '@/lib/api/client';

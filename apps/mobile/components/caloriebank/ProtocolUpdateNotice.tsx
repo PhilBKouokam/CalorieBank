@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { Text } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { UPDATE_REQUIRED_MESSAGE } from '@caloriebank/schemas';
 import { isUpdateRequired, subscribeToProtocolState } from '@/lib/api/protocol-state';

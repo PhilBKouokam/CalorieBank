@@ -419,6 +419,11 @@ const ingestionBaseShape = {
 export const currentDayExpenditureSyncSchema = z
   .object({
     ...ingestionBaseShape,
+    forecastCoverageAt: z.string().datetime().nullable().optional(),
+    retrievedAt: z.string().datetime().nullable().optional(),
+    activeSampleEndAt: z.string().datetime().nullable().optional(),
+    basalSampleEndAt: z.string().datetime().nullable().optional(),
+
     rawTotalDailyExpenditure: z.number().int().min(0).max(100_000),
     syncStatus: z.literal('ready').default('ready'),
     sourceMetadata: z
@@ -654,6 +659,12 @@ export const todayResponseSchema = z.object({
     nonStepAdjustedBurnBaselineCalories: z.number().int().nonnegative().nullable(),
   }),
   restOfDayProjection: z.object({
+    coverageStatus: z.enum(['known', 'uncertain', 'stale']).optional(),
+    coverageAt: z.string().datetime().nullable().optional(),
+    planningAnchorAt: z.string().datetime().nullable().optional(),
+    planningExpiresAt: z.string().datetime().nullable().optional(),
+    planningAnchorKind: z.enum(['verified_coverage', 'sample_horizon', 'reported_interval', 'retrieval_assumption']).nullable().optional(),
+    unroundedProjectedProviderBurnCalories: z.number().nonnegative().nullable().optional(),
     status: z.enum(['ready', 'stale', 'insufficient_data']),
     providerKcalPerHour: z.number().positive().nullable(),
     adjustedKcalPerHour: z.number().positive().nullable(),

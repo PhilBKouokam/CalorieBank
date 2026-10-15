@@ -23,6 +23,11 @@ export type RollingSyncSingleFlight<T, TOptions extends SingleFlightOptions> = {
   reset(): void;
 };
 
+/** Current planning reads require burn and steps from the same completed query session. */
+export function requiresCurrentPlanningSnapshot(upload: RollingSyncUpload, currentLocalDate: string) {
+  return upload.localDate === currentLocalDate && (upload.kind === 'expenditure' || upload.kind === 'steps');
+}
+
 export function rollingUploadKey(upload: RollingSyncUpload) {
   return `apple_health:${upload.kind}:${upload.localDate}`;
 }
@@ -30,6 +35,7 @@ export function rollingUploadKey(upload: RollingSyncUpload) {
 export function rollingUploadFingerprint(upload: RollingSyncUpload) {
   const body = { ...upload.body };
   delete body.providerUpdatedAt;
+  delete body.retrievedAt; // Query success is not new expenditure evidence; sample horizons remain in the fingerprint.
   delete body.syncSessionId;
   return JSON.stringify({ kind: upload.kind, localDate: upload.localDate, body });
 }

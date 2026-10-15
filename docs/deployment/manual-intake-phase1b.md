@@ -1816,3 +1816,31 @@ No mobile changes or new migration are required.
 Correction verification: 986 tests / 94 files passed serially, repository lint,
 all workspace typechecks, API compilation and git diff whitespace checks passed.
 The new dated-selection regression failed before the fix and passes after it.
+
+### Build 13 follow-up phone qualification and pending text-size fix
+
+Founder confirmed on Samsung and iPhone: Add/Replace/Remove save and survive
+refresh; additions follow later tracker totals, replacements stay fixed, and
+removal restores the latest tracker total. Active corrections remain isolated
+between accounts, survive returning to the original account, and synchronize
+between phones; removal also synchronizes. Cronometer remains selected.
+Normal-size Today uses side-by-side Burned/Eaten and the top-right pencil.
+Editor results and Save are reachable with the keyboard open. Samsung's usual
+estimate editor also has no black underline; it was cancelled without changes.
+
+Large system text failed on both phones immediately after changing size while
+the app was running. Relaunching fixed both at the same larger size. The pending
+source batch refreshes native paragraphs and library tab labels on font-scale
+changes without remounting routes or input fields. See the runtime text-size
+section in `docs/engineering/keyboard-input-safety.md` for implementation and
+qualification limits. No new build, distribution, API deployment or migration
+was performed for this patch. Physical live-transition verification remains
+pending the next combined build; overnight correction/history qualification is
+also not established by these checks.
+
+Pending patch verification: 991 tests across 96 files passed against the dedicated
+local test database; workspace typechecks, repository lint and `git diff --check`
+passed. Five new lifecycle regressions cover text and navigation updates without
+draft loss. Visual review compared the reported failure/cold-relaunch evidence
+and confirmed this diff changes no styles, layout hierarchy, labels or font-size
+limits. Native live-transition rendering remains unverified until phone testing.

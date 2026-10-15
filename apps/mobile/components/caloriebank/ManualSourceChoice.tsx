@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { useFocusEffect, useRouter } from 'expo-router';
 import type { ManualIntakeState } from '@caloriebank/schemas';
 import { usualEstimateSourceLabel } from '@/lib/providers/presentation';

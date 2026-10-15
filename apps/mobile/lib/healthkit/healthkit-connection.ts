@@ -44,6 +44,7 @@ import {
   createRollingSyncSingleFlight,
   accountScopedRollingSyncKey,
   mergeRollingSyncOutbox,
+  requiresCurrentPlanningSnapshot,
   sanitizeRollingSyncOutbox,
   type RollingSyncQueuedUpload,
   type RollingSyncUpload,
@@ -283,6 +284,7 @@ async function enqueueChangedUploads(
   uploads: UploadPayload[],
   accountScope: string,
   serverPresence: Map<string, boolean> | null,
+  currentLocalDate: string,
 ) {
   const [outbox, fingerprints] = await Promise.all([
     loadOutbox(accountScope),
@@ -294,6 +296,7 @@ async function enqueueChangedUploads(
     fingerprints,
     new Date().toISOString(),
     (upload) => {
+      if (requiresCurrentPlanningSnapshot(upload, currentLocalDate)) return false;
       if (upload.kind !== 'intake' && upload.kind !== 'expenditure') return true;
       return serverPresence?.get(`${upload.kind}:${upload.localDate}`) === true;
     },
@@ -304,7 +307,7 @@ async function enqueueChangedUploads(
     logHealthKitDiagnostic('stale_fingerprint_recovery_queued', {
       category: upload.kind,
       localDate: upload.localDate,
-      reason: 'server_aggregate_absent',
+      reason: requiresCurrentPlanningSnapshot(upload, currentLocalDate) ? 'current_planning_snapshot' : 'server_aggregate_absent',
     });
   }
   return {
@@ -656,6 +659,10 @@ async function performAppleHealthRollingWindowSync({
     if (expenditure.value) uploads.push({ kind: 'expenditure', localDate: window.localDate, body: {
       localDate: window.localDate, timezone: window.timezone, provider: 'apple_health',
       rawTotalDailyExpenditure: expenditure.value.rawTotalDailyExpenditure,
+      forecastCoverageAt: null,
+      retrievedAt: expenditure.value.retrievedAt?.toISOString() ?? expenditure.value.importedAt.toISOString(),
+      activeSampleEndAt: expenditure.value.activeSampleEndAt?.toISOString() ?? null,
+      basalSampleEndAt: expenditure.value.basalSampleEndAt?.toISOString() ?? null,
       syncStatus: 'ready',
       providerUpdatedAt: expenditure.value.providerUpdatedAt?.toISOString() ?? new Date().toISOString(),
       sourceMetadata: { activeEnergyCalories: expenditure.value.activeEnergyCalories ?? 0, basalEnergyCalories: expenditure.value.basalEnergyCalories ?? 0 },
@@ -703,7 +710,7 @@ async function performAppleHealthRollingWindowSync({
       [`expenditure:${date.localDate}`, date.appleHealthExpenditureAggregatePresent] as const,
     ]))
     : null;
-  const queued = await enqueueChangedUploads(uploads, context.scope, serverPresence);
+  const queued = await enqueueChangedUploads(uploads, context.scope, serverPresence, windows[0]!.localDate);
   const pendingBeforeFlush = await loadOutbox(context.scope);
   diagnostics.upload = {
     status: pendingBeforeFlush.length > 0 ? 'partial' : 'not_attempted',

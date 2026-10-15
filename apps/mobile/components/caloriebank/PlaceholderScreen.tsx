@@ -1,7 +1,8 @@
 import { KeyboardSafeScrollView } from './KeyboardSafeScrollView';
 import { Link, type Href } from 'expo-router';
 import { type ReactNode, type RefObject } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';

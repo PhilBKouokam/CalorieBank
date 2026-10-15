@@ -11,6 +11,7 @@ import { foodTrackerGuidance } from '../../mobile/lib/healthkit/food-tracker-gui
 
 const targetStore = vi.hoisted(() => ({ calories: 0, writes: [] as number[] }));
 const homeStore = vi.hoisted(() => ({ recovery: 0 }));
+const appStateStore = vi.hoisted(() => ({ onChange: null as null | ((state: string) => void) }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useFocusEffect: (callback: () => void) => React.useEffect(callback, [callback]), Link: 'Link' }));
 vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
 vi.mock('../../mobile/lib/lifecycle/account-lifecycle', () => ({ isAccountLifecycleRunning: () => false, subscribeToAccountLifecycleActivity: () => () => {}, subscribeToAccountLifecycle: () => () => {}, runAccountLifecycle: async () => ({ detail: null }) }));
@@ -32,6 +33,7 @@ beforeEach(() => { targetStore.calories = 0; targetStore.writes = []; });
 vi.mock('expo', () => ({ requireNativeModule: () => ({ watch: vi.fn(), unwatch: vi.fn(), measure: vi.fn(), addListener: () => ({ remove: vi.fn() }) }) }));
 vi.mock('react-native', () => ({
   findNodeHandle: () => null,
+  AppState: { addEventListener: (_event: string, callback: (state: string) => void) => { appStateStore.onChange = callback; return { remove: vi.fn() }; } },
   Platform: { OS: 'ios' },
   Text: 'Text', View: 'View', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView',
   ActivityIndicator: 'ActivityIndicator', RefreshControl: 'RefreshControl',
@@ -41,7 +43,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 let screen: ReactTestRenderer | undefined;
-afterEach(async () => { if (screen) await act(async () => screen!.unmount()); screen = undefined; });
+afterEach(async () => { if (screen) await act(async () => screen!.unmount()); screen = undefined; vi.useRealTimers(); });
 async function render(component: React.ReactElement) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   await act(async () => { screen = create(component); });
@@ -51,6 +53,48 @@ const source = (path: string) => readFileSync(resolve(__dirname, '../../mobile',
 const textContent = (node: ReactTestInstance): string => node.children.map(child => typeof child === 'string' ? child : textContent(child)).join('');
 
 describe('Phase 1 consumer release invariants', () => {
+  it('updates midnight feasibility on both cards without changing steps or unsaved inputs, then expires coverage', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-15T23:39:30Z'));
+    const { StepPlanningCards } = await import(resolve(__dirname, '../../mobile/components/caloriebank/StepPlanningCards.tsx')) as { StepPlanningCards: React.ComponentType<{ today: TodayResponse }> };
+    const today = { date: '2026-10-15', timezone: 'UTC', burned: { status: 'ready', source: 'Fitbit', adjustmentFactor: .8 }, steps: { status: 'ready', count: 2000, caloriesPerStep: .05, walkingPace: { stepsPerMinute: 100, sampleCount: 3 } }, restOfDayProjection: { status: 'ready', coverageStatus: 'known', coverageAt: '2026-10-15T23:39:30Z', projectedProviderBurnCalories: 4900, unroundedProjectedProviderBurnCalories: 4900 } } as unknown as TodayResponse;
+    const rendered = await render(React.createElement(StepPlanningCards, { today }));
+    const inputs = rendered.root.findAll(node => String(node.type) === 'TextInput');
+    await act(async () => { inputs[0]!.props.onChangeText('4000'); inputs[1]!.props.onChangeText('4000'); });
+    const notices = () => rendered.root.findAll(node => String(node.type) === 'Text' && textContent(node).includes('won’t fit before midnight'));
+    expect(notices()).toHaveLength(0);
+    await act(async () => { vi.advanceTimersByTime(60000); });
+    expect(notices()).toHaveLength(2);
+    expect(textContent(rendered.root)).toContain('2,000 steps remaining');
+    expect(inputs.map(input => input.props.value)).toEqual(['4000', '4000']);
+    await act(async () => { vi.advanceTimersByTime(30 * 60000); });
+    expect(textContent(rendered.root)).not.toContain('2,000 steps remaining');
+    expect(JSON.stringify(rendered.toJSON())).toContain('Waiting for newer activity data.');
+    expect(inputs.map(input => input.props.value)).toEqual(['4000', '4000']);
+  });
+
+  it('expires a persisted assumption on both cards across refresh and remount without losing edits', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-15T08:00:00Z'));
+    const { StepPlanningCards } = await import(resolve(__dirname, '../../mobile/components/caloriebank/StepPlanningCards.tsx')) as { StepPlanningCards: React.ComponentType<{ today: TodayResponse }> };
+    const today = { date: '2026-10-15', timezone: 'UTC', burned: { status: 'ready', source: 'Fitbit', adjustmentFactor: .8 }, steps: { status: 'ready', count: 2000, caloriesPerStep: .05, walkingPace: { stepsPerMinute: 100, sampleCount: 3 } }, restOfDayProjection: { status: 'ready', coverageStatus: 'uncertain', coverageAt: null, planningAnchorAt: '2026-10-15T08:00:00Z', planningExpiresAt: '2026-10-15T08:30:00Z', planningAnchorKind: 'retrieval_assumption', projectedProviderBurnCalories: 3540, unroundedProjectedProviderBurnCalories: 3540 } } as unknown as TodayResponse;
+    const rendered = await render(React.createElement(StepPlanningCards, { today }));
+    const inputs = rendered.root.findAll(node => String(node.type) === 'TextInput');
+    await act(async () => { inputs[0]!.props.onChangeText('4000'); inputs[1]!.props.onChangeText('31200'); });
+    expect(textContent(rendered.root)).toContain('29,200 steps remaining');
+    await act(async () => { vi.advanceTimersByTime(30 * 60000); });
+    expect(textContent(rendered.root)).toContain('29,200 steps remaining');
+    await act(async () => { vi.setSystemTime(new Date('2026-10-15T08:30:00.001Z')); appStateStore.onChange?.('active'); });
+    expect(textContent(rendered.root)).not.toContain('29,200 steps remaining');
+    expect(inputs.map(input => input.props.value)).toEqual(['4000', '31200']);
+    await act(async () => { rendered.update(React.createElement(StepPlanningCards, { today: { ...today } })); });
+    expect(textContent(rendered.root).match(/Waiting for newer activity data\./g)).toHaveLength(2);
+    await act(async () => { rendered.unmount(); });
+    const remounted = await render(React.createElement(StepPlanningCards, { today }));
+    expect(textContent(remounted.root).match(/Waiting for newer activity data\./g)).toHaveLength(2);
+    expect(textContent(remounted.root)).not.toContain('Review Health Connections');
+  });
+
   it.each([0, 35])('keeps Recovery adjacent to the bank only when active (%s)', async (recovery) => {
     homeStore.recovery = recovery;
     const { default: Home } = await import(resolve(__dirname, '../../mobile/app/(tabs)/today.tsx')) as { default: React.ComponentType };
@@ -61,7 +105,7 @@ describe('Phase 1 consumer release invariants', () => {
   });
   it.each([true, false])('renders compact planning inputs and unchanged answers; walking evidence=%s', async (hasPace) => {
     const { StepPlanningCards } = await import(resolve(__dirname, '../../mobile/components/caloriebank/StepPlanningCards.tsx')) as { StepPlanningCards: React.ComponentType<{ today: TodayResponse }> };
-    const today = { burned: { status: 'ready', source: 'Fitbit', adjustmentFactor: .8 }, steps: { status: 'ready', count: 8500, caloriesPerStep: .06, walkingPace: hasPace ? { stepsPerMinute: 100, sampleCount: 3 } : null }, restOfDayProjection: { status: 'ready', projectedProviderBurnCalories: 3600 } } as unknown as TodayResponse;
+    const today = { date: '2026-10-15', timezone: 'UTC', burned: { status: 'ready', source: 'Fitbit', adjustmentFactor: .8 }, steps: { status: 'ready', count: 8500, caloriesPerStep: .06, walkingPace: hasPace ? { stepsPerMinute: 100, sampleCount: 3 } : null }, restOfDayProjection: { status: 'ready', projectedProviderBurnCalories: 3600, unroundedProjectedProviderBurnCalories: 3600 } } as unknown as TodayResponse;
     const rendered = await render(React.createElement(StepPlanningCards, { today }));
     const inputs = rendered.root.findAll(node => String(node.type) === 'TextInput');
     expect(inputs).toHaveLength(2);
@@ -122,7 +166,9 @@ describe('Phase 1 consumer release invariants', () => {
     const actual = rendered.root.findAll(node => String(node.type) === 'Text').find(node => textContent(node) === `${forward.projectedAdjustedBurnCalories.toLocaleString()} kcal`)!;
     expect(actual.props.style.color).toBe(total.props.style.color);
     expect(actual.props.style.fontWeight).toBe('800');
-    expect(textContent(actual.parent!)).toBe(`${forward.projectedProviderBurnCalories.toLocaleString()} × 0.8 = ${forward.projectedAdjustedBurnCalories.toLocaleString()} kcal`);
+    let paragraph = actual.parent!;
+    while (String(paragraph.type) !== 'Text') paragraph = paragraph.parent!;
+    expect(textContent(paragraph)).toBe(`${forward.projectedProviderBurnCalories.toLocaleString()} × 0.8 = ${forward.projectedAdjustedBurnCalories.toLocaleString()} kcal`);
   });
   it.each(['You banked 573 kcal yesterday.', 'You enjoyed 83 kcal yesterday.', 'You were right on target yesterday.'])('keeps contribution emphasis and speech coherent: %s', async (sentence) => {
     const { CompletedContribution } = await import(resolve(__dirname, '../../mobile/components/caloriebank/CompletedContribution.tsx')) as { CompletedContribution: React.ComponentType<{ sentence: string }> };
@@ -152,7 +198,7 @@ describe('Phase 1 consumer release invariants', () => {
     const rendered = await render(React.createElement(WalkingTime, { steps, pace: { stepsPerMinute: 100, sampleCount: 3 } as TodayResponse['steps']['walkingPace'] }));
     const noun = estimate.sessionCount === 1 ? 'walk' : 'walks';
     const session = rendered.root.findByProps({ accessibilityLabel: `${estimate.sessionCount} ${noun} of approximately ${estimate.minutesPerSession} minutes each.` });
-    expect(session.children.join('')).toBe(`${estimate.sessionCount} × ~${estimate.minutesPerSession} min ${noun}`);
+    expect(textContent(session)).toBe(`${estimate.sessionCount} × ~${estimate.minutesPerSession} min ${noun}`);
     expect(session.props.style.fontWeight).toBe('600');
   });
   it('planning results remain prominent while using unchanged domain functions', () => {
@@ -164,7 +210,7 @@ describe('Phase 1 consumer release invariants', () => {
   });
   it('does not calculate a step target from a mixed sync generation', async () => {
     const { StepPlanningCards } = await import(resolve(__dirname, '../../mobile/components/caloriebank/StepPlanningCards.tsx')) as { StepPlanningCards: React.ComponentType<{ today: TodayResponse }> };
-    const today = { burned: { status: 'ready', source: 'Fitbit', adjustmentFactor: .8 }, steps: { status: 'ready', count: 13000, caloriesPerStep: .05, planningSnapshotReady: false }, restOfDayProjection: { status: 'ready', projectedProviderBurnCalories: 3935 } } as unknown as TodayResponse;
+    const today = { date: '2026-10-15', timezone: 'UTC', burned: { status: 'ready', source: 'Fitbit', adjustmentFactor: .8 }, steps: { status: 'ready', count: 13000, caloriesPerStep: .05, planningSnapshotReady: false }, restOfDayProjection: { status: 'ready', projectedProviderBurnCalories: 3935 } } as unknown as TodayResponse;
     const rendered = await render(React.createElement(StepPlanningCards, { today }));
     const text = JSON.stringify(rendered.toJSON());
     expect(text).toContain('Refresh your activity data to update this estimate.');

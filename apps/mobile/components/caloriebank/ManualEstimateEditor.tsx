@@ -1,6 +1,7 @@
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import type { ManualIntakeState } from '@caloriebank/schemas';
 import { ApiHttpError, saveManualIntake } from '@/lib/api/client';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';

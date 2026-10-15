@@ -91,6 +91,11 @@ export function createTodayIngestionRouter(
                 basalEnergyCalories: parsed.data.sourceMetadata.basalEnergyCalories,
               }
             : {}),
+          // Native statistics expose sample horizons, not a cumulative coverage guarantee.
+          forecastCoverageAt: null,
+          retrievedAt: new Date(parsed.data.retrievedAt ?? parsed.data.providerUpdatedAt),
+          activeSampleEndAt: parsed.data.activeSampleEndAt ? new Date(parsed.data.activeSampleEndAt) : null,
+          basalSampleEndAt: parsed.data.basalSampleEndAt ? new Date(parsed.data.basalSampleEndAt) : null,
           rawTotalDailyExpenditure: parsed.data.rawTotalDailyExpenditure,
           adjustmentFactor: V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE,
           importedAt: receivedAt,

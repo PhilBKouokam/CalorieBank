@@ -6,7 +6,8 @@ import { ManualSourceChoice } from '@/components/caloriebank/ManualSourceChoice'
 import { preferDirectFoodSources } from '@/lib/providers/intake-writer-policy';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FoodTrackerHelp } from '@/components/caloriebank/FoodTrackerHelp';
-import { ActivityIndicator, AppState, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';

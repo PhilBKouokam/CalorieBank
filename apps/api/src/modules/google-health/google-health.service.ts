@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { createGoogleHealthActivityRequest } from './google-health-request';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import {
   estimateRestingBurnFromLowActivityHours,
@@ -773,21 +774,12 @@ export class GoogleHealthFitbitService {
         expenditureStatus: 'not_attempted', intakeStatus: 'skipped', stepsStatus: 'not_attempted', workoutsStatus: 'not_attempted',
       },
     });
-    const request = async (url: string, init: RequestInit) => {
-      const response = await this.fetcher(url, {
-        ...init,
-        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', ...init.headers },
+    const request = createGoogleHealthActivityRequest(this.fetcher, accessToken, async () => {
+      await this.db.googleHealthConnection.update({
+        where: { userId: user.id },
+        data: { status: 'needs_reconnect', lastErrorCode: 'access_revoked' },
       });
-      if (response.status === 401) {
-        await this.db.googleHealthConnection.update({
-          where: { userId: user.id },
-          data: { status: 'needs_reconnect', lastErrorCode: 'access_revoked' },
-        });
-        throw new AppError('Fitbit access needs to be reconnected.', 401);
-      }
-      if (!response.ok) throw new AppError('Fitbit activity data is temporarily unavailable.', 502);
-      return response.json();
-    };
+    });
     const dailyRollup = (dataType: 'total-calories' | 'steps', date: string) => request(
       `${this.config.GOOGLE_HEALTH_API_BASE_URL}/users/me/dataTypes/${dataType}/dataPoints:dailyRollUp`,
       {
@@ -802,6 +794,16 @@ export class GoogleHealthFitbitService {
     );
     const expenditureTransport: GoogleHealthTotalCaloriesTransport = {
       fetchDailyTotalCalories: (date) => dailyRollup('total-calories', date),
+      fetchMinuteTotalCalories: ({ start, end, pageToken }) => request(
+        `${this.config.GOOGLE_HEALTH_API_BASE_URL}/users/me/dataTypes/total-calories/dataPoints:rollUp`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+          range: { startTime: start.toISOString(), endTime: end.toISOString() },
+          windowSize: '60s', pageSize: 10000,
+          dataSourceFamily: 'users/me/dataSourceFamilies/all-sources',
+          ...(pageToken ? { pageToken } : {}),
+        }) },
+        'supplementary',
+      ),
     };
     const stepTransport: GoogleHealthStepsTransport = {
       fetchDailySteps: (date) => dailyRollup('steps', date),

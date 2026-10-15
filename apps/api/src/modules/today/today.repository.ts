@@ -7,8 +7,11 @@ import { requireIntakeCapability } from '../../security/intake-capability';
 import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import {
   calculateRestOfDayBurnProjection,
+  resolveForecastCoverage,
+  resolvePlanningEvidence,
   calculateStepWhatIfProjection,
   getRemainingLocalDayMinutes,
+  getLocalDateUtcBounds,
   V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE,
   resolveAuthoritativeProviderRecord,
   type NormalizedDailyExpenditureAggregate,
@@ -29,7 +32,7 @@ import type {
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
 import { AppError } from '../../errors';
 import { getProviderDisplayName, isSyntheticProvider } from './provider-catalog';
-import { combineTodayFreshness, currentDayFreshness } from './today.freshness';
+import { combineTodayFreshness, currentDayFreshness, CURRENT_DAY_STALE_AFTER_MS } from './today.freshness';
 import { readProviderSelection } from '../provider-selection/provider-selection.repository';
 import { estimateStepContribution, estimateWalkingPace } from './steps-intelligence';
 import { getLocalDateForTimezone } from './today.time';
@@ -189,6 +192,11 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       where: { userId_localDate_provider: identity },
     });
 
+    const planningEvidence = resolvePlanningEvidence(existing ? { ...existing, localDate: aggregate.localDate } : null, aggregate, aggregate.importedAt);
+    const forecastCoverageAt = resolveForecastCoverage(existing ? {
+      ...existing, localDate: aggregate.localDate,
+    } : null, aggregate, aggregate.importedAt);
+
     if (existing && shouldIgnoreIncoming(existing.providerUpdatedAt, aggregate.providerUpdatedAt)) {
       return 'ignored_stale';
     }
@@ -197,14 +205,20 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       const unchanged = existing.rawTotalDailyExpenditure === aggregate.rawTotalDailyExpenditure &&
         existing.activeEnergyCalories === (aggregate.activeEnergyCalories ?? null) &&
         existing.basalEnergyCalories === (aggregate.basalEnergyCalories ?? null);
-      if (unchanged) await this.notifyBankingAggregateChanged(user, aggregate);
+      if (unchanged) {
+        const saved = await this.db.dailyExpenditureAggregate.updateMany({ where: { id: existing.id, updatedAt: existing.updatedAt }, data: { ...planningEvidence, forecastCoverageAt } });
+        if (!saved.count) return this.upsertExpenditureAggregate(user, aggregate);
+        await this.notifyBankingAggregateChanged(user, aggregate);
+      }
       return unchanged ? 'unchanged' : 'ignored_stale';
     }
 
     if (existing) {
-      await this.db.dailyExpenditureAggregate.update({
-        where: { id: existing.id },
+      const saved = await this.db.dailyExpenditureAggregate.updateMany({
+        where: { id: existing.id, updatedAt: existing.updatedAt },
         data: {
+          ...planningEvidence,
+          forecastCoverageAt,
           timezone: aggregate.timezone,
           providerRecordId: aggregate.providerRecordId,
           activeEnergyCalories: aggregate.activeEnergyCalories ?? null,
@@ -218,6 +232,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
           syncSessionId: aggregate.syncSessionId ?? null,
         },
       });
+      if (!saved.count) return this.upsertExpenditureAggregate(user, aggregate);
       await this.notifyBankingAggregateChanged(user, aggregate);
       return 'updated';
     }
@@ -226,6 +241,8 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       await this.db.dailyExpenditureAggregate.create({
         data: {
           ...identity,
+          ...planningEvidence,
+          forecastCoverageAt,
           timezone: aggregate.timezone,
           providerRecordId: aggregate.providerRecordId,
           activeEnergyCalories: aggregate.activeEnergyCalories ?? null,
@@ -752,22 +769,29 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     const modelAgeMs = restingModel
       ? (this.options.now?.() ?? new Date()).getTime() - restingModel.calculatedAt.getTime()
       : Number.POSITIVE_INFINITY;
-    const remainingMinutes = getRemainingLocalDayMinutes(
-      localDate,
-      timezone,
-      // Cumulative burn and remaining rest must share an observation time.
-      expenditure?.providerUpdatedAt ?? expenditure?.updatedAt ?? this.options.now?.() ?? new Date(),
-    );
-    const restProjectionStatus = (burnedStatus === 'stale' || modelAgeMs > 30 * 24 * 60 * 60 * 1000) && modelMatchesProvider
-      ? 'stale' as const
-      : burnedStatus === 'ready' && expenditure && modelMatchesProvider
-        ? 'ready' as const
-        : 'insufficient_data' as const;
+    const forecastNow = this.options.now?.() ?? new Date();
+    const coverageAt = expenditure?.forecastCoverageAt ?? null;
+    const coverageBounds = getLocalDateUtcBounds(localDate, timezone);
+    const coverageStatus = !coverageAt || coverageAt > forecastNow || coverageAt < coverageBounds.start || coverageAt > coverageBounds.end || expenditure?.timezone !== timezone
+      ? 'uncertain' as const
+      : forecastNow.getTime() - coverageAt.getTime() > CURRENT_DAY_STALE_AFTER_MS
+        ? 'stale' as const : 'known' as const;
+    const planningAnchorAt = expenditure?.planningAnchorAt ?? coverageAt;
+    const planningExpiresAt = expenditure?.planningExpiresAt ?? (coverageAt ? new Date(coverageAt.getTime() + CURRENT_DAY_STALE_AFTER_MS) : null);
+    const planningValid = planningAnchorAt && planningExpiresAt && planningAnchorAt <= forecastNow && planningAnchorAt >= coverageBounds.start && planningAnchorAt <= coverageBounds.end && expenditure?.timezone === timezone;
+    const planningExpired = planningExpiresAt != null && forecastNow > planningExpiresAt;
+    const remainingMinutes = planningValid ? getRemainingLocalDayMinutes(localDate, timezone, planningAnchorAt) : 0;
+    const exactRemainingMinutes = planningValid ? Math.max(0, (coverageBounds.end.getTime() - planningAnchorAt.getTime()) / 60000) : 0;
+    const restProjectionStatus = !planningValid ? 'insufficient_data' as const
+      : ((burnedStatus === 'stale' || planningExpired || modelAgeMs > 30 * 24 * 60 * 60 * 1000) && modelMatchesProvider)
+        ? 'stale' as const
+        : burnedStatus === 'ready' && expenditure && modelMatchesProvider
+          ? 'ready' as const : 'insufficient_data' as const;
     const restForecast = restProjectionStatus === 'ready' && expenditure && restingModel
       ? calculateRestOfDayBurnProjection({
         providerBurnSoFarCalories: expenditure.rawTotalDailyExpenditure,
         providerRestCaloriesPerHour: restingModel.providerKcalPerHour,
-        remainingMinutes,
+        remainingMinutes: exactRemainingMinutes,
         adjustmentFactor,
       })
       : null;
@@ -838,6 +862,13 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
           stepProjection?.nonStepAdjustedBurnBaselineCalories ?? null,
       },
       restOfDayProjection: {
+        planningAnchorAt: planningAnchorAt?.toISOString() ?? null,
+        planningExpiresAt: planningExpiresAt?.toISOString() ?? null,
+        planningAnchorKind: expenditure?.planningAnchorKind as 'verified_coverage' | 'sample_horizon' | 'reported_interval' | 'retrieval_assumption' | null ?? (coverageAt ? 'verified_coverage' : null),
+        coverageStatus,
+        coverageAt: coverageAt?.toISOString() ?? null,
+        unroundedProjectedProviderBurnCalories: restForecast && expenditure && restingModel
+          ? expenditure.rawTotalDailyExpenditure + restingModel.providerKcalPerHour * exactRemainingMinutes / 60 : null,
         status: restProjectionStatus,
         providerKcalPerHour: restingModel?.providerKcalPerHour ?? null,
         adjustedKcalPerHour: restingModel

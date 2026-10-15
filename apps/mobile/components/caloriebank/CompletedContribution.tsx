@@ -1,4 +1,5 @@
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { colors, typography } from '@/constants/caloriebank-theme';
 
 export function CompletedContribution({ sentence }: { sentence: string }) {

@@ -240,6 +240,21 @@ describe('Apple Health provider adapters', () => {
     });
   });
 
+  it('does not promote a repeated cumulative query timestamp to coverage', async () => {
+    let retrieved = new Date('2026-08-31T08:00:00Z');
+    const provider = new AppleHealthExpenditureProvider({ healthKit: healthKitClient({
+      HKQuantityTypeIdentifierActiveEnergyBurned: 600,
+      HKQuantityTypeIdentifierBasalEnergyBurned: 1400,
+    }), dayStart, dayEnd, now: () => retrieved });
+    const first = await provider.fetchDailyExpenditureAggregate(input);
+    retrieved = new Date('2026-08-31T08:30:00Z');
+    const repeated = await provider.fetchDailyExpenditureAggregate(input);
+    expect(first?.rawTotalDailyExpenditure).toBe(repeated?.rawTotalDailyExpenditure);
+    expect(first?.importedAt).not.toEqual(repeated?.importedAt);
+    expect(first?.forecastCoverageAt).toBeNull();
+    expect(repeated?.forecastCoverageAt).toBeNull();
+  });
+
   it('never treats a single HealthKit energy component as total expenditure', async () => {
     const provider = new AppleHealthExpenditureProvider({
       healthKit: healthKitClient({ HKQuantityTypeIdentifierBasalEnergyBurned: 1400 }),

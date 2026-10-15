@@ -220,3 +220,32 @@ The inventory regression now covers seven input-owning files and nine inputs.
 RN Web narrow previews are not proof of physical iOS/Android keyboard geometry;
 verify both modes, scrolling to Save with the keyboard open, and the Android
 underline on the next authorized test build.
+
+## Runtime system text-size changes — build 13 follow-up
+
+Physical build 13 evidence: Samsung and iPhone clipped already-mounted Today
+text after increasing system text size. Fully closing and reopening the app at
+that same size repaired both phones. This qualifies cold-start layout only;
+it does not qualify live font-size transitions.
+
+`ScaleAwareText` now reads a shared `FontScaleProvider` driven by React Native's
+`useWindowDimensions`. A scale change remounts only native text paragraphs so
+native measurement is rebuilt with the current scale. The standard bottom tab
+bar is similarly refreshed, outside the navigator's state boundary. All 32
+app-owned text consumers use this wrapper. Existing styles, native font scaling,
+accessibility props, copy, and Step Planning hierarchy are retained.
+
+Do not key the app, navigator, route, scroll container, or TextInput by font scale:
+that would discard navigation, drafts, selection or focus. Text wrappers are for
+presentation only; do not nest stateful controls or input fields inside them.
+No keyboard primitive or input inventory changed in this patch.
+
+Rendered regressions cover larger-to-normal transitions, nested text and
+accessibility props, unchanged-size width updates, mounted input/scroll identity,
+unsaved Add/Replace/usual-estimate drafts, and selected tab preservation. These
+are React lifecycle checks, not native measurement or physical keyboard proof.
+No native simulator is available in this workspace (`xcrun simctl` unavailable).
+The next combined build must physically qualify on both phones: change text size
+while Today is mounted; return without restarting; check card and tab text; then
+repeat with an unsaved calorie edit and verify the same screen, value, result and
+reachable Save. Change back to normal and cancel the test draft.

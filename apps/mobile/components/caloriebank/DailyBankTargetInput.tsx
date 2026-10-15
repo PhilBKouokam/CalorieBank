@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 
 export function DailyBankTargetInput({ value, onChange, disabled = false }: {

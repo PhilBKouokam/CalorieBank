@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { nativeIntake } from '@/lib/native-health';
 import type { NativeFoodSource } from '@/lib/native-health/intake';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';

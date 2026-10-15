@@ -190,6 +190,17 @@ describe('Google Health Fitbit activity adapters', () => {
 });
 
 describe('Google Health Fitbit expenditure adapter', () => {
+  it('separates repeated retrievals from unknown cumulative coverage', async () => {
+    let retrieved = new Date('2026-08-14T08:00:00Z');
+    const provider = new GoogleHealthFitbitExpenditureProvider({ fetchDailyTotalCalories: async () => rollup(2260) }, () => retrieved);
+    const first = await provider.fetchDailyExpenditureAggregate(input);
+    retrieved = new Date('2026-08-14T08:30:00Z');
+    const repeated = await provider.fetchDailyExpenditureAggregate(input);
+    expect(first?.rawTotalDailyExpenditure).toBe(repeated?.rawTotalDailyExpenditure);
+    expect(first?.importedAt).not.toEqual(repeated?.importedAt);
+    expect(first?.forecastCoverageAt).toBeNull();
+    expect(repeated?.forecastCoverageAt).toBeNull();
+  });
   it('normalizes Total Calories and applies the centralized adjustment exactly once', async () => {
     const provider = new GoogleHealthFitbitExpenditureProvider(
       { fetchDailyTotalCalories: async () => rollup(2500) },
@@ -492,6 +503,148 @@ describe('Google OAuth state and token exchange', () => {
       await prisma.$disconnect();
     }
   });
+
+  it('release qualification supplementary minute 401 must preserve connected daily source', async () => {
+    const prisma = new PrismaClient();
+    const id = randomUUID();
+    const key = Buffer.alloc(32, 11).toString('base64');
+    const now = new Date('2026-08-14T18:00:00.000Z');
+    const rawBurn = 2000;
+    const receivedDates: string[] = [];
+    const exerciseDates: string[] = [];
+    const receivedAggregates: Array<{ localDate: string; isCurrentDay: boolean; raw: number }> = [];
+    let restingEstimate: { providerKcalPerHour: number; observationCount: number } | null = null;
+    const repository = {
+      upsertExpenditureAggregate: async (_user: unknown, aggregate: {
+        localDate: string;
+        isCurrentDay: boolean;
+        rawTotalDailyExpenditure: number;
+      }) => {
+        receivedAggregates.push({
+          localDate: aggregate.localDate,
+          isCurrentDay: aggregate.isCurrentDay,
+          raw: aggregate.rawTotalDailyExpenditure,
+        });
+        return 'updated' as const;
+      },
+      upsertStepAggregate: async () => 'unchanged' as const,
+      upsertWorkouts: async () => [],
+      deleteMissingWorkoutsForDay: async () => 0,
+      upsertRestingBurnEstimate: async (_user: unknown, input: {
+        providerKcalPerHour: number;
+        observationCount: number;
+      }) => {
+        restingEstimate = input;
+      },
+    } as unknown as TodayAggregateRepository;
+    const fetcher: typeof fetch = async (request, init) => {
+      const url = String(request);
+      if (url === 'https://oauth2.googleapis.com/token') {
+        return new Response(JSON.stringify({
+          access_token: 'rotated-access', refresh_token: 'rotated-refresh', expires_in: 3600,
+          scope: GOOGLE_HEALTH_ACTIVITY_READ_SCOPE,
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.includes('/dataTypes/exercise/dataPoints')) {
+        const localDate = new URL(url).searchParams.get('filter')
+          ?.match(/civil_start_time >= "(\d{4}-\d{2}-\d{2})"/)?.[1];
+        if (localDate) exerciseDates.push(localDate);
+        const calibration = localDate === '2026-08-11'
+          ? Array.from({ length: 5 }, (_, index) => ({
+            name: `walk-${index}`,
+            exercise: {
+              interval: {
+                startTime: `2026-08-11T${String(10 + index).padStart(2, '0')}:00:00.000Z`,
+                endTime: `2026-08-11T${String(10 + index).padStart(2, '0')}:30:00.000Z`,
+              },
+              exerciseType: index === 4 ? 'RUNNING' : 'WALKING',
+              metricsSummary: { caloriesKcal: 100, steps: '2000' },
+            },
+          }))
+          : [];
+        return new Response(JSON.stringify({ dataPoints: calibration }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/dataPoints:rollUp') && JSON.parse(String(init?.body)).windowSize === '60s') {
+        return new Response('{}', { status: 401 });
+      }
+      if (url.endsWith('/dataPoints:rollUp')) {
+        const body = JSON.parse(String(init?.body)) as {
+          pageSize?: number;
+          range: { startTime: string; endTime: string };
+        };
+        if (url.includes('/total-calories/')) expect(body.pageSize).toBeUndefined();
+        const isCalories = url.includes('/total-calories/');
+        return new Response(JSON.stringify({
+          rollupDataPoints: [0, 1, 2].map((index) => ({
+            startTime: `2026-08-10T0${index + 1}:00:00.000Z`,
+            endTime: `2026-08-10T0${index + 2}:00:00.000Z`,
+            ...(isCalories
+              ? { totalCalories: { kcalSum: 70 + index * 2 } }
+              : { steps: { countSum: String(index * 10) } }),
+          })),
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      const body = JSON.parse(String(init?.body)) as {
+        range: { start: { date: { year: number; month: number; day: number } } };
+        dataSourceFamily: string;
+      };
+      const date = body.range.start.date;
+      const localDate = `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+      const isExpenditure = url.includes('/total-calories/');
+      if (isExpenditure) receivedDates.push(localDate);
+      expect(body.dataSourceFamily).toBe('users/me/dataSourceFamilies/all-sources');
+      return new Response(JSON.stringify({
+        rollupDataPoints: [{
+          civilStartTime: { date },
+          civilEndTime: { date: { ...date, day: date.day + 1 } },
+          ...(isExpenditure ? { totalCalories: { kcalSum: rawBurn } } : { steps: { countSum: '5000' } }),
+        }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+      await prisma.user.create({ data: { id, email: `${id}@test.local` } });
+      await prisma.googleHealthConnection.create({ data: {
+        userId: id,
+        encryptedAccessToken: encryptGoogleHealthSecret('expired-access', key),
+        encryptedRefreshToken: encryptGoogleHealthSecret('old-refresh', key),
+        accessTokenExpiresAt: new Date('2026-08-14T17:00:00.000Z'),
+        scopes: [GOOGLE_HEALTH_ACTIVITY_READ_SCOPE],
+      } });
+      await prisma.providerSelection.create({ data: {
+        userId: id,
+        authoritativeExpenditureProvider: GOOGLE_HEALTH_FITBIT_PROVIDER_ID,
+        authoritativeActivityProvider: GOOGLE_HEALTH_FITBIT_PROVIDER_ID,
+      } });
+      const service = new GoogleHealthFitbitService(
+        prisma, repository,
+        {
+          ...env,
+          GOOGLE_HEALTH_CLIENT_ID: 'client-id', GOOGLE_HEALTH_CLIENT_SECRET: 'client-secret',
+          GOOGLE_HEALTH_REDIRECT_URI: 'https://api.example.test/v1/me/integrations/fitbit/callback',
+          GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY: key,
+        },
+        undefined, fetcher, () => now,
+      );
+      expect(await service.resolveRestingBurnEstimate(
+        { id, email: `${id}@test.local` }, '2026-08-14', 'America/Chicago',
+      )).toBe(true);
+      expect(restingEstimate).toMatchObject({ providerKcalPerHour: 72, observationCount: 3 });
+      await expect(prisma.ingestionSyncSession.count({ where: { userId: id } })).resolves.toBe(0);
+      const result = await service.syncRollingWindow(
+        { id, email: `${id}@test.local` }, '2026-08-14', 'America/Chicago', true,
+      );
+      expect(receivedDates).toEqual(['2026-08-14', '2026-08-13', '2026-08-12']);
+      expect(receivedAggregates.find((row) => row.localDate === '2026-08-14')?.raw).toBe(2000);
+      expect(await prisma.googleHealthConnection.findUniqueOrThrow({ where: { userId: id } })).toMatchObject({ status: 'connected', lastErrorCode: null });
+      expect(result.datesUpdated).toContain('2026-08-14');
+    } finally {
+      await prisma.user.deleteMany({ where: { id } });
+      await prisma.$disconnect();
+    }
+  });
+
 
   it('retrieves civil days independently, refreshes revisions, and never throttles across local midnight', async () => {
     const prisma = new PrismaClient();

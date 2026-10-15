@@ -1,17 +1,20 @@
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { StepPlanningCards } from '@/components/caloriebank/StepPlanningCards';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
+import { usePlanningClock } from '@/lib/today/use-planning-clock';
 import { useTodayReadModel } from '@/lib/today/use-today-read-model';
 import { getConsumerSourceName, intakeAdjustmentDescription } from '@/lib/providers/presentation';
 
 export default function TodayBurnDetailScreen() {
   const router = useRouter();
   const { today, failed } = useTodayReadModel();
+  const { expired } = usePlanningClock(today?.restOfDayProjection);
 
   const burnSource = getConsumerSourceName(today?.burned.source);
   const intakeSource = getConsumerSourceName(today?.eaten.source);
@@ -52,7 +55,7 @@ export default function TodayBurnDetailScreen() {
             </View>
             <Text style={styles.sectionTitle}>If you rested for the rest of today</Text>
             <View style={styles.card}>
-              {today.restOfDayProjection.status === 'ready' &&
+              {!expired && today.restOfDayProjection.status === 'ready' &&
               today.restOfDayProjection.projectedProviderBurnCalories !== null &&
               today.restOfDayProjection.projectedAdjustedBurnCalories !== null &&
               today.restOfDayProjection.providerKcalPerHour !== null ? (
@@ -68,9 +71,11 @@ export default function TodayBurnDetailScreen() {
                 </>
               ) : (
                 <Text style={styles.unavailable}>
-                  {today.restOfDayProjection.status === 'stale'
-                    ? 'Refresh your burn data to update this estimate.'
-                    : 'Estimate will appear as your watch collects more data.'}
+                  {expired
+                    ? 'Waiting for newer activity data.'
+                    : today.restOfDayProjection.coverageStatus === 'uncertain'
+                      ? 'Waiting for newer activity data.'
+                      : 'Estimate will appear as your watch collects more data.'}
                 </Text>
               )}
             </View>

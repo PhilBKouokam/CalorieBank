@@ -10,7 +10,8 @@ import type {
 import * as Crypto from 'expo-crypto';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 
 import { PlaceholderScreen } from '@/components/caloriebank/PlaceholderScreen';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';

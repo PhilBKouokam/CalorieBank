@@ -163,7 +163,7 @@ async function cumulativeKilocalories(
       normalizedAggregate: value === undefined ? null : roundCalories(value),
       error: null,
     });
-    return value;
+    return { value, sampleEndAt: statistics.endDate ?? null };
   } catch (error) {
     reportQuery(dependencies, {
       category,
@@ -228,8 +228,8 @@ export class AppleHealthExpenditureProvider implements ExpenditureProvider {
     if (activeResult.status === 'rejected' || basalResult.status === 'rejected') {
       throw new Error('One or more Apple Health expenditure queries failed.');
     }
-    const activeEnergy = activeResult.value;
-    const basalEnergy = basalResult.value;
+    const activeEnergy = activeResult.value.value;
+    const basalEnergy = basalResult.value.value;
 
     // CalorieBank's fallback expenditure is a total, so neither component is optional.
     // An incomplete HealthKit result remains unavailable instead of becoming active-only burn.
@@ -244,7 +244,14 @@ export class AppleHealthExpenditureProvider implements ExpenditureProvider {
       providerRecordId: `${APPLE_HEALTH_PROVIDER_ID}:expenditure:${input.localDate}`,
       ...composed,
       importedAt,
+      // Compatibility timestamp for ingestion ordering, NOT measured coverage.
       providerUpdatedAt: importedAt,
+      // This aggregate API supplies no verified cumulative coverage watermark.
+      forecastCoverageAt: null,
+      retrievedAt: importedAt,
+      // Retained independently. Domain validation checks local query bounds and retrieval.
+      activeSampleEndAt: activeResult.value.sampleEndAt,
+      basalSampleEndAt: basalResult.value.sampleEndAt,
       syncStatus: 'ready',
     });
   }

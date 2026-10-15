@@ -1,3 +1,4 @@
+export { resolveForecastCoverage, resolvePlanningEvidence, walkingMidnightFeasibility, type ForecastEvidence } from './forecast-coverage';
 export * from './intake-adjustment';
 export { estimateWalkingTime, walkingTimeFromPace, type WalkingTimeSample, type WalkingTimeEstimate } from './walking-time';
 
@@ -258,6 +259,13 @@ export type NormalizedDailyExpenditureAggregate = {
   providerRecordId: string;
   activeEnergyCalories?: number;
   basalEnergyCalories?: number;
+  /** Verified coverage of this cumulative total; retrieval time is not coverage. */
+  forecastCoverageAt?: Date | null;
+  retrievedAt?: Date | null;
+  activeSampleEndAt?: Date | null;
+  basalSampleEndAt?: Date | null;
+  reportedIntervalEndAt?: Date | null;
+
   rawTotalDailyExpenditure: number;
   adjustedDailyExpenditure: number;
   adjustmentFactor: number;
@@ -631,7 +639,9 @@ export function calculateStepToBurnPlan(input: {
 }) {
   assertNonNegativeInteger(input.currentSteps, 'currentSteps');
   assertNonNegativeInteger(input.targetSteps, 'targetSteps');
-  assertNonNegativeInteger(input.projectedProviderBurnAtRest, 'projectedProviderBurnAtRest');
+  if (!Number.isFinite(input.projectedProviderBurnAtRest) || input.projectedProviderBurnAtRest < 0) {
+    throw new BankCalculationError('projectedProviderBurnAtRest must be finite and non-negative.');
+  }
   assertPositiveFiniteNumber(input.providerCaloriesPerStep, 'providerCaloriesPerStep');
   if (!Number.isFinite(input.adjustmentFactor) || input.adjustmentFactor < 0 || input.adjustmentFactor > 1) {
     throw new BankCalculationError('adjustmentFactor must be between 0 and 1.');
@@ -658,7 +668,9 @@ export function calculateBurnToStepPlan(input: {
 }) {
   assertNonNegativeInteger(input.currentSteps, 'currentSteps');
   assertNonNegativeInteger(input.targetActualBurnCalories, 'targetActualBurnCalories');
-  assertNonNegativeInteger(input.projectedProviderBurnAtRest, 'projectedProviderBurnAtRest');
+  if (!Number.isFinite(input.projectedProviderBurnAtRest) || input.projectedProviderBurnAtRest < 0) {
+    throw new BankCalculationError('projectedProviderBurnAtRest must be finite and non-negative.');
+  }
   assertPositiveFiniteNumber(input.providerCaloriesPerStep, 'providerCaloriesPerStep');
   if (!Number.isFinite(input.adjustmentFactor) || input.adjustmentFactor <= 0 || input.adjustmentFactor > 1) {
     throw new BankCalculationError('adjustmentFactor must be greater than zero and at most one.');
@@ -679,7 +691,7 @@ export function calculateBurnToStepPlan(input: {
   const additionalSteps = additionalProviderCaloriesNeeded / input.providerCaloriesPerStep;
   const totalDailyStepsNeeded = Math.max(
     input.currentSteps,
-    Math.round((input.currentSteps + additionalSteps) / 100) * 100,
+    Math.ceil((input.currentSteps + additionalSteps) / 100) * 100,
   );
   return {
     alreadyOnTrack: false,
@@ -730,7 +742,9 @@ export function calculateRestOfDayBurnProjection(input: {
 }) {
   assertNonNegativeInteger(input.providerBurnSoFarCalories, 'providerBurnSoFarCalories');
   assertPositiveFiniteNumber(input.providerRestCaloriesPerHour, 'providerRestCaloriesPerHour');
-  assertNonNegativeInteger(input.remainingMinutes, 'remainingMinutes');
+  if (!Number.isFinite(input.remainingMinutes) || input.remainingMinutes < 0) {
+    throw new BankCalculationError('remainingMinutes must be finite and non-negative.');
+  }
   if (!Number.isFinite(input.adjustmentFactor) || input.adjustmentFactor < 0 || input.adjustmentFactor > 1) {
     throw new BankCalculationError('adjustmentFactor must be between 0 and 1.');
   }
@@ -908,6 +922,11 @@ export function normalizeDailyExpenditureAggregate({
   activeEnergyCalories,
   basalEnergyCalories,
   rawTotalDailyExpenditure,
+  forecastCoverageAt,
+  retrievedAt,
+  activeSampleEndAt,
+  basalSampleEndAt,
+  reportedIntervalEndAt,
   adjustmentFactor = V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE,
   importedAt,
   providerUpdatedAt,
@@ -947,6 +966,12 @@ export function normalizeDailyExpenditureAggregate({
     ...(activeEnergyCalories !== undefined ? { activeEnergyCalories } : {}),
     ...(basalEnergyCalories !== undefined ? { basalEnergyCalories } : {}),
     rawTotalDailyExpenditure,
+    forecastCoverageAt: forecastCoverageAt ?? null,
+    retrievedAt: retrievedAt ?? null,
+    activeSampleEndAt: activeSampleEndAt ?? null,
+    basalSampleEndAt: basalSampleEndAt ?? null,
+    reportedIntervalEndAt: reportedIntervalEndAt ?? null,
+
     adjustedDailyExpenditure: calculateAdjustedCurrentDayExpenditure({
       rawImportedExpenditureCalories: rawTotalDailyExpenditure,
       expenditureAdjustmentRate: adjustmentFactor,

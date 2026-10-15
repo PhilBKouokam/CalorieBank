@@ -1,6 +1,7 @@
 import { dailyBankTargetInputSchema } from '@caloriebank/schemas';
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { DailyBankTargetInput } from './DailyBankTargetInput';
 import { saveDailyBankTarget } from '@/lib/api/client';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';

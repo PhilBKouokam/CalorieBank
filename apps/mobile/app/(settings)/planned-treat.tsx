@@ -5,10 +5,10 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import { Text } from '@/components/caloriebank/ScaleAwareText';
 
 import { PlaceholderScreen } from '@/components/caloriebank/PlaceholderScreen';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
