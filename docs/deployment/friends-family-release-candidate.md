@@ -120,3 +120,57 @@ migrations and API compilation passed. No new migration is required. This
 correction remains local; no further deployment, lifecycle deployment or mobile
 build is authorized by this evidence record alone. Resume only after founder
 review of this checkpoint.
+
+### Phase 2A resumed backend qualification — 2026-10-15 UTC
+
+Founder-authorized correction source: `bca23fb2940a6779d2340041f679126eb4b2f609`.
+The reviewed four-file correction was committed and pushed without private
+snapshots or credentials. Build 13 contracts remain compatible; no new API
+contract or migration was introduced by the idempotency correction.
+
+API deployment `dep-db831pqj9qps73besltg` became live at 01:51:53 UTC on that
+exact source. Health and readiness returned HTTP 200 with database ready.
+Predeploy reported 39 migrations and no pending migrations. The previously
+approved two additive forecasting migrations remain unchanged.
+
+Read-only post-API capture at 01:52:49.313 UTC and post-lifecycle capture at
+02:04:35.698 UTC match the secured 01:37:15.653 UTC baseline for all 10 accounts:
+all 13 initialization fields, whole-row/state/metadata fingerprints, Opening
+Bank calculation days, finalized History, ledger, calculation snapshots,
+Available Bank and Recovery. Zero consistency failures; migration evidence
+unchanged. Checksum-verified copies remain outside Git with owner-only access.
+Post-API canonical SHA-256:
+`84c7aadba62d39b49bc1b55e66c96e707a0240a0629232ad5928e699ea96fb8e`.
+Post-lifecycle canonical SHA-256:
+`ce102e1af85c125b97fd7e685fe1ece93654f74c2f6829219610a872801a3b6c`.
+
+Eight accounts passed two ordinary initialization checks inside read-only
+transactions without writes. Two entered the preserved pre-existing bounded
+repair path; read-only intent inspection established that the candidate old
+history dates would be excluded again, preserving retained opening dates and
+contributions. No repair was executed by that probe. Subsequent normal lifecycle
+runs exercised the existing repair path and the final snapshot confirmed every
+initialization field and accounting fingerprint unchanged for all 10 accounts.
+The older unexplained whole-table fingerprint remains HISTORICALLY UNRESOLVED —
+NO CURRENT ACCOUNTING DISCREPANCY DETECTED; this is not proof it was harmless.
+
+Lifecycle build `bld-db835p0m7kps73cs3ukg` deployed the same correction commit.
+Manual and following scheduled runs completed at 02:00:42 and 02:02:35 UTC;
+each processed 10/10 accounts, with zero failed account jobs. Both retained the
+exact same seven provider/account/http_409 tuples as the preceding old-source
+run. These are existing provider errors, not newly introduced failures.
+
+The deployed Fitbit adapter's authorized current-day sync returned HTTP 200 for
+minute, daily calorie and daily step queries; connection remained connected and
+scopes unchanged. Daily calories remain authoritative. Planning provenance was
+reported_interval with verified coverage null. Supplementary failure isolation
+is automated regression evidence, not a deliberately injected production fault.
+Apple sample-end bridge compatibility and session handling remain source/test
+verified; new-device physical qualification remains pending.
+
+Validated source retains the full Node 20 gate: 1,053 tests in 100 files, 37
+focused tests, TypeScript, lint, Prisma, local migrations and API compilation.
+One build per platform was requested only after backend qualification passed:
+iOS build 14 `c4bc8a91-7e65-44a9-97cf-41f368ef66fe`; Android versionCode 14
+`18f39fd7-fbf1-4403-83b7-4614afa63427`. Both use the exact correction commit.
+Store distribution and physical qualification are not established by this entry.
