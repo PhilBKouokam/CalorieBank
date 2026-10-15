@@ -126,6 +126,7 @@ enum MorningBankUpdateDeliveryStatus {
 }
 
 model User {
+  settingsRevisions SettingsRevision[]
   id                            String                              @id @default(uuid()) @db.Uuid
   // Email is descriptive account metadata. Clerk subject is the ownership key:
   // a deleted and recreated Clerk user may legitimately reuse an email.
@@ -817,4 +818,14 @@ model DailyIntakeAdjustment {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@id([userId, localDate])
   @@map("daily_intake_adjustments")
+}
+
+// Concurrency metadata only; never an accounting input. Retained across setting deletion.
+model SettingsRevision {
+  userId String @map("user_id") @db.Uuid
+  setting String
+  revision BigInt @default(0)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([userId, setting])
+  @@map("settings_revisions")
 }

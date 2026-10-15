@@ -1,6 +1,6 @@
 import { calculateBurnToStepPlan, calculateStepToBurnPlan, suggestNextStepTarget, walkingTimeFromPace, walkingMidnightFeasibility } from '@caloriebank/domain';
 import type { TodayResponse } from '@caloriebank/schemas';
-import { useState } from 'react';
+import { useEditorDraft } from '@/lib/drafts/use-editor-draft';
 import { usePlanningClock } from '@/lib/today/use-planning-clock';
 import { StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
@@ -31,8 +31,13 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
   const displayedBaseline = today.restOfDayProjection.projectedProviderBurnCalories;
   const baseline = today.restOfDayProjection.unroundedProjectedProviderBurnCalories
     ?? (displayedBaseline === null ? null : Math.max(0, displayedBaseline - 5));
-  const [burn, setBurn] = useState(String(baseline === null ? 0 : Math.ceil((baseline * today.burned.adjustmentFactor + 1) / 500) * 500));
-  const [steps, setSteps] = useState(String(today.steps.count === null ? 0 : suggestNextStepTarget(today.steps.count)));
+  const draft = useEditorDraft('step-planning', {
+    burn: String(baseline === null ? 0 : Math.ceil((baseline * today.burned.adjustmentFactor + 1) / 500) * 500),
+    steps: String(today.steps.count === null ? 0 : suggestNextStepTarget(today.steps.count)),
+  }, JSON.stringify([today.date, today.timezone, today.burned.source, today.steps.source]));
+  const { burn, steps } = draft.value;
+  const setBurn = (burn: string) => draft.update(v => ({ ...v, burn }));
+  const setSteps = (steps: string) => draft.update(v => ({ ...v, steps }));
   const ready = !coverageExpired && today.steps.status === 'ready' && today.burned.status === 'ready'
     && today.steps.planningSnapshotReady !== false
     && today.restOfDayProjection.status === 'ready' && baseline !== null
@@ -45,7 +50,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
     <View style={styles.card}>
       <Text style={styles.title}>If I want to burn…</Text>
       <View style={styles.inputRow}><TextInput accessibilityLabel="Desired estimated actual calories burned today" keyboardType="number-pad" maxLength={6} selectTextOnFocus
-        value={burn} onChangeText={(v) => setBurn(v.replace(/\D/g, ''))} style={inputStyle} />
+        {...draft.selection('burn')} value={burn} onChangeText={(v) => setBurn(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>calories</Text></View>
       {inverse ? <View accessibilityLiveRegion="polite" style={styles.results}>
         <Text accessibilityLabel={`Approximately ${inverse.requiredProviderBurnCalories.toLocaleString()} ${getConsumerSourceName(today.burned.source)} calories`} style={styles.supporting}>~{inverse.requiredProviderBurnCalories.toLocaleString()} {getConsumerSourceName(today.burned.source)} calories</Text>
@@ -59,7 +64,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
     <View style={styles.card}>
       <Text style={styles.title}>If I walk…</Text>
       <View style={styles.inputRow}><TextInput accessibilityLabel="Target total steps today" keyboardType="number-pad" maxLength={6} selectTextOnFocus
-        value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} style={inputStyle} />
+        {...draft.selection('steps')} value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>steps</Text></View>
       {forward ? <View accessibilityLiveRegion="polite" style={styles.results}>
         <View style={styles.burnGroup}>

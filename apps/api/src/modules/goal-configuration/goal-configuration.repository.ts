@@ -1,3 +1,4 @@
+import { settingTransaction, type SettingsOptions } from '../settings-concurrency/settings-concurrency';
 import type {
   AdjustmentSource,
   GoalConfigurationInput,
@@ -12,10 +13,11 @@ export type DevelopmentUser = {
 };
 
 export interface GoalConfigurationRepository {
-  findByUserId(userId: string): Promise<GoalConfigurationResponse | null>;
+  findByUserId(userId: string, options?: SettingsOptions): Promise<GoalConfigurationResponse | null>;
   upsertForUser(
     user: DevelopmentUser,
     input: GoalConfigurationInput,
+    options?: SettingsOptions,
   ): Promise<GoalConfigurationResponse>;
 }
 
@@ -44,16 +46,19 @@ function toResponse(configuration: {
 export class PrismaGoalConfigurationRepository implements GoalConfigurationRepository {
   constructor(private readonly db: PrismaClient) {}
 
-  async findByUserId(userId: string): Promise<GoalConfigurationResponse | null> {
-    const configuration = await this.db.goalConfiguration.findUnique({ where: { userId } });
-    return configuration ? toResponse(configuration) : null;
+  async findByUserId(userId: string, options?: SettingsOptions): Promise<GoalConfigurationResponse | null> {
+    return settingTransaction(this.db, userId, 'fitness-goal', false, options, async tx => {
+      const configuration = await tx.goalConfiguration.findUnique({ where: { userId } });
+      return configuration ? toResponse(configuration) : null;
+    });
   }
 
   async upsertForUser(
     user: DevelopmentUser,
     input: GoalConfigurationInput,
+    options?: SettingsOptions,
   ): Promise<GoalConfigurationResponse> {
-    const configuration = await this.db.$transaction(async (transaction) => {
+    const configuration = await settingTransaction(this.db, user.id, 'fitness-goal', true, options, async (transaction) => {
       await transaction.user.upsert({
         where: { id: user.id },
         update: { email: user.email },

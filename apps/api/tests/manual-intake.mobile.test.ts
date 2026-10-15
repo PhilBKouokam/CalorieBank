@@ -35,6 +35,8 @@ it('prefills the authoritative value, selects text on focus and saves a date-sco
 });
 it('cancels without a write and resets using an explicit operation', async () => {
   await mount(); await press('Cancel'); expect(api.save).not.toHaveBeenCalled(); expect(cancel).toHaveBeenCalledOnce();
+  await press('Use my usual estimate'); expect(api.save).not.toHaveBeenCalled(); // Cancelled screen cannot submit.
+  await act(async () => view.unmount()); await mount();
   await press('Use my usual estimate'); expect(api.save).toHaveBeenCalledWith({ operation: 'reset', expectedRevision: 4, localDate: '2026-09-23' });
 });
 it('retains failed offline input, does not claim saved, and retries the same revision', async () => {

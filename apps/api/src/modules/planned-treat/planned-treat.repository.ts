@@ -1,23 +1,25 @@
+import { settingTransaction, type SettingsOptions } from '../settings-concurrency/settings-concurrency';
 import type {
   ActivePlannedTreatResponse,
   PlannedTreatGetResponse,
   PlannedTreatInput,
 } from '@caloriebank/schemas';
 import { deriveConsumerBankBalances } from '@caloriebank/domain';
-import type { PlannedTreat, PrismaClient } from '@prisma/client';
+import type { PlannedTreat, Prisma, PrismaClient } from '@prisma/client';
 
 import { AppError } from '../../errors';
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
 import { derivePlannedTreatProgress } from './planned-treat.progress';
 
 export interface PlannedTreatRepository {
-  getForUser(userId: string): Promise<PlannedTreatGetResponse>;
+  getForUser(userId: string, options?: SettingsOptions): Promise<PlannedTreatGetResponse>;
   createOrReplaceForUser(
     user: DevelopmentUser,
     input: PlannedTreatInput,
+    options?: SettingsOptions,
   ): Promise<ActivePlannedTreatResponse>;
-  updateForUser(userId: string, input: PlannedTreatInput): Promise<ActivePlannedTreatResponse>;
-  deleteForUser(userId: string): Promise<void>;
+  updateForUser(userId: string, input: PlannedTreatInput, options?: SettingsOptions): Promise<ActivePlannedTreatResponse>;
+  deleteForUser(userId: string, options?: SettingsOptions): Promise<void>;
 }
 
 function toDateOnly(value: Date | null) {
@@ -28,7 +30,7 @@ function parseOptionalDate(value: string | null | undefined) {
   return value ? new Date(`${value}T00:00:00.000Z`) : null;
 }
 
-async function getAvailableBankCalories(db: PrismaClient, userId: string) {
+async function getAvailableBankCalories(db: Prisma.TransactionClient, userId: string) {
   const [ledgerSum, initialization] = await Promise.all([
     db.calorieLedgerTransaction.aggregate({
       where: { userId },
@@ -67,10 +69,11 @@ function toResponse(
 export class PrismaPlannedTreatRepository implements PlannedTreatRepository {
   constructor(private readonly db: PrismaClient) {}
 
-  async getForUser(userId: string): Promise<PlannedTreatGetResponse> {
+  async getForUser(userId: string, options?: SettingsOptions): Promise<PlannedTreatGetResponse> {
+    return settingTransaction(this.db, userId, 'banking-goal', false, options, async tx => {
     const [treat, availableBankCalories] = await Promise.all([
-      this.db.plannedTreat.findUnique({ where: { userId } }),
-      getAvailableBankCalories(this.db, userId),
+      tx.plannedTreat.findUnique({ where: { userId } }),
+      getAvailableBankCalories(tx, userId),
     ]);
 
     if (!treat) {
@@ -82,13 +85,15 @@ export class PrismaPlannedTreatRepository implements PlannedTreatRepository {
     }
 
     return toResponse(treat, availableBankCalories);
+    });
   }
 
   async createOrReplaceForUser(
     user: DevelopmentUser,
     input: PlannedTreatInput,
+    options?: SettingsOptions,
   ): Promise<ActivePlannedTreatResponse> {
-    const treat = await this.db.$transaction(async (transaction) => {
+    const treat = await settingTransaction(this.db, user.id, 'banking-goal', true, options, async (transaction) => {
       await transaction.user.upsert({
         where: { id: user.id },
         update: { email: user.email },
@@ -121,14 +126,15 @@ export class PrismaPlannedTreatRepository implements PlannedTreatRepository {
     return toResponse(treat, availableBankCalories);
   }
 
-  async updateForUser(userId: string, input: PlannedTreatInput): Promise<ActivePlannedTreatResponse> {
-    const existing = await this.db.plannedTreat.findUnique({ where: { userId } });
+  async updateForUser(userId: string, input: PlannedTreatInput, options?: SettingsOptions): Promise<ActivePlannedTreatResponse> {
+    return settingTransaction(this.db, userId, 'banking-goal', true, options, async tx => {
+    const existing = await tx.plannedTreat.findUnique({ where: { userId } });
 
     if (!existing) {
       throw new AppError('Planned Treat has not been configured.', 404);
     }
 
-    const treat = await this.db.plannedTreat.update({
+    const treat = await tx.plannedTreat.update({
       where: { userId },
       data: {
         name: input.name,
@@ -138,18 +144,21 @@ export class PrismaPlannedTreatRepository implements PlannedTreatRepository {
         deletedAt: null,
       },
     });
-    const availableBankCalories = await getAvailableBankCalories(this.db, userId);
+    const availableBankCalories = await getAvailableBankCalories(tx, userId);
 
     return toResponse(treat, availableBankCalories);
+    });
   }
 
-  async deleteForUser(userId: string): Promise<void> {
-    const existing = await this.db.plannedTreat.findUnique({ where: { userId } });
+  async deleteForUser(userId: string, options?: SettingsOptions): Promise<void> {
+    return settingTransaction(this.db, userId, 'banking-goal', true, options, async tx => {
+    const existing = await tx.plannedTreat.findUnique({ where: { userId } });
 
     if (!existing) {
       return;
     }
 
-    await this.db.plannedTreat.delete({ where: { userId } });
+    await tx.plannedTreat.delete({ where: { userId } });
+    });
   }
 }

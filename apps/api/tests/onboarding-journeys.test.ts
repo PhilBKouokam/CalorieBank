@@ -53,6 +53,10 @@ vi.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('expo-router', () => ({ useRouter: () => h.router, useLocalSearchParams: () => ({ returnTo: 'onboarding', ...h.params }), useFocusEffect: (callback: () => void | (() => void)) => React.useEffect(callback, []) }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: async (url: string) => { connect(url); return { type: 'success', url: 'caloriebank://integrations?fitbit=connected' }; } }));
+vi.mock('../../mobile/lib/api/settings-concurrency', () => ({ SettingsConflictError: class extends Error {},
+fetchProtectedTarget: async () => ({ value: { calories: 0, chosen: h.targetChosen }, revision: '0' }),
+ saveProtectedTarget: async (calories: number) => { h.targetChosen = true; return { calories, chosen: true }; },
+}));
 vi.mock('../../mobile/lib/api/client', () => ({
   fetchManualIntake: async () => ({ selectionEnabled: h.manualEnabled, selected: data().intake.authoritativeProvider === 'manual_estimate', localDate: '2026-09-23', revision: 0, selectionRevision: null, estimate: null }),
   fetchDailyBankTarget: async () => ({ calories: 0, chosen: h.targetChosen }),

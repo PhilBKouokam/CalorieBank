@@ -15,6 +15,11 @@ const appStateStore = vi.hoisted(() => ({ onChange: null as null | ((state: stri
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useFocusEffect: (callback: () => void) => React.useEffect(callback, [callback]), Link: 'Link' }));
 vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
 vi.mock('../../mobile/lib/lifecycle/account-lifecycle', () => ({ isAccountLifecycleRunning: () => false, subscribeToAccountLifecycleActivity: () => () => {}, subscribeToAccountLifecycle: () => () => {}, runAccountLifecycle: async () => ({ detail: null }) }));
+vi.mock('../../mobile/lib/api/settings-concurrency', () => ({ SettingsConflictError: class extends Error {},
+ fetchProtectedGoal: async () => ({ value: { goalMode: 'maintain', adjustmentSource: 'manual_calories', dailyEnergyAdjustment: 0 }, revision: '0' }), saveProtectedGoal: async (value: unknown) => value,
+fetchProtectedTarget: async () => ({ value: { calories: targetStore.calories, chosen: targetStore.writes.length > 0 }, revision: String(targetStore.writes.length) }),
+ saveProtectedTarget: async (calories: number) => { targetStore.calories = calories; targetStore.writes.push(calories); return { calories, chosen: true }; },
+}));
 vi.mock('../../mobile/lib/api/client', () => ({
   getApiBaseUrl: () => 'https://fixture.invalid',
   fetchBankSummary: async () => ({ openingBankStatus: 'initialized', availableBankCalories: homeStore.recovery ? 0 : 2843, recoveryCalories: homeStore.recovery, latestCompletedDate: '2026-09-10', latestDailyBankChange: 547 }),

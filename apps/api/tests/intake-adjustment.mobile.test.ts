@@ -38,6 +38,9 @@ it('switches to replacement without reinterpreting the addition as a total', asy
 it('edits the existing addition instead of compounding it, and supports removal and cancellation', async () => {
   await mount({ ...state, revision: 1, calories: 2100, adjustment: { mode: 'add', calories: 300 } });
   expect(field().props.value).toBe('300'); await press('Cancel'); expect(api.save).not.toHaveBeenCalled();
+  await press('Remove adjustment'); expect(api.save).not.toHaveBeenCalled(); // Cancelled screen cannot submit.
+  await act(async () => view.unmount());
+  await mount({ ...state, revision: 1, calories: 2100, adjustment: { mode: 'add', calories: 300 } });
   await press('Remove adjustment'); expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ mode: 'none', calories: 0, expectedRevision: 1 }));
 });
 it('keeps failed input and rejects missing or invalid additions', async () => {

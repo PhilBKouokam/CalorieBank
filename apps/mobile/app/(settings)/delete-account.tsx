@@ -1,3 +1,4 @@
+import { terminateDraftSession } from '@/lib/drafts/session-drafts';
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { deletionHealthNote } from '@/lib/native-health/copy';
 import { useClerk } from '@clerk/expo';
@@ -23,6 +24,7 @@ export default function DeleteAccountScreen() {
     try {
       await prepareMorningBankUpdateAccountDeletion();
       await deleteCalorieBankAccount();
+      terminateDraftSession();
       await signOut().catch(() => undefined);
       router.replace('/sign-in');
     } catch {

@@ -82,7 +82,8 @@
           }
         }
       ],
-      "./plugins/with-health-connect.cjs"
+      "./plugins/with-health-connect.cjs",
+      "./plugins/with-fabric-font-scale.cjs"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -6,6 +6,11 @@ const api = vi.hoisted(() => ({ load: vi.fn(), save: vi.fn() }));
 vi.mock('react-native', () => ({ ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: <T,>(x: T) => x } }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock('../../mobile/components/caloriebank/PlaceholderScreen', () => ({ PlaceholderScreen: ({ children }: { children: React.ReactNode }) => React.createElement('screen', null, children) }));
+vi.mock('../../mobile/lib/api/settings-concurrency', () => ({
+  SettingsConflictError: class SettingsConflictError extends Error {},
+  fetchProtectedTreat: async () => ({ value: await api.load(), revision: '0' }),
+  saveProtectedTreat: api.save, deleteProtectedTreat: api.save,
+}));
 vi.mock('../../mobile/lib/api/client', () => ({ fetchPlannedTreat: api.load, createOrReplacePlannedTreat: api.save, updatePlannedTreat: api.save, deletePlannedTreat: api.save }));
 it('shows a retryable load failure instead of a spinner or an editable empty plan, then recovers', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });

@@ -1,3 +1,4 @@
+import { settingsOptions } from '../settings-concurrency/settings-concurrency';
 import { dailyBankTargetInputSchema, dailyBankTargetResponseSchema } from '@caloriebank/schemas';
 import { Router } from 'express';
 import { resolveRequestUser, type RequestUserSource } from '../../auth/current-user';
@@ -7,15 +8,15 @@ import { createRateLimit } from '../../security/rate-limit';
 
 export function createDailyBankTargetRouter(repository: DailyBankTargetRepository, userSource: RequestUserSource) {
   const router = Router();
-  router.get('/', async (_req, res, next) => {
-    try { res.json(dailyBankTargetResponseSchema.parse(await repository.get(resolveRequestUser(userSource, res).id))); }
+  router.get('/', async (req, res, next) => {
+    try { res.json(dailyBankTargetResponseSchema.parse(await repository.get(resolveRequestUser(userSource, res).id, settingsOptions(req, res)))); }
     catch (error) { next(error); }
   });
   router.put('/', createRateLimit({ limit: 60, windowMs: 15 * 60 * 1000, operation: 'daily_bank_target_write' }), async (req, res, next) => {
     try {
       const input = dailyBankTargetInputSchema.safeParse(req.body);
       if (!input.success) throw new AppError('Choose a target from 0 to 2,000 calories.', 400);
-      res.json(dailyBankTargetResponseSchema.parse(await repository.update(resolveRequestUser(userSource, res).id, input.data.calories)));
+      res.json(dailyBankTargetResponseSchema.parse(await repository.update(resolveRequestUser(userSource, res).id, input.data.calories, settingsOptions(req, res, true))));
     } catch (error) { next(error); }
   });
   return router;

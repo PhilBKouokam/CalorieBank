@@ -1,3 +1,4 @@
+import { settingsOptions } from '../settings-concurrency/settings-concurrency';
 import { plannedTreatInputSchema } from '@caloriebank/schemas';
 import { Router } from 'express';
 
@@ -11,9 +12,9 @@ export function createPlannedTreatRouter(
 ) {
   const router = Router();
 
-  router.get('/', async (_req, res, next) => {
+  router.get('/', async (req, res, next) => {
     try {
-      res.json(await repository.getForUser(resolveRequestUser(userSource, res).id));
+      res.json(await repository.getForUser(resolveRequestUser(userSource, res).id, settingsOptions(req, res)));
     } catch (error) {
       next(error);
     }
@@ -27,7 +28,7 @@ export function createPlannedTreatRouter(
         throw new AppError('Planned Treat is invalid.', 400, parsedInput.error.flatten());
       }
 
-      res.status(201).json(await repository.createOrReplaceForUser(resolveRequestUser(userSource, res), parsedInput.data));
+      res.status(201).json(await repository.createOrReplaceForUser(resolveRequestUser(userSource, res), parsedInput.data, settingsOptions(req, res, true)));
     } catch (error) {
       next(error);
     }
@@ -41,15 +42,15 @@ export function createPlannedTreatRouter(
         throw new AppError('Planned Treat is invalid.', 400, parsedInput.error.flatten());
       }
 
-      res.json(await repository.updateForUser(resolveRequestUser(userSource, res).id, parsedInput.data));
+      res.json(await repository.updateForUser(resolveRequestUser(userSource, res).id, parsedInput.data, settingsOptions(req, res, true)));
     } catch (error) {
       next(error);
     }
   });
 
-  router.delete('/', async (_req, res, next) => {
+  router.delete('/', async (req, res, next) => {
     try {
-      await repository.deleteForUser(resolveRequestUser(userSource, res).id);
+      await repository.deleteForUser(resolveRequestUser(userSource, res).id, settingsOptions(req, res, true));
       res.status(204).send();
     } catch (error) {
       next(error);

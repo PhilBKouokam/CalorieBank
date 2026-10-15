@@ -1,3 +1,4 @@
+import { useEditorDraft } from '@/lib/drafts/use-editor-draft';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
@@ -9,9 +10,16 @@ import { colors, spacing } from '@/constants/caloriebank-theme';
 export function IntakeAdjustmentEditor({ state, onSaved, onCancel }: {
   state: IntakeAdjustmentState; onSaved: () => void; onCancel: () => void;
 }) {
-  const [mode, setMode] = useState<'replace' | 'add'>(state.adjustment?.mode ?? 'add');
-  const [addition, setAddition] = useState(state.adjustment?.mode === 'add' ? String(state.adjustment.calories) : '');
-  const [replacement, setReplacement] = useState(String(state.calories ?? ''));
+  const draft = useEditorDraft('calorie-correction', {
+    mode: state.adjustment?.mode ?? 'add' as 'add' | 'replace',
+    addition: state.adjustment?.mode === 'add' ? String(state.adjustment.calories) : '',
+    replacement: String(state.calories ?? ''),
+  }, JSON.stringify([state.localDate, state.source, state.selectionRevision]),
+  JSON.stringify([state.revision, state.manualRevision]));
+  const { mode, addition, replacement } = draft.value;
+  const setMode = (mode: 'add' | 'replace') => draft.update(v => ({ ...v, mode }));
+  const setAddition = (addition: string) => draft.update(v => ({ ...v, addition }));
+  const setReplacement = (replacement: string) => draft.update(v => ({ ...v, replacement }));
   const [saving, setSaving] = useState(false), [error, setError] = useState('');
   const alive = useRef(true), locked = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -20,23 +28,26 @@ export function IntakeAdjustmentEditor({ state, onSaved, onCancel }: {
   const total = mode === 'replace' ? calories : state.baseCalories === null ? NaN : state.baseCalories + calories;
   async function save(remove = false) {
     if (locked.current) return;
+    if (draft.conflict) { setError('Your day, source, or adjustment changed. Cancel and reopen this editor to use the latest values.'); return; }
     if (!remove && (!Number.isSafeInteger(calories) || calories < 0 || calories > 100000)) {
       setError('Enter a whole number from 0 to 100,000.'); return;
     }
     if (!remove && mode === 'add' && state.baseCalories === null) {
       setError('Wait for tracker calories, or replace today’s total.'); return;
     }
+    if (!draft.beginSave()) return;
     locked.current = true; setSaving(true); setError('');
     try {
       await saveIntakeAdjustment({ localDate: state.localDate, expectedRevision: state.revision,
         selectionRevision: state.selectionRevision, manualRevision: state.manualRevision,
         mode: remove ? 'none' : mode, calories: remove ? 0 : calories });
-      if (alive.current) onSaved();
+      draft.clear('saved');
+      if (alive.current && draft.isCurrent()) onSaved();
     } catch (failure) {
       if (alive.current) setError(failure instanceof ApiHttpError && failure.kind === 'update_required' ? failure.message
         : failure instanceof ApiHttpError && failure.kind === 'conflict' ? 'Your day, source, or adjustment changed. Close this editor and try again.'
         : 'Couldn’t save your update. Try again.');
-    } finally { locked.current = false; if (alive.current) setSaving(false); }
+    } finally { draft.endSave(); locked.current = false; if (alive.current) setSaving(false); }
   }
   return <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
     <Text accessibilityRole="header" style={styles.title}>Calories eaten today</Text>
@@ -48,13 +59,13 @@ export function IntakeAdjustmentEditor({ state, onSaved, onCancel }: {
     <Text style={styles.detail}>{mode === 'add' ? 'Your addition stays on top as your source updates.' : 'This total stays fixed until you remove it.'} Only for today.</Text>
     <Text style={styles.label}>{mode === 'add' ? 'Untracked calories (kcal)' : 'Today’s total (kcal)'}</Text>
     <View style={styles.inputFrame}><TextInput accessibilityLabel={mode === 'add' ? 'Untracked calories, kilocalories' : 'Today’s total, kilocalories'}
-      keyboardType="number-pad" underlineColorAndroid="transparent" selectTextOnFocus value={text}
+      keyboardType="number-pad" underlineColorAndroid="transparent" selectTextOnFocus {...draft.selection(mode)} value={text}
       onChangeText={mode === 'add' ? setAddition : setReplacement} editable={!saving} style={styles.input} /></View>
     {Number.isSafeInteger(total) && total >= 0 ? <Text accessibilityLiveRegion="polite" style={styles.result}>{mode === 'add' ? `${state.baseCalories!.toLocaleString()} + ${calories.toLocaleString()} = ` : 'Today’s total: '}{total.toLocaleString()} kcal</Text> : null}
     {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
     <Pressable accessibilityRole="button" disabled={saving} style={styles.save} onPress={() => void save()}><Text style={styles.saveText}>{saving ? 'Saving…' : 'Save'}</Text></Pressable>
     {state.adjustment ? <Pressable accessibilityRole="button" disabled={saving} style={styles.action} onPress={() => void save(true)}><Text style={styles.link}>Remove adjustment</Text></Pressable> : null}
-    <Pressable accessibilityRole="button" disabled={saving} style={styles.action} onPress={onCancel}><Text style={styles.link}>Cancel</Text></Pressable>
+    <Pressable accessibilityRole="button" disabled={saving} style={styles.action} onPress={() => { draft.clear(); onCancel(); }}><Text style={styles.link}>Cancel</Text></Pressable>
   </KeyboardSafeScrollView>;
 }
 const styles = StyleSheet.create({

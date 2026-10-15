@@ -1,3 +1,6 @@
+import { useSettingsConflict } from '@/lib/drafts/use-settings-conflict';
+import { SettingsConflictNotice } from '@/components/caloriebank/SettingsConflictNotice';
+import { useEditorDraft } from '@/lib/drafts/use-editor-draft';
 import {
   estimatedWeightRateOptions,
   getGoalModeLabel,
@@ -19,7 +22,7 @@ import {
 import { Text } from '@/components/caloriebank/ScaleAwareText';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
-import { fetchGoalConfiguration, saveGoalConfiguration } from '@/lib/api/client';
+import { fetchProtectedGoal, saveProtectedGoal } from '@/lib/api/settings-concurrency';
 
 const goalOptions: { value: GoalMode; label: string; description: string }[] = [
   { value: 'cut', label: 'Cut', description: 'Lose weight by setting a daily amount below your estimated actual burn.' },
@@ -50,10 +53,16 @@ function defaultEstimatedOption(goalMode: GoalMode) {
 
 export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormProps) {
   const { fontScale } = useWindowDimensions();
-  const [goalMode, setGoalMode] = useState<GoalMode>('maintain');
-  const [adjustmentSource, setAdjustmentSource] = useState<AdjustmentSource>('manual_calories');
-  const [manualAdjustmentText, setManualAdjustmentText] = useState('500');
-  const [selectedWeeklyRate, setSelectedWeeklyRate] = useState<number | null>(null);
+  const draft = useEditorDraft('fitness-goal', {
+    goalMode: 'maintain' as GoalMode, adjustmentSource: 'manual_calories' as AdjustmentSource,
+    manualAdjustmentText: '500', selectedWeeklyRate: null as number | null,
+  }, mode);
+  const conflict = useSettingsConflict(draft, fetchProtectedGoal);
+  const { goalMode, adjustmentSource, manualAdjustmentText, selectedWeeklyRate } = draft.value;
+  const setGoalMode = (goalMode: GoalMode) => draft.update(v => ({ ...v, goalMode }));
+  const setAdjustmentSource = (adjustmentSource: AdjustmentSource) => draft.update(v => ({ ...v, adjustmentSource }));
+  const setManualAdjustmentText = (manualAdjustmentText: string) => draft.update(v => ({ ...v, manualAdjustmentText }));
+  const setSelectedWeeklyRate = (selectedWeeklyRate: number | null) => draft.update(v => ({ ...v, selectedWeeklyRate }));
   const [status, setStatus] = useState<FormStatus>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const savingRef = useRef(false);
@@ -69,14 +78,17 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
       setErrorMessage('');
 
       try {
-        const configuration = await fetchGoalConfiguration();
+        const snapshot = await fetchProtectedGoal();
+        const configuration = snapshot.value;
         if (!isMounted) return;
 
-        if (configuration) {
-          setGoalMode(configuration.goalMode);
-          setAdjustmentSource(configuration.adjustmentSource);
-          setManualAdjustmentText(String(Math.abs(configuration.dailyEnergyAdjustment)));
-          setSelectedWeeklyRate(configuration.desiredWeeklyWeightChange);
+        const matches = draft.hydrate(configuration ? {
+          goalMode: configuration.goalMode, adjustmentSource: configuration.adjustmentSource,
+          manualAdjustmentText: String(Math.abs(configuration.dailyEnergyAdjustment)),
+          selectedWeeklyRate: configuration.desiredWeeklyWeightChange,
+        } : draft.value, snapshot.revision);
+        if (!matches) {
+          conflict.show(snapshot); setStatus('idle'); return;
         }
 
         setStatus('idle');
@@ -92,6 +104,8 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
     return () => {
       isMounted = false;
     };
+  // A route mount owns this fetch; editing a draft must not reload saved values.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   function handleGoalModeChange(nextGoalMode: GoalMode) {
@@ -150,7 +164,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
   }
 
   async function handleSave() {
-    if (savingRef.current) return;
+    if (savingRef.current || conflict.latest) return;
     setErrorMessage('');
     const input = buildInput();
     if (!input) {
@@ -165,17 +179,22 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
       return;
     }
 
+    if (!draft.beginSave()) return;
     savingRef.current = true;
     setStatus('saving');
 
     try {
-      const configuration = await saveGoalConfiguration(parsedInput.data);
+      if (conflict.latest) return;
+      const configuration = await saveProtectedGoal(parsedInput.data, draft.revision);
+      draft.clear('saved');
       setStatus('success');
-      setTimeout(() => onSaved(configuration), mode === 'settings' ? 500 : 0);
-    } catch {
+      setTimeout(() => { if (draft.isCurrent()) onSaved(configuration); }, mode === 'settings' ? 500 : 0);
+    } catch (error) {
+      if (await conflict.handle(error)) { setStatus('idle'); return; }
       setStatus('error');
       setErrorMessage("We couldn't save your goal. Check your connection and refresh your health data, then try again.");
     } finally {
+      draft.endSave();
       savingRef.current = false;
     }
   }
@@ -191,6 +210,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
 
   return (
     <View style={styles.form}>
+      {conflict.latest ? <SettingsConflictNotice latest={conflict.latest.value ? `${conflict.latest.value.goalMode}, ${conflict.latest.value.dailyEnergyAdjustment} kcal/day (${conflict.latest.value.adjustmentSource === 'manual_calories' ? 'Daily calories' : `${conflict.latest.value.desiredWeeklyWeightChange} lb/week`})` : 'No Fitness Goal configured'} onReview={conflict.review} /> : null}
       <Text style={styles.label}>Goal mode</Text>
       <View style={styles.optionColumn}>
         {goalOptions.map((option) => {
@@ -238,6 +258,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
               <TextInput
                 accessibilityLabel={`Daily ${goalMode === 'cut' ? 'deficit' : 'surplus'} calories`}
                 keyboardType="number-pad"
+                {...draft.selection('adjustment')}
                 onChangeText={setManualAdjustmentText}
                 placeholder={defaultManualText(goalMode)}
                 placeholderTextColor={colors.textMuted}
@@ -291,7 +312,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
 
       <Pressable
         accessibilityRole="button"
-        disabled={status === 'saving'}
+        disabled={status === 'saving' || Boolean(conflict.latest)}
         onPress={() => void handleSave()}
         style={[styles.saveButton, status === 'saving' && styles.disabledButton]}
       >

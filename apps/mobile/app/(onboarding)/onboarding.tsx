@@ -1,3 +1,4 @@
+import { clearEditorDraft, onboardingDraftStage } from '@/lib/drafts/session-drafts';
 import { sourceLabel } from '@/lib/native-health/copy';
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { isKnownIntakeProvider } from '@caloriebank/schemas';
@@ -116,7 +117,7 @@ export default function OnboardingScreen() {
   const [initialLoadFailed, setInitialLoadFailed] = useState(false);
   const [preparationAttempted, setPreparationAttempted] = useState(false);
   const [morningUpdateState, setMorningUpdateState] = useState<'idle' | 'loading' | 'enabled' | 'denied' | 'error'>('idle');
-  const [displayStage, setDisplayStage] = useState<SetupStage | null>(null);
+  const [displayStage, setDisplayStage] = useState<SetupStage | null>(onboardingDraftStage);
   const [dailyTarget, setDailyTarget] = useState<{ calories: number; chosen: boolean } | null>(null);
   const [editingRole, setEditingRole] = useState<SourceRole | null>(null);
   const [foodHelpTracker, setFoodHelpTracker] = useState<KnownFoodTracker | null>(null);
@@ -250,6 +251,8 @@ export default function OnboardingScreen() {
   }
 
   function showStage(stage: OnboardingStage | null, editRole: SourceRole | null = null) {
+    if (activeStage === 'goal' && stage !== 'goal') clearEditorDraft('fitness-goal');
+    if (activeStage === 'daily_bank_target') clearEditorDraft('daily-bank-target');
     viewGeneration.current += 1;
     refreshGeneration.current.invalidate();
     setBusy(null);

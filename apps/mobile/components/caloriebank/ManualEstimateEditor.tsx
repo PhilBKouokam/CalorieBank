@@ -1,3 +1,4 @@
+import { useEditorDraft } from '@/lib/drafts/use-editor-draft';
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
@@ -10,40 +11,45 @@ import { colors, radii, spacing, typography } from '@/constants/caloriebank-them
 export function ManualEstimateEditor({ state, mode, onSaved, onCancel }: {
   state: ManualIntakeState; mode: 'select' | 'usual' | 'today'; onSaved: () => void; onCancel: () => void;
 }) {
-  const [text, setText] = useState(String(mode === 'today' ? state.estimate?.value.calories ?? '' : state.estimate?.usualCalories ?? ''));
+  const draft = useEditorDraft('usual-estimate', String(mode === 'today' ? state.estimate?.value.calories ?? '' : state.estimate?.usualCalories ?? ''),
+    JSON.stringify([mode, state.localDate, state.selectionRevision, state.selected]), String(state.revision));
+  const text = draft.value, setText = draft.update;
   const [saving, setSaving] = useState(false), [error, setError] = useState('');
   const alive = useRef(true), locked = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   async function save(reset = false) {
     if (locked.current) return;
+    if (draft.conflict) { setError('Your day or estimate changed. Cancel and reopen this editor to use the latest values.'); return; }
     const calories = /^\d+$/.test(text.trim()) ? Number(text) : NaN;
     if (!reset && (!Number.isSafeInteger(calories) || calories < (mode === 'today' ? 0 : 1) || calories > 100000)) {
       setError(mode === 'today' ? 'Enter a whole number from 0 to 100,000.' : 'Enter a whole number from 1 to 100,000.'); return;
     }
+    if (!draft.beginSave()) return;
     locked.current = true; setSaving(true); setError('');
     try {
       const common = { expectedRevision: state.revision, localDate: state.localDate };
       await saveManualIntake(reset ? { operation: 'reset', ...common }
         : mode === 'select' ? { operation: 'select', calories, expectedRevision: state.revision, selectionRevision: state.selectionRevision }
         : { operation: mode, calories, ...common });
-      if (alive.current) onSaved();
+      draft.clear('saved');
+      if (alive.current && draft.isCurrent()) onSaved();
     } catch (failure) {
       if (alive.current) setError(failure instanceof ApiHttpError && failure.kind === 'update_required' ? failure.message
         : failure instanceof ApiHttpError && failure.kind === 'conflict' ? 'Your day or estimate changed. Close this editor and try again.'
         : 'Couldn’t save your update. Try again.');
-    } finally { locked.current = false; if (alive.current) setSaving(false); }
+    } finally { draft.endSave(); locked.current = false; if (alive.current) setSaving(false); }
   }
   return <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>{mode === 'today' ? 'Calories eaten today' : 'About how many calories do you usually eat in a day?'}</Text>
       <Text style={styles.detail}>{mode === 'today' ? 'Your best estimate for the whole day.' : 'We’ll use this as your daily estimate. Change today’s amount whenever you eat more or less.'}</Text>
       {/* Keep the custom border off Android's native input background drawable. */}
       <View style={styles.inputFrame}>
-        <TextInput accessibilityLabel={mode === 'today' ? 'Calories eaten today, kilocalories' : 'Usual daily estimate, kilocalories'} keyboardType="number-pad" underlineColorAndroid="transparent" selectTextOnFocus value={text} onChangeText={setText} editable={!saving} style={styles.input} />
+        <TextInput accessibilityLabel={mode === 'today' ? 'Calories eaten today, kilocalories' : 'Usual daily estimate, kilocalories'} keyboardType="number-pad" underlineColorAndroid="transparent" selectTextOnFocus {...draft.selection('calories')} value={text} onChangeText={setText} editable={!saving} style={styles.input} />
       </View>
       {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
       <Pressable accessibilityRole="button" disabled={saving} style={styles.save} onPress={() => void save()}><Text style={styles.saveText}>{saving ? 'Saving…' : mode === 'select' ? 'Use my estimate' : 'Save'}</Text></Pressable>
       {mode === 'today' && state.estimate?.overridden ? <Pressable accessibilityRole="button" disabled={saving} style={styles.action} onPress={() => void save(true)}><Text style={styles.link}>Use my usual estimate</Text></Pressable> : null}
-      <Pressable accessibilityRole="button" disabled={saving} style={styles.action} onPress={onCancel}><Text style={styles.link}>Cancel</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={saving} style={styles.action} onPress={() => { draft.clear(); onCancel(); }}><Text style={styles.link}>Cancel</Text></Pressable>
       <View style={{ height: spacing.lg }} />
   </KeyboardSafeScrollView>;
 }

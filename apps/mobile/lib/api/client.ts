@@ -274,7 +274,7 @@ export function getApiNetworkDiagnostics(): ApiNetworkDiagnostics {
   return { ...apiNetworkDiagnostics, baseUrl: getApiBaseUrl() };
 }
 
-async function apiRequest(path: string, init?: RequestInit, timeoutMs = 20000) {
+export async function apiRequest(path: string, init?: RequestInit, timeoutMs = 20000) {
   const apiBaseUrl = getApiBaseUrl();
 
   if (!apiBaseUrl) {

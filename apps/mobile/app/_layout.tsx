@@ -1,3 +1,5 @@
+import { setDraftSession } from '@/lib/drafts/session-drafts';
+import { restorableNavigation, useSessionNavigation } from '@/lib/drafts/use-session-navigation';
 import { ClerkProvider, useAuth } from '@clerk/expo';
 import { tokenCache } from '@clerk/expo/token-cache';
 import * as Notifications from 'expo-notifications';
@@ -15,7 +17,8 @@ import { setNativeHealthAccountScope } from '@/lib/native-health';
 import { resetAccountLifecycle, refreshOnAppState } from '@/lib/lifecycle/account-lifecycle';
 import { setNotificationAccountScope, syncMorningBankUpdateDevice } from '@/lib/notifications/morning-bank-update';
 
-function AppStack() {
+function AppStack({ sessionReady = true }: { sessionReady?: boolean }) {
+  useSessionNavigation(sessionReady);
   return (
     <FontScaleProvider>
       <View style={{ flex: 1 }}>
@@ -48,6 +51,7 @@ function AuthenticatedAppStack() {
     ready: isLoaded && isSignedIn && Boolean(sessionId),
     activeSessionPresent: Boolean(sessionId),
   }, userId ?? null);
+  if (isLoaded) setDraftSession(isSignedIn ? userId ?? null : null, isSignedIn ? sessionId ?? null : null);
   setNativeHealthAccountScope(userId ?? null);
   setNotificationAccountScope(userId ?? null);
   useEffect(() => {
@@ -55,7 +59,8 @@ function AuthenticatedAppStack() {
     if (!isLoaded || !isSignedIn || !sessionId || !userId) return;
     void refreshOnAppState(AppState.currentState);
     void syncMorningBankUpdateDevice().catch(() => undefined);
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
+    // Do not replay a cached notification over a same-process restored editor.
+    if (!restorableNavigation()) void Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response?.notification.request.content.data.category === 'morning_bank_update') router.replace('/today');
     });
     const notificationResponse = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -69,7 +74,7 @@ function AuthenticatedAppStack() {
     });
     return () => { subscription.remove(); notificationResponse.remove(); };
   }, [isLoaded, isSignedIn, router, sessionId, userId]);
-  return <AppStack key={userId ?? 'signed-out'} />;
+  return <AppStack key={userId ?? 'signed-out'} sessionReady={Boolean(isLoaded && isSignedIn && sessionId && userId)} />;
 }
 
 export default function RootLayout() {
@@ -80,6 +85,7 @@ export default function RootLayout() {
     throw new Error('Beta and production builds require Clerk authentication and an HTTPS API URL.');
   }
   if (authMode !== 'clerk') {
+    setDraftSession('local-development', 'local-development');
     setNativeHealthAccountScope('local-development');
     setNotificationAccountScope('local-development');
     resetAccountLifecycle('local-development');

@@ -166,6 +166,7 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
   app.use(
     cors({
       origin: config.CORS_ORIGIN === '*' ? true : config.CORS_ORIGIN,
+      exposedHeaders: ['X-CB-Settings-Revision'],
     }),
   );
   app.use(express.json({ limit: '32kb' }));

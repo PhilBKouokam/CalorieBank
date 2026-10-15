@@ -1,3 +1,4 @@
+import { settingsOptions } from '../settings-concurrency/settings-concurrency';
 import { goalConfigurationInputSchema } from '@caloriebank/schemas';
 import { Router } from 'express';
 
@@ -12,10 +13,10 @@ export function createGoalConfigurationRouter(
 ) {
   const router = Router();
 
-  router.get('/', async (_req, res, next) => {
+  router.get('/', async (req, res, next) => {
     try {
       const user = resolveRequestUser(userSource, res);
-      const configuration = await repository.findByUserId(user.id);
+      const configuration = await repository.findByUserId(user.id, settingsOptions(req, res));
 
       if (!configuration) {
         throw new AppError('Goal configuration has not been configured.', 404);
@@ -36,7 +37,9 @@ export function createGoalConfigurationRouter(
         throw new AppError('Goal configuration is invalid.', 400, parsedInput.error.flatten());
       }
 
-      const existing = await repository.findByUserId(user.id);
+      const options = settingsOptions(req, res, true);
+      // Reject already-stale protected editors before existing historical preparation.
+      const existing = await repository.findByUserId(user.id, options);
       if (existing && beforeUpdate) {
         const preparation = await beforeUpdate(user);
         if (!preparation.ready) {
@@ -54,7 +57,7 @@ export function createGoalConfigurationRouter(
         }
       }
 
-      const configuration = await repository.upsertForUser(user, parsedInput.data);
+      const configuration = await repository.upsertForUser(user, parsedInput.data, options);
       res.json(configuration);
     } catch (error) {
       next(error);

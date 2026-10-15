@@ -1,3 +1,6 @@
+import { useSettingsConflict } from '@/lib/drafts/use-settings-conflict';
+import { SettingsConflictNotice } from '@/components/caloriebank/SettingsConflictNotice';
+import { useEditorDraft } from '@/lib/drafts/use-editor-draft';
 import { plannedTreatInputSchema, type PlannedTreatGetResponse } from '@caloriebank/schemas';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -12,12 +15,7 @@ import { Text } from '@/components/caloriebank/ScaleAwareText';
 
 import { PlaceholderScreen } from '@/components/caloriebank/PlaceholderScreen';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
-import {
-  createOrReplacePlannedTreat,
-  deletePlannedTreat,
-  fetchPlannedTreat,
-  updatePlannedTreat,
-} from '@/lib/api/client';
+import { fetchProtectedTreat, saveProtectedTreat, deleteProtectedTreat } from '@/lib/api/settings-concurrency';
 
 type FormStatus = 'loading' | 'idle' | 'saving' | 'deleting' | 'success' | 'error' | 'load_error';
 
@@ -30,8 +28,11 @@ function isActivePlannedTreat(
 export default function PlannedTreatScreen() {
   const router = useRouter();
   const [existingTreat, setExistingTreat] = useState<PlannedTreatGetResponse | null>(null);
-  const [name, setName] = useState('');
-  const [requiredCalories, setRequiredCalories] = useState('');
+  const draft = useEditorDraft('banking-goal', { name: '', requiredCalories: '' });
+  const conflict = useSettingsConflict(draft, fetchProtectedTreat);
+  const { name, requiredCalories } = draft.value;
+  const setName = (name: string) => draft.update(v => ({ ...v, name }));
+  const setRequiredCalories = (requiredCalories: string) => draft.update(v => ({ ...v, requiredCalories }));
   const [status, setStatus] = useState<FormStatus>('loading');
   const [message, setMessage] = useState('');
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -44,14 +45,16 @@ export default function PlannedTreatScreen() {
       setMessage('');
 
       try {
-        const plannedTreat = await fetchPlannedTreat();
+        const snapshot = await fetchProtectedTreat();
+        const plannedTreat = snapshot.value;
         if (!isMounted) return;
 
         setExistingTreat(plannedTreat);
 
-        if (isActivePlannedTreat(plannedTreat)) {
-          setName(plannedTreat.name);
-          setRequiredCalories(String(plannedTreat.requiredCalories));
+        if (!draft.hydrate(isActivePlannedTreat(plannedTreat)
+          ? { name: plannedTreat.name, requiredCalories: String(plannedTreat.requiredCalories) }
+          : { name: '', requiredCalories: '' }, snapshot.revision)) {
+          conflict.show(snapshot); setStatus('idle'); return;
         }
 
         setStatus('idle');
@@ -67,9 +70,12 @@ export default function PlannedTreatScreen() {
     return () => {
       isMounted = false;
     };
+  // A route mount/retry owns this fetch; editing a draft must not reload saved values.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadAttempt]);
 
   async function handleSave() {
+    if (conflict.latest) return;
     setMessage('');
 
     const parsedInput = plannedTreatInputSchema.safeParse({
@@ -84,37 +90,39 @@ export default function PlannedTreatScreen() {
       return;
     }
 
+    if (!draft.beginSave()) return;
     setStatus('saving');
 
     try {
-      if (isActivePlannedTreat(existingTreat)) {
-        await updatePlannedTreat(parsedInput.data);
-      } else {
-        await createOrReplacePlannedTreat(parsedInput.data);
-      }
+      await saveProtectedTreat(parsedInput.data, draft.revision);
 
+      draft.clear('saved');
       setStatus('success');
       setMessage('Banking Goal saved.');
-      setTimeout(() => router.replace('/today'), 400);
-    } catch {
+      setTimeout(() => { if (draft.isCurrent()) router.replace('/today'); }, 400);
+    } catch (error) {
+      if (await conflict.handle(error)) { setStatus('idle'); return; }
       setStatus('error');
       setMessage('Your Banking Goal could not be saved. Try again later.');
-    }
+    } finally { draft.endSave(); }
   }
 
   async function handleDelete() {
+    if (conflict.latest || !draft.beginSave()) return;
     setStatus('deleting');
     setMessage('');
 
     try {
-      await deletePlannedTreat();
+      await deleteProtectedTreat(draft.revision);
+      draft.clear('saved');
       setStatus('success');
       setMessage('Banking Goal removed.');
-      setTimeout(() => router.replace('/today'), 400);
-    } catch {
+      setTimeout(() => { if (draft.isCurrent()) router.replace('/today'); }, 400);
+    } catch (error) {
+      if (await conflict.handle(error)) { setStatus('idle'); return; }
       setStatus('error');
       setMessage('Your Banking Goal could not be removed. Try again later.');
-    }
+    } finally { draft.endSave(); }
   }
 
   const activeTreat = isActivePlannedTreat(existingTreat) ? existingTreat : null;
@@ -141,6 +149,7 @@ export default function PlannedTreatScreen() {
           </View>
         ) : (
           <View style={styles.form}>
+            {conflict.latest ? <SettingsConflictNotice latest={conflict.latest.value.status === 'no_plan' ? 'No Banking Goal' : `${conflict.latest.value.name}, ${conflict.latest.value.requiredCalories} kcal${conflict.latest.value.targetDate ? `, ${conflict.latest.value.targetDate}` : ''}`} onReview={() => { setExistingTreat(conflict.latest!.value); conflict.review(); }} /> : null}
             {activeTreat ? (
               <View style={styles.progressPanel}>
                 <Text style={styles.progressLabel}>
@@ -162,7 +171,7 @@ export default function PlannedTreatScreen() {
               placeholder="Cookies and milk"
               placeholderTextColor={colors.textMuted}
               style={styles.input}
-              value={name}
+              {...draft.selection('name')} value={name}
             />
 
             <Text style={styles.label}>Required calories</Text>
@@ -173,7 +182,7 @@ export default function PlannedTreatScreen() {
               placeholder="1500"
               placeholderTextColor={colors.textMuted}
               style={styles.input}
-              value={requiredCalories}
+              {...draft.selection('calories')} value={requiredCalories}
             />
 
             <Text style={styles.help}>
@@ -186,7 +195,7 @@ export default function PlannedTreatScreen() {
 
             <Pressable
               accessibilityRole="button"
-              disabled={isBusy}
+              disabled={isBusy || Boolean(conflict.latest)}
               onPress={() => void handleSave()}
               style={[styles.primaryButton, isBusy && styles.disabledButton]}
             >
@@ -200,7 +209,7 @@ export default function PlannedTreatScreen() {
             {activeTreat ? (
               <Pressable
                 accessibilityRole="button"
-                disabled={isBusy}
+                disabled={isBusy || Boolean(conflict.latest)}
                 onPress={() => void handleDelete()}
                 style={[styles.secondaryButton, isBusy && styles.disabledButton]}
               >

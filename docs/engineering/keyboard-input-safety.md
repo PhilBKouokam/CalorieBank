@@ -249,3 +249,18 @@ The next combined build must physically qualify on both phones: change text size
 while Today is mounted; return without restarting; check card and tab text; then
 repeat with an unsaved calorie edit and verify the same screen, value, result and
 reachable Save. Change back to normal and cancel the test draft.
+
+## October 15 Android recreation and shared draft correction
+
+The canonical inventory remains **nine TextInputs across seven input-owning files**.
+Eight non-destructive inputs use the shared memory-only draft mechanism (including
+both Step Planning inputs); account deletion confirmation is deliberately excluded.
+Daily Bank Target's settings/setup hosts share the same input component and store.
+
+See [Android font scale and session drafts](android-font-scale-draft-restoration.md)
+for the native feature flag, root-recreation tests, revision/account safeguards and
+Save/Cancel/Back cleanup. `KeyboardSafeScrollView` remains the only keyboard owner;
+this patch adds no offsets, padding workarounds, font limits or Activity suppression.
+Physical Android 200% geometry and keyboard qualification of the corrected binary
+remain pending. The prior iPhone build-15 physical pass is not proof for this shared
+JavaScript change.

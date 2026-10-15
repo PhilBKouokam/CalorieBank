@@ -1,9 +1,10 @@
+import type { TextInputProps } from 'react-native';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 
-export function DailyBankTargetInput({ value, onChange, disabled = false }: {
-  value: string; onChange: (value: string) => void; disabled?: boolean;
+export function DailyBankTargetInput({ value, onChange, disabled = false, selectionProps }: {
+  value: string; onChange: (value: string) => void; disabled?: boolean; selectionProps?: Pick<TextInputProps, 'selection' | 'onSelectionChange'>;
 }) {
   return <View style={styles.container}>
     <Text style={styles.title}>How much would you like to bank each day?</Text>
@@ -19,7 +20,7 @@ export function DailyBankTargetInput({ value, onChange, disabled = false }: {
     </View>
     <Text style={styles.label}>Daily Bank Target (kcal)</Text>
     <TextInput accessibilityLabel="Daily Bank Target in calories" editable={!disabled}
-      keyboardType="number-pad" maxLength={4} value={value}
+      keyboardType="number-pad" {...selectionProps} maxLength={4} value={value}
       onChangeText={(text) => onChange(text.replace(/\D/g, ''))} style={styles.input} />
     <Text style={styles.detail}>This is a flexible target, separate from your Fitness Goal. Choose 0 for no daily target. You can change it later.</Text>
   </View>;

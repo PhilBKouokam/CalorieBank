@@ -11,6 +11,10 @@ vi.mock('react-native', () => ({
   View: 'View', TextInput: 'TextInput', ActivityIndicator: 'ActivityIndicator',
   StyleSheet: { create: <T,>(x: T) => x },
 }));
+vi.mock('../../mobile/lib/api/settings-concurrency', () => ({
+  SettingsConflictError: class SettingsConflictError extends Error {},
+  fetchProtectedGoal: async () => ({ value: await api.fetch(), revision: '0' }), saveProtectedGoal: api.save,
+}));
 vi.mock('../../mobile/lib/api/client', () => ({ fetchGoalConfiguration: api.fetch, saveGoalConfiguration: api.save }));
 let view: ReactTestRenderer | undefined;
 beforeEach(() => {
