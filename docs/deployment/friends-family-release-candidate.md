@@ -239,3 +239,40 @@ Android EAS metadata confirms versionCode 14 source is `bca23fb2940a6779d2340041
 its compiled bundle contains ScaleAwareTabBar. It is affected shared source and
 remains undistributed. Physical launch, forecasting and live text qualification
 remain pending corrected artifacts; automated checks are not physical proof.
+
+### Corrected private artifacts — qualification in progress
+
+Correction source committed/pushed as
+`14f3e1ea59bd74fb1d4366436b0fda32e5c2fa29` with `[skip render]`.
+Exactly one replacement per platform was requested from that source:
+- iOS build 15: `b43f8223-fda5-4454-94e6-53d8b8865b35`.
+- Android versionCode 15: `3a4ead97-9f4a-4fbf-b6c8-38ceb8c484fd`.
+
+iOS finished, submission `3779a21a-02a0-4e0a-9846-6835e62f609f` succeeded,
+and App Store Connect build `c6d43264-a2ed-47a5-afd0-e2c29737d982` shows
+Testing with Friends & Family assigned. No public App Store submission.
+Founder physical evidence: build 15 opens on both initial launch and terminated
+relaunch. This resolves the observed iPhone launch failure; forecasting and live
+text qualification are separate and remain pending. Android 14 stays preserved
+and undistributed; replacement Android delivery remains in progress.
+
+Founder iPhone live-text evidence on build 15: unsaved draft preserved, text
+unclipped, same screen/tab retained, and Save reachable with keyboard open after
+changing system text size without restarting. The requested exercise covered
+calorie correction and usual-estimate editors; no saved intake changes were
+requested. These are founder-reported physical observations, not inferred from
+rendered tests. Physical Step Planning remains pending both devices' startup.
+
+Android versionCode 15 finished from the same correction source and was published
+only to Google Play Internal Testing, release 12, on October 14 at 22:27 CDT.
+Console shows Available to internal testers with one version code, 15 (1.0.0).
+The only console warning is the missing deobfuscation file; no supported-device
+loss was reported. Signed AAB SHA-256:
+`8ca861eb251a64563705302c71f477eef9503cdf9a8ee6b83cb1dc922827910f`.
+Preserved Android 14 SHA-256:
+`844d616f17eef784ba89dd75b7b3629e69579398fc93bec55fc30a69dbe1d88f`.
+VersionCode 14 was never uploaded. No public release, backend deployment,
+production migration, or manual accounting mutation was performed in this
+correction release. Android physical startup/accessibility and both devices'
+forecasting qualification remain pending; no physical success is inferred from
+artifact compilation or store availability.
