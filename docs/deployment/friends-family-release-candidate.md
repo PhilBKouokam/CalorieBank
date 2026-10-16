@@ -409,3 +409,49 @@ Android startup, installed permission verification, both-platform forecasting,
 production-binary accessibility and live settings-conflict qualification remain
 outstanding. Previous 1,106-test release gate remains the validated automation
 baseline; no implementation changed during release delivery.
+
+
+### Android observer correction delivery — October 16, in progress
+
+Correction commit `5adb3b496324e6efa62054fec0c3327dcebc800a` contains only
+Android keyboard registration/ownership/recovery, focused tests and keyboard
+safety documentation. Pushed to the existing private-beta-release branch.
+Root untracked `app.json` is excluded and retains SHA-256
+`b7c55adf9886178318b9a475422a1a361cb6a3211b82f774104c77e460a1ec88`.
+The unchanged full Node 20 gate remains 1,115 tests across 107 files plus eight
+native lifecycle tests; 14 focused keyboard tests passed again before delivery.
+
+One replacement Android AAB requested: EAS
+`5961590c-442a-4605-a3e6-94f9c14f5f6e`, play-testing profile, versionName 1.0.0,
+remote versionCode advanced from 16 to 17. EAS records exact correction commit.
+No iOS build, backend deployment or production migration requested.
+
+Read-only accounting snapshot at 2026-10-16T20:34:56.824Z, deployed API source
+`3ff8b90438bd4851de74d6d009d8f4fcb4a4d3db`: 10 accounts, zero inconsistencies.
+Canonical snapshot SHA-256
+`e177cd40bd993031e214e54eba31f7418266b2ce989bdb7c8441eff2dac5123f`.
+All initialization whole-row/state and Opening Bank fingerprints match the
+secured October 15 21:03:20.371Z baseline. Earlier ledger and calculation rows
+match exactly when filtering later-created records; earlier History matches
+exactly after reverting only later lock metadata in the comparison's memory.
+Later activity comprises four new finalized dates across three accounts
+(October 14/15), five ledger/calculation rows, and three October 13 locks.
+All current finalized expenditure adjustment rates remain 0.8. Derived balances
+and Recovery reconcile. No production records were changed by verification.
+
+Before update, ADB confirms com.caloriebank.mobile versionCode 16, versionName
+1.0.0, installer com.android.vending, and only READ_NUTRITION among Health Connect
+permissions. Replacement artifact/Play installation/physical checks remain pending.
+
+
+Android 17 completed successfully and was published to Google Play Internal
+Testing release 14 on October 16 at 15:58 America/Chicago. Play confirms
+Available to internal testers; tester configuration was not changed. No public
+track was used. AAB SHA-256:
+`bea8c2fcacb4a285e8aceb136c162322279218e4f99597602e220c2620ba39c8`.
+Compiled manifest matches build 16 for permissions and MainActivity configuration;
+only versionCode advances to 17. Health Connect READ_NUTRITION remains the sole
+health permission. Compiled DEX contains the corrected observer registry and
+font-scale flag implementation. Play reports zero supported-device losses and
+one missing-deobfuscation-file warning. Exact Play installation, production
+keyboard/draft/startup and representative-input qualification are still pending.
