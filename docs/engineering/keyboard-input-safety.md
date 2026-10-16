@@ -264,3 +264,88 @@ this patch adds no offsets, padding workarounds, font limits or Activity suppres
 Physical Android 200% geometry and keyboard qualification of the corrected binary
 remain pending. The prior iPhone build-15 physical pass is not proof for this shared
 JavaScript change.
+
+## October 16 — Android observer registration race
+
+Physical production-hierarchy diagnostic `9449639` reproduced build 16's exact
+582px obstruction in comparisons C (immediate editor data) and D (immediate
+session readiness). Native `watch` ran before Fabric could resolve the view,
+returned without an observer, and JS treated the void completion as registration.
+Later IME changes therefore generated no current-screen geometry measurement.
+A/B happened to register successfully; adding a loading delay is not a fix.
+
+The correction leaves `keyboardOverlap` and `focusedScrollTarget` unchanged.
+`KeyboardObserverRegistry` owns the target View, Activity, actual window
+ViewTreeObserver, attach listener and a screen-lifetime token. Registration returns
+`attached`, `pending` with a reason, or `error` with a reason. RN 0.81.5's specific
+missing-tag `IllegalViewOperationException` is temporary; unexpected resolver
+errors are logged and stop that registration rather than being called success.
+
+Recovery is event-driven, without timers or busy polling: a pending registration
+listens to the current Activity decor's global layout, and a resolved detached
+view also has an attachment listener. The decor listener lasts only for the
+registration lifetime, allowing replacement-view discovery. No event means no
+retry work. JS layout and foreground events can reattempt an idempotent watch,
+including an initially unavailable Activity. Successful attachment immediately
+emits geometry so an already-visible keyboard is measured.
+
+Ownership checks reject detached/wrong-window targets. Cleanup removes both the
+stored observer and current observer listeners (Android can merge a floating
+observer into a window observer), plus recovery and attachment listeners.
+Activity destruction clears destroyed-Activity registrations; module destruction
+clears all. An old lifetime cannot unwatch or measure a replacement lifetime.
+JS measurements additionally retain request-revision and mounted-lifetime checks.
+No account identity, input text or health data enters this native contract.
+
+Regressions cover pending resolution, attachment, replacement, duplicates,
+navigation cleanup, Activity replacement, explicit errors, initial measurement,
+layout-before-effect, stale responses and the unchanged 582px/310.4dp geometry.
+Native tests use Robolectric against Android API 33; these are lifecycle tests,
+not physical proof. Android-only registration code does not alter the iOS owner,
+shared draft store, route inventory, safe areas or consumer content.
+
+Release hold: corrected production binary remains unqualified until physical
+keyboard-open Save reachability, 200% layout and draft restoration pass on its
+exact installed artifact. A passing isolated diagnostic is not production proof.
+
+Automated validation for this correction: Node 20 release gate passed with 1,115
+Vitest tests across 107 files, including the iOS keyboard and shared draft suites.
+The initial-measurement regression was also run against the original component
+and failed as expected. Eight Robolectric lifecycle tests passed during isolated
+EAS build `3821ac3b-bd81-421b-b3d8-e4319a4bf255`; the corrected native module and
+native test sources compiled. Physical results follow separately below.
+
+
+### Corrected isolated diagnostic physical qualification — October 16
+
+Artifact `3821ac3b-bd81-421b-b3d8-e4319a4bf255`, diagnostic source
+`99ed21ad4ab2c1cb7964e09f47b5241ced8f54d4`, package
+`com.caloriebank.layoutdiagnostic` versionCode 2, Samsung SM-A136U / Android 13.
+Production CalorieBank versionCode 16 was not replaced.
+
+- A: normal to 200% font size recreated Activity (182736507 to 241923238)
+  and surface (1 to 11); the JS runtime survived. Founder confirmed unsaved
+  150 survived, no clipping, and input/calculation/Save reachable with keyboard.
+  Pending registration for tag 770 recovered to attached on the new view.
+- C (immediate editor data): missing-view pending registration recovered for
+  tag 1258. Founder confirmed Save reachable at 200% with keyboard open.
+- D (immediate session readiness): tag 1552 attached successfully; Save reachable.
+- In A/C/D, applied overlap was 310.4dp at density 1.875 = 582 physical pixels.
+  Scroll viewport changed from Y195–1510 to Y195–928, exactly keyboard top Y928.
+- Cancel after A discarded unsaved 150: subsequent editor showed saved 100.
+  Founder tapped Save once for 150 in D with keyboard open and reopening showed
+  saved 150. Physical evidence confirms the result; exactly-once semantics are
+  additionally covered by automated tests, not inferred from the displayed value.
+- Reopening after Save reproduced pending view lookup (tag 1684). Registration
+  remained pending while idle, then the keyboard layout event recovered it,
+  emitted initial geometry immediately, and applied the same 582px reduction.
+  Save remained reachable. This is event-driven recovery, not guaranteed immediate
+  attachment when no layout/attach event is delivered.
+- No callbacks after disposed-owner cleanup appeared in the captured A/C/D trace.
+  Request 4 after reopening was superseded by request 5; only current revision
+  drove the subsequent calculation. B was not repeated for this correction.
+
+Geometry-only captures are retained outside Git under `/tmp/cb-recovery-*-physical.log`.
+The production replacement artifact still requires its own physical qualification;
+this isolated result does not qualify installed CalorieBank build 16. No backend,
+production migrations, provider permissions or accounting data were changed.
