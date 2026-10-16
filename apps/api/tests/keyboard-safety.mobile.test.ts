@@ -7,6 +7,7 @@ vi.mock('expo', () => ({ requireNativeModule: () => ({ watch: vi.fn(), unwatch: 
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
 const api = vi.hoisted(() => ({ fetch: vi.fn(), save: vi.fn() }));
 vi.mock('react-native', () => ({
+  AppState: { addEventListener: () => ({ remove: vi.fn() }) },
   findNodeHandle: () => null, Platform: platform, useWindowDimensions: () => ({ width: 320, fontScale: 2 }), ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text',
   View: 'View', TextInput: 'TextInput', ActivityIndicator: 'ActivityIndicator',
   StyleSheet: { create: <T,>(x: T) => x },
