@@ -255,7 +255,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
           {adjustmentSource === 'manual_calories' ? (
             <>
               <Text style={styles.label}>Daily {goalMode === 'cut' ? 'deficit' : 'surplus'} calories</Text>
-              <TextInput
+              <TextInput underlineColorAndroid="transparent"
                 accessibilityLabel={`Daily ${goalMode === 'cut' ? 'deficit' : 'surplus'} calories`}
                 keyboardType="number-pad"
                 {...draft.selection('adjustment')}

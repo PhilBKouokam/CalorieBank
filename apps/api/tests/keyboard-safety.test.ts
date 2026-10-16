@@ -38,6 +38,25 @@ describe('permanent input surface inventory', () => {
     ]);
   });
 
+  it('suppresses the native Android underline on every custom-bordered input', () => {
+    // The audited nine-input inventory uses borders on the input or its frame.
+    // Keep this explicit prop consistent with the existing estimate/correction editors.
+    let checked = 0;
+    for (const path of sources) {
+      const visit = (node: ts.Node) => {
+        if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node.tagName.getText() === 'TextInput') {
+          checked++;
+          const prop = node.attributes.properties.find((attribute) => ts.isJsxAttribute(attribute) && attribute.name.getText() === 'underlineColorAndroid');
+          expect(prop && ts.isJsxAttribute(prop) && prop.initializer && ts.isStringLiteral(prop.initializer) ? prop.initializer.text : undefined,
+            `${relative(root, path)}:${parse(path).getLineAndCharacterOfPosition(node.getStart()).line + 1}`).toBe('transparent');
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(parse(path));
+    }
+    expect(checked).toBe(9);
+  });
+
   it('follows imported form components from every route and rejects inputs outside a keyboard-safe host', () => {
     function unsafeInputs(path: string, chain: string[] = []): string[] {
       if (chain.includes(path)) return [];

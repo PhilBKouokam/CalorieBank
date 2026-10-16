@@ -349,3 +349,29 @@ Geometry-only captures are retained outside Git under `/tmp/cb-recovery-*-physic
 The production replacement artifact still requires its own physical qualification;
 this isolated result does not qualify installed CalorieBank build 16. No backend,
 production migrations, provider permissions or accounting data were changed.
+
+## Android custom-border input underline invariant — October 16
+
+Every currently reachable app-owned TextInput uses a custom border, either on the
+input or its surrounding frame. Each must explicitly set
+`underlineColorAndroid="transparent"`, matching the existing calorie-correction
+and manual-estimate implementation. Keep the native component and existing props;
+a wrapper/refactor is unnecessary for this presentation-only setting.
+
+Audited inventory: Fitness Goal (1), Daily Bank Target (1), Banking Goal name and
+calories (2), Step Planning burn and steps (2), calorie correction (1), manual
+estimate (1, shared by usual estimate and today's manual intake), and deletion
+confirmation (1): nine inputs across seven files. Seven omissions in five files
+were corrected; correction/manual-estimate were already compliant. Deletion
+confirmation remains excluded from draft restoration. The input-inventory AST
+regression checks all nine inputs, including future inventory changes. No style,
+validation, keyboard ownership, selection, draft, Save/Cancel or accounting code
+changes accompany this setting.
+
+Build 17 physically passed keyboard reachability on calorie correction, Fitness
+Goal and Daily Bank Target. Its Daily Bank Target screenshot exposed the native
+underline, prompting this batch. Corrected appearance is not physically verified
+until a consolidated replacement artifact is approved and installed. Banking Goal
+and Step Planning representative keyboard checks, post-test accounting verification
+and outstanding Phase 2A forecasting qualification remain separate release checks.
+No underline-only build is authorized or created.

@@ -455,3 +455,90 @@ health permission. Compiled DEX contains the corrected observer registry and
 font-scale flag implementation. Play reports zero supported-device losses and
 one missing-deobfuscation-file warning. Exact Play installation, production
 keyboard/draft/startup and representative-input qualification are still pending.
+
+### Android 17 physical qualification — stopped on visual defect
+
+ADB verified com.caloriebank.mobile versionName 1.0.0 / versionCode 17,
+installer com.android.vending, updated October 16 16:04:42 device time.
+Installed JS bundle matches the released AAB exactly. Installed DEX contains the
+corrected observer registry; Play processing changes DEX packaging (seven files
+versus six in the AAB), so whole-DEX byte equality is not claimed. Installed
+Health Connect permission remains READ_NUTRITION only.
+
+Founder confirmed existing account restoration and Today, History, Settings and
+Health Connections without crash/navigation problems. On the designated test
+account, saved correction 100 was edited to unsaved 150, then text size changed
+from normal to 200%. Draft survived, text remained unclipped, and input,
+calculation and Save were reachable with keyboard open. ADB confirmed font_scale
+2.0 and CalorieBank foreground during that check. Android Back dismissed the
+keyboard; Cancel and reopen restored saved 100. Explicit Save once of 150 with
+the keyboard open reopened as 150. Removal returned Today to source calories with
+no adjustment label. No test correction was left behind. These user observations
+do not independently prove server mutation count or a post-test ledger snapshot.
+
+Fitness Goal and Daily Bank Target input/explanation/Save were reachable at 200%
+with keyboard open; founder cancelled without saving. Daily Bank Target screenshot
+then exposed a black native underline within the bordered input. Source inspection
+shows DailyBankTargetInput omits underlineColorAndroid="transparent", which is
+present in the corrected manual-estimate and calorie-correction inputs. No
+production source correction was made. This is a separate visual defect from
+keyboard reachability. Per founder failure policy, qualification is paused;
+Banking Goal and Step Planning representative checks remain outstanding. No
+replacement build or deployment was initiated. Post-test accounting verification
+and final full release verdict remain pending.
+
+### Final consolidated qualification checkpoint — October 16, 2026
+
+Founder authorized continuing functional qualification while the seven-input
+underline correction remains pending locally. On installed Play build 17 at 200%
+text, Banking Goal's two inputs, explanation and Save were reachable with the
+keyboard open; Cancel left saved settings unchanged. Both Step Planning inputs
+and calculations/results were reachable with the keyboard open; values were
+unchanged and the keyboard was dismissed. These are physical founder reports,
+not automated-only results.
+
+A new read-only production accounting capture at 2026-10-16T23:34:44.109Z compared
+with the pre-test capture at 2026-10-16T20:34:56.824Z. All ten account identities,
+whole initialization rows, accounting evidence and derived balances matched
+exactly; all consistency checks passed. No intervening finalized-day differences
+needed classification in this interval. Earlier date-scoped legitimate activity
+and the documented historical fingerprint limitation remain as previously
+recorded. Private snapshots remain outside Git. New capture canonical checksum:
+6a5f69e5cf204a9a6fca5af10681f861701ea2cdd7a1b58fbb3b96bdc3901ff4.
+
+The complete Node 20 release:friends-family gate passed with 1,116 tests across
+107 files, Prisma validation, local migration readiness, type checks, lint and
+builds. Lint retains one existing non-failing revision.current cleanup warning in
+AndroidKeyboardSafeScrollView. The pending application diff is seven explicit
+underlineColorAndroid="transparent" props across five files, with an AST inventory
+regression covering all nine inputs. Keyboard, draft and forecasting logic are
+unchanged. Root untracked app.json remains preserved and excluded.
+
+Remaining qualification: physical repeated-refresh forecast stability and
+provider evidence/freshness observations, both-card numerical coherence and
+midnight feasibility where natural conditions permit. Automated coverage is not
+physical proof of those scenarios. Corrected underline appearance requires the
+next approved Android binary. No build, distribution, backend deployment or
+production migration is authorized by this checkpoint; prepare the consolidated
+replacement for founder review only.
+
+### Consolidated Android release authorization — October 16, 2026
+
+Founder approved one replacement Android AAB and Internal Testing distribution.
+Exact-source Node 20 release gate passed again: 1,116 tests / 107 files, local
+migrations, Prisma, types, lint and API/domain/schema builds. The existing lint
+warning remains non-failing. Native observer source is unchanged from qualified
+build 17; replacement EAS native compilation and compiled permissions must also
+be checked before delivery. Remote EAS versionCode is 17; next build is 18.
+
+Additional physical Step Planning evidence on build 17: target 3,500 remained
+stable while observed burn progressed 2,982→2,988; later steps rose 21,245→21,259
+and remaining steps decreased 2,455→2,441, preserving total target 23,700.
+The 25,000-step card showed 3,741 remaining, source burn 4,490, adjusted burn
+3,590 and 39 minutes. At 18:44, no midnight warning was appropriate. A temporary
+100,000-step target showed 13h33m and the expected midnight infeasibility warning;
+founder restored 25,000. Subsequent burn 2,994→3,002 with unchanged 21,259 steps
+left 3,741 remaining. Identical-provider-evidence stability remains automated-only.
+Natural freshness expiry remains opportunistic physical evidence, explicitly not
+a private-distribution blocker with passing deterministic tests and no contrary
+evidence. No production data or clock was manipulated to force these conditions.

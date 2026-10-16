@@ -37,7 +37,7 @@ export default function DeleteAccountScreen() {
       <Text style={styles.title}>Delete your CalorieBank account?</Text>
       <Text style={styles.body}>This permanently removes your CalorieBank history, imported health data, goals, preferences, and connected services.{deletionHealthNote}</Text>
       <Text style={styles.label}>Type DELETE to confirm</Text>
-      <TextInput accessibilityLabel="Type DELETE to confirm" autoCapitalize="characters" autoCorrect={false} editable={status !== 'deleting'} onChangeText={setConfirmation} style={styles.input} value={confirmation} />
+      <TextInput underlineColorAndroid="transparent" accessibilityLabel="Type DELETE to confirm" autoCapitalize="characters" autoCorrect={false} editable={status !== 'deleting'} onChangeText={setConfirmation} style={styles.input} value={confirmation} />
       {status === 'failed' ? <Text accessibilityRole="alert" style={styles.error}>Deletion hasn’t finished yet. Please try again. If it already started, we’ll keep working to finish it safely.</Text> : null}
       <Pressable accessibilityRole="button" disabled={confirmation !== 'DELETE' || status === 'deleting'} onPress={() => void remove()} style={({ pressed }) => [styles.button, (confirmation !== 'DELETE' || status === 'deleting') && styles.disabled, pressed && styles.pressed]}>
         {status === 'deleting' ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.buttonText}>Delete Account</Text>}
