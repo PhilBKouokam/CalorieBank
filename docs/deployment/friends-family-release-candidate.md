@@ -370,3 +370,42 @@ The reconnection blocker is resolved. Private artifact preparation may resume;
 new-artifact physical startup, settings conflict UI, accessibility and forecasting
 qualification remain pending. Successful reconnect does not by itself prove the
 next eventual token refresh will succeed.
+
+Founder subsequently confirmed the designated account has no reconnect warning
+and Today displays updated Burned and Steps. Readiness returned HTTP 200 with
+database ready. Release evidence committed/pushed as
+`eafddab371ae3568d8cf53d5b75e11f07f2d7acd` (documentation-only after implementation
+commit 3ff8b90). Exactly one consolidated build per platform was accepted from
+that clean source archive:
+- iOS build 16: `b09b2d6e-bd89-4c81-9ce3-9849cfb7a63f`, profile testflight.
+- Android versionCode 16: `068e9a5d-96b3-4704-9913-1d1c64d2f9ac`, profile play-testing.
+The unrelated root app.json was preserved outside the upload and restored after
+both uploads. Store distribution and physical qualification remain pending.
+
+iOS build 16 completed successfully. EAS submission
+`40f6ef9f-1912-42ac-9ea6-60232d487aba` successfully uploaded the binary to Apple;
+Apple processing and Friends & Family assignment remain pending verification.
+Android build 16 remains in progress. Play Internal Testing release draft 13
+contains the prepared release notes but no uploaded artifact and is unpublished.
+Store UI continuation paused when the Mac locked; no replacement builds requested.
+
+Apple processing completed. Build 16 (`9959a70b-62ee-4a7a-be34-f2e5096c1721`)
+now shows Testing with Friends & Family assigned after the beta submission.
+No public App Store submission. Android build 16 finished successfully; AAB
+SHA-256 `5e7804ba47942b991b3c409396e78e09d6b3b94554f224095b3b32f64fb90ad1`.
+Compiled base manifest contains only `android.permission.health.READ_NUTRITION`
+in the Health Connect permission namespace. Play Internal upload is in progress.
+Physical qualification remains pending; no device success is inferred from builds.
+
+Founder reports iOS build 16 passed both launches, account/Today restoration and
+bottom-tab navigation with no crash. This is physical founder evidence only for
+startup/navigation; other qualification remains pending.
+
+Google Play Internal Testing release 13 now shows Available to internal testers:
+`1.0.0 (16) — Accessibility and Step Planning`. The review showed no supported-device
+loss and one warning about a missing deobfuscation file. VersionCode 15 is excluded
+from this replacement release. No public production rollout was performed.
+Android startup, installed permission verification, both-platform forecasting,
+production-binary accessibility and live settings-conflict qualification remain
+outstanding. Previous 1,106-test release gate remains the validated automation
+baseline; no implementation changed during release delivery.
