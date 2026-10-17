@@ -542,3 +542,36 @@ left 3,741 remaining. Identical-provider-evidence stability remains automated-on
 Natural freshness expiry remains opportunistic physical evidence, explicitly not
 a private-distribution blocker with passing deterministic tests and no contrary
 evidence. No production data or clock was manipulated to force these conditions.
+
+### Android 18 privately distributed — physical qualification pending
+
+Source commit: 2ad7662f1ac7c5bb82ea104c619f1dc3d27c5452.
+Exactly one Android AAB created: EAS 4dda47a8-f426-43b1-8175-1568011bdaf2,
+versionName 1.0.0 / versionCode 18, play-testing profile. EAS recorded that exact
+commit and completed successfully at 2026-10-17T00:22:59.643Z. Clean Expo prebuild,
+autolinking and native compilation completed (BUILD SUCCESSFUL in 21m15s), including
+keyboard module Kotlin/Java. Compiled manifest permissions and MainActivity match
+17; Health Connect READ_NUTRITION is the sole health permission. DEX retains the
+observer registry, recoverable registration and font-scale flag implementation.
+AAB SHA-256: 60ee11ac3785a38053526793566f30cddfe22e400a4431e887bd3fe44f35abb0.
+
+Google Play Internal Testing release 15, named “1.0.0 (18) — Phase 2A consolidated”,
+was published October 16 at 19:27 America/Chicago. Console confirms Available to
+internal testers, one version code. Existing testers were unchanged. No public
+track was used. Zero supported-device losses; existing missing-deobfuscation-file
+warning only. No iOS build, backend deployment or migration occurred.
+
+Read-only production baseline at 2026-10-17T00:00:04.409Z: ten accounts consistent,
+all initialization rows/accounting evidence/derived balances exactly unchanged
+from 2026-10-16T23:34:44.109Z. API remains 3ff8b90438bd4851de74d6d009d8f4fcb4a4d3db.
+Baseline canonical SHA-256:
+07444156e2f7f23e0cd6f8792fa42465d787a632435008e6e79068a96120378a.
+Private field-level evidence stays outside Git.
+
+Exact Play installation/ADB identity, cold startup, correction draft/keyboard at
+200%, underline appearance and representative Banking Goal/Step Planning checks
+on 18 are pending. Build 17 passing evidence is preserved but is not claimed as
+physical qualification of 18. Identical-evidence forecasting remains automated;
+natural expiry is opportunistic and not a distribution blocker per authorization.
+Root untracked app.json is unchanged and not committed (SHA-256
+b7c55adf9886178318b9a475422a1a361cb6a3211b82f774104c77e460a1ec88).
