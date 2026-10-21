@@ -21,17 +21,22 @@ export function structuredLog(level: 'info' | 'warn' | 'error', event: string, m
 
 export const requestLogger: RequestHandler = (req, res, next) => {
   const startedAt = process.hrtime.bigint();
-  const requestId = req.header('x-request-id')?.slice(0, 128) || randomUUID();
+  // Never copy arbitrary caller text into hosted diagnostics or response headers.
+  const requestId = randomUUID();
   res.locals.requestId = requestId;
   res.setHeader('x-request-id', requestId);
 
   res.on('finish', () => {
     const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    const route: unknown = req.route;
+    const path = route && typeof route === 'object' && 'path' in route && typeof route.path === 'string'
+      ? route.path : 'unmatched';
 
     structuredLog('info', 'request_completed', {
         requestId,
         method: req.method,
-        path: req.path,
+        // Server-registered template only: raw paths can contain health dates or IDs.
+        path,
         statusCode: res.statusCode,
         durationMs: Math.round(durationMs),
       });
