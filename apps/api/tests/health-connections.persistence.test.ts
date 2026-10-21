@@ -214,7 +214,7 @@ describe('selected provider disconnect guards', () => {
     const service = new GoogleHealthFitbitService(
       prisma,
       {} as TodayAggregateRepository,
-      { ...env, GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY: account.key },
+      { ...env, GOOGLE_HEALTH_CLIENT_ID: 'test', GOOGLE_HEALTH_CLIENT_SECRET: 'test', GOOGLE_HEALTH_REDIRECT_URI: 'https://example.com/callback', GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY: account.key },
       undefined,
       async () => { revokeCalls += 1; return new Response(null, { status: 200 }); },
     );
@@ -246,7 +246,7 @@ describe('selected provider disconnect guards', () => {
     const service = new GoogleHealthFitbitService(
       prisma,
       {} as TodayAggregateRepository,
-      { ...env, GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY: account.key },
+      { ...env, GOOGLE_HEALTH_CLIENT_ID: 'test', GOOGLE_HEALTH_CLIENT_SECRET: 'test', GOOGLE_HEALTH_REDIRECT_URI: 'https://example.com/callback', GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY: account.key },
       undefined,
       async () => new Response(null, { status: 200 }),
     );
