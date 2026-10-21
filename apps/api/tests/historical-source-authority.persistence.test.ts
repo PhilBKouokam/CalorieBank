@@ -5,7 +5,7 @@ import {
 } from '@caloriebank/domain';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PrismaBankHistoryRepository } from '../src/modules/bank-history/bank-history.repository';
 import { PrismaTodayAggregateRepository } from '../src/modules/today/today.repository';
@@ -72,10 +72,14 @@ async function seed(account: ReturnType<typeof user>, appleBurn = 3_500, fatSecr
 }
 
 describe('historical per-day source authority', () => {
-  afterEach(async () => prisma.user.deleteMany({ where: { id: { in: userIds.splice(0) } } }));
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await prisma.user.deleteMany({ where: { id: { in: userIds.splice(0) } } });
+  });
   afterAll(async () => prisma.$disconnect());
 
   it('switches burn and intake independently with append-only corrections and supports A to B to A', async () => {
+    const logs = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const account = user();
     await setup(account);
     await seed(account);
@@ -136,6 +140,22 @@ describe('historical per-day source authority', () => {
     });
     expect((await prisma.calorieLedgerTransaction.findMany({ where: { userId: account.id } })).map((item) => item.amountCalories))
       .toEqual([1_400, -400, 400, -400, -200, 400, 200]);
+
+    // Source changes must remain auditable in accounting without copying health
+    // values, dates, source choices or account identifiers into hosted logs.
+    const events: unknown[] = logs.mock.calls.map(([line]) => JSON.parse(String(line)) as unknown);
+    const historicalEvents = events.filter((event): event is { event: string } =>
+      typeof event === 'object' && event !== null && 'event' in event
+      && typeof event.event === 'string' && event.event.startsWith('historical_source_'));
+    expect(new Set(historicalEvents.map((event) => event.event))).toEqual(new Set([
+      'historical_source_options_resolved',
+      'historical_source_override_requested',
+      'historical_source_override_persisted',
+      'historical_source_authority_resolved',
+      'historical_source_reconciliation_result',
+      'historical_source_override_applied',
+    ]));
+    for (const event of historicalEvents) expect(Object.keys(event)).toEqual(['event']);
   });
 
   it('honors an override during later sync reconciliation and ignores nonselected updates', async () => {

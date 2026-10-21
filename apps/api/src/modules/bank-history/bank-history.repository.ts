@@ -1725,9 +1725,6 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       this.sourceOptionsInTransaction(transaction, userId, logDate));
     console.info(JSON.stringify({
       event: 'historical_source_options_resolved',
-      date: logDate,
-      expenditureOptionCount: sources.expenditure.options.length,
-      intakeOptionCount: sources.intake.options.length,
     }));
     return sources;
   }
@@ -1823,16 +1820,6 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       }
       console.info(JSON.stringify({
         event: 'historical_source_override_requested',
-        date: logDate,
-        role,
-        requestedProvider: candidate.provider,
-        currentOverrideProvider: (dbRole === 'EXPENDITURE' ? authority.expenditureOverride : authority.intakeOverride)?.provider ?? null,
-        globalProvider: dbRole === 'EXPENDITURE'
-          ? globalSelection.authoritativeExpenditureProvider
-          : globalSelection.authoritativeIntakeProvider,
-        currentEffectiveSnapshotProvider: dbRole === 'EXPENDITURE'
-          ? latestSnapshot?.expenditureProvider ?? null
-          : latestSnapshot?.intakeProvider ?? null,
       }));
       const currentOverride = dbRole === 'EXPENDITURE' ? authority.expenditureOverride : authority.intakeOverride;
       const currentRevision = currentOverride?.revision ?? 0;
@@ -1847,10 +1834,6 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       });
       console.info(JSON.stringify({
         event: 'historical_source_override_persisted',
-        date: logDate,
-        role,
-        persistedProvider: candidate.provider,
-        overrideDeletedOrUpserted: 'upserted',
       }));
       const resolved = await resolveDaySourceAuthority(transaction, user.id, date, record.timezone);
       const expenditure = resolved.selectedExpenditure?.record
@@ -1876,13 +1859,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       }
       console.info(JSON.stringify({
         event: 'historical_source_authority_resolved',
-        date: logDate,
-        expenditureProvider: expenditure.provider,
-        expenditureResolutionSource: resolved.expenditureOverride ? 'override' : 'global',
-        intakeProvider: intake.provider,
-        intakeResolutionSource: resolved.intakeOverride ? 'override' : 'global',
       }));
-      const oldEffectiveContribution = record.effectiveDailyBankChange;
       const result = await this.postOrReconcile(transaction, user, logDate, record.timezone, {
         importedTotalDailyExpenditure: expenditure.rawTotalDailyExpenditure,
         expenditureAdjustmentRate: record.expenditureAdjustmentRate.toNumber(),
@@ -1899,18 +1876,8 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         triggerSyncSessionId: expenditure.syncSessionId ?? intake.syncSessionId ?? null,
       }, this.now(), true);
       if (!result.detail) throw new AppError('The completed day could not be recalculated.', 409, { code: 'HISTORICAL_SOURCE_RECALCULATION_FAILED' });
-      const latestResultSnapshot = result.detail.versions.at(-1);
       console.info(JSON.stringify({
         event: 'historical_source_reconciliation_result',
-        date: logDate,
-        role,
-        oldEffectiveContribution,
-        recalculatedContribution: result.detail.effectiveDailyBankChange,
-        correctionDelta: result.detail.effectiveDailyBankChange - oldEffectiveContribution,
-        snapshotCreated: result.detail.versions.length > record.currentVersion,
-        snapshotProvider: dbRole === 'EXPENDITURE'
-          ? latestResultSnapshot?.expenditureProvider ?? null
-          : latestResultSnapshot?.intakeProvider ?? null,
       }));
       await transaction.historicalSourceOverrideRequest.create({
         data: { userId: user.id, idempotencyKey: input.idempotencyKey, localDate: date, role: dbRole, optionId: input.optionId },
@@ -1918,11 +1885,6 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       const sources = await this.sourceOptionsInTransaction(transaction, user.id, logDate);
       console.info(JSON.stringify({
         event: result.outcome === 'unchanged' ? 'historical_source_override_noop' : 'historical_source_override_applied',
-        date: logDate,
-        role,
-        provider: candidate.provider,
-        version: result.detail.versions.at(-1)?.version ?? null,
-        correctionDelta: result.detail.versions.at(-1)?.correctionDelta ?? 0,
       }));
       return { sources, day: result.detail };
     });
