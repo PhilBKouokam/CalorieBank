@@ -171,6 +171,10 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
   );
   app.use(express.json({ limit: '32kb' }));
   app.use(requestLogger);
+  // Exact public ownership proof; account routes retain their authentication boundary.
+  app.get('/google0aac822cbde53d15.html', (_req, res) => {
+    res.type('html').send('google-site-verification: google0aac822cbde53d15.html');
+  });
   app.use(authentication.verify);
   app.use(intakeCapabilityBoundary);
 
