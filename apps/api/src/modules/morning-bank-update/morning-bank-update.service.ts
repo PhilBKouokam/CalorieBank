@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { Prisma, type PrismaClient } from '@prisma/client';
 
 import type { BankHistoryRepository } from '../bank-history/bank-history.repository';
@@ -21,10 +20,6 @@ function parseLocalDate(localDate: string) {
   return new Date(`${localDate}T00:00:00.000Z`);
 }
 
-function safeAccountReference(userId: string) {
-  return createHash('sha256').update(userId).digest('hex').slice(0, 12);
-}
-
 export function localHour(timezone: string, now: Date) {
   const part = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
@@ -39,15 +34,8 @@ export function isMorningBankUpdateWindow(timezone: string, now: Date) {
   return Number.isInteger(hour) && hour >= MORNING_START_HOUR && hour < MORNING_END_HOUR;
 }
 
-export function morningBankUpdateCopy(availableBankCalories: number, contributionCalories: number) {
-  const title = `Available Bank: ${availableBankCalories.toLocaleString('en-US')} kcal${contributionCalories > 0 ? ' 🎉' : ''}`;
-  const magnitude = Math.abs(contributionCalories).toLocaleString('en-US');
-  const body = contributionCalories > 0
-    ? `You banked ${magnitude} kcal yesterday.`
-    : contributionCalories < 0
-      ? `You enjoyed ${magnitude} kcal yesterday.`
-      : 'You were right on target yesterday.';
-  return { title, body };
+export function morningBankUpdateCopy() {
+  return { title: 'CalorieBank', body: 'Your daily banking summary is ready.' };
 }
 
 type PushResult =
@@ -58,11 +46,18 @@ type PushResult =
 type ReceiptResult = { status: 'ok' | 'retryable_failure' | 'permanent_failure'; code?: string };
 
 export interface PushTransport {
-  send(input: { token: string; title: string; body: string; data: Record<string, string> }): Promise<PushResult>;
+  send(input: { token: string }): Promise<PushResult>;
   receipts(ticketIds: string[]): Promise<Map<string, ReceiptResult>>;
 }
 
 type ExpoPushTransportOptions = { accessToken?: string; fetchImpl?: typeof fetch };
+
+// Expo's documented categories are operational diagnostics; arbitrary provider
+// text may contain tokens or payload fragments and must not enter logs/storage.
+function expoFailureCategory(value: unknown, fallback: string): string {
+  const categories = ['DeviceNotRegistered', 'MessageTooBig', 'MessageRateExceeded', 'MismatchSenderId', 'InvalidCredentials'];
+  return typeof value === 'string' && categories.includes(value) ? value : fallback;
+}
 
 export class ExpoPushTransport implements PushTransport {
   private readonly fetchImpl: typeof fetch;
@@ -78,17 +73,24 @@ export class ExpoPushTransport implements PushTransport {
     };
   }
 
-  async send(input: { token: string; title: string; body: string; data: Record<string, string> }): Promise<PushResult> {
+  async send(input: { token: string }): Promise<PushResult> {
     try {
       const response = await this.fetchImpl('https://exp.host/--/api/v2/push/send', {
         method: 'POST', headers: this.headers(),
-        body: JSON.stringify({ to: input.token, title: input.title, body: input.body, data: input.data, sound: 'default' }),
+        // Construct the allowlisted envelope at the last external boundary. Never
+        // forward caller-provided text, identifiers, dates, health values or URLs.
+        body: JSON.stringify({
+          to: input.token,
+          ...morningBankUpdateCopy(),
+          data: { route: '/today', category: 'morning_bank_update' },
+          sound: 'default',
+        }),
       });
       if (response.status === 429 || response.status >= 500) return { status: 'retryable_failure', code: `expo_http_${response.status}` };
       if (!response.ok) return { status: 'permanent_failure', code: `expo_http_${response.status}` };
       const payload = await response.json() as { data?: { status?: string; id?: string; details?: { error?: string } } };
       if (payload.data?.status === 'ok' && payload.data.id) return { status: 'accepted', ticketId: payload.data.id };
-      const code = payload.data?.details?.error ?? 'expo_ticket_rejected';
+      const code = expoFailureCategory(payload.data?.details?.error, 'expo_ticket_rejected');
       return code === 'DeviceNotRegistered'
         ? { status: 'permanent_failure', code }
         : { status: 'retryable_failure', code };
@@ -111,7 +113,7 @@ export class ExpoPushTransport implements PushTransport {
         if (!receipt) continue;
         if (receipt.status === 'ok') results.set(ticketId, { status: 'ok' });
         else {
-          const code = receipt.details?.error ?? 'expo_receipt_failure';
+          const code = expoFailureCategory(receipt.details?.error, 'expo_receipt_failure');
           results.set(ticketId, {
             status: code === 'DeviceNotRegistered' ? 'permanent_failure' : 'retryable_failure', code,
           });
@@ -204,9 +206,8 @@ export class MorningBankUpdateService {
 
   async deliverForUser(userId: string, timezone: string) {
     const now = this.now();
-    const accountReference = safeAccountReference(userId);
     if (!isMorningBankUpdateWindow(timezone, now)) {
-      structuredLog('info', 'morning_bank_update_skipped', { accountReference, reason: 'outside_morning_window' });
+      structuredLog('info', 'morning_bank_update_skipped', { reason: 'outside_morning_window' });
       return { status: 'outside_window' as const };
     }
     const currentLocalDate = getLocalDateForTimezone(timezone, now);
@@ -224,40 +225,38 @@ export class MorningBankUpdateService {
       }),
     ]);
     if (!preference?.enabled) {
-      structuredLog('info', 'morning_bank_update_skipped', { accountReference, completedLocalDate, reason: 'preference_off' });
+      structuredLog('info', 'morning_bank_update_skipped', { reason: 'preference_off' });
       return { status: 'preference_off' as const };
     }
     if (!completedDay) {
-      structuredLog('info', 'morning_bank_update_skipped', { accountReference, completedLocalDate, reason: 'completed_accounting_unavailable' });
+      structuredLog('info', 'morning_bank_update_skipped', { reason: 'completed_accounting_unavailable' });
       return { status: 'not_eligible' as const };
     }
     if (existingDelivery?.status === 'DELIVERED' || existingDelivery?.status === 'PERMANENT_FAILURE' || existingDelivery?.status === 'ATTEMPTING') {
       return { status: 'already_handled' as const };
     }
-    structuredLog('info', 'morning_bank_update_eligible', { accountReference, completedLocalDate });
+    structuredLog('info', 'morning_bank_update_eligible');
     if (!device?.active) {
       await this.recordNoToken(userId, completedLocalDate);
-      structuredLog('info', 'morning_bank_update_skipped', { accountReference, completedLocalDate, reason: 'no_active_token' });
+      structuredLog('info', 'morning_bank_update_skipped', { reason: 'no_active_token' });
       return { status: 'no_token' as const };
     }
     const delivery = await this.claim(userId, completedLocalDate);
     if (!delivery) return { status: 'already_handled' as const };
-    const summary = await this.bankHistory.getSummary(userId);
+    // Preserve the existing summary/locking step, but never pass its values to push.
+    await this.bankHistory.getSummary(userId);
     const account = await this.db.user.findUnique({ where: { id: userId }, select: { deletionRequestedAt: true } });
     if (!account || account.deletionRequestedAt) return { status: 'not_eligible' as const };
-    const copy = morningBankUpdateCopy(summary.availableBankCalories, completedDay.effectiveDailyBankChange);
-    structuredLog('info', 'morning_bank_update_delivery_started', { accountReference, completedLocalDate, attempt: delivery.attemptCount });
+    structuredLog('info', 'morning_bank_update_delivery_started', { attempt: delivery.attemptCount });
     const result = await this.transport.send({
       token: device.expoPushToken,
-      ...copy,
-      data: { route: '/today', completedLocalDate, category: 'morning_bank_update' },
     });
     if (result.status === 'accepted') {
       await this.db.morningBankUpdateDelivery.update({
         where: { id: delivery.id },
         data: { status: 'DELIVERED', deliveredAt: now, expoTicketId: result.ticketId, failureCode: null },
       });
-      structuredLog('info', 'morning_bank_update_delivered', { accountReference, completedLocalDate });
+      structuredLog('info', 'morning_bank_update_delivered');
       return { status: 'delivered' as const };
     }
     if (result.status === 'permanent_failure') {
@@ -265,7 +264,7 @@ export class MorningBankUpdateService {
         this.db.morningBankUpdateDelivery.update({ where: { id: delivery.id }, data: { status: 'PERMANENT_FAILURE', failureCode: result.code } }),
         this.db.pushDeviceRegistration.update({ where: { userId }, data: { active: false, invalidatedAt: now } }),
       ]);
-      structuredLog('warn', 'morning_bank_update_token_invalidated', { accountReference, completedLocalDate, failureCategory: result.code });
+      structuredLog('warn', 'morning_bank_update_token_invalidated', { failureCategory: result.code });
       return { status: 'permanent_failure' as const };
     }
     await this.db.morningBankUpdateDelivery.update({
@@ -273,7 +272,7 @@ export class MorningBankUpdateService {
       data: { status: 'RETRYABLE_FAILURE', nextRetryAt: new Date(now.getTime() + RETRY_DELAY_MS), failureCode: result.code },
     });
     structuredLog('warn', delivery.attemptCount < MAX_ATTEMPTS ? 'morning_bank_update_retry_scheduled' : 'morning_bank_update_failed', {
-      accountReference, completedLocalDate, failureCategory: result.code, attempt: delivery.attemptCount,
+      failureCategory: result.code, attempt: delivery.attemptCount,
     });
     return { status: 'retryable_failure' as const };
   }
@@ -293,7 +292,7 @@ export class MorningBankUpdateService {
       if (receipt.status === 'permanent_failure') {
         await this.db.pushDeviceRegistration.updateMany({ where: { userId: delivery.userId }, data: { active: false, invalidatedAt: this.now() } });
         structuredLog('warn', 'morning_bank_update_token_invalidated', {
-          accountReference: safeAccountReference(delivery.userId), failureCategory: receipt.code ?? 'receipt_permanent_failure',
+          failureCategory: receipt.code ?? 'receipt_permanent_failure',
         });
       }
     }

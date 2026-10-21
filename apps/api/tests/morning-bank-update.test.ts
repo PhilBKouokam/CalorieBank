@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   isMorningBankUpdateWindow,
+  ExpoPushTransport,
   MorningBankUpdateService,
   morningBankUpdateCopy,
   type PushTransport,
@@ -15,6 +16,8 @@ function fixture(options: {
   token?: boolean;
   completed?: boolean;
   contribution?: number;
+  availableBank?: number;
+  transport?: PushTransport;
   send?: Awaited<ReturnType<PushTransport['send']>>;
 } = {}) {
   let delivery: Record<string, unknown> | null = null;
@@ -61,13 +64,13 @@ function fixture(options: {
       ? (operation as (transaction: typeof delegates) => Promise<unknown>)(delegates)
       : Promise.all(operation as Promise<unknown>[])),
   };
-  const transport: PushTransport = {
+  const transport: PushTransport = options.transport ?? {
     send: vi.fn(async () => options.send ?? { status: 'accepted' as const, ticketId: 'ticket-1' }),
     receipts: vi.fn(async () => new Map()),
   };
   const service = new MorningBankUpdateService(
     db as never,
-    { getSummary: vi.fn(async () => ({ availableBankCalories: 2843 })) } as never,
+    { getSummary: vi.fn(async () => ({ availableBankCalories: options.availableBank ?? 2843 })) } as never,
     transport,
     () => options.now ?? new Date('2026-09-05T13:15:00.000Z'),
   );
@@ -75,21 +78,9 @@ function fixture(options: {
 }
 
 describe('Morning Bank Update copy', () => {
-  it('puts Available Bank first for positive contributions', () => {
-    expect(morningBankUpdateCopy(2843, 547)).toEqual({
-      title: 'Available Bank: 2,843 kcal 🎉', body: 'You banked 547 kcal yesterday.',
-    });
-  });
-
-  it('uses enjoyed with an unsigned magnitude for negative contributions', () => {
-    expect(morningBankUpdateCopy(188, -83)).toEqual({
-      title: 'Available Bank: 188 kcal', body: 'You enjoyed 83 kcal yesterday.',
-    });
-  });
-
-  it('uses neutral copy for zero contributions', () => {
-    expect(morningBankUpdateCopy(2843, 0)).toEqual({
-      title: 'Available Bank: 2,843 kcal', body: 'You were right on target yesterday.',
+  it('keeps personal values inside the app', () => {
+    expect(morningBankUpdateCopy()).toEqual({
+      title: 'CalorieBank', body: 'Your daily banking summary is ready.',
     });
   });
 });
@@ -124,9 +115,7 @@ describe('Morning Bank Update eligibility and delivery', () => {
     expect(await service.deliverForUser(userId, 'America/Chicago')).toEqual({ status: 'delivered' });
     expect(await service.deliverForUser(userId, 'America/Chicago')).toEqual({ status: 'already_handled' });
     expect(transport.send).toHaveBeenCalledOnce();
-    expect(transport.send).toHaveBeenCalledWith(expect.objectContaining({
-      title: 'Available Bank: 2,843 kcal 🎉', body: 'You banked 547 kcal yesterday.',
-    }));
+    expect(transport.send).toHaveBeenCalledWith({ token: 'ExpoPushToken[test-token]' });
   });
 
   it('does not replace delivered state when the device is later removed', async () => {
@@ -181,5 +170,84 @@ describe('Morning Bank Update eligibility and delivery', () => {
     expect(db.pushDeviceRegistration.deleteMany).toHaveBeenCalledWith({
       where: { expoPushToken: 'ExpoPushToken[test-token]', userId: { not: '00000000-0000-4000-8000-000000000002' } },
     });
+  });
+});
+
+describe('remote notification privacy boundary', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function expo() {
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+      data: { status: 'ok', id: 'ticket-1' },
+    }), { status: 200 }));
+    // Vitest keeps one overload from the combined Node/DOM/native fetch types;
+    // this test boundary only handles the transport's string URL + RequestInit.
+    return { fetchImpl, transport: new ExpoPushTransport({ fetchImpl: fetchImpl as typeof fetch }) };
+  }
+
+  it.each([
+    { availableBank: 2843, contribution: 547 },
+    { availableBank: 188, contribution: -83 },
+    { availableBank: 0, contribution: -2468 },
+    { availableBank: 2843, contribution: 0 },
+    { availableBank: 987654, contribution: 12345 },
+  ])('sends the same generic envelope for $availableBank / $contribution', async (values) => {
+    const { transport, fetchImpl } = expo();
+    const logs = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const { service, getDelivery } = fixture({ ...values, transport });
+    expect(await service.deliverForUser(userId, 'America/Chicago')).toEqual({ status: 'delivered' });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(fetchImpl.mock.calls[0]?.[0]).toBe('https://exp.host/--/api/v2/push/send');
+    expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body))).toEqual({
+      to: 'ExpoPushToken[test-token]', title: 'CalorieBank',
+      body: 'Your daily banking summary is ready.',
+      data: { route: '/today', category: 'morning_bank_update' }, sound: 'default',
+    });
+    expect(getDelivery()).toMatchObject({ status: 'DELIVERED', attemptCount: 1 });
+    for (const [line] of logs.mock.calls) {
+      const event = JSON.parse(String(line)) as Record<string, unknown>;
+      expect(Object.keys(event).every(key => ['level', 'event', 'attempt'].includes(key))).toBe(true);
+    }
+  });
+
+  it('discards extra caller text, health metadata and deep-link query strings at the external boundary', async () => {
+    const { transport, fetchImpl } = expo();
+    const extraFields = {
+      token: 'ExpoPushToken[test-token]', title: 'Private 8765 kcal', body: 'Recovery 4321',
+      data: { route: '/today?bank=8765', completedLocalDate: '2026-09-04', provider: 'private-source', userId },
+      analytics: { calorieIntake: 5678 },
+    };
+    await transport.send(extraFields);
+    const body = String(fetchImpl.mock.calls[0]?.[1]?.body);
+    for (const privateValue of ['8765', '4321', '5678', '2026-09-04', 'private-source', userId, '?bank', 'analytics']) {
+      expect(body).not.toContain(privateValue);
+    }
+  });
+
+  it.each(['DeviceNotRegistered', 'MessageTooBig', 'MessageRateExceeded', 'MismatchSenderId', 'InvalidCredentials'])(
+    'preserves the documented operational category %s without forwarding error messages', async (code) => {
+      const fetchImpl = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+        data: { status: 'error', message: 'Private 8765 kcal ExpoPushToken[private]', details: { error: code } },
+      }), { status: 200 }));
+      expect(await new ExpoPushTransport({ fetchImpl: fetchImpl as typeof fetch }).send({ token: 'ExpoPushToken[test-token]' }))
+        .toEqual({ status: code === 'DeviceNotRegistered' ? 'permanent_failure' : 'retryable_failure', code });
+    },
+  );
+
+  it('reduces unknown send/receipt error content to fixed categories before persistence and logging', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async (url) => new Response(JSON.stringify({
+      data: String(url).endsWith('getReceipts')
+        ? { 'ticket-1': { status: 'error', details: { error: 'Private 8765 kcal ExpoPushToken[private]' } } }
+        : { status: 'error', details: { error: 'Private 8765 kcal ExpoPushToken[private]' } },
+    }), { status: 200 }));
+    const transport = new ExpoPushTransport({ fetchImpl: fetchImpl as typeof fetch });
+    const logs = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { service, getDelivery } = fixture({ transport });
+    expect(await service.deliverForUser(userId, 'America/Chicago')).toEqual({ status: 'retryable_failure' });
+    expect(getDelivery()).toMatchObject({ failureCode: 'expo_ticket_rejected' });
+    expect(await transport.receipts(['ticket-1'])).toEqual(new Map([
+      ['ticket-1', { status: 'retryable_failure', code: 'expo_receipt_failure' }],
+    ]));
+    expect(JSON.stringify(logs.mock.calls)).not.toMatch(/8765|ExpoPushToken|completedLocalDate|accountReference/);
   });
 });

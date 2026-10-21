@@ -1013,7 +1013,7 @@ The approved HealthKit historical scope is intentionally limited to three local 
 
 ## Notification Requirements
 
-The primary V1 notification is the Morning Bank Update implemented under ADR 024. It leads with Available Bank and follows with yesterday's banked, enjoyed, or right-on-target result. Emergency Bank, Recovery Forecast, Planned Treat, Banking Goal, and incomplete-day messages remain deferred and are not part of this concise delivery.
+The primary V1 notification is the Morning Bank Update implemented under ADR 024. The founder-approved October 21 privacy amendment uses generic remote copy: `CalorieBank` / `Your daily banking summary is ready.` Personalized values and yesterday's result remain inside the authenticated application; remote metadata contains only static Today routing/category, with no dates, calorie values or account/source identities. Timing, eligibility and preferences remain unchanged. Production rollout is separately qualified/approved. Emergency Bank, Recovery Forecast, Planned Treat, Banking Goal, and incomplete-day messages remain deferred and are not part of this concise delivery.
 
 Request notification permission only after explaining this value. Delivery is evaluated hourly from 07:00 through 11:59 in the user's local timezone, is durable and at most once per user/completed date from CalorieBank's sender, and never depends on current-day estimates.
 

@@ -930,7 +930,7 @@ Do not send a definitive balance notification for a day that lacks required data
 
 ## Morning Update
 
-The primary V1 notification is one meaningful Morning Bank Update governed by ADR 024. It uses the server's completed accounting and current consumer bank summary. The title always leads with `Available Bank: X kcal`; the body says the user `banked`, `enjoyed`, or was `right on target` yesterday. It is never generated from current-day estimates or an incomplete completed day.
+The primary V1 notification is one meaningful Morning Bank Update governed by ADR 024. The October 21 privacy amendment uses generic remote copy (`CalorieBank` / `Your daily banking summary is ready.`), with personalized values available only inside the authenticated app. Eligibility remains based on completed accounting, never current-day estimates or an incomplete completed day. Remote payloads exclude calorie values, health-derived results and dates; only the token and static Today routing are sent. Local implementation approval does not authorize production deployment.
 
 It communicates only Available Bank and yesterday's completed contribution. Emergency Bank, Recovery Forecast, Planned Treat, Banking Goal, provider detail, and incomplete-day messages remain separate future decisions.
 
