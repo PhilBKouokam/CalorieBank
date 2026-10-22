@@ -48,13 +48,13 @@ describe('Clerk identity provisioning', () => {
     const identityA = identity('a');
     const identityB = identity('b');
 
-    const userA = await resolveVerifiedClerkIdentity(prisma, config, identityA);
-    const userB = await resolveVerifiedClerkIdentity(prisma, config, identityB);
+    const userA = await resolveVerifiedClerkIdentity(prisma, config, identityA, async () => identityA);
+    const userB = await resolveVerifiedClerkIdentity(prisma, config, identityB, async () => identityB);
     createdUserIds.push(userA.id, userB.id);
 
     expect(userA.id).not.toBe(userB.id);
     expect(userB.id).not.toBe(config.DEV_USER_ID);
-    await expect(resolveVerifiedClerkIdentity(prisma, config, identityB)).resolves.toEqual(userB);
+    await expect(resolveVerifiedClerkIdentity(prisma, config, identityB, async () => identityB)).resolves.toEqual(userB);
 
     const [profileA, profileB, openingB] = await Promise.all([
       prisma.userProfile.findUniqueOrThrow({ where: { userId: userA.id } }),
@@ -71,7 +71,7 @@ describe('Clerk identity provisioning', () => {
     const config = clerkConfig();
     const unknown = identity('concurrent');
     const resolved = await Promise.all(
-      Array.from({ length: 4 }, () => resolveVerifiedClerkIdentity(prisma, config, unknown)),
+      Array.from({ length: 4 }, () => resolveVerifiedClerkIdentity(prisma, config, unknown, async () => unknown)),
     );
     createdUserIds.push(resolved[0]!.id);
     expect(new Set(resolved.map((user) => user.id)).size).toBe(1);
@@ -82,7 +82,7 @@ describe('Clerk identity provisioning', () => {
     const config = clerkConfig();
     const identityA = identity('route-a');
     const identityB = identity('route-b');
-    const userA = await resolveVerifiedClerkIdentity(prisma, config, identityA);
+    const userA = await resolveVerifiedClerkIdentity(prisma, config, identityA, async () => identityA);
     createdUserIds.push(userA.id);
 
     const boundary = createAuthenticationBoundary(config, prisma, async (request) => {
@@ -157,12 +157,12 @@ describe('Clerk identity provisioning', () => {
   it('provisions a separate user when a recreated Clerk subject uses an existing email', async () => {
     const config = clerkConfig();
     const original = identity('same-email');
-    const first = await resolveVerifiedClerkIdentity(prisma, config, original);
+    const first = await resolveVerifiedClerkIdentity(prisma, config, original, async () => original);
     createdUserIds.push(first.id);
     const recreated = { subject: `user_recreated_${randomUUID()}`, email: original.email };
     createdSubjects.push(recreated.subject);
 
-    const second = await resolveVerifiedClerkIdentity(prisma, config, recreated);
+    const second = await resolveVerifiedClerkIdentity(prisma, config, recreated, async () => recreated);
     createdUserIds.push(second.id);
     expect(second.id).not.toBe(first.id);
     await expect(prisma.user.count({ where: { email: original.email } })).resolves.toBe(2);

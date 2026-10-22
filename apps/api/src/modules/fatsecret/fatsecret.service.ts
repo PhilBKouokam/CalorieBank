@@ -163,6 +163,8 @@ export class FatSecretService {
       !attempt.encryptedRequestToken ||
       !attempt.encryptedRequestTokenSecret
     ) throw new AppError('FatSecret authorization is invalid or expired.', 400);
+    const owner = await this.db.user.findUnique({ where: { id: attempt.userId }, select: { id: true, email: true, deletionRequestedAt: true } });
+    if (!owner || owner.deletionRequestedAt) throw new AppError('This account is unavailable.', 400);
     const storedRequestToken = decryptProviderSecret(attempt.encryptedRequestToken, secrets.encryptionKey);
     if (storedRequestToken !== oauthToken) throw new AppError('FatSecret authorization token is invalid.', 400);
     const requestTokenSecret = decryptProviderSecret(attempt.encryptedRequestTokenSecret, secrets.encryptionKey);
@@ -178,8 +180,14 @@ export class FatSecretService {
     const response = await this.fetcher(url, { headers: { Accept: 'application/x-www-form-urlencoded' } });
     if (!response.ok) throw new AppError('FatSecret authorization could not be completed.', 502);
     const access = parseTokenResponse(await response.text());
-    await this.db.$transaction([
-      this.db.externalProviderConnection.upsert({
+    await this.db.$transaction(async tx => {
+      await requireExistingRequestAccount(tx, owner);
+      const consumed = await tx.externalProviderOAuthAttempt.updateMany({
+        where: { id: attempt.id, userId: owner.id, consumedAt: null, expiresAt: { gt: this.now() } },
+        data: { consumedAt: this.now() },
+      });
+      if (consumed.count !== 1) throw new AppError('Authorization is invalid or expired.', 400);
+      await tx.externalProviderConnection.upsert({
         where: { userId_provider: { userId: attempt.userId, provider: FATSECRET_PROVIDER_ID } },
         create: {
           userId: attempt.userId,
@@ -202,12 +210,8 @@ export class FatSecretService {
           lastErrorCode: null,
           connectedAt: this.now(),
         },
-      }),
-      this.db.externalProviderOAuthAttempt.update({
-        where: { id: attempt.id },
-        data: { consumedAt: this.now() },
-      }),
-    ]);
+      });
+    });
     return attempt.mobileRedirectUri;
   }
 

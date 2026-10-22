@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { createGoogleHealthActivityRequest } from './google-health-request';
-import { requireExistingRequestAccount } from '../../auth/existing-account';
+import { requireExistingRequestAccount, requireLiveAccount } from '../../auth/existing-account';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import {
   estimateRestingBurnFromLowActivityHours,
@@ -496,7 +496,7 @@ export class GoogleHealthFitbitService {
       if (!attempt || attempt.consumedAt || attempt.expiresAt <= this.now()) {
         throw new AppError('Google authorization state is invalid or expired.', 400);
       }
-      const owner = await this.db.user.findUnique({ where: { id: attempt.userId }, select: { deletionRequestedAt: true } });
+      const owner = await this.db.user.findUnique({ where: { id: attempt.userId }, select: { id: true, email: true, deletionRequestedAt: true } });
       if (!owner || owner.deletionRequestedAt) throw new AppError('This account is unavailable.', 400);
       stage = 'state_validated';
       this.logOAuthStage(stage);
@@ -511,6 +511,7 @@ export class GoogleHealthFitbitService {
         refreshTokenPresent: Boolean(token.refresh_token),
       });
 
+      await requireLiveAccount(this.db, attempt.userId);
       stage = 'identity_lookup_started';
       this.logOAuthStage(stage);
       const identity = await this.getIdentity(token.access_token);
@@ -545,8 +546,14 @@ export class GoogleHealthFitbitService {
 
       stage = 'connection_persist_started';
       this.logOAuthStage(stage);
-      await this.db.$transaction([
-        this.db.googleHealthConnection.upsert({
+      await this.db.$transaction(async tx => {
+        await requireExistingRequestAccount(tx, owner);
+        const consumed = await tx.googleHealthOAuthAttempt.updateMany({
+          where: { id: attempt.id, userId: owner.id, consumedAt: null, expiresAt: { gt: this.now() } },
+          data: { consumedAt: this.now() },
+        });
+        if (consumed.count !== 1) throw new AppError('Authorization is invalid or expired.', 400);
+        await tx.googleHealthConnection.upsert({
           where: { userId: attempt.userId },
           create: {
             userId: attempt.userId,
@@ -568,11 +575,9 @@ export class GoogleHealthFitbitService {
             scopes: token.scope?.split(' ').filter(Boolean) ?? [GOOGLE_HEALTH_ACTIVITY_READ_SCOPE],
             status: 'connected', lastErrorCode: null, connectedAt: this.now(),
           },
-        }),
-        this.db.googleHealthOAuthAttempt.update({
-          where: { id: attempt.id }, data: { consumedAt: this.now() },
-        }),
-      ]);
+        });
+
+      });
       this.logOAuthStage('connection_persist_success');
       this.logOAuthStage('mobile_redirect_started', { scheme: 'caloriebank' });
       return attempt.mobileRedirectUri;

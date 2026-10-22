@@ -10,6 +10,8 @@ import type { ApiEnv } from '../../apps/api/src/env';
 import { PrismaSyncSessionRepository } from '../../apps/api/src/modules/today/sync-session.repository';
 import { PrismaTodayAggregateRepository } from '../../apps/api/src/modules/today/today.repository';
 import { normalizeDailyExpenditureAggregate } from '@caloriebank/domain';
+import { GoogleHealthFitbitService } from '../../apps/api/src/modules/google-health/google-health.service';
+import { localDevelopmentApiEnv } from '../../apps/api/tests/support/test-api-env';
 
 const raw = process.env.TEST_DELETION_DATABASE_URL;
 assert(raw, 'TEST_DELETION_DATABASE_URL_REQUIRED');
@@ -59,7 +61,7 @@ test('completed deletion must reject a paused stale dashboard request instead of
     assert.deepEqual(identityDeleted, [oldSubject]);
     assert.equal(await db.user.findUnique({ where: { id: owner.id } }), null);
     assert.equal(await db.bankAccountInitialization.count({ where: { userId: owner.id } }), 0);
-    const replacement = await resolveVerifiedClerkIdentity(db, config, { subject: newSubject, email: owner.email });
+    const replacement = await resolveVerifiedClerkIdentity(db, config, { subject: newSubject, email: owner.email }, async () => ({ subject: newSubject, email: owner.email }));
     cleanupIds.push(replacement.id);
     assert.notEqual(replacement.id, owner.id);
     resume();
@@ -109,12 +111,12 @@ test('deletion intent rejects dashboard, sync-session and ingestion work without
   }
 });
 
-test('OPEN residual characterization: a captured verified subject can provision a new UUID after completed deletion', async () => {
+test('captured subject after completed deletion cannot provision when fresh identity authority rejects it', async () => {
   const identity = { subject: `synthetic-captured-${randomUUID()}`, email: `deletion-synthetic-${randomUUID()}@example.invalid` };
   const config = { AUTH_MODE: 'clerk', APP_ENV: 'beta' } as ApiEnv;
   const cleanupIds: string[] = [];
   try {
-    const original = await resolveVerifiedClerkIdentity(db, config, identity);
+    const original = await resolveVerifiedClerkIdentity(db, config, identity, async () => identity);
     cleanupIds.push(original.id);
     // Resolver-only characterization, not the complete production boundary:
     // production first checks the mapping, then fetches Clerk only if absent.
@@ -127,14 +129,190 @@ test('OPEN residual characterization: a captured verified subject can provision 
     assert.deepEqual(deletedSubjects, [identity.subject]);
     assert.equal(await db.user.findUnique({ where: { id: original.id } }), null);
     // Deliberately unchanged resolver: no re-verification/network/tombstone policy added.
-    const reprovisioned = await resolveVerifiedClerkIdentity(db, config, capturedIdentity);
-    cleanupIds.push(reprovisioned.id);
-    assert.notEqual(reprovisioned.id, original.id);
-    const row = await db.user.findUniqueOrThrow({ where: { id: reprovisioned.id } });
-    assert.equal(row.authSubject, identity.subject);
-    assert.equal(await db.bankAccountInitialization.count({ where: { userId: reprovisioned.id } }), 1);
-    console.info('OPEN RESIDUAL: a pre-deletion verified identity can provision a new internal User after completed deletion');
+    await assert.rejects(resolveVerifiedClerkIdentity(db, config, capturedIdentity, async () => null),
+      (error: unknown) => error !== null && typeof error === 'object' && 'statusCode' in error && error.statusCode === 401);
+    assert.equal(await db.user.count({ where: { authSubject: identity.subject } }), 0);
   } finally {
     await db.user.deleteMany({ where: { id: { in: cleanupIds } } }); await db.$disconnect();
   }
+});
+
+function barrier() {
+  let release!: () => void;
+  const promise = new Promise<void>(resolve => { release = resolve; });
+  return { promise, release };
+}
+
+test('deletion lock wins: two independent deleters and a captured identity cannot recreate after identity removal', async () => {
+  const identity = { subject: `synthetic-lock-${randomUUID()}`, email: `synthetic-${randomUUID()}@example.invalid` };
+  const config = { AUTH_MODE: 'clerk', APP_ENV: 'beta' } as ApiEnv;
+  const entered = barrier(), finish = barrier();
+  let exists = true, freshCalls = 0;
+  const owner = await resolveVerifiedClerkIdentity(db, config, identity, async () => identity);
+  const revoker = { revokeForAccountDeletion: async () => undefined };
+  const remove = async () => { entered.release(); await finish.promise; exists = false; };
+  try {
+    const deletionA = new AccountSafetyService(db, config, revoker, remove).deleteAccount(owner);
+    await entered.promise;
+    const deletionB = new AccountSafetyService(db, config, revoker, remove).deleteAccount(owner);
+    const stale = assert.rejects(resolveVerifiedClerkIdentity(db, config, identity, async () => { freshCalls++; return exists ? identity : null; }));
+    // The different subject must be independent of the held deletion lock.
+    const unrelated = { subject: `synthetic-other-${randomUUID()}`, email: identity.email };
+    const other = await resolveVerifiedClerkIdentity(db, config, unrelated, async () => unrelated);
+    await db.user.deleteMany({ where: { id: other.id } });
+    assert.equal(freshCalls, 0, 'fresh identity cannot run outside the held lock');
+    finish.release();
+    await Promise.all([deletionA, deletionB]);
+    await stale;
+    assert.equal(await db.user.count({ where: { authSubject: identity.subject } }), 0);
+    // Worker-style retry after completed deletion is an idempotent success.
+    await new AccountSafetyService(db, config, revoker, remove).deleteAccount(owner);
+  } finally { finish.release(); await db.user.deleteMany({ where: { authSubject: identity.subject } }); }
+});
+
+test('provisioning lock wins: deletion waits for fresh-check transaction; subsequent captured subject fails and new subject succeeds', async () => {
+  const identity = { subject: `synthetic-provision-${randomUUID()}`, email: `synthetic-${randomUUID()}@example.invalid` };
+  const config = { AUTH_MODE: 'clerk', APP_ENV: 'beta' } as ApiEnv;
+  const entered = barrier(), finish = barrier();
+  let exists = true;
+  const provisioning = resolveVerifiedClerkIdentity(db, config, identity, async () => { entered.release(); await finish.promise; return identity; });
+  await entered.promise;
+  const waiting = resolveVerifiedClerkIdentity(db, config, identity, async () => { throw new Error('must converge on existing mapping'); });
+  try {
+    finish.release();
+    const owner = await provisioning;
+    assert.deepEqual(await waiting, owner);
+    await new AccountSafetyService(db, config, { revokeForAccountDeletion: async () => undefined }, async () => { exists = false; }).deleteAccount(owner);
+    await assert.rejects(resolveVerifiedClerkIdentity(db, config, identity, async () => exists ? identity : null));
+    const newIdentity = { ...identity, subject: `synthetic-new-${randomUUID()}` };
+    const replacement = await resolveVerifiedClerkIdentity(db, config, newIdentity, async () => newIdentity);
+    assert.notEqual(replacement.id, owner.id);
+    assert.equal(await db.calorieLedgerTransaction.count({ where: { userId: replacement.id } }), 0);
+    assert.equal(await db.finalizedDailyBankRecord.count({ where: { userId: replacement.id } }), 0);
+    await db.user.deleteMany({ where: { id: replacement.id } });
+  } finally { finish.release(); await db.user.deleteMany({ where: { authSubject: identity.subject } }); }
+});
+
+test('interrupted local cascade retains intent after remote success; independent worker resumes on identity 404', async () => {
+  const identity = { subject: `synthetic-interrupted-${randomUUID()}`, email: `synthetic-${randomUUID()}@example.invalid` };
+  const config = { AUTH_MODE: 'clerk', APP_ENV: 'beta' } as ApiEnv;
+  const owner = await resolveVerifiedClerkIdentity(db, config, identity, async () => identity);
+  let exists = true;
+  const interrupted = new Proxy(db, { get(target, key) {
+    if (key !== '$transaction') return Reflect.get(target, key, target);
+    return (operation: (tx: unknown) => Promise<unknown>, options: object) => db.$transaction(tx => operation(new Proxy(tx, { get(transaction, name) {
+      if (name !== 'user') return Reflect.get(transaction, name, transaction);
+      return new Proxy(transaction.user, { get(delegate, method) {
+        if (method === 'deleteMany') return async () => { throw new Error('synthetic interrupted cascade'); };
+        return Reflect.get(delegate, method, delegate);
+      } });
+    } })), options);
+  } });
+  try {
+    await assert.rejects(new AccountSafetyService(interrupted, config, { revokeForAccountDeletion: async () => undefined }, async () => { exists = false; }).deleteAccount(owner));
+    assert.equal(exists, false);
+    assert((await db.user.findUniqueOrThrow({ where: { id: owner.id } })).deletionRequestedAt);
+    await assert.rejects(resolveVerifiedClerkIdentity(db, config, identity, async () => identity));
+    await new AccountSafetyService(db, config, { revokeForAccountDeletion: async () => undefined }, async () => { throw { status: 404 }; }).resumePendingDeletions();
+    assert.equal(await db.user.findUnique({ where: { id: owner.id } }), null);
+  } finally { await db.user.deleteMany({ where: { id: owner.id } }); }
+});
+
+test('fresh identity failure, mismatch and unavailable service never provision a captured subject', async () => {
+  const identity = { subject: `synthetic-fail-${randomUUID()}`, email: `synthetic-${randomUUID()}@example.invalid` };
+  const config = { AUTH_MODE: 'clerk', APP_ENV: 'beta' } as ApiEnv;
+  await assert.rejects(resolveVerifiedClerkIdentity(db, config, identity, async () => { throw { status: 404 }; }));
+  await assert.rejects(resolveVerifiedClerkIdentity(db, config, identity, async () => { throw { status: 503 }; }));
+  await assert.rejects(resolveVerifiedClerkIdentity(db, config, identity, async () => ({ ...identity, subject: 'wrong-subject' })));
+  assert.equal(await db.user.count({ where: { authSubject: identity.subject } }), 0);
+});
+
+for (const mode of ['intent', 'completed', 'consumed', 'expired'] as const) {
+  test(`callback response after deletion ${mode} cannot persist connection or restore account`, async () => {
+    const identity = { subject: `synthetic-callback-${randomUUID()}`, email: `synthetic-${randomUUID()}@example.invalid` };
+    const config = { ...localDevelopmentApiEnv(), AUTH_MODE: 'clerk' as const, APP_ENV: 'beta' as const,
+      GOOGLE_HEALTH_CLIENT_ID: 'synthetic', GOOGLE_HEALTH_CLIENT_SECRET: 'synthetic',
+      GOOGLE_HEALTH_REDIRECT_URI: 'https://example.invalid/callback',
+      GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 17).toString('base64') };
+    const owner = await resolveVerifiedClerkIdentity(db, config, identity, async () => identity);
+    const entered = barrier(), finish = barrier();
+    let requests = 0;
+    const service = new GoogleHealthFitbitService(db, {} as never, config, undefined, async () => {
+      requests++;
+      if (requests === 1) return Response.json({ access_token: 'synthetic', refresh_token: 'synthetic', expires_in: 3600 });
+      entered.release(); await finish.promise;
+      return Response.json({ healthUserId: 'synthetic-health-id' });
+    });
+    try {
+      const authorization = await service.createAuthorizationUrl(owner, 'caloriebank://integrations');
+      const state = new URL(authorization).searchParams.get('state'); assert(state);
+      const callback = assert.rejects(service.completeAuthorization('synthetic-code', state));
+      await entered.promise;
+      if (mode === 'intent') await db.user.update({ where: { id: owner.id }, data: { deletionRequestedAt: new Date() } });
+      else if (mode === 'completed') await new AccountSafetyService(db, config, { revokeForAccountDeletion: async () => undefined }, async () => undefined).deleteAccount(owner);
+      else await db.googleHealthOAuthAttempt.updateMany({ where: { userId: owner.id }, data: mode === 'consumed' ? { consumedAt: new Date() } : { expiresAt: new Date(0) } });
+      finish.release(); await callback;
+      assert.equal(await db.googleHealthConnection.count({ where: { userId: owner.id } }), 0);
+      assert.equal(await db.user.count({ where: { id: owner.id } }), mode === 'completed' ? 0 : 1);
+      assert.equal(await db.calorieLedgerTransaction.count({ where: { userId: owner.id } }), 0);
+    } finally { finish.release(); await db.user.deleteMany({ where: { id: owner.id } }); }
+  });
+}
+
+test('subject lock contention times out without provisioning and is retryable after lock release', async () => {
+  const identity = { subject: `synthetic-timeout-${randomUUID()}`, email: `synthetic-${randomUUID()}@example.invalid` };
+  const config = { AUTH_MODE: 'clerk', APP_ENV: 'beta' } as ApiEnv;
+  const entered = barrier(), finish = barrier();
+  let freshCalls = 0;
+  const lock = db.$transaction(async tx => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(1128417100, hashtext(${identity.subject}))::text`;
+    entered.release(); await finish.promise;
+  }, { timeout: 15_000 });
+  try {
+    await entered.promise;
+    await assert.rejects(resolveVerifiedClerkIdentity(db, config, identity, async () => { freshCalls++; return identity; }));
+    assert.equal(freshCalls, 0);
+    assert.equal(await db.user.count({ where: { authSubject: identity.subject } }), 0);
+    finish.release(); await lock;
+    const recovered = await resolveVerifiedClerkIdentity(db, config, identity, async () => identity);
+    await db.user.deleteMany({ where: { id: recovered.id } });
+  } finally { finish.release(); await lock; await db.user.deleteMany({ where: { authSubject: identity.subject } }); }
+});
+
+test('callback persistence wins: deletion revokes the committed connection then cascades it', async () => {
+  const identity = { subject: `synthetic-callback-wins-${randomUUID()}`, email: `synthetic-${randomUUID()}@example.invalid` };
+  const config = { ...localDevelopmentApiEnv(), AUTH_MODE: 'clerk' as const, APP_ENV: 'beta' as const,
+    GOOGLE_HEALTH_CLIENT_ID: 'synthetic', GOOGLE_HEALTH_CLIENT_SECRET: 'synthetic',
+    GOOGLE_HEALTH_REDIRECT_URI: 'https://example.invalid/callback', GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 17).toString('base64') };
+  const owner = await resolveVerifiedClerkIdentity(db, config, identity, async () => identity);
+  const entered = barrier(), finish = barrier();
+  const callbackDb = new Proxy(db, { get(target, key) {
+    if (key !== '$transaction') return Reflect.get(target, key, target);
+    return (operation: (tx: unknown) => Promise<unknown>) => db.$transaction(tx => operation(new Proxy(tx, { get(transaction, name) {
+      if (name !== 'googleHealthConnection') return Reflect.get(transaction, name, transaction);
+      return new Proxy(transaction.googleHealthConnection, { get(delegate, method) {
+        if (method === 'upsert') return async (...args: Parameters<typeof delegate.upsert>) => {
+          const result = await delegate.upsert(...args); entered.release(); await finish.promise; return result;
+        };
+        return Reflect.get(delegate, method, delegate);
+      } });
+    } })));
+  } });
+  let requests = 0, revokedConnectionCount = -1;
+  const service = new GoogleHealthFitbitService(callbackDb, {} as never, config, undefined, async () => ++requests === 1
+    ? Response.json({ access_token: 'synthetic', refresh_token: 'synthetic', expires_in: 3600 })
+    : Response.json({ healthUserId: 'synthetic-health-id' }));
+  try {
+    const state = new URL(await service.createAuthorizationUrl(owner, 'caloriebank://integrations')).searchParams.get('state'); assert(state);
+    const callback = service.completeAuthorization('synthetic', state);
+    await entered.promise;
+    const deletion = new AccountSafetyService(db, config, { revokeForAccountDeletion: async () => {
+      revokedConnectionCount = await db.googleHealthConnection.count({ where: { userId: owner.id } });
+    } }, async () => undefined).deleteAccount(owner);
+    finish.release(); await Promise.all([callback, deletion]);
+    assert.equal(revokedConnectionCount, 1, 'revocation must observe the callback connection committed before intent');
+    assert.equal(await db.user.count({ where: { id: owner.id } }), 0);
+    assert.equal(await db.googleHealthConnection.count({ where: { userId: owner.id } }), 0);
+    assert.equal(await db.googleHealthOAuthAttempt.count({ where: { userId: owner.id } }), 0);
+  } finally { finish.release(); await db.user.deleteMany({ where: { id: owner.id } }); }
 });

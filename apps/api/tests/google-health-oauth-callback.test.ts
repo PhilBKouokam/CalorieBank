@@ -52,8 +52,9 @@ function oauthDb(options: {
     }
     : null;
   const db = {
-    user: { updateMany: async () => ({ count: 1 }), findUnique: async () => ({ deletionRequestedAt: options.unavailableOwner ? new Date() : null }) },
+    user: { updateMany: async () => ({ count: 1 }), findUnique: async () => ({ id: 'owner', email: 'synthetic@example.invalid', deletionRequestedAt: options.unavailableOwner ? new Date() : null }) },
     googleHealthOAuthAttempt: {
+      updateMany: async () => { if (attempt) attempt.consumedAt = new Date(); return { count: 1 }; },
       create: async ({ data }: { data: Omit<StoredAttempt, 'id' | 'consumedAt'> }) => {
         attempt = { ...data, id: randomUUID(), consumedAt: null };
         return attempt;
@@ -75,7 +76,7 @@ function oauthDb(options: {
         return connection;
       },
     },
-    $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations),
+    $transaction: async (operations: Promise<unknown>[] | ((tx: unknown) => Promise<unknown>)) => typeof operations === 'function' ? operations(db) : Promise.all(operations),
   };
   return {
     db: db as unknown as PrismaClient,

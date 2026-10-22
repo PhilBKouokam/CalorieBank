@@ -9,7 +9,7 @@ import { localDevelopmentApiEnv } from './support/test-api-env';
 const user = { id: '10000000-0000-4000-8000-000000000001', email: 'safe@test.local' };
 
 function fakeDb(overrides: Record<string, unknown> = {}) {
-  return {
+  const db = {
     user: { findUnique: vi.fn().mockResolvedValue({ authSubject: 'clerk_subject' }), update: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
     pushDeviceRegistration: { updateMany: vi.fn().mockResolvedValue({}) },
     bankDayProcessingState: { count: vi.fn().mockResolvedValue(0) },
@@ -17,7 +17,9 @@ function fakeDb(overrides: Record<string, unknown> = {}) {
     dailyExpenditureAggregate: { count: vi.fn().mockResolvedValue(1) },
     dailyIntakeAggregate: { count: vi.fn().mockResolvedValue(1) },
     ...overrides,
-  } as unknown as PrismaClient;
+  };
+  Object.assign(db, { $queryRaw: vi.fn(), $transaction: async (operation: (tx: unknown) => Promise<unknown>) => operation(db) });
+  return db as unknown as PrismaClient;
 }
 
 describe('PB.2 account safety', () => {

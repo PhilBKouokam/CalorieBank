@@ -56,15 +56,17 @@ describe('durable deletion recovery', () => {
         findMany: vi.fn().mockResolvedValue([user]), deleteMany: vi.fn().mockRejectedValueOnce(new Error('db transient')).mockResolvedValue({ count: 1 }) },
       pushDeviceRegistration: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     };
+    Object.assign(db, { $queryRaw: vi.fn(), $transaction: async (operation: (tx: unknown) => Promise<unknown>) => operation(db) });
     const service = new AccountSafetyService(db as never, localDevelopmentApiEnv(), provider, identity);
     await service.resumePendingDeletions();
     expect(db.user.update).toHaveBeenCalledWith(expect.objectContaining({ data: { deletionRequestedAt: expect.any(Date) } }));
     expect(db.pushDeviceRegistration.updateMany).toHaveBeenCalledWith({ where: { userId: user.id }, data: { active: false } });
     expect(db.user.deleteMany).toHaveBeenCalledTimes(2);
-    expect(identity).toHaveBeenCalledTimes(1);
+    expect(identity).toHaveBeenCalledTimes(2);
   });
   it('keeps durable intent and does not cascade when Clerk rejects deletion', async () => {
     const db = { user: { findUnique: vi.fn().mockResolvedValue({ authSubject: 'present' }), update: vi.fn(), deleteMany: vi.fn() }, pushDeviceRegistration: { updateMany: vi.fn() } };
+    Object.assign(db, { $queryRaw: vi.fn(), $transaction: async (operation: (tx: unknown) => Promise<unknown>) => operation(db) });
     const service = new AccountSafetyService(db as never, localDevelopmentApiEnv(), { revokeForAccountDeletion: vi.fn() }, async () => { throw { status: 403 }; });
     await expect(service.deleteAccount(user)).rejects.toMatchObject({ statusCode: 502 });
     expect(db.user.update).toHaveBeenCalled(); expect(db.user.deleteMany).not.toHaveBeenCalled();

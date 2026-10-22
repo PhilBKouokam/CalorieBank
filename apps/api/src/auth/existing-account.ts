@@ -11,3 +11,10 @@ export async function requireExistingRequestAccount(db: Pick<Prisma.TransactionC
   const result = await db.user.updateMany({ where: { id: user.id, deletionRequestedAt: null }, data: { email: user.email } });
   if (result.count !== 1) throw new AppError('This account is unavailable.', 409, { code: 'ACCOUNT_UNAVAILABLE' });
 }
+
+/** Recheck at asynchronous work boundaries; this does not cancel remote work already in flight. */
+export async function requireLiveAccount(db: Pick<Prisma.TransactionClient, 'user'>, userId: string) {
+  const owner = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true, deletionRequestedAt: true } });
+  if (!owner || owner.deletionRequestedAt) throw new AppError('This account is unavailable.', 409, { code: 'ACCOUNT_UNAVAILABLE' });
+  return owner;
+}

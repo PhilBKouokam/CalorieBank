@@ -1,3 +1,4 @@
+import { requireLiveAccount } from '../../auth/existing-account';
 import { intakeRefreshPlan, lockIntakeAuthority } from '../provider-selection/intake-authority';
 import { requireIntakeCapability } from '../../security/intake-capability';
 import { Prisma, type PrismaClient } from '@prisma/client';
@@ -109,6 +110,7 @@ export class AccountLifecycleCoordinator {
   }
 
   async runUser(user: DevelopmentUser, timezone: string, trigger: 'scheduled' | 'app_foreground' | 'manual_refresh') {
+    await requireLiveAccount(this.db, user.id);
     const startedAt = this.now();
     const currentLocalDate = getLocalDateForTimezone(timezone, startedAt);
     const accountingStartsOn = await this.bankHistory.getAccountingStartDate(user.id);
@@ -172,6 +174,7 @@ export class AccountLifecycleCoordinator {
       this.log('provider_refresh_started', { userSuffix: user.id.slice(-8), provider, trigger });
       try {
         await this.withRetry(provider, async (attempt) => {
+          await requireLiveAccount(this.db, user.id);
           if (provider === 'google_health_fitbit') {
             const result = await this.fitbit.syncRollingWindow(user, currentLocalDate, timezone, needsOpeningImport || attempt > 0 || trigger !== 'scheduled', dayCount, trigger);
             if (result.retryableFailure) throw new AppError('Fitbit burn refresh was incomplete.', 502);
@@ -190,6 +193,7 @@ export class AccountLifecycleCoordinator {
       }
     }
 
+    await requireLiveAccount(this.db, user.id);
     const orchestration = await this.finalization.execute({
       user,
       currentLocalDate,

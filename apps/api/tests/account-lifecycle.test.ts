@@ -93,6 +93,7 @@ describe('account lifecycle coordinator', () => {
     const fatSecret = { syncRollingWindow: vi.fn().mockResolvedValue({}) };
     const finalization = { execute: vi.fn().mockResolvedValue({ datesReconciled: [], datesLocked: [], waitingDates: [], errors: [] }) };
     const db = {
+      user: { findUnique: vi.fn().mockResolvedValue({ id: 'synthetic', email: 'synthetic@example.invalid', deletionRequestedAt: null }) },
       intakeAuthorityBoundary: { findMany: vi.fn().mockResolvedValue([]), findFirst: vi.fn().mockResolvedValue(null) },
       bankCalculationSnapshot: { findMany: vi.fn().mockResolvedValue([]) },
       bankAccountInitialization: { findUnique: vi.fn().mockResolvedValue(options.openingIncomplete ? { status: 'WAITING_FOR_OPENING_DATA' } : null) },
@@ -124,6 +125,14 @@ describe('account lifecycle coordinator', () => {
     );
     return { coordinator, db, fitbit, fatSecret, finalization };
   }
+
+  it.each([null, { deletionRequestedAt: new Date() }])('stops work selected before deletion when the owner is now unavailable', async owner => {
+    const f = fixture(); f.db.user.findUnique.mockResolvedValue(owner as never);
+    await expect(f.coordinator.runUser({ id: 'synthetic', email: 'synthetic@example.invalid' }, 'UTC', 'scheduled'))
+      .rejects.toMatchObject({ statusCode: 409, details: { code: 'ACCOUNT_UNAVAILABLE' } });
+    expect(f.fitbit.syncRollingWindow).not.toHaveBeenCalled(); expect(f.fatSecret.syncRollingWindow).not.toHaveBeenCalled();
+    expect(f.finalization.execute).not.toHaveBeenCalled();
+  });
 
   it.each([
     ['P2002', 'P2002'], ['P2028', 'P2028'], ['P2034', 'P2034'],

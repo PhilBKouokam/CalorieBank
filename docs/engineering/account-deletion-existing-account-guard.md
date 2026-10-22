@@ -1,5 +1,8 @@
 # Existing-account repository guard — local correction
 
+Historical Phase 4J checkpoint. The subsequent local Phase 4K correction and
+qualification are recorded in [account-deletion-identity-serialization.md](account-deletion-identity-serialization.md).
+
 October 21, 2026. Local-only follow-up to reproduction `f9f35e8`, based on deployed
 `25ce192`. No production service/database, provider, Clerk account or deployment
 branch was changed. This closes the reproduced repository path, not every possible

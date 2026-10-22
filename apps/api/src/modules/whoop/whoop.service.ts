@@ -117,6 +117,8 @@ export class WhoopService {
     if (!attempt || attempt.provider !== WHOOP_PROVIDER_ID || attempt.consumedAt || attempt.expiresAt <= this.now()) {
       throw new AppError('WHOOP authorization state is invalid or expired.', 400);
     }
+    const owner = await this.db.user.findUnique({ where: { id: attempt.userId }, select: { id: true, email: true, deletionRequestedAt: true } });
+    if (!owner || owner.deletionRequestedAt) throw new AppError('This account is unavailable.', 400);
     const token = await this.tokenRequest(new URLSearchParams({
       grant_type: 'authorization_code',
       code,
@@ -132,8 +134,14 @@ export class WhoopService {
     const encryptedRefreshToken = token.refresh_token
       ? encryptProviderSecret(token.refresh_token, secrets.encryptionKey)
       : existing!.encryptedRefreshToken;
-    await this.db.$transaction([
-      this.db.externalProviderConnection.upsert({
+    await this.db.$transaction(async tx => {
+      await requireExistingRequestAccount(tx, owner);
+      const consumed = await tx.externalProviderOAuthAttempt.updateMany({
+        where: { id: attempt.id, userId: owner.id, consumedAt: null, expiresAt: { gt: this.now() } },
+        data: { consumedAt: this.now() },
+      });
+      if (consumed.count !== 1) throw new AppError('Authorization is invalid or expired.', 400);
+      await tx.externalProviderConnection.upsert({
         where: { userId_provider: { userId: attempt.userId, provider: WHOOP_PROVIDER_ID } },
         create: {
           userId: attempt.userId,
@@ -158,12 +166,8 @@ export class WhoopService {
           lastErrorCode: null,
           connectedAt: this.now(),
         },
-      }),
-      this.db.externalProviderOAuthAttempt.update({
-        where: { id: attempt.id },
-        data: { consumedAt: this.now() },
-      }),
-    ]);
+      });
+    });
     return attempt.mobileRedirectUri;
   }
 

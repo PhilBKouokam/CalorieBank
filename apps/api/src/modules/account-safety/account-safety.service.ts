@@ -4,6 +4,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 
 import type { ApiEnv } from '../../env';
 import { AppError } from '../../errors';
+import { boundedIdentityOperation, withAccountLifecycleLock } from '../../auth/account-lifecycle-lock';
 import { structuredLog } from '../../logger';
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
 import { remoteStatus, retryDeletionOperation } from './deletion-retry';
@@ -61,30 +62,33 @@ export class AccountSafetyService {
       throw error;
     }
 
-    if (stored.authSubject) {
-      try {
-        await retryDeletionOperation(async () => {
-          try { await this.deleteIdentity(stored.authSubject!); }
-          catch (error) { if (remoteStatus(error) !== 404) throw error; }
-        }, (error) => remoteStatus(error) === undefined || remoteStatus(error) === 429 || (remoteStatus(error) ?? 0) >= 500);
-      } catch {
-        structuredLog('error', 'account_deletion_failed', {
-          accountReference: safeUserReference(user.id), phase: 'identity_deletion',
-        });
-        throw new AppError('Account deletion could not be completed. Try again.', 502, {
-          code: 'IDENTITY_DELETION_FAILED',
-        });
-      }
-    }
-
+    // Intent is durable outside this transaction. If a remote deletion succeeds
+    // and the DB transaction aborts, the next worker attempt sees the same intent.
     try {
       await retryDeletionOperation(async () => {
-        // deleteMany is idempotent when another retry already finished the cascade.
-        await this.db.user.deleteMany({ where: { id: user.id } });
-      }, () => true);
+        const finish = async (tx: Prisma.TransactionClient) => {
+          const current = await tx.user.findUnique({ where: { id: user.id }, select: { authSubject: true } });
+          if (!current) return;
+          if (current.authSubject) {
+            try {
+              await boundedIdentityOperation(signal => retryDeletionOperation(async () => {
+                if (signal.aborted) throw new AppError('Account service is temporarily unavailable.', 503);
+                try { await this.deleteIdentity(current.authSubject!); }
+                catch (error) { if (remoteStatus(error) !== 404) throw error; }
+              }, error => !signal.aborted && (remoteStatus(error) === undefined || remoteStatus(error) === 429 || (remoteStatus(error) ?? 0) >= 500)));
+            } catch {
+              throw new AppError('Account deletion could not be completed. Try again.', 502, { code: 'IDENTITY_DELETION_FAILED' });
+            }
+          }
+          await tx.user.deleteMany({ where: { id: user.id } });
+        };
+        if (stored.authSubject) await withAccountLifecycleLock(this.db, stored.authSubject, finish);
+        else await this.db.$transaction(finish);
+      }, error => !(error instanceof AppError));
     } catch (error) {
       structuredLog('error', 'account_deletion_failed', {
-        accountReference: safeUserReference(user.id), phase: 'caloriebank_data_deletion',
+        accountReference: safeUserReference(user.id),
+        phase: error instanceof AppError ? 'identity_deletion' : 'caloriebank_data_deletion',
       });
       throw error;
     }

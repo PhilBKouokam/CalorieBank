@@ -1,11 +1,12 @@
 import { clerkMiddleware, createClerkClient, getAuth } from '@clerk/express';
-import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
 import type { ApiEnv } from '../env';
 import { AppError } from '../errors';
+import { boundedIdentityOperation, withAccountLifecycleLock } from './account-lifecycle-lock';
+import { remoteStatus } from '../modules/account-safety/deletion-retry';
 import type { DevelopmentUser } from '../modules/goal-configuration/goal-configuration.repository';
 
 declare global {
@@ -145,43 +146,29 @@ export async function resolveVerifiedClerkIdentity(
   db: PrismaClient,
   config: ApiEnv,
   identity: VerifiedIdentity,
+  refreshIdentity: (subject: string) => Promise<VerifiedIdentity | null>,
 ): Promise<DevelopmentUser> {
-  const mapped = await db.user.findUnique({ where: { authSubject: identity.subject } });
-  if (mapped) {
-    if (mapped.authProvider !== 'clerk') {
-      throw authError('Authenticated identity is linked to an unsupported provider.', 409, 'UNSUPPORTED_AUTH_PROVIDER');
+  return withAccountLifecycleLock(db, identity.subject, async tx => {
+    const mapped = await tx.user.findUnique({ where: { authSubject: identity.subject } });
+    if (mapped) {
+      if (mapped.deletionRequestedAt) throw authError('This account is unavailable.', 409, 'ACCOUNT_UNAVAILABLE');
+      if (mapped.authProvider !== 'clerk') throw authError('Authenticated identity is linked to an unsupported provider.', 409, 'UNSUPPORTED_AUTH_PROVIDER');
+      const user = { id: mapped.id, email: mapped.email };
+      logIdentityResolution(config, identity, user, 'existing');
+      return user;
     }
-    const user = { id: mapped.id, email: mapped.email };
-    logIdentityResolution(config, identity, user, 'existing');
-    return user;
-  }
-
-  try {
-    const created = await db.user.create({
-      data: {
-        email: identity.email,
-        authProvider: 'clerk',
-        authSubject: identity.subject,
-        profile: { create: {} },
-        bankAccountInitialization: { create: {} },
-      },
-    });
+    // A captured verified identity is insufficient to create: revalidate while
+    // sharing deletion's lock, so a completed identity deletion cannot be bypassed.
+    const fresh = await boundedIdentityOperation(() => refreshIdentity(identity.subject));
+    if (!fresh || fresh.subject !== identity.subject) throw authError('Authentication is required.', 401, 'AUTHENTICATION_REQUIRED');
+    const created = await tx.user.create({ data: {
+      email: fresh.email, authProvider: 'clerk', authSubject: identity.subject,
+      profile: { create: {} }, bankAccountInitialization: { create: {} },
+    } });
     const user = { id: created.id, email: created.email };
-    logIdentityResolution(config, identity, user, 'created');
+    logIdentityResolution(config, fresh, user, 'created');
     return user;
-  } catch (error) {
-    // Concurrent first requests may race on the unique subject. Re-read only
-    // that subject; never select a user by email or an arbitrary existing row.
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const concurrentlyCreated = await db.user.findUnique({ where: { authSubject: identity.subject } });
-      if (concurrentlyCreated?.authProvider === 'clerk') {
-        const user = { id: concurrentlyCreated.id, email: concurrentlyCreated.email };
-        logIdentityResolution(config, identity, user, 'existing');
-        return user;
-      }
-    }
-    throw error;
-  }
+  });
 }
 
 export function createAuthenticationBoundary(
@@ -288,7 +275,7 @@ export function createAuthenticationBoundary(
         if (identityVerifier) {
           const identity = await identityVerifier(request);
           if (!identity) throw authError('Authentication is required.', 401, 'AUTHENTICATION_REQUIRED');
-          response.locals.currentUser = await resolveVerifiedClerkIdentity(db, config, identity);
+          response.locals.currentUser = await resolveVerifiedClerkIdentity(db, config, identity, () => identityVerifier(request));
           return next();
         }
 
@@ -307,6 +294,7 @@ export function createAuthenticationBoundary(
         }
         const mapped = await db.user.findUnique({ where: { authSubject: userId } });
         if (mapped) {
+          if (mapped.deletionRequestedAt) throw authError('This account is unavailable.', 409, 'ACCOUNT_UNAVAILABLE');
           if (mapped.authProvider !== 'clerk') {
             logAuthBoundary(config, request, 'request_rejected', {
               httpStatus: 409,
@@ -328,24 +316,17 @@ export function createAuthenticationBoundary(
           response.locals.currentUser = user;
           return next();
         }
-        const clerkUser = await client.users.getUser(userId);
-        const primaryEmail = clerkUser.emailAddresses.find(
-          (email) => email.id === clerkUser.primaryEmailAddressId,
-        )?.emailAddress;
-        if (!primaryEmail) {
-          logAuthBoundary(config, request, 'request_rejected', {
-            httpStatus: 403,
-            currentUserLookupStarted: true,
-            currentUserLookupOutcome: 'primary_email_unavailable',
-            rejectionBranch: 'missing_primary_email',
-            errorCode: 'PRIMARY_EMAIL_REQUIRED',
-            safeMessage: 'Authenticated account has no primary email address.',
-          });
-          throw authError('Authenticated account has no primary email address.', 403, 'PRIMARY_EMAIL_REQUIRED');
-        }
         response.locals.currentUser = await resolveVerifiedClerkIdentity(db, config, {
-          subject: userId,
-          email: primaryEmail.toLowerCase(),
+          subject: userId, email: '',
+        }, async subject => {
+          const clerkUser = await client.users.getUser(subject).catch(error => {
+            if (remoteStatus(error) === 404) return null;
+            throw authError('Account service is temporarily unavailable. Try again.', 503, 'IDENTITY_SERVICE_UNAVAILABLE');
+          });
+          if (!clerkUser) return null;
+          const primaryEmail = clerkUser.emailAddresses.find(email => email.id === clerkUser.primaryEmailAddressId)?.emailAddress;
+          if (!primaryEmail) throw authError('Authenticated account has no primary email address.', 403, 'PRIMARY_EMAIL_REQUIRED');
+          return { subject: clerkUser.id, email: primaryEmail.toLowerCase() };
         });
         logAuthBoundary(config, request, 'current_user_resolved', {
           currentUserLookupStarted: true,
