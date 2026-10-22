@@ -1,6 +1,6 @@
 import { intakeRefreshPlan, lockIntakeAuthority } from '../provider-selection/intake-authority';
 import { requireIntakeCapability } from '../../security/intake-capability';
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { AppError } from '../../errors';
 import type { BankHistoryRepository } from '../bank-history/bank-history.repository';
@@ -16,6 +16,19 @@ const MAX_CATCH_UP_DAYS = 8;
 const NORMAL_SYNC_DAYS = 3;
 const HOSTED_CONCURRENCY = 4;
 const RETRY_DELAYS_MS = [250, 750] as const;
+
+// Static diagnostic vocabulary only. Never include Prisma message/meta or account identifiers.
+const LIFECYCLE_PRISMA_CODES = new Set([
+  'P2000', 'P2002', 'P2003', 'P2010', 'P2011', 'P2014', 'P2020',
+  'P2021', 'P2022', 'P2023', 'P2024', 'P2025', 'P2028', 'P2034',
+]);
+function safeLifecycleFailure(error: unknown) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const code = error.code;
+    return { reasonCode: 'PrismaClientKnownRequestError', prismaCode: LIFECYCLE_PRISMA_CODES.has(code) ? code : 'unknown' };
+  }
+  return { reasonCode: error instanceof Error ? 'Error' : 'unknown' };
+}
 
 function shiftDate(localDate: string, days: number) {
   const date = new Date(`${localDate}T12:00:00.000Z`);
@@ -234,12 +247,9 @@ export class AccountLifecycleCoordinator {
         });
         return result;
       }));
-      settled.forEach((result, offset) => {
+      settled.forEach((result) => {
         if (result.status === 'fulfilled') results.push(result.value);
-        else this.log('lifecycle_user_failed', {
-          userSuffix: batch[offset]!.user.id.slice(-8),
-          reasonCode: result.reason instanceof Error ? result.reason.name : 'unknown',
-        });
+        else this.log('lifecycle_user_failed', safeLifecycleFailure(result.reason));
       });
     }
     const summary = {

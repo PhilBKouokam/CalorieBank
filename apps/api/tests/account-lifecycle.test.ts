@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
+import { Prisma } from '@prisma/client';
 
 import { hasCompletedDayQueryEvidence } from '../src/modules/bank-history/day-source-authority';
 import { errorHandler } from '../src/errors';
@@ -123,6 +124,49 @@ describe('account lifecycle coordinator', () => {
     );
     return { coordinator, db, fitbit, fatSecret, finalization };
   }
+
+  it.each([
+    ['P2002', 'P2002'], ['P2028', 'P2028'], ['P2034', 'P2034'],
+    ['P9999', 'unknown'], ['P2002 private-health-value', 'unknown'],
+  ])('logs only allowlisted Prisma classification for %s and keeps dispatch unchanged', async (code, expected) => {
+    const { coordinator, db } = fixture();
+    db.userProfile.findMany.mockResolvedValue([0, 1, 2].map(index => ({
+      timezone: 'America/Chicago', user: { id: `private-account-${index}-secret-id`, email: 'private@example.invalid' },
+    })) as never);
+    const error = new Prisma.PrismaClientKnownRequestError('private health date 2026-08-30 amount 1234 and SQL secret', {
+      code, clientVersion: 'synthetic', meta: { userId: 'private-account', query: 'private SQL', amount: 1234 },
+    });
+    error.name = 'private-error-name';
+    const run = vi.spyOn(coordinator, 'runUser').mockRejectedValueOnce(error).mockResolvedValue({
+      userIdSuffix: 'private-suffix', timezone: 'America/Chicago', datesRequested: [], unresolvedDates: [],
+      refreshedProviders: [], errors: [], historyDayCount: 3,
+    });
+    const log = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    try {
+      const summary = await coordinator.runDueAccounts();
+      expect(run).toHaveBeenCalledTimes(3);
+      expect(summary).toMatchObject({ userCount: 3, completedCount: 2, failedCount: 1, providerErrorCount: 0 });
+      const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+      const failures = events.filter(event => event.event === 'lifecycle_user_failed');
+      expect(failures).toEqual([{ component: 'account_lifecycle', event: 'lifecycle_user_failed',
+        reasonCode: 'PrismaClientKnownRequestError', prismaCode: expected }]);
+      expect(JSON.stringify(failures)).not.toMatch(/private|2026-08-30|1234|meta|userSuffix|userId|email/);
+    } finally { log.mockRestore(); run.mockRestore(); }
+  });
+
+  it('does not trust a Prisma-shaped object or raw exception name for failure diagnostics', async () => {
+    for (const error of [{ code: 'P2002', name: 'private-name', message: 'private-message' }, Object.assign(new Error('private-message'), { name: 'private-name' })]) {
+      const { coordinator, db } = fixture();
+      db.userProfile.findMany.mockResolvedValue([{ timezone: 'UTC', user: { id: 'private-id', email: 'private@example.invalid' } }] as never);
+      const run = vi.spyOn(coordinator, 'runUser').mockRejectedValue(error);
+      const log = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+      try {
+        await coordinator.runDueAccounts();
+        const failure = log.mock.calls.map(([line]) => JSON.parse(String(line))).find(event => event.event === 'lifecycle_user_failed');
+        expect(failure).toEqual({ component: 'account_lifecycle', event: 'lifecycle_user_failed', reasonCode: error instanceof Error ? 'Error' : 'unknown' });
+      } finally { log.mockRestore(); run.mockRestore(); }
+    }
+  });
 
   it('refreshes only authoritative server-readable providers', async () => {
     const { coordinator, fitbit, fatSecret } = fixture();
