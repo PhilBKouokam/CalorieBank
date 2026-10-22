@@ -131,7 +131,7 @@ or accounting policy changed. Existing pending intent remains resumable.
 - Complete Node **20.20.2** release gate: **PASS**, **1,154 tests / 112 files**;
   Prisma generation/validation, **40** existing migrations with none pending,
   API/mobile/domain/schema type checks, API/mobile lint, API build and diff checks.
-- Explicit real PostgreSQL adversarial checks: **13/13 PASS**. These are safety
+- Explicit real PostgreSQL adversarial checks: **14/14 PASS**. These are safety
   assertions, replacing the earlier expected-unsafe resolver characterization.
   Callback-persistence-first ordering also proves revocation observes the
   committed connection before the final cascade.
@@ -171,3 +171,18 @@ then successful deletion retry without User creation. Both production SDK-adapte
 and injected-verifier branches are tested. A fresh local startup regression
 creates its synthetic owner through the explicit identity helper before ingestion,
 checks data/timezone and zero ledger effects, and rejects hosted/Clerk bootstrap.
+
+
+The explicit database tool additionally runs the actual scheduled coordinator
+against a real eligible synthetic profile. Its actual profile query is restricted
+to that one owner and paused after selection; completed deletion then removes the
+owner before the captured result resumes. The real Prisma owner guard rejects the
+job, no provider/finalization/delivery port is called, and User, aggregate,
+initialization, History and ledger rows stay absent. Only external/accounting
+ports are fail-fast synthetic stubs. This proves the selected-before-delete worker
+case, not cancellation of a call already in flight. The provisioning test is
+accurately named concurrent convergence followed by deletion; it does not claim
+to observe deletion waiting during the fresh check. The callback-first test proves
+commit/revocation ordering, without asserting a measured lock wait. These targeted
+checks do not claim to exercise every provider end to end; the source inventory
+and full API suite cover the other guarded call sites.

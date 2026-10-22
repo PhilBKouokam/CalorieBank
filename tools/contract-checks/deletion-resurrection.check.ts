@@ -11,6 +11,7 @@ import { PrismaSyncSessionRepository } from '../../apps/api/src/modules/today/sy
 import { PrismaTodayAggregateRepository } from '../../apps/api/src/modules/today/today.repository';
 import { normalizeDailyExpenditureAggregate } from '@caloriebank/domain';
 import { GoogleHealthFitbitService } from '../../apps/api/src/modules/google-health/google-health.service';
+import { AccountLifecycleCoordinator } from '../../apps/api/src/modules/lifecycle/account-lifecycle.service';
 import { localDevelopmentApiEnv } from '../../apps/api/tests/support/test-api-env';
 
 const raw = process.env.TEST_DELETION_DATABASE_URL;
@@ -170,7 +171,7 @@ test('deletion lock wins: two independent deleters and a captured identity canno
   } finally { finish.release(); await db.user.deleteMany({ where: { authSubject: identity.subject } }); }
 });
 
-test('provisioning lock wins: deletion waits for fresh-check transaction; subsequent captured subject fails and new subject succeeds', async () => {
+test('concurrent provisioning converges; subsequent deletion denies the captured subject while a new subject succeeds', async () => {
   const identity = { subject: `synthetic-provision-${randomUUID()}`, email: `synthetic-${randomUUID()}@example.invalid` };
   const config = { AUTH_MODE: 'clerk', APP_ENV: 'beta' } as ApiEnv;
   const entered = barrier(), finish = barrier();
@@ -314,5 +315,53 @@ test('callback persistence wins: deletion revokes the committed connection then 
     assert.equal(await db.user.count({ where: { id: owner.id } }), 0);
     assert.equal(await db.googleHealthConnection.count({ where: { userId: owner.id } }), 0);
     assert.equal(await db.googleHealthOAuthAttempt.count({ where: { userId: owner.id } }), 0);
+  } finally { finish.release(); await db.user.deleteMany({ where: { id: owner.id } }); }
+});
+
+
+test('actual worker selected before completed deletion stops without provider, finalization or notification work', async () => {
+  const identity = { subject: `synthetic-worker-${randomUUID()}`, email: `synthetic-${randomUUID()}@example.invalid` };
+  const config = { AUTH_MODE: 'clerk', APP_ENV: 'beta' } as ApiEnv;
+  const owner = await resolveVerifiedClerkIdentity(db, config, identity, async () => identity);
+  await db.userProfile.update({ where: { userId: owner.id }, data: { timezone: 'UTC', onboardingCompletedAt: new Date() } });
+  const entered = barrier(), finish = barrier();
+  let selectedCount = -1;
+  const workerDb = new Proxy(db, { get(target, key) {
+    if (key !== 'userProfile') return Reflect.get(target, key, target);
+    return new Proxy(target.userProfile, { get(delegate, method) {
+      if (method === 'findMany') return async (args: Parameters<typeof delegate.findMany>[0]) => {
+        // The actual coordinator query/eligibility predicate is preserved, but
+        // constrained to this one synthetic owner so no other fixture can run.
+        const profiles = await delegate.findMany({ ...args, where: { AND: [args?.where ?? {}, { userId: owner.id }] } });
+        selectedCount = profiles.length; entered.release(); await finish.promise;
+        return profiles;
+      };
+      return Reflect.get(delegate, method, delegate);
+    } });
+  } });
+  const calls: string[] = [];
+  const forbidden = (name: string) => async () => { calls.push(name); throw new Error(`unexpected synthetic port: ${name}`); };
+  const coordinator = new AccountLifecycleCoordinator(workerDb,
+    { getAccountingStartDate: forbidden('bank_history') } as never,
+    { execute: forbidden('finalization') } as never,
+    { syncRollingWindow: forbidden('fitbit') } as never,
+    { syncRollingWindow: forbidden('fatsecret') } as never,
+    undefined,
+    { reconcileReceipts: async () => undefined, deliverForUser: forbidden('notification') });
+  try {
+    const job = coordinator.runDueAccounts();
+    await entered.promise; assert.equal(selectedCount, 1);
+    await new AccountSafetyService(db, config, { revokeForAccountDeletion: async () => undefined }, async () => undefined).deleteAccount(owner);
+    assert.equal(await db.user.findUnique({ where: { id: owner.id } }), null);
+    finish.release();
+    const result = await job;
+    assert.equal(result.userCount, 1); assert.equal(result.completedCount, 0); assert.equal(result.failedCount, 1);
+    assert.deepEqual(calls, []);
+    assert.equal(await db.user.count({ where: { id: owner.id } }), 0);
+    assert.equal(await db.dailyExpenditureAggregate.count({ where: { userId: owner.id } }), 0);
+    assert.equal(await db.dailyIntakeAggregate.count({ where: { userId: owner.id } }), 0);
+    assert.equal(await db.calorieLedgerTransaction.count({ where: { userId: owner.id } }), 0);
+    assert.equal(await db.finalizedDailyBankRecord.count({ where: { userId: owner.id } }), 0);
+    assert.equal(await db.bankAccountInitialization.count({ where: { userId: owner.id } }), 0);
   } finally { finish.release(); await db.user.deleteMany({ where: { id: owner.id } }); }
 });
