@@ -5,6 +5,7 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
 import type { ApiEnv } from '../env';
 import { AppError } from '../errors';
+import { bootstrapLocalDevelopmentAccount } from './local-development-account';
 import { boundedIdentityOperation, withAccountLifecycleLock } from './account-lifecycle-lock';
 import { remoteStatus } from '../modules/account-safety/deletion-retry';
 import type { DevelopmentUser } from '../modules/goal-configuration/goal-configuration.repository';
@@ -48,6 +49,10 @@ const callbackPaths = new Set([
 
 export function isProviderCallback(method: string, path: string) {
   return method === 'GET' && callbackPaths.has(path);
+}
+
+function isPendingAccountCleanupRequest(request: Request) {
+  return request.method === 'DELETE' && (request.path === '/v1/me/account' || request.path === '/v1/me/morning-bank-update/device');
 }
 
 function isPublicRequest(request: Request) {
@@ -147,11 +152,12 @@ export async function resolveVerifiedClerkIdentity(
   config: ApiEnv,
   identity: VerifiedIdentity,
   refreshIdentity: (subject: string) => Promise<VerifiedIdentity | null>,
+  context: { allowDeletionCleanup?: boolean } = {},
 ): Promise<DevelopmentUser> {
   return withAccountLifecycleLock(db, identity.subject, async tx => {
     const mapped = await tx.user.findUnique({ where: { authSubject: identity.subject } });
     if (mapped) {
-      if (mapped.deletionRequestedAt) throw authError('This account is unavailable.', 409, 'ACCOUNT_UNAVAILABLE');
+      if (mapped.deletionRequestedAt && !context.allowDeletionCleanup) throw authError('This account is unavailable.', 409, 'ACCOUNT_UNAVAILABLE');
       if (mapped.authProvider !== 'clerk') throw authError('Authenticated identity is linked to an unsupported provider.', 409, 'UNSUPPORTED_AUTH_PROVIDER');
       const user = { id: mapped.id, email: mapped.email };
       logIdentityResolution(config, identity, user, 'existing');
@@ -202,23 +208,7 @@ export function createAuthenticationBoundary(
           // Explicit local development provisioning belongs at the identity boundary,
           // never in a repository handling an already-resolved (possibly stale) owner.
           try {
-            const requestedTimezone = request.body?.timezone ?? request.query.timezone;
-            let timezone = 'UTC';
-            if (typeof requestedTimezone === 'string' && requestedTimezone.length <= 100) {
-              try {
-                new Intl.DateTimeFormat('en-US', { timeZone: requestedTimezone }).format();
-                timezone = requestedTimezone;
-              } catch { /* Route validation remains responsible for invalid input. */ }
-            }
-            await db.user.upsert({
-              where: { id: config.DEV_USER_ID },
-              update: {},
-              create: {
-                id: config.DEV_USER_ID,
-                email: config.DEV_USER_EMAIL,
-                profile: { create: { timezone } },
-              },
-            });
+            await bootstrapLocalDevelopmentAccount(db, config, request.body?.timezone ?? request.query.timezone);
           } catch (error) {
             next(error);
             return;
@@ -275,7 +265,7 @@ export function createAuthenticationBoundary(
         if (identityVerifier) {
           const identity = await identityVerifier(request);
           if (!identity) throw authError('Authentication is required.', 401, 'AUTHENTICATION_REQUIRED');
-          response.locals.currentUser = await resolveVerifiedClerkIdentity(db, config, identity, () => identityVerifier(request));
+          response.locals.currentUser = await resolveVerifiedClerkIdentity(db, config, identity, () => identityVerifier(request), { allowDeletionCleanup: isPendingAccountCleanupRequest(request) });
           return next();
         }
 
@@ -294,7 +284,7 @@ export function createAuthenticationBoundary(
         }
         const mapped = await db.user.findUnique({ where: { authSubject: userId } });
         if (mapped) {
-          if (mapped.deletionRequestedAt) throw authError('This account is unavailable.', 409, 'ACCOUNT_UNAVAILABLE');
+          if (mapped.deletionRequestedAt && !isPendingAccountCleanupRequest(request)) throw authError('This account is unavailable.', 409, 'ACCOUNT_UNAVAILABLE');
           if (mapped.authProvider !== 'clerk') {
             logAuthBoundary(config, request, 'request_rejected', {
               httpStatus: 409,

@@ -3,7 +3,10 @@ import express from 'express';
 import request from 'supertest';
 import { createAuthenticationBoundary } from '../src/auth/current-user';
 import { boundedIdentityOperation } from '../src/auth/account-lifecycle-lock';
-import { errorHandler } from '../src/errors';
+import { AccountSafetyService } from '../src/modules/account-safety/account-safety.service';
+import { createAccountSafetyRouter } from '../src/modules/account-safety/account-safety.routes';
+import { currentUser } from '../src/auth/current-user';
+import { AppError, errorHandler } from '../src/errors';
 import { localDevelopmentApiEnv } from './support/test-api-env';
 
 const sdk = vi.hoisted(() => ({ getUser: vi.fn() }));
@@ -58,5 +61,50 @@ describe('production Clerk adapter serialization', () => {
     const rejected = expect(operation).rejects.toMatchObject({ statusCode: 503, details: { code: 'IDENTITY_SERVICE_TIMEOUT' } });
     await vi.advanceTimersByTimeAsync(8_000); await rejected; expect(aborted?.aborted).toBe(true); finish(); await Promise.resolve();
     expect(continuation).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('pending deletion HTTP cleanup compatibility', () => {
+  it.each(['production', 'injected'])('permits only the two existing cleanup paths using %s authentication, without provisioning', async mode => {
+    let owner: { id: string; email: string; authSubject: string; authProvider: string; deletionRequestedAt: Date | null } | null = {
+      id: 'synthetic-owner', email: 'synthetic@example.invalid', authSubject: 'synthetic-subject', authProvider: 'clerk', deletionRequestedAt: null,
+    };
+    const original = { id: owner.id, email: owner.email };
+    const user = {
+      findUnique: vi.fn(async () => owner),
+      update: vi.fn(async () => { if (owner) owner.deletionRequestedAt = new Date(); return owner; }),
+      deleteMany: vi.fn(async () => { owner = null; return { count: 1 }; }),
+      create: vi.fn(),
+    };
+    const db = { user, pushDeviceRegistration: { updateMany: vi.fn() }, $queryRaw: vi.fn(),
+      $transaction: async (operation: (tx: unknown) => Promise<unknown>) => operation(db) };
+    const config = { ...localDevelopmentApiEnv(), AUTH_MODE: 'clerk' as const, APP_ENV: 'beta' as const,
+      CLERK_SECRET_KEY: 'sk_test_synthetic', CLERK_PUBLISHABLE_KEY: 'pk_test_synthetic' };
+    const revocation = vi.fn().mockRejectedValueOnce(new AppError('Temporary provider failure.', 502)).mockResolvedValue(undefined);
+    const identityDeletion = vi.fn(async () => undefined);
+    const service = new AccountSafetyService(db as never, config, { revokeForAccountDeletion: revocation }, identityDeletion);
+    const boundary = createAuthenticationBoundary(config, db as never, mode === 'injected'
+      ? async () => owner ? { subject: owner.authSubject, email: owner.email } : null : undefined);
+    const app = express(); app.use(express.json()); app.use(boundary.requireUser);
+    app.use('/v1/me', createAccountSafetyRouter(service, currentUser));
+    const cleanup = vi.fn(); app.delete('/v1/me/morning-bank-update/device', (_req, res) => { cleanup(); res.sendStatus(204); });
+    app.use((_req, res) => res.sendStatus(204)); app.use(errorHandler);
+    await request(app).delete('/v1/me/account').send({ confirmation: 'DELETE' }).expect(502);
+    expect(owner?.deletionRequestedAt).toBeInstanceOf(Date);
+    for (const path of ['/v1/me/profile', '/v1/me/integrations/fitbit', '/v1/me/support-diagnostics', '/v1/me/account', '/v1/me/morning-bank-update/device']) {
+      await request(app).get(path).expect(409); await request(app).post(path).send({}).expect(409);
+    }
+    await request(app).delete('/v1/me/account/extra').expect(409);
+    await request(app).delete('/v1/me/morning-bank-update/device/extra').expect(409);
+    await request(app).delete('/v1/me/morning-bank-update/device').expect(204); expect(cleanup).toHaveBeenCalledTimes(1);
+    await request(app).delete('/v1/me/account').send({ confirmation: 'wrong' }).expect(400);
+    await request(app).delete('/v1/me/account').send({ confirmation: 'DELETE' }).expect(204);
+    expect(revocation).toHaveBeenCalledTimes(2); expect(identityDeletion).toHaveBeenCalledTimes(1);
+    expect(user.deleteMany).toHaveBeenCalledWith({ where: { id: original.id } });
+    expect(user.create).not.toHaveBeenCalled(); expect(owner).toBeNull();
+    sdk.getUser.mockRejectedValue({ status: 404 });
+    await request(app).delete('/v1/me/account').send({ confirmation: 'DELETE' }).expect(401);
+    expect(user.create).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,4 @@
+import { bootstrapLocalDevelopmentAccount } from './auth/local-development-account';
 import { createApp } from './app';
 import { env } from './env';
 import { prisma } from './db/client';
@@ -6,14 +7,17 @@ import { PrismaTodayAggregateRepository } from './modules/today/today.repository
 
 async function start() {
   try {
-    if (env.APP_ENV === 'local' && env.AUTH_MODE === 'development') await bootstrapDevelopmentTodayAggregates({
-      config: env,
-      developmentUser: {
-        id: env.DEV_USER_ID,
-        email: env.DEV_USER_EMAIL,
-      },
-      repository: new PrismaTodayAggregateRepository(prisma),
-    });
+    if (env.APP_ENV === 'local' && env.AUTH_MODE === 'development') {
+      await bootstrapLocalDevelopmentAccount(prisma, env, env.TODAY_INGESTION_MODE === 'development' ? 'America/Chicago' : 'UTC');
+      await bootstrapDevelopmentTodayAggregates({
+        config: env,
+        developmentUser: {
+          id: env.DEV_USER_ID,
+          email: env.DEV_USER_EMAIL,
+        },
+        repository: new PrismaTodayAggregateRepository(prisma),
+      });
+    }
   } catch (error) {
     console.warn(
       JSON.stringify({

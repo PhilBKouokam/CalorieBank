@@ -1,3 +1,6 @@
+import { bootstrapLocalDevelopmentAccount } from '../src/auth/local-development-account';
+import { bootstrapDevelopmentTodayAggregates } from '../src/modules/today/today.bootstrap';
+import { PrismaTodayAggregateRepository } from '../src/modules/today/today.repository';
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -43,6 +46,20 @@ afterEach(async () => {
 });
 
 describe('Clerk identity provisioning', () => {
+  it('bootstraps a fresh explicit local owner before startup synthetic ingestion, with no hosted fallback', async () => {
+    const id = randomUUID(); createdUserIds.push(id);
+    const config = { ...env, APP_ENV: 'local' as const, AUTH_MODE: 'development' as const,
+      DEV_USER_ID: id, DEV_USER_EMAIL: 'synthetic-startup@example.invalid', TODAY_INGESTION_MODE: 'development' as const };
+    await bootstrapLocalDevelopmentAccount(prisma, config, 'America/Chicago');
+    await bootstrapDevelopmentTodayAggregates({ config, developmentUser: { id, email: config.DEV_USER_EMAIL }, repository: new PrismaTodayAggregateRepository(prisma) });
+    expect(await prisma.dailyExpenditureAggregate.count({ where: { userId: id } })).toBe(1);
+    expect(await prisma.dailyIntakeAggregate.count({ where: { userId: id } })).toBe(1);
+    expect((await prisma.userProfile.findUniqueOrThrow({ where: { userId: id } })).timezone).toBe('America/Chicago');
+    expect(await prisma.calorieLedgerTransaction.count({ where: { userId: id } })).toBe(0);
+    await expect(bootstrapLocalDevelopmentAccount(prisma, { ...config, APP_ENV: 'beta' })).rejects.toThrow('explicit local');
+    await expect(bootstrapLocalDevelopmentAccount(prisma, { ...config, AUTH_MODE: 'clerk' })).rejects.toThrow('explicit local');
+  });
+
   it('creates isolated users by subject, keeps re-logins stable, and never provisions a new subject as DEV_USER_ID', async () => {
     const config = clerkConfig();
     const identityA = identity('a');

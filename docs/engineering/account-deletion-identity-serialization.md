@@ -25,8 +25,14 @@ cannot create a User by itself. While holding the lock it rechecks the mapping,
 rejects deletion intent, and, only if missing, fetches the fresh identity before
 creating. Production uses Clerk `users.getUser` there. SDK 404 maps to static
 401 `AUTHENTICATION_REQUIRED`; service errors map to static 503 without SDK
-payloads. The production mapped fast path remains network-free and now rejects
-`deletionRequestedAt` explicitly. Injected test identity ports are trusted synthetic
+payloads. The production mapped fast path remains network-free and rejects deletion
+intent except for the two existing authenticated cleanup routes: exactly
+`DELETE /v1/me/account` and `DELETE /v1/me/morning-bank-update/device`. The exported
+resolver defaults to denial; only those request contexts permit an existing
+deleting mapping. Missing mappings still require fresh identity authority and
+cannot bypass a deleted identity. Ordinary reads (including support diagnostics),
+provider routes, POST and near-match DELETE paths remain denied. Existing deletion
+confirmation and rate limits remain unchanged. Injected test identity ports are trusted synthetic
 authorities, not proof of remote Clerk behavior.
 
 Deletion keeps its existing order: durable intent, push deactivation, provider
@@ -65,8 +71,11 @@ Already in-flight provider traffic or an accepted generic push cannot be recalle
 The correction does not claim otherwise. All guarded repositories prohibit parent
 User recreation, and PostgreSQL foreign keys/cascade protect deleted ownership.
 
-The only runtime User creation sites are explicit local-development bootstrap at
-the authentication boundary and serialized Clerk provisioning. The operator-only
+The only runtime User creation sites are the shared explicit local-development
+identity helper and serialized Clerk provisioning. Local startup invokes the same
+helper before synthetic ingestion; HTTP local authentication invokes it before
+repository access. The helper asserts both `APP_ENV=local` and
+`AUTH_MODE=development`, preserves the initial timezone, and has no hosted fallback. The operator-only
 identity linking command updates an existing row; it was not executed. Local
 bank-history seeding now requires an existing development owner and cannot create
 an absent account via repositories. No callback/worker can provision User.
@@ -119,7 +128,7 @@ or accounting policy changed. Existing pending intent remains resumable.
 
 ### Final local results
 
-- Complete Node **20.20.2** release gate: **PASS**, **1,151 tests / 112 files**;
+- Complete Node **20.20.2** release gate: **PASS**, **1,154 tests / 112 files**;
   Prisma generation/validation, **40** existing migrations with none pending,
   API/mobile/domain/schema type checks, API/mobile lint, API build and diff checks.
 - Explicit real PostgreSQL adversarial checks: **13/13 PASS**. These are safety
@@ -152,3 +161,13 @@ cannot be demonstrated, retain the P1 hold and do not run new deletion
 qualification during the handoff. Reverting API to `9baaea2` or worker to `25ce192`
 reopens the P1; it is not a safe deletion rollback. No data restoration or schema
 rollback is required or authorized by this local correction.
+
+
+The final compatibility follow-up preserves the existing pending-deletion account
+retry and device cleanup paths for a verified, still-mapped owner. Actual HTTP
+middleware/router/service regressions exercise a provider failure persisting
+intent, denied ordinary requests, device cleanup, rejected wrong confirmation,
+then successful deletion retry without User creation. Both production SDK-adapter
+and injected-verifier branches are tested. A fresh local startup regression
+creates its synthetic owner through the explicit identity helper before ingestion,
+checks data/timezone and zero ledger effects, and rejects hosted/Clerk bootstrap.
