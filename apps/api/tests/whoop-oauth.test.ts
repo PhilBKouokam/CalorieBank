@@ -32,6 +32,7 @@ describe('WHOOP OAuth connection', () => {
       () => new Date('2026-08-17T18:00:00.000Z'),
     );
     try {
+      await db.user.create({ data: { id, email: `${id}@test.local` } });
       const authorizationUrl = await service.createAuthorizationUrl(
         { id, email: `${id}@test.local` },
         'caloriebank://integrations',

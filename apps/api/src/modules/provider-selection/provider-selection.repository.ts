@@ -11,6 +11,7 @@ import type {
   ProviderSelectionResponse,
 } from '@caloriebank/schemas';
 import type { Prisma, PrismaClient } from '@prisma/client';
+import { requireExistingRequestAccount } from '../../auth/existing-account';
 import {
   canProvideAuthoritativeExpenditure,
   getProviderCapabilities,
@@ -548,11 +549,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         );
       }
     }
-    await this.db.user.upsert({
-      where: { id: user.id },
-      update: { email: user.email },
-      create: { id: user.id, email: user.email },
-    });
+    await requireExistingRequestAccount(this.db, user);
     const authoritativeActivityProvider = input.authoritativeActivityProvider
       ?? input.authoritativeExpenditureProvider;
     const activityCapabilities = getProviderCapabilities(authoritativeActivityProvider);

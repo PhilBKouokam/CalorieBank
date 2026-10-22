@@ -43,6 +43,7 @@ describe('FatSecret delegated connection and rolling sync', () => {
       () => 'nonce',
     );
     try {
+      await db.user.create({ data: { id, email: `${id}@test.local` } });
       const authorizationUrl = await service.createAuthorizationUrl(
         { id, email: `${id}@test.local` }, 'caloriebank://integrations',
       );
@@ -86,6 +87,7 @@ describe('FatSecret delegated connection and rolling sync', () => {
     try {
       await expect(service.completeAuthorization('unknown-token', 'verifier'))
         .rejects.toThrow('invalid or expired');
+      await db.user.create({ data: { id, email: `${id}@test.local` } });
       await service.createAuthorizationUrl(
         { id, email: `${id}@test.local` }, 'caloriebank://integrations',
       );
@@ -111,6 +113,7 @@ describe('FatSecret delegated connection and rolling sync', () => {
       () => new Date('2026-08-17T18:00:00.000Z'), () => 'nonce',
     );
     try {
+      await db.user.create({ data: { id, email: `${id}@test.local` } });
       await service.createAuthorizationUrl(
         { id, email: `${id}@test.local` }, 'caloriebank://integrations',
       );

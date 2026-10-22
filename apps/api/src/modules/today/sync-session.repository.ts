@@ -1,3 +1,4 @@
+import { requireExistingRequestAccount } from '../../auth/existing-account';
 import type {
   IngestionSyncSessionComplete,
   IngestionSyncSessionResponse,
@@ -90,15 +91,7 @@ export class PrismaSyncSessionRepository implements SyncSessionRepository {
   constructor(private readonly db: PrismaClient) {}
 
   async start(user: DevelopmentUser, input: IngestionSyncSessionStart, now: Date) {
-    await this.db.user.upsert({
-      where: { id: user.id },
-      update: { email: user.email },
-      create: {
-        id: user.id,
-        email: user.email,
-        profile: { create: { timezone: input.timezone } },
-      },
-    });
+    await requireExistingRequestAccount(this.db, user);
     const session = await this.db.ingestionSyncSession.create({
       data: {
         userId: user.id,

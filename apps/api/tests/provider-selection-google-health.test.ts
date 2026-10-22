@@ -480,6 +480,7 @@ describe('Google OAuth state and token exchange', () => {
         }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
     );
     try {
+      await prisma.user.create({ data: { id, email: `${id}@test.local` } });
       const authorizationUrl = await service.createAuthorizationUrl(
         { id, email: `${id}@test.local` }, 'caloriebank://integrations',
       );

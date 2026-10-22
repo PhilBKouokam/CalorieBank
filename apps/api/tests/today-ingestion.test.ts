@@ -360,6 +360,7 @@ describe('provider-neutral Today ingestion', () => {
     await prisma.calorieLedgerTransaction.deleteMany({ where: { userId: persistenceUser.id } });
     await prisma.user.deleteMany({ where: { id: persistenceUser.id } });
 
+    await prisma.user.create({ data: { ...persistenceUser, profile: { create: { timezone: aggregateInput.timezone } } } });
     await service.syncDailyAggregates(persistenceUser, {
       ...aggregateInput,
       userId: persistenceUser.id,

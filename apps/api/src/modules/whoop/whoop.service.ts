@@ -5,6 +5,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import type { ApiEnv } from '../../env';
 import { AppError } from '../../errors';
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
+import { requireExistingRequestAccount } from '../../auth/existing-account';
 import {
   decryptProviderSecret,
   encryptProviderSecret,
@@ -72,11 +73,7 @@ export class WhoopService {
     const secrets = configured(this.config);
     // WHOOP currently documents an eight-character state value.
     const state = randomBytes(6).toString('base64url');
-    await this.db.user.upsert({
-      where: { id: user.id },
-      update: { email: user.email },
-      create: { id: user.id, email: user.email },
-    });
+    await requireExistingRequestAccount(this.db, user);
     await this.db.externalProviderOAuthAttempt.create({
       data: {
         userId: user.id,

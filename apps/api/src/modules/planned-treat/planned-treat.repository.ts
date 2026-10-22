@@ -1,4 +1,5 @@
 import { settingTransaction, type SettingsOptions } from '../settings-concurrency/settings-concurrency';
+import { requireExistingRequestAccount } from '../../auth/existing-account';
 import type {
   ActivePlannedTreatResponse,
   PlannedTreatGetResponse,
@@ -94,15 +95,7 @@ export class PrismaPlannedTreatRepository implements PlannedTreatRepository {
     options?: SettingsOptions,
   ): Promise<ActivePlannedTreatResponse> {
     const treat = await settingTransaction(this.db, user.id, 'banking-goal', true, options, async (transaction) => {
-      await transaction.user.upsert({
-        where: { id: user.id },
-        update: { email: user.email },
-        create: {
-          id: user.id,
-          email: user.email,
-          profile: { create: {} },
-        },
-      });
+      await requireExistingRequestAccount(transaction, user);
 
       return transaction.plannedTreat.upsert({
         where: { userId: user.id },

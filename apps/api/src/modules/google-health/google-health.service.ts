@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { createGoogleHealthActivityRequest } from './google-health-request';
+import { requireExistingRequestAccount } from '../../auth/existing-account';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import {
   estimateRestingBurnFromLowActivityHours,
@@ -364,9 +365,7 @@ export class GoogleHealthFitbitService {
       stage = 'oauth_attempt_creation';
       const state = randomBytes(32).toString('base64url');
       const verifier = randomBytes(48).toString('base64url');
-      await this.db.user.upsert({
-        where: { id: user.id }, update: { email: user.email }, create: { id: user.id, email: user.email },
-      });
+      await requireExistingRequestAccount(this.db, user);
       await this.db.googleHealthOAuthAttempt.create({
         data: {
           userId: user.id,

@@ -20,6 +20,7 @@ describe('planned treat PostgreSQL persistence', () => {
       email: `treat-${randomUUID()}@caloriebank.local`,
     };
 
+    await prisma.user.create({ data: { ...user, profile: { create: { timezone: 'America/Chicago' } } } });
     await bankRepository.postProvisionalDailyRecord(user, {
       logDate: '2026-07-19',
       timezone: 'America/Chicago',
@@ -91,6 +92,8 @@ describe('planned treat PostgreSQL persistence', () => {
       email: `treat-${randomUUID()}@caloriebank.local`,
     };
 
+    await prisma.user.create({ data: { ...firstUser, profile: { create: { timezone: 'America/Chicago' } } } });
+    await prisma.user.create({ data: { ...secondUser, profile: { create: { timezone: 'America/Chicago' } } } });
     await bankRepository.postProvisionalDailyRecord(firstUser, {
       logDate: '2026-07-19',
       timezone: 'America/Chicago',

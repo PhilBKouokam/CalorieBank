@@ -1,4 +1,5 @@
 import { lockIntakeAuthority } from '../provider-selection/intake-authority';
+import { requireExistingRequestAccount } from '../../auth/existing-account';
 import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
 import {
   V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE,
@@ -1166,11 +1167,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
   ) {
     const processedAt = input.finalizedAt ?? this.now();
     const result = await this.db.$transaction(async (transaction) => {
-      await transaction.user.upsert({
-        where: { id: user.id },
-        update: { email: user.email },
-        create: { id: user.id, email: user.email, profile: { create: { timezone: input.timezone } } },
-      });
+      await requireExistingRequestAccount(transaction, user);
       return this.postOrReconcile(
         transaction,
         user,

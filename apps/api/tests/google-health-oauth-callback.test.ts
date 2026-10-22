@@ -52,7 +52,7 @@ function oauthDb(options: {
     }
     : null;
   const db = {
-    user: { upsert: async () => user, findUnique: async () => ({ deletionRequestedAt: options.unavailableOwner ? new Date() : null }) },
+    user: { updateMany: async () => ({ count: 1 }), findUnique: async () => ({ deletionRequestedAt: options.unavailableOwner ? new Date() : null }) },
     googleHealthOAuthAttempt: {
       create: async ({ data }: { data: Omit<StoredAttempt, 'id' | 'consumedAt'> }) => {
         attempt = { ...data, id: randomUUID(), consumedAt: null };

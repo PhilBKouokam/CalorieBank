@@ -18,6 +18,7 @@ describe('bank history PostgreSQL persistence', () => {
       email: `bank-${randomUUID()}@caloriebank.local`,
     };
 
+    await prisma.user.create({ data: { ...user, profile: { create: { timezone: 'America/Chicago' } } } });
     const input = {
       logDate: '2026-07-19',
       timezone: 'America/Chicago',
@@ -60,6 +61,7 @@ describe('bank history PostgreSQL persistence', () => {
       email: `bank-${randomUUID()}@caloriebank.local`,
     };
 
+    await prisma.user.create({ data: { ...user, profile: { create: { timezone: 'America/Chicago' } } } });
     await repository.postProvisionalDailyRecord(user, {
       logDate: '2026-07-18',
       timezone: 'America/Chicago',

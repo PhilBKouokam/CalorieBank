@@ -1,3 +1,4 @@
+import { requireExistingRequestAccount } from '../../auth/existing-account';
 import type {
   DashboardPreferencesPatch,
   DashboardPreferencesResponse,
@@ -32,11 +33,7 @@ export class PrismaDashboardPreferencesRepository implements DashboardPreference
   constructor(private readonly db: PrismaClient) {}
 
   private async ensureUser(user: DevelopmentUser) {
-    await this.db.user.upsert({
-      where: { id: user.id },
-      update: { email: user.email },
-      create: { id: user.id, email: user.email, profile: { create: { timezone: 'UTC' } } },
-    });
+    await requireExistingRequestAccount(this.db, user);
   }
 
   async get(user: DevelopmentUser) {

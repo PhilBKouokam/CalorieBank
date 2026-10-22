@@ -5,6 +5,7 @@ import { intakeRefreshPlan, resolveIntakeAuthority } from '../provider-selection
 import { resolveManualIntake } from '../manual-intake/manual-intake.repository';
 import { requireIntakeCapability } from '../../security/intake-capability';
 import { matchesSelectedIntakeSource } from '../provider-selection/intake-source';
+import { requireExistingRequestAccount } from '../../auth/existing-account';
 import {
   calculateRestOfDayBurnProjection,
   resolveForecastCoverage,
@@ -166,23 +167,15 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     if (!session) throw new AppError('Sync session was not found.', 404);
   }
 
-  private async ensureUser(user: DevelopmentUser, timezone: string) {
-    await this.db.user.upsert({
-      where: { id: user.id },
-      update: { email: user.email },
-      create: {
-        id: user.id,
-        email: user.email,
-        profile: { create: { timezone } },
-      },
-    });
+  private async ensureUser(user: DevelopmentUser) {
+    await requireExistingRequestAccount(this.db, user);
   }
 
   async upsertExpenditureAggregate(
     user: DevelopmentUser,
     aggregate: NormalizedDailyExpenditureAggregate,
   ): Promise<AggregateUpsertResult> {
-    await this.ensureUser(user, aggregate.timezone);
+    await this.ensureUser(user);
     const identity = {
       userId: user.id,
       localDate: parseLocalDate(aggregate.localDate),
@@ -284,7 +277,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         });
       }
     }
-    await this.ensureUser(user, aggregate.timezone);
+    await this.ensureUser(user);
     // Preserve legacy rows and their provenance; additional Apple writers get
     // separate deterministic storage identities, including for old client uploads.
     const legacyApple = aggregate.provider === 'apple_health' ? await this.db.dailyIntakeAggregate.findUnique({
@@ -424,7 +417,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     user: DevelopmentUser,
     aggregate: NormalizedDailyStepAggregate,
   ): Promise<AggregateUpsertResult> {
-    await this.ensureUser(user, aggregate.timezone);
+    await this.ensureUser(user);
     const identity = {
       userId: user.id,
       localDate: parseLocalDate(aggregate.localDate),
@@ -490,7 +483,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       calculatedAt: Date;
     },
   ) {
-    await this.ensureUser(user, 'UTC');
+    await this.ensureUser(user);
     await this.db.restingBurnEstimate.upsert({
       where: { userId: user.id },
       create: {
@@ -522,7 +515,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     if (workouts.length === 0) return [];
     const firstWorkout = workouts[0];
     if (!firstWorkout) return [];
-    await this.ensureUser(user, firstWorkout.timezone);
+    await this.ensureUser(user);
 
     return this.db.$transaction(async (transaction) => {
       const results: AggregateUpsertResult[] = [];

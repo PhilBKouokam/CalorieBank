@@ -18,6 +18,7 @@ describe('goal configuration PostgreSQL persistence', () => {
       email: `goal-${randomUUID()}@caloriebank.local`,
     };
 
+    await prisma.user.create({ data: { ...user, profile: { create: {} } } });
     const saved = await repository.upsertForUser(user, {
       goalMode: 'bulk',
       dailyEnergyAdjustment: 500,

@@ -195,7 +195,7 @@ export function createAuthenticationBoundary(
     }
     return {
       verify: (_request, _response, next) => next(),
-    requireUser: (request, response, next) => {
+      requireUser: async (request, response, next) => {
         if (!isPublicRequest(request)) {
           if (request.header('authorization')) {
             logAuthBoundary(config, request, 'request_rejected', {
@@ -211,6 +211,30 @@ export function createAuthenticationBoundary(
               409,
               'DEVELOPMENT_AUTH_CONFLICT',
             ));
+          }
+          // Explicit local development provisioning belongs at the identity boundary,
+          // never in a repository handling an already-resolved (possibly stale) owner.
+          try {
+            const requestedTimezone = request.body?.timezone ?? request.query.timezone;
+            let timezone = 'UTC';
+            if (typeof requestedTimezone === 'string' && requestedTimezone.length <= 100) {
+              try {
+                new Intl.DateTimeFormat('en-US', { timeZone: requestedTimezone }).format();
+                timezone = requestedTimezone;
+              } catch { /* Route validation remains responsible for invalid input. */ }
+            }
+            await db.user.upsert({
+              where: { id: config.DEV_USER_ID },
+              update: {},
+              create: {
+                id: config.DEV_USER_ID,
+                email: config.DEV_USER_EMAIL,
+                profile: { create: { timezone } },
+              },
+            });
+          } catch (error) {
+            next(error);
+            return;
           }
           response.locals.currentUser = { id: config.DEV_USER_ID, email: config.DEV_USER_EMAIL };
         }

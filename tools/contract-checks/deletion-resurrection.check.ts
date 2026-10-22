@@ -7,6 +7,9 @@ import { AccountSafetyService } from '../../apps/api/src/modules/account-safety/
 import { PrismaDashboardPreferencesRepository } from '../../apps/api/src/modules/dashboard-preferences/dashboard-preferences.repository';
 import { resolveVerifiedClerkIdentity } from '../../apps/api/src/auth/current-user';
 import type { ApiEnv } from '../../apps/api/src/env';
+import { PrismaSyncSessionRepository } from '../../apps/api/src/modules/today/sync-session.repository';
+import { PrismaTodayAggregateRepository } from '../../apps/api/src/modules/today/today.repository';
+import { normalizeDailyExpenditureAggregate } from '@caloriebank/domain';
 
 const raw = process.env.TEST_DELETION_DATABASE_URL;
 assert(raw, 'TEST_DELETION_DATABASE_URL_REQUIRED');
@@ -32,10 +35,13 @@ test('completed deletion must reject a paused stale dashboard request instead of
   const requestDb = new Proxy(db, { get(target, key) {
     if (key !== 'user') return Reflect.get(target, key, target);
     return new Proxy(target.user, { get(delegate, method) {
-      if (method !== 'upsert') return Reflect.get(delegate, method, delegate);
-      return async (...args: Parameters<typeof db.user.upsert>) => {
+      if (method === 'upsert') return async (...args: Parameters<typeof db.user.upsert>) => {
         entered(); await released; return db.user.upsert(...args);
       };
+      if (method === 'updateMany') return async (...args: Parameters<typeof db.user.updateMany>) => {
+        entered(); await released; return db.user.updateMany(...args);
+      };
+      return Reflect.get(delegate, method, delegate);
     } });
   } });
   const config = { AUTH_MODE: 'clerk', APP_ENV: 'beta' } as ApiEnv;
@@ -76,5 +82,29 @@ test('completed deletion must reject a paused stale dashboard request instead of
     resume();
     await db.user.deleteMany({ where: { id: { in: cleanupIds } } });
     await db.$disconnect();
+  }
+});
+
+test('deletion intent rejects dashboard, sync-session and ingestion work without changing the account', async () => {
+  const owner = { id: randomUUID(), email: `deletion-synthetic-${randomUUID()}@example.invalid` };
+  const deletionRequestedAt = new Date('2026-10-21T12:00:00Z');
+  try {
+    await db.user.create({ data: { ...owner, authProvider: 'clerk', authSubject: `synthetic-${randomUUID()}`,
+      profile: { create: { timezone: 'UTC' } }, deletionRequestedAt } });
+    const matchesUnavailable = (error: unknown) => error !== null && typeof error === 'object'
+      && 'details' in error && (error.details as { code?: string }).code === 'ACCOUNT_UNAVAILABLE';
+    await assert.rejects(new PrismaDashboardPreferencesRepository(db).get(owner), matchesUnavailable);
+    await assert.rejects(new PrismaSyncSessionRepository(db).start(owner, { provider: 'apple_health', localDate: '2026-10-21',
+      timezone: 'UTC', trigger: 'app_foreground', datesQueried: ['2026-10-21'] }, deletionRequestedAt), matchesUnavailable);
+    await assert.rejects(new PrismaTodayAggregateRepository(db, { allowSyntheticProviders: false }).upsertExpenditureAggregate(owner,
+      normalizeDailyExpenditureAggregate({ userId: owner.id, provider: 'apple_health', providerRecordId: 'synthetic-burn',
+        localDate: '2026-10-21', timezone: 'UTC', importedAt: deletionRequestedAt, providerUpdatedAt: deletionRequestedAt, isCurrentDay: true,
+        rawTotalDailyExpenditure: 1000, syncStatus: 'ready' })), matchesUnavailable);
+    assert.equal((await db.user.findUniqueOrThrow({ where: { id: owner.id } })).deletionRequestedAt?.toISOString(), deletionRequestedAt.toISOString());
+    assert.equal(await db.ingestionSyncSession.count({ where: { userId: owner.id } }), 0);
+    assert.equal(await db.dailyExpenditureAggregate.count({ where: { userId: owner.id } }), 0);
+    assert.equal(await db.dashboardPreferences.count({ where: { userId: owner.id } }), 0);
+  } finally {
+    await db.user.deleteMany({ where: { id: owner.id } }); await db.$disconnect();
   }
 });
