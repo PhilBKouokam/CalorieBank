@@ -70,12 +70,60 @@ class GoogleHealthRemoteError extends AppError {
   }
 }
 
+const OAUTH_LOG_EVENTS = [
+  'authorization_start_failure', 'oauth_callback_failure', 'oauth_callback_received',
+  'authorization_code_present', 'configuration_validation', 'state_lookup_started',
+  'state_found', 'state_validated', 'token_exchange_started', 'token_exchange_success',
+  'identity_lookup_started', 'identity_lookup_success', 'token_encryption_started',
+  'token_encryption_success', 'connection_persist_started', 'connection_persist_success',
+  'mobile_redirect_started', 'mobile_redirect_success', 'resting_model_resolved',
+  'resting_burn_estimate_failed',
+];
+const OAUTH_LOG_STATIC_VALUES: Readonly<Record<string, readonly string[]>> = {
+  stage: [...OAUTH_LOG_EVENTS, 'callback_validation', 'mobile_redirect_validation',
+    'oauth_attempt_creation', 'refresh_token_validation'],
+  errorType: ['AppError', 'GoogleHealthRemoteError', 'PrismaClientKnownRequestError',
+    'Error', 'TypeError', 'SyntaxError', 'object', 'string', 'undefined'],
+  googleErrorCode: ['invalid_grant', 'invalid_client', 'invalid_request', 'access_denied',
+    'unauthorized_client', 'unsupported_grant_type', 'invalid_scope', 'temporarily_unavailable',
+    'server_error', 'PERMISSION_DENIED', 'UNAUTHENTICATED', 'RESOURCE_EXHAUSTED', 'UNAVAILABLE',
+    'incomplete_token_response', 'malformed_response', 'malformed_identity_response', 'missing_health_user_id'],
+  prismaCode: ['P1000', 'P1001', 'P1010', 'P2002', 'P2003', 'P2021', 'P2022', 'P2025', 'P2034'],
+  validationErrorCode: ['INVALID_REDIRECT', 'TEMPORARY_ERROR'],
+  scheme: ['caloriebank'],
+  parsedScheme: ['caloriebank'],
+};
+const OAUTH_LOG_BOOLEAN_KEYS = [
+  'codePresent', 'statePresent', 'redirectUriMatchesConfiguredValue', 'pkceVerifierPresent',
+  'refreshTokenPresent', 'healthUserIdPresent', 'legacyUserIdPresent',
+  'mobileRedirectUriPresent', 'providerConfigurationComplete', 'existingConnection', 'oauthAttemptCreated',
+];
+
 function defaultOAuthLogger(event: string, metadata: Readonly<Record<string, unknown>> = {}) {
+  const safeEvent = OAUTH_LOG_EVENTS.includes(event) ? event : 'oauth_diagnostic';
+  const safe: Record<string, unknown> = {};
+  // Model evidence and calorie-derived context are never default log metadata.
+  if (safeEvent !== 'resting_model_resolved' && safeEvent !== 'resting_burn_estimate_failed') {
+    for (const [key, allowed] of Object.entries(OAUTH_LOG_STATIC_VALUES)) {
+      const value = metadata[key];
+      if (value === null) safe[key] = null;
+      else if (typeof value === 'string') safe[key] = allowed.includes(value) ? value : 'other';
+    }
+    for (const key of ['httpStatus', 'googleHttpStatus']) {
+      const value = metadata[key];
+      if (value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 100 && value <= 599)) {
+        safe[key] = value;
+      }
+    }
+    for (const key of OAUTH_LOG_BOOLEAN_KEYS) {
+      if (typeof metadata[key] === 'boolean') safe[key] = metadata[key];
+    }
+  }
   console.info(JSON.stringify({
-    level: event === 'oauth_callback_failure' ? 'error' : 'info',
+    level: safeEvent === 'oauth_callback_failure' ? 'error' : 'info',
     component: 'google_health_oauth',
-    event,
-    ...metadata,
+    event: safeEvent,
+    ...safe,
   }));
 }
 
