@@ -186,3 +186,18 @@ to observe deletion waiting during the fresh check. The callback-first test prov
 commit/revocation ordering, without asserting a measured lock wait. These targeted
 checks do not claim to exercise every provider end to end; the source inventory
 and full API suite cover the other guarded call sites.
+
+The stale-dashboard deletion/recreation check now starts with a nonempty negative
+control. Using the established Opening Bank persistence fixture pattern, it stores
+synthetic Apple Health expenditure plus an exact synthetic intake writer, completes
+the bounded import evidence, initializes Opening Bank through the actual bank
+repository, then posts a completed day through that repository. Before deletion,
+all six counts are strictly positive: expenditure aggregates, intake aggregates,
+History, ledger, calculation snapshots and Opening calculation days. Actual account
+deletion must reduce all six old-owner counts to zero. A fresh subject with the
+same email must have zero of all six, a fresh waiting initialization, and no old
+opening amount or accounting-start date. The paused stale repository request is
+then released and still must reject without recreating the deleted owner. This is
+synthetic local evidence; no real records or direct ledger-insertion shortcut is
+used. The complete explicit PostgreSQL tool remains **14/14 PASS**, with strict
+standalone TypeScript and lint passing; production/runtime source is unchanged.

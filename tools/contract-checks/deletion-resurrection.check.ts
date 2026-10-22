@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { PrismaClient } from '@prisma/client';
+import { PrismaBankHistoryRepository } from '../../apps/api/src/modules/bank-history/bank-history.repository';
 import { AccountSafetyService } from '../../apps/api/src/modules/account-safety/account-safety.service';
 import { PrismaDashboardPreferencesRepository } from '../../apps/api/src/modules/dashboard-preferences/dashboard-preferences.repository';
 import { resolveVerifiedClerkIdentity } from '../../apps/api/src/auth/current-user';
@@ -53,6 +54,36 @@ test('completed deletion must reject a paused stale dashboard request instead of
     await db.user.create({ data: { ...owner, authProvider: 'clerk', authSubject: oldSubject,
       profile: { create: { timezone: 'UTC', onboardingCompletedAt: new Date('2026-10-20T12:00:00Z') } },
       bankAccountInitialization: { create: {} }, dashboardPreferences: { create: {} } } });
+    // Nonempty negative control, following existing Opening Bank persistence
+    // fixtures and the production bank repository (no direct ledger writes).
+    await db.goalConfiguration.create({ data: { userId: owner.id, goalMode: 'maintain', dailyEnergyAdjustment: 0, adjustmentSource: 'manual_calories' } });
+    await db.providerSelection.create({ data: { userId: owner.id, authoritativeExpenditureProvider: 'apple_health',
+      authoritativeActivityProvider: 'apple_health', authoritativeIntakeProvider: 'apple_health',
+      appleHealthIntakeWriterBundleId: 'synthetic.intake.writer', appleHealthIntakeWriterDisplayName: 'Synthetic tracker' } });
+    const date = new Date('2026-10-19T00:00:00Z'), importedAt = new Date('2026-10-20T01:00:00Z');
+    await db.dailyExpenditureAggregate.create({ data: { userId: owner.id, localDate: date, timezone: 'UTC', provider: 'apple_health',
+      providerRecordId: 'synthetic-old-burn', rawTotalDailyExpenditure: 2500, adjustedDailyExpenditure: 2000,
+      adjustmentFactor: 0.8, importedAt, providerUpdatedAt: importedAt, syncStatus: 'ready', isCurrentDay: false } });
+    await db.dailyIntakeAggregate.create({ data: { userId: owner.id, localDate: date, timezone: 'UTC', provider: 'apple_health',
+      providerRecordId: 'synthetic-old-food', totalCaloriesConsumed: 1600, writerBundleIdentifier: 'synthetic.intake.writer',
+      writerDisplayName: 'Synthetic tracker', importedAt, providerUpdatedAt: importedAt, syncStatus: 'ready', isCurrentDay: false } });
+    await db.ingestionSyncSession.create({ data: { userId: owner.id, provider: 'apple_health', localDate: new Date('2026-10-20T00:00:00Z'),
+      timezone: 'UTC', trigger: 'connection', status: 'completed', startedAt: new Date(), completedAt: new Date(Date.now() + 1000),
+      expenditureStatus: 'ready', intakeStatus: 'ready', stepsStatus: 'skipped', workoutsStatus: 'skipped',
+      datesQueried: Array.from({ length: 8 }, (_, offset) => new Date(Date.UTC(2026, 9, 20 - offset)).toISOString().slice(0, 10)) } });
+    const bank = new PrismaBankHistoryRepository(db, { now: () => new Date('2026-10-21T12:00:00Z'), allowSyntheticProviders: false });
+    assert.equal((await bank.initializeOpeningBank(owner, '2026-10-20', 'UTC')).outcome, 'initialized');
+    await bank.postProvisionalDailyRecord(owner, { logDate: '2026-10-20', timezone: 'UTC', importedTotalDailyExpenditure: 3000,
+      goalMode: 'maintain', goalAdjustmentCalories: 0, importedCalorieIntake: 2000,
+      finalizedAt: new Date('2026-10-21T01:00:00Z') });
+    async function persistedCounts(userId: string) {
+      return Promise.all([
+        db.dailyExpenditureAggregate.count({ where: { userId } }), db.dailyIntakeAggregate.count({ where: { userId } }),
+        db.finalizedDailyBankRecord.count({ where: { userId } }), db.calorieLedgerTransaction.count({ where: { userId } }),
+        db.bankCalculationSnapshot.count({ where: { userId } }), db.openingBankCalculationDay.count({ where: { userId } }),
+      ]);
+    }
+    assert((await persistedCounts(owner.id)).every(count => count > 0), 'old health, History, ledger, snapshot and Opening provenance must be nonempty before deletion');
     const staleRequest = new PrismaDashboardPreferencesRepository(requestDb).get(owner)
       .then(() => ({ status: 'fulfilled' as const }), () => ({ status: 'rejected' as const }));
     await paused;
@@ -62,9 +93,15 @@ test('completed deletion must reject a paused stale dashboard request instead of
     assert.deepEqual(identityDeleted, [oldSubject]);
     assert.equal(await db.user.findUnique({ where: { id: owner.id } }), null);
     assert.equal(await db.bankAccountInitialization.count({ where: { userId: owner.id } }), 0);
+    assert.deepEqual(await persistedCounts(owner.id), [0, 0, 0, 0, 0, 0], 'completed deletion must cascade every seeded old record');
     const replacement = await resolveVerifiedClerkIdentity(db, config, { subject: newSubject, email: owner.email }, async () => ({ subject: newSubject, email: owner.email }));
     cleanupIds.push(replacement.id);
     assert.notEqual(replacement.id, owner.id);
+    assert.deepEqual(await persistedCounts(replacement.id), [0, 0, 0, 0, 0, 0], 'new subject reusing email must inherit no health, History, ledger or Opening provenance');
+    const freshOpening = await db.bankAccountInitialization.findUniqueOrThrow({ where: { userId: replacement.id } });
+    assert.equal(freshOpening.status, 'WAITING_FOR_OPENING_DATA');
+    assert.equal(freshOpening.historicalOpeningNetCalories, null);
+    assert.equal(freshOpening.accountingStartsOn, null);
     resume();
     const outcome = await staleRequest;
     const old = await db.user.findUnique({ where: { id: owner.id }, include: { profile: true } });
