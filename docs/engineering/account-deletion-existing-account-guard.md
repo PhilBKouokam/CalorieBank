@@ -78,3 +78,30 @@ existing-account guards do **not** solve it. No network identity-validation,
 tombstone, permanent deletion registry, retention policy or schema change is
 included or inferred. The affected public release remains blocked until this
 separate boundary is assessed and any production change is explicitly approved.
+
+### Subsequent characterization of the residual
+
+An additional explicit localhost check now demonstrates this second path using
+the actual unchanged verified-subject resolver and completed deletion service.
+A verified subject is captured before deletion; after deletion removes its mapping,
+passing that captured identity to the resolver provisions a **new UUID** with the
+same subject and a fresh pending initialization. This does not resurrect the
+deleted UUID, so the existing-account guard cannot detect it. External identity and
+provider ports remain synthetic; no JWT or Clerk network behavior is tested or
+changed. The characterization's expected unsafe observation is not a safety PASS.
+This exported-resolver behavior is confirmed locally and stays **OPEN** for
+production-boundary assessment, distinct from the two passing
+repository/deletion-intent safety checks. It must be assessed and explicitly
+dispositioned before claiming complete account-deletion qualification.
+
+The characterization calls the exported resolver directly, as the injected test
+identity verifier does; it does not reproduce the complete production middleware.
+Production `requireUser` first looks up the subject and returns an existing mapping
+directly. Only a missing mapping calls Clerk `users.getUser` before invoking the
+resolver. A request beginning after successful Clerk deletion should fail that
+network lookup; this check does not show that a deleted account's JWT alone can
+provision an account. A production provisioning race would require an initially
+missing mapping and a successful Clerk lookup captured before deletion, with
+concurrent account provisioning/deletion before the resolver's second lookup.
+Those structural prerequisites and remote identity timing are not demonstrated by
+this local characterization. The production auth boundary remains unchanged.

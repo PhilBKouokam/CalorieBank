@@ -108,3 +108,33 @@ test('deletion intent rejects dashboard, sync-session and ingestion work without
     await db.user.deleteMany({ where: { id: owner.id } }); await db.$disconnect();
   }
 });
+
+test('OPEN residual characterization: a captured verified subject can provision a new UUID after completed deletion', async () => {
+  const identity = { subject: `synthetic-captured-${randomUUID()}`, email: `deletion-synthetic-${randomUUID()}@example.invalid` };
+  const config = { AUTH_MODE: 'clerk', APP_ENV: 'beta' } as ApiEnv;
+  const cleanupIds: string[] = [];
+  try {
+    const original = await resolveVerifiedClerkIdentity(db, config, identity);
+    cleanupIds.push(original.id);
+    // Resolver-only characterization, not the complete production boundary:
+    // production first checks the mapping, then fetches Clerk only if absent.
+    // This models a previously captured identity; it does not prove that a
+    // post-deletion JWT passes that network check or this production interleaving.
+    const capturedIdentity = { ...identity };
+    const deletedSubjects: string[] = [];
+    await new AccountSafetyService(db, config, { revokeForAccountDeletion: async () => undefined },
+      async subject => { deletedSubjects.push(subject); }).deleteAccount(original);
+    assert.deepEqual(deletedSubjects, [identity.subject]);
+    assert.equal(await db.user.findUnique({ where: { id: original.id } }), null);
+    // Deliberately unchanged resolver: no re-verification/network/tombstone policy added.
+    const reprovisioned = await resolveVerifiedClerkIdentity(db, config, capturedIdentity);
+    cleanupIds.push(reprovisioned.id);
+    assert.notEqual(reprovisioned.id, original.id);
+    const row = await db.user.findUniqueOrThrow({ where: { id: reprovisioned.id } });
+    assert.equal(row.authSubject, identity.subject);
+    assert.equal(await db.bankAccountInitialization.count({ where: { userId: reprovisioned.id } }), 1);
+    console.info('OPEN RESIDUAL: a pre-deletion verified identity can provision a new internal User after completed deletion');
+  } finally {
+    await db.user.deleteMany({ where: { id: { in: cleanupIds } } }); await db.$disconnect();
+  }
+});
