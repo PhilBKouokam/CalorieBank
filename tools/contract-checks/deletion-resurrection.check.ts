@@ -166,7 +166,7 @@ test('captured subject after completed deletion cannot provision when fresh iden
       async subject => { deletedSubjects.push(subject); }).deleteAccount(original);
     assert.deepEqual(deletedSubjects, [identity.subject]);
     assert.equal(await db.user.findUnique({ where: { id: original.id } }), null);
-    // Deliberately unchanged resolver: no re-verification/network/tombstone policy added.
+    // Captured identity cannot provision after the fresh identity authority denies it.
     await assert.rejects(resolveVerifiedClerkIdentity(db, config, capturedIdentity, async () => null),
       (error: unknown) => error !== null && typeof error === 'object' && 'statusCode' in error && error.statusCode === 401);
     assert.equal(await db.user.count({ where: { authSubject: identity.subject } }), 0);
