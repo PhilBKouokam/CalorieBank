@@ -426,7 +426,6 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       console.warn(JSON.stringify({
         component: 'bank_history',
         event: 'history_gap_detected',
-        localDate: logDate,
         missingRole: !authority.selectedExpenditure
           ? 'burned'
           : !authority.selectedIntake ? 'eaten' : 'calculation',
@@ -437,7 +436,6 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         console.warn(JSON.stringify({
           component: 'bank_history',
           event: 'history_gap_unresolved',
-          localDate: logDate,
           reasonCode: 'outside_supported_refresh_window',
         }));
       }
@@ -689,11 +687,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
     console.info(JSON.stringify({
       component: 'opening_bank',
       event: 'false_complete_import_repaired',
-      userSuffix: user.id.slice(-8),
-      repairedDates: repairedDays.map((day) =>
-        typeof day.logDate === 'string' ? day.logDate : toDateOnly(day.logDate),
-      ),
-      openingEffectiveBalanceCalories,
+      repairedDayCount: repairedDays.length,
     }));
     return openingEffectiveBalanceCalories;
   }

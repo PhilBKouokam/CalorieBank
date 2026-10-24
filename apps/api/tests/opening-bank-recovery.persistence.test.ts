@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { DailyBankTargetRepository } from '../src/modules/daily-bank-target/daily-bank-target.repository';
 import { createHash, randomUUID } from 'node:crypto';
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PrismaBankHistoryRepository } from '../src/modules/bank-history/bank-history.repository';
 import { PrismaPlannedTreatRepository } from '../src/modules/planned-treat/planned-treat.repository';
@@ -166,6 +166,7 @@ describe('Opening Bank and Recovery persistence', () => {
     expect(await targets.get(other.id)).toEqual({ calories: 0, chosen: false });
   });
   afterEach(async () => {
+    vi.restoreAllMocks();
     await prisma.user.deleteMany({ where: { id: { in: userIds.splice(0) } } });
   });
 
@@ -465,6 +466,7 @@ describe('Opening Bank and Recovery persistence', () => {
   });
 
   it('repairs a false-complete Opening Bank when acknowledged HealthKit skips lacked server intake', async () => {
+    const information = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const user = await createUser({ openingPolicy: true });
     const skippedDates = Array.from({ length: 8 }, (_, offset) => {
       const date = new Date('2026-08-19T12:00:00.000Z');
@@ -521,6 +523,11 @@ describe('Opening Bank and Recovery persistence', () => {
     await expect(repository.initializeOpeningBank(user, '2026-08-21', 'America/Chicago'))
       .resolves.toMatchObject({ outcome: 'already_initialized', openingEffectiveBalanceCalories: 519 });
     expect(initializationUpdates).toHaveLength(1);
+    const repairDiagnostics = information.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+      .filter((event) => event.event === 'false_complete_import_repaired');
+    expect(repairDiagnostics).toEqual([{
+      component: 'opening_bank', event: 'false_complete_import_repaired', repairedDayCount: 6,
+    }]);
     const repaired = await prisma.bankAccountInitialization.findUniqueOrThrow({ where: { userId: user.id } });
     expect(repaired.updatedAt.getTime()).toBeGreaterThan(initialized.updatedAt.getTime());
     expect(repaired).toMatchObject({ historicalOpeningNetCalories: 519, openingEffectiveBalanceCalories: 519, eligibleDayCount: 2 });

@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PrismaBankHistoryRepository } from '../src/modules/bank-history/bank-history.repository';
 
@@ -8,6 +8,7 @@ const prisma = new PrismaClient();
 const repository = new PrismaBankHistoryRepository(prisma);
 
 describe('bank history PostgreSQL persistence', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
   afterAll(async () => {
     await prisma.$disconnect();
   });
@@ -92,6 +93,7 @@ describe('bank history PostgreSQL persistence', () => {
   });
 
   it('returns every unexplained post-boundary date instead of silently skipping it', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const userId = randomUUID();
     await prisma.user.create({
       data: {
@@ -100,7 +102,7 @@ describe('bank history PostgreSQL persistence', () => {
         bankAccountInitialization: {
           create: {
             status: 'INITIALIZED',
-            accountingStartsOn: new Date('2026-08-21T00:00:00.000Z'),
+            accountingStartsOn: new Date('2026-08-20T00:00:00.000Z'),
             timezone: 'America/Chicago',
           },
         },
@@ -129,8 +131,18 @@ describe('bank history PostgreSQL persistence', () => {
       '2026-08-23',
       '2026-08-22',
       '2026-08-21',
+      '2026-08-20',
     ]);
     expect(history.missingDays.every((day) => day.status === 'unprocessed')).toBe(true);
+    const diagnostics = warning.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
+    expect(diagnostics.filter((event) => event.event === 'history_gap_detected')).toHaveLength(9);
+    expect(diagnostics.some((event) => event.event === 'history_gap_unresolved')).toBe(true);
+    for (const event of diagnostics) {
+      expect(Object.keys(event).sort()).toEqual(event.event === 'history_gap_detected'
+        ? ['component', 'event', 'missingRole', 'reasonCode', 'recoverable']
+        : ['component', 'event', 'reasonCode']);
+      expect(event.component).toBe('bank_history');
+    }
 
     await prisma.user.delete({ where: { id: userId } });
   });
