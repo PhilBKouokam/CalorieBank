@@ -3,7 +3,8 @@ import express from 'express';
 import { execFileSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { assertFallbackTestEnvironment, blockedFallbackTestRoute, matchesSyntheticNativeFixture } from './fallback-test-policy';
+import { assertFallbackTestEnvironment, blockedFallbackTestRoute, classifySyntheticNativeFixture } from './fallback-test-policy';
+import { createIosFixtureGuard, createIosFixturePayloadGuard, createIosFixtureStore } from './fallback-ios-guard';
 
 async function main() {
   // Validate before importing any API module or opening a database connection.
@@ -21,20 +22,27 @@ async function main() {
     import('../../apps/api/src/db/client'), import('../../apps/api/src/auth/current-user'),
   ]);
   const original = createAuthenticationBoundary(env, prisma);
+  const iosGuard = createIosFixtureGuard(isolation.iosFixture, createIosFixtureStore(prisma));
   const app = express();
   app.disable('x-powered-by');
   app.use((request, response, next) => {
     response.setHeader('Cache-Control', 'no-store');
     if (Date.now() >= isolation.expiry) return response.status(503).json({ error: 'This test session expired.' });
-    if (blockedFallbackTestRoute(request, isolation.nativeFixture)) return response.status(403).json({ error: 'This action is outside the synthetic qualification session.' });
+    if (blockedFallbackTestRoute(request, isolation.nativeFixture, isolation.iosFixture)) return response.status(403).json({ error: 'This action is outside the synthetic qualification session.' });
     next();
   });
   // Parse only the explicitly enabled exact native route; the ordinary API still
   // performs authentication, ownership, source selection and freshness checks.
+  app.use(createIosFixturePayloadGuard(isolation.iosFixture));
   app.use((request, response, next) => {
     if (request.method !== 'POST' || request.path !== '/v1/me/ingestion/native-intake') return next();
     express.json({ limit: '32kb' })(request, response, error => {
-      if (error || !isolation.nativeFixture || !matchesSyntheticNativeFixture(request.body as unknown, isolation.nativeFixture)) {
+      const decision = error ? 'invalid_json' : isolation.nativeFixture
+        ? classifySyntheticNativeFixture(request.body as unknown, isolation.nativeFixture) : 'disabled';
+      if (decision !== 'accepted') {
+        // Only an allowlisted decision code leaves this test boundary. Never log
+        // the body, parser error, source, date, amount, identity or credential.
+        if (isolation.nativeFixture) console.info(JSON.stringify({ event: 'fallback_native_upload_rejected', reason: decision }));
         return response.status(403).json({ error: 'Only the configured synthetic native fixture is permitted.' });
       }
       next();
@@ -52,7 +60,10 @@ async function main() {
         if (!auth.isAuthenticated || !auth.sessionId || !auth.userId || !isolation.subjects.has(auth.userId)) {
           return response.status(401).json({ error: 'A dedicated test account is required.' });
         }
-        return original.requireUser(request, response, next);
+        return original.requireUser(request, response, error => {
+          if (error) return next(error);
+          return iosGuard(request, response, next);
+        });
       },
     },
   }));

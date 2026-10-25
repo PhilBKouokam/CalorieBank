@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertFallbackTestEnvironment, blockedFallbackTestRoute, matchesSyntheticNativeFixture, syntheticNativeFixture } from '../../../tools/qualification/fallback-test-policy';
+import { assertFallbackTestEnvironment, blockedFallbackTestRoute, classifySyntheticNativeFixture, matchesSyntheticNativeFixture, syntheticNativeFixture } from '../../../tools/qualification/fallback-test-policy';
 
 const now = Date.parse('2026-10-25T03:00:00Z');
 const valid = { DATABASE_URL: 'postgresql://caloriebank_test_phase5a:synthetic@localhost:5432/caloriebank_test_phase5a',
@@ -57,6 +57,28 @@ describe('isolated HTTPS fallback service admission', () => {
     for (const body of [null, {}, differentSource, differentValue, differentDate, additionalDay, absent,
       { ...batch(), privateNote: 'Not an accepted field' }]) {
       expect(matchesSyntheticNativeFixture(body, fixture)).toBe(false);
+    }
+  });
+  it('distinguishes fixture failures using fixed codes without changing admission', () => {
+    const source = batch(); source.source.id = 'org.other.tracker';
+    const total = batch(); total.days[0]!.totalCaloriesConsumed = 124;
+    const date = batch(); date.days[0]!.localDate = '2026-10-26';
+    const additional = batch(); additional.days[1]!.quality = 'usable_evidence'; additional.days[1]!.totalCaloriesConsumed = 100;
+    const absent = batch(); absent.days[0]!.quality = 'empty'; absent.days[0]!.totalCaloriesConsumed = null;
+    const cases = [[batch(), 'accepted'], [null, 'schema_invalid'], [source, 'source_mismatch'],
+      [total, 'total_mismatch'], [date, 'date_mismatch'], [additional, 'usable_day_count_mismatch'],
+      [absent, 'usable_day_count_mismatch']] as const;
+    for (const [body, decision] of cases) {
+      expect(classifySyntheticNativeFixture(body, fixture)).toBe(decision);
+      expect(matchesSyntheticNativeFixture(body, fixture)).toBe(decision === 'accepted');
+    }
+  });
+  it('never returns rejected payload content or validation details in diagnostic codes', () => {
+    const body = { ...batch(), privateNote: 'synthetic-canary-do-not-log', token: 'synthetic-credential-canary' };
+    expect(classifySyntheticNativeFixture(body, fixture)).toBe('schema_invalid');
+    const result = JSON.stringify({ event: 'fallback_native_upload_rejected', reason: classifySyntheticNativeFixture(body, fixture) });
+    for (const forbidden of ['synthetic-canary', 'synthetic-credential', fixture.sourceId, fixture.localDate, '123', 'privateNote', 'token']) {
+      expect(result).not.toContain(forbidden);
     }
   });
   it('permits only authenticated device detachment for ordinary sign-out; push remains blocked', () => {
