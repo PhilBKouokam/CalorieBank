@@ -11,6 +11,16 @@ const valid = { DATABASE_URL: 'postgresql://caloriebank_test_phase5a:synthetic@l
   FALLBACK_TEST_EXPIRES_AT: '2026-10-26T03:00:00Z' };
 
 describe('isolated HTTPS fallback service admission', () => {
+  it('permits only authenticated device detachment for ordinary sign-out; push remains blocked', () => {
+    expect(blockedFallbackTestRoute({ method: 'DELETE', path: '/v1/me/morning-bank-update/device' })).toBe(false);
+    for (const method of ['GET', 'PUT', 'POST', 'PATCH']) {
+      expect(blockedFallbackTestRoute({ method, path: '/v1/me/morning-bank-update/device' })).toBe(true);
+    }
+    for (const path of ['/v1/me/morning-bank-update', '/v1/me/morning-bank-update/device/other', '/v1/me/morning-bank-update/deliver']) {
+      expect(blockedFallbackTestRoute({ method: 'DELETE', path })).toBe(true);
+    }
+  });
+
   it('starts with no admitted accounts and permits at most two explicit test subjects', () => {
     expect(assertFallbackTestEnvironment(valid, now).subjects.size).toBe(0);
     expect(assertFallbackTestEnvironment({ ...valid, FALLBACK_TEST_ALLOWED_SUBJECTS: 'user_old,user_new' }, now).subjects.size).toBe(2);
@@ -37,7 +47,7 @@ describe('isolated HTTPS fallback service admission', () => {
   });
   it('blocks provider callbacks, ingestion, deletion and scheduled processing but preserves core routes', () => {
     for (const path of ['/v1/me/integrations/fitbit/callback', '/v1/me/integrations/fatsecret/authorize',
-      '/v1/me/ingestion/native-intake', '/v1/me/morning-bank-update/device', '/v1/me/lifecycle/refresh', '/v1/me/account']) {
+      '/v1/me/ingestion/native-intake', '/v1/me/morning-bank-update', '/v1/me/lifecycle/refresh', '/v1/me/account']) {
       expect(blockedFallbackTestRoute({ method: 'DELETE', path })).toBe(true);
     }
     for (const path of ['/v1/me/manual-intake', '/v1/me/intake-adjustment', '/v1/me/provider-selection', '/v1/me/health-connections', '/v1/me/onboarding', '/v1/me/today', '/v1/me/bank-history']) {

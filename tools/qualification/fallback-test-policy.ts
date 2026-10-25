@@ -44,8 +44,10 @@ export function assertFallbackTestEnvironment(input: Readonly<Record<string, str
   return { expiry, subjects };
 }
 
-/** No remote grants, provider ingestion, deletion, push or account-wide worker. */
+/** No remote grants, ingestion, account deletion, push registration/delivery or worker. */
 export function blockedFallbackTestRoute(request: Pick<Request, 'method' | 'path'>) {
+  // Preserve the real authenticated sign-out cleanup without enabling push.
+  if (request.method === 'DELETE' && request.path === '/v1/me/morning-bank-update/device') return false;
   return request.path.startsWith('/v1/me/integrations')
     || request.path.startsWith('/v1/me/ingestion')
     || request.path.startsWith('/v1/me/morning-bank-update')
