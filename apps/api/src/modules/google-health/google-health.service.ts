@@ -359,6 +359,9 @@ export class GoogleHealthFitbitService {
       try { return new URL(mobileRedirectUri).protocol.replace(/:$/, ''); } catch { return null; }
     })();
     try {
+      if (this.config.APP_ENV === 'local' && this.config.GOOGLE_HEALTH_LOCAL_AUTHORIZATION_PAUSED === '1') {
+        throw new AppError('Google connection is paused for local development.', 503, { code: 'LOCAL_AUTHORIZATION_PAUSED' });
+      }
       const secrets = configured(this.config);
       stage = 'mobile_redirect_validation';
       const safeRedirect = safeMobileRedirect(mobileRedirectUri);

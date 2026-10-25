@@ -49,7 +49,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
   return <>
     <View style={styles.card}>
       <Text style={styles.title}>If I want to burn…</Text>
-      <View style={styles.inputRow}><TextInput accessibilityLabel="Desired estimated actual calories burned today" keyboardType="number-pad" maxLength={6} selectTextOnFocus
+      <View style={styles.inputRow}><TextInput underlineColorAndroid="transparent" accessibilityLabel="Desired estimated actual calories burned today" keyboardType="number-pad" maxLength={6} selectTextOnFocus
         {...draft.selection('burn')} value={burn} onChangeText={(v) => setBurn(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>calories</Text></View>
       {inverse ? <View accessibilityLiveRegion="polite" style={styles.results}>
@@ -63,7 +63,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
     </View>
     <View style={styles.card}>
       <Text style={styles.title}>If I walk…</Text>
-      <View style={styles.inputRow}><TextInput accessibilityLabel="Target total steps today" keyboardType="number-pad" maxLength={6} selectTextOnFocus
+      <View style={styles.inputRow}><TextInput underlineColorAndroid="transparent" accessibilityLabel="Target total steps today" keyboardType="number-pad" maxLength={6} selectTextOnFocus
         {...draft.selection('steps')} value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>steps</Text></View>
       {forward ? <View accessibilityLiveRegion="polite" style={styles.results}>

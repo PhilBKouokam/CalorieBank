@@ -103,6 +103,28 @@ async function authorizationState(service: GoogleHealthFitbitService) {
 }
 
 describe('Google Health OAuth callback', () => {
+  it('pauses new local authorization before creating an attempt or changing an existing connection', async () => {
+    const harness = oauthDb({ existingRefreshToken: 'unchanged-encrypted-fixture' });
+    const original = harness.getConnection();
+    const service = new GoogleHealthFitbitService(harness.db, {} as TodayAggregateRepository,
+      config({ APP_ENV: 'local', GOOGLE_HEALTH_LOCAL_AUTHORIZATION_PAUSED: '1' }));
+    await expect(service.createAuthorizationUrl(user, 'caloriebank://integrations')).rejects.toMatchObject({
+      statusCode: 503, details: { code: 'LOCAL_AUTHORIZATION_PAUSED' },
+    });
+    expect(harness.getAttempt()).toBeNull(); expect(harness.getConnection()).toEqual(original);
+  });
+
+  it.each(['beta', 'production'] as const)('keeps hosted %s authorization on its configured stable callback', async APP_ENV => {
+    const harness = oauthDb();
+    const redirect = 'https://caloriebank-beta-api.onrender.com/v1/me/integrations/fitbit/callback';
+    const service = new GoogleHealthFitbitService(harness.db, {} as TodayAggregateRepository,
+      config({ APP_ENV, GOOGLE_HEALTH_LOCAL_AUTHORIZATION_PAUSED: '1', GOOGLE_HEALTH_REDIRECT_URI: redirect }));
+    const { authorizationUrl } = await authorizationState(service);
+    expect(new URL(authorizationUrl).searchParams.get('redirect_uri')).toBe(redirect);
+    expect(new URL(authorizationUrl).searchParams.get('scope')).toBe(GOOGLE_HEALTH_ACTIVITY_READ_SCOPE);
+    expect(harness.getAttempt()).not.toBeNull();
+  });
+
   it('rejects a non-canonical mobile redirect with a typed error and safe authorization-start diagnostics', async () => {
     const harness = oauthDb();
     const events: Array<{ event: string; metadata: Readonly<Record<string, unknown>> }> = [];

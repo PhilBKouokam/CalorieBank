@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 
 import type { ApiEnv } from '../../env';
+import { requirePublicIntakeSource } from '../../security/public-intake-availability';
 import { AppError } from '../../errors';
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
 import { requireExistingRequestAccount } from '../../auth/existing-account';
@@ -117,6 +118,7 @@ export class FatSecretService {
   }
 
   async createAuthorizationUrl(user: DevelopmentUser, mobileRedirectUri: string) {
+    await requirePublicIntakeSource(this.db, user.id, { provider: FATSECRET_PROVIDER_ID }, this.config);
     const secrets = configured(this.config);
     const parameters = this.signedParameters({
       method: 'POST',
@@ -165,6 +167,7 @@ export class FatSecretService {
     ) throw new AppError('FatSecret authorization is invalid or expired.', 400);
     const owner = await this.db.user.findUnique({ where: { id: attempt.userId }, select: { id: true, email: true, deletionRequestedAt: true } });
     if (!owner || owner.deletionRequestedAt) throw new AppError('This account is unavailable.', 400);
+    await requirePublicIntakeSource(this.db, owner.id, { provider: FATSECRET_PROVIDER_ID }, this.config);
     const storedRequestToken = decryptProviderSecret(attempt.encryptedRequestToken, secrets.encryptionKey);
     if (storedRequestToken !== oauthToken) throw new AppError('FatSecret authorization token is invalid.', 400);
     const requestTokenSecret = decryptProviderSecret(attempt.encryptedRequestTokenSecret, secrets.encryptionKey);
@@ -182,6 +185,7 @@ export class FatSecretService {
     const access = parseTokenResponse(await response.text());
     await this.db.$transaction(async tx => {
       await requireExistingRequestAccount(tx, owner);
+      await requirePublicIntakeSource(tx, owner.id, { provider: FATSECRET_PROVIDER_ID }, this.config);
       const consumed = await tx.externalProviderOAuthAttempt.updateMany({
         where: { id: attempt.id, userId: owner.id, consumedAt: null, expiresAt: { gt: this.now() } },
         data: { consumedAt: this.now() },
@@ -216,6 +220,7 @@ export class FatSecretService {
   }
 
   private async delegatedCredentials(userId: string) {
+    await requirePublicIntakeSource(this.db, userId, { provider: FATSECRET_PROVIDER_ID }, this.config);
     const secrets = configured(this.config);
     const connection = await this.db.externalProviderConnection.findUnique({
       where: { userId_provider: { userId, provider: FATSECRET_PROVIDER_ID } },

@@ -13,7 +13,7 @@ const trackers = [
 ] as const;
 
 /** Shared consumer chooser; only exact observed writers can become authoritative. */
-export function AndroidFoodChoices({ onSelected, onBusyChange, disabled = false }: { disabled?: boolean; onSelected: () => Promise<void>; onBusyChange: (busy: boolean) => void }) {
+export function AndroidFoodChoices({ onSelected, onBusyChange, disabled = false, allowFatSecret = true }: { allowFatSecret?: boolean; disabled?: boolean; onSelected: () => Promise<void>; onBusyChange: (busy: boolean) => void }) {
   const [busy, setBusy] = useState(false);
   const [requested, setRequested] = useState<string | null>(null);
   const [sources, setSources] = useState<NativeFoodSource[]>([]);
@@ -39,7 +39,7 @@ export function AndroidFoodChoices({ onSelected, onBusyChange, disabled = false 
       if (!current.current) return;
       if (['unavailable', 'unsupported_version', 'setup_required'].includes(discovered.access.state)) {
         setNeedsSetup(discovered.access.state === 'setup_required');
-        setMessage('Health Connect needs to be available on this phone. You can choose FatSecret instead.');
+        setMessage(allowFatSecret ? 'Health Connect needs to be available on this phone. You can choose FatSecret instead.' : 'Health Connect needs to be available on this phone. You can use a daily estimate instead.');
       } else if (!discovered.access.granted.includes('nutrition')) {
         setMessage('Allow CalorieBank to read nutrition in Health Connect, then check again.');
       } else if (discovered.queryState !== 'complete' && discovered.queryState !== 'empty') {
@@ -52,8 +52,9 @@ export function AndroidFoodChoices({ onSelected, onBusyChange, disabled = false 
           setMessage(`No ${name} calories were found in Health Connect yet. Make sure ${name} is sharing nutrition with Health Connect, then check again.`);
         }
       } else {
-        setSources(discovered.sources);
-        if (!discovered.sources.length) setMessage('No food data was found in Health Connect yet. Open your tracker and enable nutrition sharing, then check again.');
+        const available = discovered.sources.filter(source => allowFatSecret || source.source.id !== 'com.fatsecret.android');
+        setSources(available);
+        if (!available.length) setMessage('No food data was found in Health Connect yet. Open your tracker and enable nutrition sharing, then check again.');
       }
     } catch { if (current.current) setMessage('We couldn’t check your food data. Try again.'); }
     finally { if (current.current) changeBusy(false); }
@@ -65,7 +66,7 @@ export function AndroidFoodChoices({ onSelected, onBusyChange, disabled = false 
     <Pressable accessibilityRole="button" disabled={busy || disabled} onPress={() => void choose(null)} style={styles.option}>
       <Text style={styles.name}>Another app using Health Connect</Text><Text style={styles.detail}>Choose another app that shares your calories with Health Connect.</Text>
     </Pressable>
-    {sources.map((source, index) => <Pressable key={source.source.id} accessibilityRole="button" disabled={busy || disabled} style={styles.option} onPress={() => {
+    {sources.filter(source => allowFatSecret || source.source.id !== 'com.fatsecret.android').map((source, index) => <Pressable key={source.source.id} accessibilityRole="button" disabled={busy || disabled} style={styles.option} onPress={() => {
       if (locked.current || disabled) return;
       changeBusy(true);
       void select(source).catch(() => { if (current.current) setMessage('Your food source could not be saved. Try again.'); }).finally(() => { if (current.current) changeBusy(false); });

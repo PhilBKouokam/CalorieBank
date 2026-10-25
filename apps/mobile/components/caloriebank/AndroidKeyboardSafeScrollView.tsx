@@ -1,13 +1,15 @@
 import { requireNativeModule } from 'expo';
 import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
-import { findNodeHandle, ScrollView, StyleSheet, View, type ScrollViewProps } from 'react-native';
+import { AppState, findNodeHandle, ScrollView, StyleSheet, View, type ScrollViewProps } from 'react-native';
 import { focusedScrollTarget, keyboardOverlap, type KeyboardGeometry } from '@/lib/keyboard/geometry';
 
+type Registration = { status: 'attached' | 'pending' | 'error'; reason?: string };
+let nextOwner = 0;
 type GeometryModule = {
-  watch(tag: number): Promise<void>;
-  unwatch(tag: number): Promise<void>;
-  measure(outer: number, scroll: number): Promise<KeyboardGeometry | null>;
-  addListener(event: 'geometryChanged', listener: (event: { tag: number }) => void): { remove(): void };
+  watch(tag: number, owner: string): Promise<Registration>;
+  unwatch(tag: number, owner: string): Promise<void>;
+  measure(outer: number, scroll: number, owner: string): Promise<KeyboardGeometry | null>;
+  addListener(event: 'geometryChanged', listener: (event: { tag: number; owner: string }) => void): { remove(): void };
 };
 
 /** The stable outer frame measures overlap; only the inner viewport shrinks. */
@@ -20,14 +22,18 @@ export const AndroidKeyboardSafeScrollView = forwardRef<ScrollView, ScrollViewPr
   const mounted = useRef(false);
   const revision = useRef(0);
   const overlapRef = useRef(0);
+  const owner = useRef('');
+  const watchedTag = useRef<number | null>(null);
+  const registration = useRef<Promise<void> | null>(null);
   const [overlap, setOverlap] = useState(0);
 
   const refresh = useCallback(async () => {
     const outerTag = findNodeHandle(outer.current), scrollTag = findNodeHandle(scroll.current);
     if (!module.current || outerTag === null || scrollTag === null) return;
     const request = ++revision.current;
-    const geometry = await module.current.measure(outerTag, scrollTag);
-    if (!mounted.current || request !== revision.current || !geometry) return;
+    const lifetime = owner.current;
+    const geometry = await module.current.measure(outerTag, scrollTag, lifetime);
+    if (!mounted.current || lifetime !== owner.current || request !== revision.current || !geometry) return;
     const next = keyboardOverlap(geometry);
     if (next !== overlapRef.current) {
       overlapRef.current = next;
@@ -38,32 +44,66 @@ export const AndroidKeyboardSafeScrollView = forwardRef<ScrollView, ScrollViewPr
     if (target !== null) scroll.current?.scrollTo({ y: target, animated: false });
   }, []);
 
-  useEffect(() => {
-    ++revision.current; // Invalidate measurements from a previous effect lifetime.
-    mounted.current = true;
-    const native = requireNativeModule<GeometryModule>('CalorieBankKeyboardGeometry');
-    module.current = native;
+  const register = useCallback(() => {
+    const native = module.current;
     const tag = findNodeHandle(outer.current);
-    const subscription = native.addListener('geometryChanged', event => {
-      if (event.tag === tag) void refresh();
+    if (!mounted.current || !native || tag === null || registration.current) return;
+    const lifetime = owner.current;
+    if (watchedTag.current !== tag) {
+      ++revision.current;
+      if (watchedTag.current !== null) void native.unwatch(watchedTag.current, lifetime);
+      watchedTag.current = tag;
+    }
+    const pending = native.watch(tag, lifetime).then(result => {
+      if (!mounted.current || owner.current !== lifetime) return;
+      if (result.status === 'attached') void refresh();
+      else if (result.status === 'error') console.warn('Keyboard observer registration failed:', result.reason);
+      // Pending view lookup is recovered by native window-layout/attachment events.
+      // Layout/foreground below also reattempt, including a temporarily absent Activity.
+    }).catch(() => {
+      if (mounted.current && owner.current === lifetime) console.warn('Keyboard observer registration failed.');
+    }).finally(() => {
+      if (registration.current === pending) registration.current = null;
     });
-    if (tag !== null) void native.watch(tag);
-    return () => {
-      mounted.current = false;
-      subscription.remove();
-      if (tag !== null) void native.unwatch(tag);
-    };
+    registration.current = pending;
   }, [refresh]);
 
-  return <View ref={outer} collapsable={false} style={[styles.host, style]} onLayout={() => void refresh()}>
+  const layoutChanged = useCallback(() => { register(); void refresh(); }, [register, refresh]);
+
+  useEffect(() => {
+    ++revision.current;
+    mounted.current = true;
+    const lifetime = `keyboard-${++nextOwner}`;
+    owner.current = lifetime;
+    registration.current = null;
+    const native = requireNativeModule<GeometryModule>('CalorieBankKeyboardGeometry');
+    module.current = native;
+    watchedTag.current = null;
+    const subscription = native.addListener('geometryChanged', event => {
+      if (mounted.current && owner.current === lifetime && event.owner === lifetime && event.tag === watchedTag.current) void refresh();
+    });
+    const foreground = AppState.addEventListener('change', state => { if (state === 'active') register(); });
+    register(); // Also recovers layout-before-effect ordering; no prior onLayout is required.
+    return () => {
+      mounted.current = false;
+      ++revision.current;
+      module.current = null;
+      subscription.remove();
+      foreground.remove();
+      if (watchedTag.current !== null) void native.unwatch(watchedTag.current, lifetime);
+      watchedTag.current = null;
+    };
+  }, [refresh, register]);
+
+  return <View ref={outer} collapsable={false} style={[styles.host, style]} onLayout={layoutChanged}>
     <ScrollView {...props} ref={value => {
       scroll.current = value;
       if (typeof forwardedRef === 'function') forwardedRef(value);
       else if (forwardedRef) forwardedRef.current = value;
     }} style={[styles.scroll, { marginBottom: overlap }]}
       automaticallyAdjustKeyboardInsets={false} keyboardDismissMode="none" keyboardShouldPersistTaps="handled"
-      onLayout={event => { onLayout?.(event); void refresh(); }}
-      onContentSizeChange={(width, height) => { onContentSizeChange?.(width, height); void refresh(); }}
+      onLayout={event => { onLayout?.(event); layoutChanged(); }}
+      onContentSizeChange={(width, height) => { onContentSizeChange?.(width, height); layoutChanged(); }}
     />
   </View>;
 });

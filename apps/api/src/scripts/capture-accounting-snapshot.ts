@@ -5,13 +5,10 @@
 import { PrismaClient } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { privateAccountingSnapshotPath } from './accounting-snapshot-path';
 
-const output = process.env.ACCOUNTING_SNAPSHOT_PATH;
+const output = privateAccountingSnapshotPath(process.env.ACCOUNTING_SNAPSHOT_PATH);
 const sourceCommit = process.env.RENDER_GIT_COMMIT ?? process.env.ACCOUNTING_SOURCE_COMMIT;
-if (!output || !isAbsolute(output) || !relative(process.cwd(), resolve(output)).startsWith('..')) {
-  throw new Error('Use an absolute private evidence path outside the checkout.');
-}
 if (!sourceCommit || !/^[a-f0-9]{40}$/.test(sourceCommit)) throw new Error('An exact source commit is required.');
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const db = new PrismaClient();
@@ -56,7 +53,7 @@ async function capture() {
     return { formatVersion: 1, capturedAt: capturedAt[0].captured_at, sourceCommit, migrations, accounts };
   }, { isolationLevel: 'RepeatableRead', timeout: 30_000 });
   // Exclusive creation prevents overwriting earlier evidence; permissions are owner-only.
-  writeFileSync(output!, JSON.stringify(snapshot, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+  writeFileSync(output, JSON.stringify(snapshot, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
   const inconsistentAccounts = snapshot.accounts.filter((account) => Object.values(account.consistency).some((valid) => !valid)).length;
   console.log(JSON.stringify({ capturedAt: snapshot.capturedAt, sourceCommit, accounts: snapshot.accounts.length, inconsistentAccounts, snapshotSha256: hash(snapshot), savedPrivately: true }));
   if (inconsistentAccounts) process.exitCode = 1;

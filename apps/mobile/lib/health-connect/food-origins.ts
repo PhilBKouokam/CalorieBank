@@ -12,13 +12,14 @@ export function foodOriginName(packageId: string): string {
 export function discoverFoodOrigins(
   report: QualificationReport,
   connections: readonly { provider: string; status: string }[],
+  allowFatSecret = true,
 ): FoodOrigin[] {
   if (report.readConsistency !== 'stable_read' || report.state !== 'complete' ||
       !report.access.granted.includes('nutrition') ||
       Object.entries(report.counts).some(([category, count]) => category !== 'nutrition' && count > 0)) return [];
   const directFatSecret = connections.some((c) => c.provider === 'fatsecret' && c.status === 'connected');
   return [...new Set(report.origins.map((s) => s.id))]
-    .filter((id) => !directFatSecret || id !== 'com.fatsecret.android')
+    .filter((id) => (allowFatSecret && !directFatSecret) || id !== 'com.fatsecret.android')
     .map((id): FoodOrigin => ({ source: { namespace: 'android_package', id }, displayName: foodOriginName(id) }))
     .sort((a, b) => a.displayName.localeCompare(b.displayName) || a.source.id.localeCompare(b.source.id));
 }

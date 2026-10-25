@@ -62,7 +62,7 @@ export default function SettingsScreen() {
           </View>
           {signOutError ? <Text accessibilityLiveRegion="assertive" style={styles.signOutError}>We couldn’t finish signing you out. Please try again.</Text> : null}
         </> : null}
-        {Platform.OS === 'android' ? <View style={styles.group}><PrivacyPolicyRow /></View> : null}
+        <View style={styles.group}><PrivacyPolicyRow /></View>
       </ScrollView>
     </SafeAreaView>
   );

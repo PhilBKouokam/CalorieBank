@@ -1,3 +1,5 @@
+import { env } from '../../env';
+import { publicIntakeAvailability, requirePublicIntakeSource, type PublicIntakeConfig } from '../../security/public-intake-availability';
 import { getLocalDateForTimezone } from '../today/today.time';
 import { openingImportDates } from '../bank-history/opening-bank-import';
 import { intakeRefreshPlan, resolveIntakeAuthority, sameIntakeIdentity, selectionIdentity, transitionIntakeAuthority } from './intake-authority';
@@ -128,6 +130,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
     private readonly bankHistory: BankHistoryRepository,
     private readonly now: () => Date = () => new Date(),
     private readonly transitionsEnabled = true,
+    private readonly publicIntakeConfig: PublicIntakeConfig = env,
   ) {}
 
   private async responseInTransaction(userId: string, db: Prisma.TransactionClient): Promise<ProviderSelectionResponse> {
@@ -211,6 +214,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       openingImportDates(getLocalDateForTimezone(profile?.timezone ?? 'UTC', this.now())), selection);
 
     return {
+      intakeAvailability: await publicIntakeAvailability(db, userId, this.publicIntakeConfig),
       expenditure: {
         selected: selection.expenditureSelected,
         authoritativeProvider: selection.authoritativeExpenditureProvider as 'apple_health' | 'google_health_fitbit',
@@ -399,6 +403,12 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
     const effectiveEatenSelected = selection.intakeSelected && selection.authoritativeIntakeProvider === 'manual_estimate'
       ? roleOption('eaten-manual-estimate-v1', 'Your estimate', 'available')
       : selection.intakeSelected && selection.authoritativeIntakeProvider === 'health_connect' ? nativeOption : eatenSelected;
+    const intakeAvailability = await publicIntakeAvailability(this.db, userId, this.publicIntakeConfig);
+    const publicEatenOptions = intakeAvailability?.fatSecret === false
+      ? eatenOptions.filter(option => option.optionId !== HEALTH_CONNECTION_OPTION_IDS.eatenFatSecret
+        && !(option.optionId === HEALTH_CONNECTION_OPTION_IDS.eatenNative && selection.nativeIntakeSourceId === 'com.fatsecret.android')
+        && !(option.optionId === HEALTH_CONNECTION_OPTION_IDS.eatenAppleHealthWriter && selection.appleHealthIntakeWriterBundleId === 'com.fatsecret.caloriecounter'))
+      : eatenOptions;
     const selectable = (option: HealthConnectionOption) => option.status === 'connected';
 
     const connectedServices: HealthConnectionOption[] = [];
@@ -435,10 +445,11 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
     const burnedAlternatives = burnedOptions.filter((option) =>
       option.optionId !== burnedSelected?.optionId && option.status !== 'not_connected',
     );
-    const eatenAlternatives = eatenOptions.filter((option) =>
+    const eatenAlternatives = publicEatenOptions.filter((option) =>
       option.optionId !== effectiveEatenSelected?.optionId && option.status !== 'not_connected',
     );
     return {
+      intakeAvailability,
       burned: {
         selected: burnedSelected,
         alternatives: burnedAlternatives,
@@ -450,7 +461,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
         selected: effectiveEatenSelected,
         alternatives: eatenAlternatives,
         canChange: eatenAlternatives.some(selectable),
-        canAddSource: eatenOptions.some((option) =>
+        canAddSource: publicEatenOptions.some((option) =>
           option.optionId !== effectiveEatenSelected?.optionId && option.status !== 'connected'),
       },
       connectedServices,
@@ -570,6 +581,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
       }
     }
     if (changesIntake && input.authoritativeIntakeProvider === 'fatsecret') {
+      await requirePublicIntakeSource(this.db, user.id, { provider: 'fatsecret' }, this.publicIntakeConfig);
       const connection = await this.db.externalProviderConnection.findUnique({
         where: { userId_provider: { userId: user.id, provider: 'fatsecret' } },
       });
@@ -616,6 +628,7 @@ export class PrismaProviderSelectionRepository implements ProviderSelectionRepos
     await this.db.$transaction(async (transaction) => {
       await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${user.id}), hashtext('opening-bank'))`;
       await requireCompatibleSourceMutation(transaction, user.id);
+      if (changesIntake) await requirePublicIntakeSource(transaction, user.id, { provider: input.authoritativeIntakeProvider, writerId: selectedWriter?.bundleIdentifier ?? null, sourceId: nativeSourceId }, this.publicIntakeConfig);
       const stored = await transaction.providerSelection.findUnique({ where: { userId: user.id } });
       requireIntakeCapability(stored?.authoritativeIntakeProvider, input.authoritativeIntakeProvider);
       const changed = Object.entries(roleChanges).filter(([key, value]) =>

@@ -7,6 +7,8 @@ const EnvSchema = z.object({
   APP_ENV: z.enum(['local', 'beta', 'production']).default('local'),
   INTAKE_AUTHORITY_TRANSITIONS_ENABLED: z.enum(['0', '1']).default('0'),
   MANUAL_INTAKE_SELECTION_ENABLED: z.enum(['0', '1']).default('0'),
+  PUBLIC_INTAKE_MODE: z.enum(['unchanged', 'without_fatsecret']).default('unchanged'),
+  FATSECRET_PRIVATE_BETA_CREATED_BEFORE: z.string().datetime().optional(),
   AUTH_MODE: z.enum(['development', 'clerk']).default('development'),
   CLERK_PUBLISHABLE_KEY: z.string().trim().min(1).optional(),
   CLERK_SECRET_KEY: z.string().trim().min(1).optional(),
@@ -19,6 +21,7 @@ const EnvSchema = z.object({
   DEV_USER_ID: z.string().uuid().default('00000000-0000-4000-8000-000000000001'),
   DEV_USER_EMAIL: z.string().email().default('developer@caloriebank.local'),
   TODAY_INGESTION_MODE: z.enum(['disabled', 'development', 'device']).default('disabled'),
+  GOOGLE_HEALTH_LOCAL_AUTHORIZATION_PAUSED: z.enum(['0', '1']).default('0'),
   GOOGLE_HEALTH_CLIENT_ID: z.string().trim().min(1).optional(),
   GOOGLE_HEALTH_CLIENT_SECRET: z.string().trim().min(1).optional(),
   GOOGLE_HEALTH_REDIRECT_URI: z.string().url().optional(),
@@ -44,6 +47,9 @@ const EnvSchema = z.object({
   FATSECRET_API_BASE_URL: z.string().url().default('https://platform.fatsecret.com/rest'),
   EXPO_ACCESS_TOKEN: z.string().trim().min(1).optional(),
 }).superRefine((value, context) => {
+  if (value.PUBLIC_INTAKE_MODE === 'without_fatsecret' && (!value.FATSECRET_PRIVATE_BETA_CREATED_BEFORE || Date.parse(value.FATSECRET_PRIVATE_BETA_CREATED_BEFORE) > Date.now())) {
+    context.addIssue({ code: 'custom', path: ['FATSECRET_PRIVATE_BETA_CREATED_BEFORE'], message: 'An explicit non-future private-beta cutoff is required for the public intake contingency.' });
+  }
   if (value.APP_ENV !== 'local' && value.AUTH_MODE !== 'clerk') {
     context.addIssue({
       code: 'custom',

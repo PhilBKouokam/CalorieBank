@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { openBrowserAsync } from 'expo-web-browser';
 
@@ -9,7 +9,6 @@ import { SettingsRow } from '@/components/caloriebank/SettingsRow';
 export function PrivacyPolicyRow() {
   const [failed, setFailed] = useState(false);
   const [opening, setOpening] = useState(false);
-  if (Platform.OS !== 'android') return null;
 
   async function openPolicy() {
     if (opening) return;

@@ -37,10 +37,10 @@ it('offers a recoverable failure and clears it after retry', async () => {
   expect(mocks.open).toHaveBeenCalledTimes(2);
   await act(async () => view.unmount());
 });
-it('does not change the iOS Settings presentation', async () => {
+it('opens the same approved privacy page on iOS', async () => {
   mocks.os = 'ios';
   const view = await render();
-  expect(view.toJSON()).toBeNull();
-  expect(mocks.open).not.toHaveBeenCalled();
+  await act(async () => view.root.findByProps({ title: 'Privacy Policy' }).props.onPress());
+  expect(mocks.open).toHaveBeenCalledExactlyOnceWith('https://caloriebank.philbk.dev/privacy');
   await act(async () => view.unmount());
 });

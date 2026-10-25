@@ -7,7 +7,7 @@ import { deriveOnboardingStatus } from '../src/modules/onboarding/onboarding.rep
 
 const h = vi.hoisted(() => ({
   params: {} as Record<string, string>, os: 'ios', providers: null as ProviderSelectionResponse | null, goal: false, empty: false, fail: false, writers: true,
-  pause: null as Promise<void> | null, healthUnavailable: false,
+  pause: null as Promise<void> | null, healthUnavailable: false, fitbitAuthorization: vi.fn(), browserAuthorization: vi.fn(),
   targetChosen: false, manualEnabled: false, nativeRefresh: vi.fn(async () => 'ready'),
   router: { push: vi.fn(), replace: vi.fn() }, saves: [] as ProviderSelectionInput[],
 }));
@@ -52,7 +52,7 @@ vi.mock('react-native', () => ({
 vi.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('expo-router', () => ({ useRouter: () => h.router, useLocalSearchParams: () => ({ returnTo: 'onboarding', ...h.params }), useFocusEffect: (callback: () => void | (() => void)) => React.useEffect(callback, []) }));
-vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: async (url: string) => { connect(url); return { type: 'success', url: 'caloriebank://integrations?fitbit=connected' }; } }));
+vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: async (url: string) => { h.browserAuthorization(url); connect(url); return { type: 'success', url: 'caloriebank://integrations?fitbit=connected' }; } }));
 vi.mock('../../mobile/lib/api/settings-concurrency', () => ({ SettingsConflictError: class extends Error {},
 fetchProtectedTarget: async () => ({ value: { calories: 0, chosen: h.targetChosen }, revision: '0' }),
  saveProtectedTarget: async (calories: number) => { h.targetChosen = true; return { calories, chosen: true }; },
@@ -81,7 +81,7 @@ vi.mock('../../mobile/lib/api/client', () => ({
     }
     return data();
   },
-  startFatSecretAuthorization: async () => ({ authorizationUrl: 'fatsecret' }), startFitbitAuthorization: async () => ({ authorizationUrl: 'google_health_fitbit' }),
+  startFatSecretAuthorization: async () => ({ authorizationUrl: 'fatsecret' }), startFitbitAuthorization: async () => { h.fitbitAuthorization(); return { authorizationUrl: 'google_health_fitbit' }; },
   syncFatSecret: sync, syncFitbit: sync, getApiRequestFailureKind: () => 'unknown', MOBILE_INTEGRATION_REDIRECT_URI: 'caloriebank://integrations',
   ProviderAuthorizationError: class extends Error {}, completeOnboarding: async () => {}, completeOnboardingWelcome: async () => {},
 }));
@@ -146,6 +146,7 @@ async function mountSettings() {
 }
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: false });
+  h.fitbitAuthorization.mockClear(); h.browserAuthorization.mockClear();
   h.nativeRefresh.mockClear(); h.router.push.mockClear(); h.router.replace.mockClear();
   h.params = {}; h.os = 'ios'; h.goal = false; h.targetChosen = false; h.empty = false; h.fail = false; h.writers = true; h.saves = []; h.pause = null; h.healthUnavailable = false;
   h.manualEnabled = false;
@@ -159,9 +160,32 @@ beforeEach(() => {
 afterEach(async () => { if (screen) await act(async () => screen!.unmount()); screen = undefined; });
 
 describe('actual onboarding component journeys', () => {
+  it.each(['ios', 'android'])('shows Fitbit disclosure and permits Cancel before authorization on %s', async (os) => {
+    h.os = os;
+    await mount();
+    const before = structuredClone(data());
+    await press('Connect Fitbit');
+    expect(text(screen!.root)).toContain('Connect Fitbit through Google Health');
+    expect(h.fitbitAuthorization).not.toHaveBeenCalled();
+    expect(h.browserAuthorization).not.toHaveBeenCalled();
+    expect(data()).toEqual(before);
+    await press('Cancel');
+    expect(text(screen!.root)).toContain('What do you use to track your activity?');
+    expect(h.fitbitAuthorization).not.toHaveBeenCalled();
+    expect(data()).toEqual(before);
+    await press('Connect Fitbit');
+    expect(h.fitbitAuthorization).not.toHaveBeenCalled();
+    await press('Continue to Google');
+    expect(h.fitbitAuthorization).toHaveBeenCalledOnce();
+    expect(h.browserAuthorization).toHaveBeenCalledExactlyOnceWith('google_health_fitbit');
+    expect(data().expenditure.authoritativeProvider).toBe('google_health_fitbit');
+    expect(data().expenditure.selected).toBe(true);
+  });
+
   for (const burn of ['Apple Health', 'Fitbit']) for (const food of ['FatSecret', 'Cronometer', 'MyFitnessPal', 'Lose It!', 'MacroFactor', 'Detected food app']) {
     it(`${burn} -> ${food} -> Back/Forward -> Goal -> Preparation -> remount`, async () => {
       await mount(); await press(`Connect ${burn}`);
+      if (burn === 'Fitbit') await press('Continue to Google');
       expect(text(screen!.root)).toContain('Where do you track your food?');
       expect(data().intake.selected).toBe(false);
       if (food === 'Detected food app') await press('Connect Another app using Apple Health');
@@ -214,7 +238,7 @@ describe('actual onboarding component journeys', () => {
     expect(text(screen!.root)).not.toContain('Choose a food tracker');
   });
   it('repeated Edit Setup/Back/Continue and connections navigation do not mutate selections', async () => {
-    await mount(); await press('Connect Fitbit'); await press('Connect Cronometer'); await press('Save goal'); await press('Continue');
+    await mount(); await press('Connect Fitbit'); await press('Continue to Google'); await press('Connect Cronometer'); await press('Save goal'); await press('Continue');
     const selected = structuredClone(data());
     for (let i = 0; i < 3; i++) {
       await press('Edit setup'); await press('Back'); await press('Back'); await press('Continue'); await press('Continue'); await press('Save goal'); await press('Continue');
@@ -234,7 +258,7 @@ describe('actual onboarding component journeys', () => {
     expect(text(screen!.root)).not.toMatch(/couldn.t refresh|Something went wrong|too long/);
   });
   it('Settings selects direct FatSecret even when native Apple Health lookup fails', async () => {
-    await mount(); await press('Connect Fitbit'); await press('Connect Cronometer');
+    await mount(); await press('Connect Fitbit'); await press('Continue to Google'); await press('Connect Cronometer');
     const burn = structuredClone(data().expenditure);
     await act(async () => screen!.unmount()); h.healthUnavailable = true; await mountSettings();
     await press('Change sources for calories eaten'); await press('FatSecret');
@@ -252,7 +276,7 @@ describe('Android qualified direct-provider journeys', () => {
     expect(h.router.replace).toHaveBeenCalledWith('/onboarding'); expect(data()).toEqual(before);
   });
   it('navigates backward through both source steps without changing authority', async () => {
-    h.os = 'android'; await mount(); await press('Connect Fitbit'); await press('Continue');
+    h.os = 'android'; await mount(); await press('Connect Fitbit'); await press('Continue to Google'); await press('Continue');
     await press('Back'); expect(text(screen!.root)).toContain('Step  1');
     await press('Continue'); await press('Choose Cronometer'); await press('Continue');
     const before = structuredClone(data()); await press('Back'); expect(text(screen!.root)).toContain('Step  2');
@@ -265,7 +289,7 @@ describe('Android qualified direct-provider journeys', () => {
     expect(data().expenditure.selected).toBe(false);
   });
   it('renders canonical Fitbit and exact Cronometer authority independently of nutrition permission', async () => {
-    h.os = 'android'; await mount(); await press('Connect Fitbit'); await press('Continue'); await press('Choose Cronometer');
+    h.os = 'android'; await mount(); await press('Connect Fitbit'); await press('Continue to Google'); await press('Continue'); await press('Choose Cronometer');
     const before = structuredClone(data());
     await act(async () => screen!.unmount()); await mountSettings();
     expect(text(screen!.root)).toContain('Fitbit');
@@ -277,7 +301,7 @@ describe('Android qualified direct-provider journeys', () => {
   });
 
   it.each(['Cronometer', 'MacroFactor'])('runs Fitbit → %s through explicit source Continue buttons', async (name) => {
-    h.os = 'android'; await mount(); await press('Connect Fitbit');
+    h.os = 'android'; await mount(); await press('Connect Fitbit'); await press('Continue to Google');
     expect(text(screen!.root)).toContain('Step  1');
     expect(data().intake.selected).toBe(false);
     await press('Continue'); expect(text(screen!.root)).toContain('Step  2');
@@ -294,7 +318,7 @@ describe('Android qualified direct-provider journeys', () => {
     h.os = 'android';
     await mount();
     expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch|Health Connect/);
-    await press('Connect Fitbit'); await press('Continue');
+    await press('Connect Fitbit'); await press('Continue to Google'); await press('Continue');
     expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch/);
     expect(text(screen!.root)).toContain('Another app using Health Connect');
     await press('Connect FatSecret'); await press('Continue');
@@ -304,7 +328,7 @@ describe('Android qualified direct-provider journeys', () => {
     expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch/);
   });
   it('resumes Fitbit plus exact Health Connect intake through goal and preparation', async () => {
-    h.os = 'android'; await mount(); await press('Connect Fitbit'); await press('Continue');
+    h.os = 'android'; await mount(); await press('Connect Fitbit'); await press('Continue to Google'); await press('Continue');
     expect(text(screen!.root)).toContain('Cronometer'); expect(h.router.push).not.toHaveBeenCalledWith('/native-food');
     const burn = structuredClone(data().expenditure);
     data().connectedProviders.push({ ...data().connectedProviders[0]!, provider: 'health_connect', displayName: 'Health Connect', status: 'connected' });
@@ -319,7 +343,7 @@ describe('Android qualified direct-provider journeys', () => {
   });
   it('keeps empty direct diary recovery independent of native health', async () => {
     h.os = 'android'; h.empty = true;
-    await mount(); await press('Connect Fitbit'); await press('Continue'); await press('Connect FatSecret');
+    await mount(); await press('Connect Fitbit'); await press('Continue to Google'); await press('Continue'); await press('Connect FatSecret');
     expect(text(screen!.root)).toContain('FatSecret');
     expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch/);
   });
@@ -330,7 +354,7 @@ describe('Android qualified direct-provider journeys', () => {
     expect(text(screen!.root)).toContain('Your saved source cannot refresh on this phone');
     expect(text(screen!.root)).not.toMatch(/Apple Health|Apple Watch/);
     expect(data()).toEqual(before);
-    await press('Connect Fitbit'); await press('Connect FatSecret');
+    await press('Connect Fitbit'); await press('Continue to Google'); await press('Connect FatSecret');
     expect(data().intake.authoritativeProvider).toBe('fatsecret');
   });
   it('hides native alternatives in Connections without silently replacing authority', async () => {

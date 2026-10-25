@@ -1,3 +1,4 @@
+import { allowsFatSecret } from '../providers/public-intake-availability';
 import { AppState } from 'react-native';
 import { fetchProviderSelection, saveProviderSelection, uploadNativeIntake } from '../api/client';
 import { nativeNutritionQualification } from '../health-connect/bridge.android';
@@ -88,7 +89,7 @@ export const nativeIntake: NativeIntakeService = {
     const report = await nativeNutritionQualification.inspect();
     const providers = await fetchProviderSelection();
     if (!stillCurrent(run)) return { access, sources: [], queryState: 'failed' };
-    const sources = discoverFoodOrigins(report, providers.connectedProviders);
+    const sources = discoverFoodOrigins(report, providers.connectedProviders, allowsFatSecret(providers));
     discovered = new Set(sources.map((s) => s.source.id));
     return { access: report.access, sources, queryState: report.state === 'complete' ? 'complete' : report.state === 'no_records' ? 'empty' : 'failed' };
   },

@@ -19,7 +19,7 @@ export function DailyBankTargetInput({ value, onChange, disabled = false, select
       </Pressable>)}
     </View>
     <Text style={styles.label}>Daily Bank Target (kcal)</Text>
-    <TextInput accessibilityLabel="Daily Bank Target in calories" editable={!disabled}
+    <TextInput underlineColorAndroid="transparent" accessibilityLabel="Daily Bank Target in calories" editable={!disabled}
       keyboardType="number-pad" {...selectionProps} maxLength={4} value={value}
       onChangeText={(text) => onChange(text.replace(/\D/g, ''))} style={styles.input} />
     <Text style={styles.detail}>This is a flexible target, separate from your Fitness Goal. Choose 0 for no daily target. You can change it later.</Text>

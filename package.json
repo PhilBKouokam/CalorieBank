@@ -8,9 +8,9 @@
     "packages/*"
   ],
   "scripts": {
-    "release:friends-family": "tsx apps/api/src/scripts/release-friends-family.ts",
+    "release:friends-family": "node scripts/with-node20.cjs tsx apps/api/src/scripts/release-friends-family.ts",
     "postinstall": "npm --workspace @caloriebank/domain run build && npm --workspace @caloriebank/schemas run build && node apps/mobile/scripts/patch-health-connect.cjs && node apps/mobile/scripts/patch-ios-back-alignment.cjs",
-    "api:dev": "npm --workspace @caloriebank/api run dev",
+    "api:dev": "node scripts/with-node20.cjs npm --workspace @caloriebank/api run dev",
     "api:build": "npm --workspace @caloriebank/api run build",
     "api:start": "npm --workspace @caloriebank/api run start",
     "db:generate": "npm --workspace @caloriebank/api run db:generate",
@@ -21,15 +21,18 @@
     "lifecycle:run": "npm --workspace @caloriebank/api run lifecycle:run",
     "bank:inspect-providers": "npm --workspace @caloriebank/api run inspect:provider-provenance",
     "auth:link-existing": "npm --workspace @caloriebank/api run auth:link-existing --",
-    "mobile:start": "npm --workspace @caloriebank/mobile run start --",
-    "mobile:ios": "npm --workspace @caloriebank/mobile run ios --",
-    "mobile:ios:device": "npm --workspace @caloriebank/mobile run ios:device --",
-    "mobile:prebuild:ios": "npm --workspace @caloriebank/mobile run prebuild:ios --",
-    "mobile:android": "npm --workspace @caloriebank/mobile run android --",
-    "mobile:web": "npm --workspace @caloriebank/mobile run web --",
-    "lint": "npm --workspaces --if-present run lint",
-    "typecheck": "npm --workspaces --if-present run typecheck",
-    "test": "npm --workspaces --if-present run test"
+    "mobile:start": "node scripts/with-node20.cjs npm --workspace @caloriebank/mobile run start --",
+    "mobile:ios": "node scripts/with-node20.cjs npm --workspace @caloriebank/mobile run ios --",
+    "mobile:ios:device": "node scripts/with-node20.cjs npm --workspace @caloriebank/mobile run ios:device --",
+    "mobile:prebuild:ios": "node scripts/with-node20.cjs npm --workspace @caloriebank/mobile run prebuild:ios --",
+    "mobile:android": "node scripts/with-node20.cjs npm --workspace @caloriebank/mobile run android --",
+    "mobile:web": "node scripts/with-node20.cjs npm --workspace @caloriebank/mobile run web --",
+    "lint": "node scripts/with-node20.cjs npm --workspaces --if-present run lint",
+    "typecheck": "node scripts/with-node20.cjs npm --workspaces --if-present run typecheck",
+    "test": "node scripts/with-node20.cjs node scripts/run-isolated-tests.cjs",
+    "playground": "node scripts/with-node20.cjs node tools/component-playground/run.cjs",
+    "playground:check": "node scripts/with-node20.cjs node tools/component-playground/run.cjs --check",
+    "playground:typecheck": "node scripts/with-node20.cjs node node_modules/typescript/bin/tsc --project tools/component-playground/tsconfig.json --noEmit"
   },
   "engines": {
     "node": ">=20.19.0 <21"

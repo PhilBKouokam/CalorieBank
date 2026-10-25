@@ -1,3 +1,4 @@
+import { requirePublicIntakeSource, type PublicIntakeConfig } from '../../security/public-intake-availability';
 import { activeAdjustment, adjustmentValue } from '../intake-adjustment/intake-adjustment.repository';
 import { adjustedIntakeCalories } from '@caloriebank/domain';
 import { requireAdjustmentCapability } from '../../security/intake-capability';
@@ -138,6 +139,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     private readonly db: PrismaClient,
     private readonly options: {
       allowSyntheticProviders: boolean;
+      publicIntakeConfig?: PublicIntakeConfig;
       onBankingAggregateChanged?: (
         user: DevelopmentUser,
         localDate: string,
@@ -262,6 +264,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     user: DevelopmentUser,
     aggregate: NormalizedDailyIntakeAggregate,
   ): Promise<AggregateUpsertResult> {
+    await requirePublicIntakeSource(this.db, user.id, { provider: aggregate.provider, writerId: aggregate.writerBundleIdentifier ?? null, sourceId: aggregate.sourceId ?? null }, this.options.publicIntakeConfig);
     if (aggregate.provider === 'health_connect') throw new AppError('Use the native intake batch endpoint.', 400);
     if (aggregate.provider === 'apple_health') {
       const selection = await readProviderSelection(this.db, user.id);

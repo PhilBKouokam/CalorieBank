@@ -1,3 +1,5 @@
+import { env } from '../../env';
+import { requirePublicIntakeSource, type PublicIntakeConfig } from '../../security/public-intake-availability';
 import { intakeRefreshPlan } from '../provider-selection/intake-authority';
 import { nativeIntakeBatchSchema, nativeIntakeSourceName } from '@caloriebank/schemas';
 import type { PrismaClient } from '@prisma/client';
@@ -10,7 +12,7 @@ import { openingImportDates } from '../bank-history/opening-bank-import';
 import type { FinalizationScheduler } from '../finalization-orchestration/finalization-orchestration.service';
 
 /** One exact source, one completed read generation, one atomic normalized upload. */
-export function createNativeIntakeRouter(db: PrismaClient, users: RequestUserSource, scheduler?: FinalizationScheduler, now = () => new Date()) {
+export function createNativeIntakeRouter(db: PrismaClient, users: RequestUserSource, scheduler?: FinalizationScheduler, now = () => new Date(), publicIntakeConfig: PublicIntakeConfig = env) {
   const router = Router();
   router.post('/', async (req, res, next) => {
     try {
@@ -29,6 +31,7 @@ export function createNativeIntakeRouter(db: PrismaClient, users: RequestUserSou
       }
       const session = await db.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${user.id}), hashtext('opening-bank'))`;
+        await requirePublicIntakeSource(tx, user.id, { provider: 'health_connect', sourceId: input.source.id }, publicIntakeConfig);
         const selected = await tx.providerSelection.findUnique({ where: { userId: user.id } });
         requireIntakeCapability(selected?.authoritativeIntakeProvider);
         const plan = selected ? await intakeRefreshPlan(tx, user.id, dates, selected) : [];

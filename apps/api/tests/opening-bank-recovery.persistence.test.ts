@@ -47,6 +47,11 @@ async function createUser(options: { openingPolicy?: boolean; goalAdjustment?: n
     },
   });
   if (options.openingPolicy && options.importComplete !== false) {
+    const selection = await prisma.providerSelection.findUniqueOrThrow({
+      where: { userId: id }, select: { updatedAt: true },
+    });
+    // Model a new sync after selection without relying on wall-clock milliseconds.
+    const startedAt = new Date(selection.updatedAt.getTime() + 1);
     await prisma.ingestionSyncSession.create({
       data: {
         userId: id,
@@ -55,8 +60,8 @@ async function createUser(options: { openingPolicy?: boolean; goalAdjustment?: n
         timezone: 'America/Chicago',
         trigger: 'connection',
         status: 'completed',
-        startedAt: new Date(),
-        completedAt: new Date(Date.now() + 1_000),
+        startedAt,
+        completedAt: new Date(startedAt.getTime() + 1_000),
         expenditureStatus: 'ready',
         intakeStatus: 'ready',
         stepsStatus: 'skipped',
@@ -121,6 +126,34 @@ async function addProviderDay(
 }
 
 describe('Opening Bank and Recovery persistence', () => {
+  it('requires an import strictly after source selection before opening History is initialized', async () => {
+    const user = await createUser({ openingPolicy: true });
+    await addProviderDay(user.id, '2026-08-18', 235);
+    const selection = await prisma.providerSelection.findUniqueOrThrow({
+      where: { userId: user.id }, select: { updatedAt: true },
+    });
+    await prisma.ingestionSyncSession.updateMany({
+      where: { userId: user.id }, data: { startedAt: selection.updatedAt },
+    });
+    const repository = new PrismaBankHistoryRepository(prisma, {
+      now: () => new Date('2026-08-19T18:00:00.000Z'), allowSyntheticProviders: false,
+    });
+
+    await expect(repository.initializeOpeningBank(user, '2026-08-19', 'America/Chicago'))
+      .resolves.toMatchObject({ outcome: 'waiting_for_opening_data' });
+    expect(await prisma.openingBankCalculationDay.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.calorieLedgerTransaction.count({ where: { userId: user.id } })).toBe(0);
+
+    await prisma.ingestionSyncSession.updateMany({
+      where: { userId: user.id },
+      data: { startedAt: new Date(selection.updatedAt.getTime() + 1) },
+    });
+    await expect(repository.initializeOpeningBank(user, '2026-08-19', 'America/Chicago'))
+      .resolves.toMatchObject({ outcome: 'initialized', openingEffectiveBalanceCalories: 235 });
+    expect((await repository.getHistory(user.id, 'ALL')).days.map(day => [day.logDate, day.provenance]))
+      .toEqual([['2026-08-18', 'opening']]);
+  });
+
   it('Daily Bank Target is isolated planning metadata before and after initialization', async () => {
     const user = await createUser({ openingPolicy: true });
     const other = await createUser({ openingPolicy: true });

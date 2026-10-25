@@ -273,6 +273,7 @@ const providerConnectionStatusSchema = z.enum([
 ]);
 
 export const providerSelectionResponseSchema = z.object({
+  intakeAvailability: z.object({ fatSecret: z.boolean() }).optional(),
   expenditure: z.object({
     selected: z.boolean().optional(),
     authoritativeProvider: bankingProviderSchema,
@@ -361,6 +362,7 @@ export const healthConnectionRoleSchema = z.object({
 });
 
 export const healthConnectionsResponseSchema = z.object({
+  intakeAvailability: z.object({ fatSecret: z.boolean() }).optional(),
   burned: healthConnectionRoleSchema,
   eaten: healthConnectionRoleSchema,
   connectedServices: z.array(healthConnectionOptionSchema),

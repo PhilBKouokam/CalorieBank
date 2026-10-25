@@ -431,7 +431,8 @@ export default function TodayScreen() {
       >
         <View style={styles.header}>
           <View style={styles.mark}>
-            <Text style={styles.markText}>CB</Text>
+            {/* Fixed-size brand artwork; the adjacent app name still scales. */}
+            <Text allowFontScaling={false} style={styles.markText}>CB</Text>
           </View>
           <Text style={styles.wordmark}>CalorieBank</Text>
         </View>

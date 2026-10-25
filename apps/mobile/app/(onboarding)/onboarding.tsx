@@ -1,7 +1,9 @@
+import { FitbitConnectionDisclosure } from '@/components/caloriebank/FitbitConnectionDisclosure';
 import { clearEditorDraft, onboardingDraftStage } from '@/lib/drafts/session-drafts';
 import { sourceLabel } from '@/lib/native-health/copy';
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { isKnownIntakeProvider } from '@caloriebank/schemas';
+import { allowsFatSecret } from '@/lib/providers/public-intake-availability';
 import { AndroidFoodChoices } from '@/components/caloriebank/AndroidFoodChoices';
 import { ManualSourceChoice } from '@/components/caloriebank/ManualSourceChoice';
 import { beginOnboardingProviderReturn } from '@/lib/auth/native-intent';
@@ -109,6 +111,7 @@ const stageNumber = {
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const [fitbitDisclosure, setFitbitDisclosure] = useState(false);
   const [status, setStatus] = useState<OnboardingStatusResponse | null>(null);
   const [providerState, setProviderState] = useState<ProviderSelectionResponse | null>(null);
   const [busy, setBusy] = useState<BusyAction>('loading');
@@ -313,6 +316,7 @@ export default function OnboardingScreen() {
   }
 
   async function connectFatSecret() {
+    if (!allowsFatSecret(providerState)) { setMessage('Choose another food tracker or use a daily estimate.'); return; }
     await run('fatsecret', async () => {
       const redirect = MOBILE_INTEGRATION_REDIRECT_URI;
       const { authorizationUrl } = await startFatSecretAuthorization(redirect);
@@ -383,16 +387,15 @@ export default function OnboardingScreen() {
       if (await getNativeHealthConnectionStatus() !== 'connected') {
         const connection = await connectNativeHealth();
         if (connection !== 'connected') {
-          throw new OnboardingConsumerError('Apple Health is not available on this device. Choose FatSecret or try again later.');
+          throw new OnboardingConsumerError('Apple Health is not available on this device. Choose another source or use a daily estimate.');
         }
       }
       await withOnboardingTimeout(
         refreshNativeHealthForCurrentAccount({ trigger: 'provider_reconnect', dayCount: 8 }),
       );
-      const writers = preferDirectFoodSources(
-        await withOnboardingTimeout(discoverNativeIntakeWriters()),
-        (await fetchProviderSelection()).connectedProviders,
-      );
+      const discovered = await withOnboardingTimeout(discoverNativeIntakeWriters());
+      const sourceState = await fetchProviderSelection();
+      const writers = preferDirectFoodSources(discovered, sourceState.connectedProviders, allowsFatSecret(sourceState));
       const writer = resolveKnownFoodTracker(tracker, writers);
       const trackerName = {
         cronometer: 'Cronometer', myfitnesspal: 'MyFitnessPal',
@@ -415,21 +418,19 @@ export default function OnboardingScreen() {
       if (await getNativeHealthConnectionStatus() !== 'connected') {
         const connection = await connectNativeHealth();
         if (connection !== 'connected') {
-          throw new OnboardingConsumerError('Apple Health is not available on this device. Choose FatSecret or try again later.');
+          throw new OnboardingConsumerError('Apple Health is not available on this device. Choose another source or use a daily estimate.');
         }
       }
       const discovered = await withOnboardingTimeout(discoverNativeIntakeWriters());
-      const writers = preferDirectFoodSources(
-        discovered,
-        (await fetchProviderSelection()).connectedProviders,
-      );
+      const sourceState = await fetchProviderSelection();
+      const writers = preferDirectFoodSources(discovered, sourceState.connectedProviders, allowsFatSecret(sourceState));
       if (writers.length === 0) {
         return {
           stayOnStage: 'calories_eaten',
           tone: 'attention',
           message: discovered.length > 0
-            ? 'Your food tracker is already connected directly. Choose it to continue.'
-            : 'No food apps with calorie data were found in Apple Health yet. Check again later or choose FatSecret.',
+            ? allowsFatSecret(sourceState) ? 'Your food tracker is already connected directly. Choose it to continue.' : 'Choose another food tracker or use a daily estimate.'
+            : 'No food apps with calorie data were found in Apple Health yet. Check again later or use a daily estimate.',
         };
       }
       setDiscoveredIntakeWriters(writers);
@@ -554,6 +555,10 @@ export default function OnboardingScreen() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [status?.stage, preparationAttempted, busy, displayStage, refresh]);
 
+  if (fitbitDisclosure) return <FitbitConnectionDisclosure onCancel={() => setFitbitDisclosure(false)} onContinue={async () => {
+    try { await connectFitbit(); } finally { setFitbitDisclosure(false); }
+  }} />;
+
   if (!status && initialLoadFailed && busy !== 'loading') {
     return <SetupLoadError onRetry={() => {
       setBusy('loading');
@@ -568,6 +573,7 @@ export default function OnboardingScreen() {
   const activeStage = nativeRecoveryStage ?? displayStage ?? (!status.completed && !dailyTarget?.chosen && ['preparing_bank', 'ready'].includes(status.stage) ? 'daily_bank_target' : status.stage);
   const progress = stageNumber[activeStage];
   const fitbitConnected = providerIsConnected(providerState, 'google_health_fitbit');
+  const allowFatSecret = allowsFatSecret(providerState);
   const fatSecretConnected = providerIsConnected(providerState, 'fatsecret');
   const expenditureActionActive = busy === 'apple-burn' || busy === 'fitbit';
   const intakeActionActive = busy === 'native-intake' || busy === 'fatsecret' || busy?.startsWith('apple-intake:') === true;
@@ -610,7 +616,7 @@ export default function OnboardingScreen() {
             onRetry={() => void retrySelectedSource('expenditure')}
           /> : <>
           {nativeHealthCapability.supported ? <ProviderOption title="Apple Watch" detail="CalorieBank securely reads its activity data through Apple Health." busy={sourceActionIsPending(busy, 'apple-burn')} disabled={busy !== null} connected={status.expenditure.provider === 'apple_health' && status.expenditure.connected} onPress={() => void connectApple('expenditure')} /> : null}
-          <ProviderOption title="Fitbit" detail="Uses your Fitbit calorie burn, steps, and workouts." busy={sourceActionIsPending(busy, 'fitbit')} disabled={busy !== null} connected={fitbitConnected} onPress={() => void connectFitbit()} />
+          <ProviderOption title="Fitbit" detail="Uses your Fitbit calorie burn, steps, and workouts." busy={sourceActionIsPending(busy, 'fitbit')} disabled={busy !== null} connected={fitbitConnected} onPress={() => setFitbitDisclosure(true)} />
           {fitbitConnected && status.expenditure.provider !== 'google_health_fitbit' ? (
             <PrimaryButton busy={busy !== null} label="Use connected Fitbit" onPress={() => void run('fitbit', async () => {
               await selectProvider({ authoritativeExpenditureProvider: 'google_health_fitbit', authoritativeActivityProvider: 'google_health_fitbit' });
@@ -660,10 +666,10 @@ export default function OnboardingScreen() {
               />
             ))}
           </> : null}
-          {nativeIntake.supported ? <AndroidFoodChoices onBusyChange={(active) => setBusy((current) => active ? 'native-intake' : current === 'native-intake' ? null : current)} onSelected={async () => { await refresh(); showStage('calories_eaten'); }} /> : null}
-          <Text style={styles.sectionLabel}>Direct connection</Text>
-          <ProviderOption title="FatSecret" detail="Connect your existing FatSecret food diary directly." busy={busy === 'fatsecret'} disabled={busy !== null} connected={fatSecretConnected} onPress={() => void connectFatSecret()} />
-          {fatSecretConnected && status.intake.provider !== 'fatsecret' ? (
+          {nativeIntake.supported ? <AndroidFoodChoices allowFatSecret={allowFatSecret} onBusyChange={(active) => setBusy((current) => active ? 'native-intake' : current === 'native-intake' ? null : current)} onSelected={async () => { await refresh(); showStage('calories_eaten'); }} /> : null}
+          {allowFatSecret ? <><Text style={styles.sectionLabel}>Direct connection</Text>
+          <ProviderOption title="FatSecret" detail="Connect your existing FatSecret food diary directly." busy={busy === 'fatsecret'} disabled={busy !== null} connected={fatSecretConnected} onPress={() => void connectFatSecret()} /></> : null}
+          {allowFatSecret && fatSecretConnected && status.intake.provider !== 'fatsecret' ? (
             <PrimaryButton busy={busy !== null} label="Use connected FatSecret" onPress={() => void run('fatsecret', async () => {
               await selectProvider({ authoritativeIntakeProvider: 'fatsecret' });
               await syncFatSecret(Intl.DateTimeFormat().resolvedOptions().timeZone, true);
