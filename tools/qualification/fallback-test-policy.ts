@@ -23,7 +23,8 @@ export function assertFallbackTestEnvironment(input: Readonly<Record<string, str
     || !input.CLERK_PUBLISHABLE_KEY?.startsWith('pk_test_')
     || !input.CLERK_SECRET_KEY?.startsWith('sk_test_')
     || input.PUBLIC_INTAKE_MODE !== 'without_fatsecret'
-    || input.FATSECRET_PRIVATE_BETA_CREATED_BEFORE !== '2026-10-01T00:00:00.000Z'
+    || input.FATSECRET_PRIVATE_BETA_ACCOUNT_IDS === undefined
+    || Boolean(input.FATSECRET_PRIVATE_BETA_CREATED_BEFORE)
     || input.GOOGLE_HEALTH_LOCAL_AUTHORIZATION_PAUSED !== '1'
     || input.CLERK_TELEMETRY_DISABLED !== '1'
     || input.FALLBACK_TEST_SYNTHETIC_ONLY !== '1') {

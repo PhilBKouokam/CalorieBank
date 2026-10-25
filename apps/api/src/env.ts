@@ -8,7 +8,7 @@ const EnvSchema = z.object({
   INTAKE_AUTHORITY_TRANSITIONS_ENABLED: z.enum(['0', '1']).default('0'),
   MANUAL_INTAKE_SELECTION_ENABLED: z.enum(['0', '1']).default('0'),
   PUBLIC_INTAKE_MODE: z.enum(['unchanged', 'without_fatsecret']).default('unchanged'),
-  FATSECRET_PRIVATE_BETA_CREATED_BEFORE: z.string().datetime().optional(),
+  FATSECRET_PRIVATE_BETA_ACCOUNT_IDS: z.string().optional(),
   AUTH_MODE: z.enum(['development', 'clerk']).default('development'),
   CLERK_PUBLISHABLE_KEY: z.string().trim().min(1).optional(),
   CLERK_SECRET_KEY: z.string().trim().min(1).optional(),
@@ -47,8 +47,14 @@ const EnvSchema = z.object({
   FATSECRET_API_BASE_URL: z.string().url().default('https://platform.fatsecret.com/rest'),
   EXPO_ACCESS_TOKEN: z.string().trim().min(1).optional(),
 }).superRefine((value, context) => {
-  if (value.PUBLIC_INTAKE_MODE === 'without_fatsecret' && (!value.FATSECRET_PRIVATE_BETA_CREATED_BEFORE || Date.parse(value.FATSECRET_PRIVATE_BETA_CREATED_BEFORE) > Date.now())) {
-    context.addIssue({ code: 'custom', path: ['FATSECRET_PRIVATE_BETA_CREATED_BEFORE'], message: 'An explicit non-future private-beta cutoff is required for the public intake contingency.' });
+  if (value.PUBLIC_INTAKE_MODE === 'without_fatsecret') {
+    const raw = value.FATSECRET_PRIVATE_BETA_ACCOUNT_IDS;
+    const ids = raw === undefined || raw === '' ? [] : raw.split(',');
+    if (raw === undefined || ids.length > 100 || new Set(ids).size !== ids.length
+      || ids.some(id => !z.string().uuid().safeParse(id).success)) {
+      context.addIssue({ code: 'custom', path: ['FATSECRET_PRIVATE_BETA_ACCOUNT_IDS'],
+        message: 'An explicit list of at most 100 unique internal account UUIDs is required; an empty list denies all.' });
+    }
   }
   if (value.APP_ENV !== 'local' && value.AUTH_MODE !== 'clerk') {
     context.addIssue({

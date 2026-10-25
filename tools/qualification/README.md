@@ -11,9 +11,11 @@ Required configuration, with all credentials outside Git:
   `sk_test_` bindings. Production Clerk/provider keys fail startup.
 - A separate database and role both named `caloriebank_test_phase5a`, with its exact
   hostname in `FALLBACK_TEST_DATABASE_HOST`. No production database/env group.
-- `PUBLIC_INTAKE_MODE=without_fatsecret`, fixture-only
-  `FATSECRET_PRIVATE_BETA_CREATED_BEFORE=2026-10-01T00:00:00.000Z`.
-  This is not the proposed live cohort cutoff.
+- `PUBLIC_INTAKE_MODE=without_fatsecret`, explicit
+  `FATSECRET_PRIVATE_BETA_ACCOUNT_IDS` containing only synthetic internal UUIDs
+  (or an explicit empty string to deny all). No timestamp cutoff is accepted by
+  this Phase5B variant; remove the old timestamp variable from a test deployment.
+  Actual private-beta membership belongs in a protected owner-reviewed file, never Git.
 - `GOOGLE_HEALTH_LOCAL_AUTHORIZATION_PAUSED=1`, `CLERK_TELEMETRY_DISABLED=1`,
   `FALLBACK_TEST_SYNTHETIC_ONLY=1`, existing manual/authority capability flags1.
 - Explicit `FALLBACK_TEST_EXPIRES_AT` within36 hours. After expiry requests fail
@@ -50,8 +52,9 @@ disposable data source and narrowly approved ingestion scope. Do not route found
 health data through this service. This limitation is explicit, not a passing test.
 
 For cohort simulation, seed separately approved synthetic records under the two
-confirmed test subjects: one internal creation timestamp before the fixture cutoff,
-one at/after; preserve different internal IDs and one exact selected authority.
+confirmed test subjects: one explicitly listed internal UUID and one unlisted UUID;
+preserve different IDs and exact selected authorities. Creation time and email
+have no admission meaning. New signup never inherits a deleted UUID's membership.
 Synthetic connected-source rows are simulations, not evidence of real provider
 authorization or entitlement. Existing same-source/device/ledger qualification is
 not replaced by them. Never alter production creation timestamps for eligibility.

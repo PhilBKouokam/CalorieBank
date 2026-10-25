@@ -23,11 +23,12 @@ if (!url || !['localhost', '127.0.0.1'].includes(new URL(url).hostname) || !/^\/
 const db = new PrismaClient({ datasourceUrl: url });
 const ids: string[] = [];
 const now = () => new Date('2026-10-24T12:00:00Z');
-const config = { ...env, PUBLIC_INTAKE_MODE: 'without_fatsecret' as const, FATSECRET_PRIVATE_BETA_CREATED_BEFORE: '2026-10-01T00:00:00Z',
+const config = { ...env, PUBLIC_INTAKE_MODE: 'without_fatsecret' as const, FATSECRET_PRIVATE_BETA_ACCOUNT_IDS: '',
   FATSECRET_CONSUMER_KEY: 'synthetic', FATSECRET_CONSUMER_SECRET: 'synthetic', FATSECRET_REDIRECT_URI: 'https://example.com/callback',
   EXTERNAL_PROVIDER_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 42).toString('base64') };
-async function account(createdAt = '2026-10-24T00:00:00Z') {
+async function account(privateBeta = false, createdAt = '2026-10-24T00:00:00Z') {
   const id = randomUUID(); ids.push(id);
+  if (privateBeta) config.FATSECRET_PRIVATE_BETA_ACCOUNT_IDS = [config.FATSECRET_PRIVATE_BETA_ACCOUNT_IDS, id].filter(Boolean).join(',');
   return db.user.create({ data: { id, email: `${id}@test.local`, createdAt: new Date(createdAt), profile: { create: { timezone: 'UTC' } } } });
 }
 const repo = () => new PrismaProviderSelectionRepository(db, new PrismaBankHistoryRepository(db), now, true, config);
@@ -36,25 +37,23 @@ const input = { selectionRole: 'eaten' as const, authoritativeExpenditureProvide
 async function connection(userId: string) {
   return db.externalProviderConnection.create({ data: { userId, provider: 'fatsecret', authProtocol: 'oauth1', encryptedAccessToken: 'opaque-test', encryptedTokenSecret: 'opaque-test' } });
 }
-afterEach(async () => { await db.user.deleteMany({ where: { id: { in: ids.splice(0) } } }); });
+afterEach(async () => { config.FATSECRET_PRIVATE_BETA_ACCOUNT_IDS = ''; await db.user.deleteMany({ where: { id: { in: ids.splice(0) } } }); });
 afterAll(async () => db.$disconnect());
 
 describe('default-off public intake contingency with real PostgreSQL', () => {
-  it('uses exact UTC internal creation timestamps independently of profile timezone', async () => {
-    const cutoff = '2026-10-25T03:00:00.000Z';
-    const policy = { ...config, FATSECRET_PRIVATE_BETA_CREATED_BEFORE: cutoff };
-    for (const [createdAt, allowed, timezone] of [
-      ['2026-10-25T02:59:59.999Z', true, 'Pacific/Kiritimati'],
-      [cutoff, false, 'America/Adak'],
-      ['2026-10-25T03:00:00.001Z', false, 'UTC'],
+  it('uses exact stable membership independently of account age and profile timezone', async () => {
+    for (const [listed, createdAt, timezone] of [
+      [true, '2026-10-25T03:00:00.001Z', 'Pacific/Kiritimati'],
+      [false, '2026-09-01T00:00:00Z', 'America/Adak'],
+      [true, '2026-10-25T03:00:00Z', 'UTC'],
     ] as const) {
-      const user = await account(createdAt);
+      const user = await account(listed, createdAt);
       await db.userProfile.update({ where: { userId: user.id }, data: { timezone } });
-      expect(await publicIntakeAvailability(db, user.id, policy)).toEqual({ fatSecret: allowed });
+      expect(await publicIntakeAvailability(db, user.id, config)).toEqual({ fatSecret: listed });
     }
   });
   it('preserves cohort on restored sessions/devices and reclassifies deliberate fresh identity signup', async () => {
-    const old = await account('2026-09-01T00:00:00Z');
+    const old = await account(true);
     const subject = `user_${randomUUID().replaceAll('-', '')}`;
     await db.user.update({ where: { id: old.id }, data: { authProvider: 'clerk', authSubject: subject } });
     const authConfig = { ...env, APP_ENV: 'beta' as const, AUTH_MODE: 'clerk' as const };
@@ -73,7 +72,7 @@ describe('default-off public intake contingency with real PostgreSQL', () => {
     expect(await db.externalProviderConnection.count({ where: { userId: recreated.id } })).toBe(0);
     expect(await db.calorieLedgerTransaction.count({ where: { userId: recreated.id } })).toBe(0);
   });
-  it('does not substitute a post-cutoff account\'s pre-existing selected FatSecret source on reads', async () => {
+  it('does not substitute an unlisted account\'s pre-existing selected FatSecret source on reads', async () => {
     const user = await account();
     const saved = await connection(user.id);
     const privateRepo = new PrismaProviderSelectionRepository(db, new PrismaBankHistoryRepository(db), now, true,
@@ -87,13 +86,19 @@ describe('default-off public intake contingency with real PostgreSQL', () => {
     expect(await db.externalProviderConnection.findUnique({ where: { id: saved.id } })).toEqual(saved);
     expect(await db.calorieLedgerTransaction.count({ where: { userId: user.id } })).toBe(0);
   });
-  it('requires an explicit non-future cutoff; omission is unchanged', () => {
+  it('requires an explicit stable allowlist, rejects email/invalid/duplicate IDs, and accepts deny-all', () => {
     expect(parseApiEnv({ NODE_ENV: 'test' }).PUBLIC_INTAKE_MODE).toBe('unchanged');
     expect(() => parseApiEnv({ NODE_ENV: 'test', PUBLIC_INTAKE_MODE: 'without_fatsecret' })).toThrow();
-    expect(() => parseApiEnv({ NODE_ENV: 'test', PUBLIC_INTAKE_MODE: 'without_fatsecret', FATSECRET_PRIVATE_BETA_CREATED_BEFORE: '2099-01-01T00:00:00Z' })).toThrow();
+    const duplicate = randomUUID();
+    for (const invalid of ['test@example.com', 'not-a-uuid', `${randomUUID()},`, `${duplicate},${duplicate}`,
+      Array.from({ length: 101 }, () => randomUUID()).join(',')]) {
+      expect(() => parseApiEnv({ NODE_ENV: 'test', PUBLIC_INTAKE_MODE: 'without_fatsecret', FATSECRET_PRIVATE_BETA_ACCOUNT_IDS: invalid })).toThrow();
+    }
+    expect(() => parseApiEnv({ NODE_ENV: 'test', PUBLIC_INTAKE_MODE: 'without_fatsecret', FATSECRET_PRIVATE_BETA_CREATED_BEFORE: '2026-10-01T00:00:00Z' })).toThrow();
+    expect(parseApiEnv({ NODE_ENV: 'test', PUBLIC_INTAKE_MODE: 'without_fatsecret', FATSECRET_PRIVATE_BETA_ACCOUNT_IDS: '' }).FATSECRET_PRIVATE_BETA_ACCOUNT_IDS).toBe('');
   });
-  it('keeps cutoff, deletion and account switching decisions independent', async () => {
-    const old = await account('2026-09-30T23:59:59Z'), current = await account('2026-10-01T00:00:00Z');
+  it('keeps membership, deletion and account switching decisions independent', async () => {
+    const old = await account(true), current = await account();
     expect(await publicIntakeAvailability(db, current.id, config)).toEqual({ fatSecret: false });
     expect(await publicIntakeAvailability(db, old.id, config)).toEqual({ fatSecret: true });
     expect(await publicIntakeAvailability(db, current.id, config)).toEqual({ fatSecret: false });
@@ -111,7 +116,7 @@ describe('default-off public intake contingency with real PostgreSQL', () => {
     expect(current.intakeAvailability).toEqual({ fatSecret: false });
   });
   it('rejects legacy authorize before remote work and leaves other accounts/connections intact', async () => {
-    const user = await account(), other = await account('2026-09-01T00:00:00Z');
+    const user = await account(), other = await account(true);
     const saved = await connection(other.id), fetcher = vi.fn(async () => new Response('unexpected', { status: 500 }));
     const app = express(); app.use('/fatsecret', createFatSecretRouter(new FatSecretService(db, new PrismaTodayAggregateRepository(db), config, fetcher), user)); app.use(errorHandler);
     const response = await request(app).get('/fatsecret/authorize').expect(403);
@@ -121,18 +126,18 @@ describe('default-off public intake contingency with real PostgreSQL', () => {
     expect(await db.externalProviderConnection.findUnique({ where: { id: saved.id } })).toEqual(saved);
   });
   it('preserves existing private users including legitimate new private authorization', async () => {
-    const user = await account('2026-09-01T00:00:00Z');
+    const user = await account(true);
     const fetcher = vi.fn(async () => new Response('oauth_token=synthetic&oauth_token_secret=synthetic-secret&oauth_callback_confirmed=true'));
     const service = new FatSecretService(db, new PrismaTodayAggregateRepository(db), config, fetcher, now);
     await expect(service.createAuthorizationUrl(user, 'caloriebank://integrations')).resolves.toContain('oauth_token=synthetic');
     expect(await db.externalProviderOAuthAttempt.count({ where: { userId: user.id } })).toBe(1);
   });
   it('blocks pending callback completion before exchange without consuming or creating records', async () => {
-    const user = await account('2026-09-01T00:00:00Z');
+    const user = await account(true);
     const fetcher = vi.fn(async () => new Response('oauth_token=synthetic&oauth_token_secret=synthetic-secret&oauth_callback_confirmed=true'));
     const service = new FatSecretService(db, new PrismaTodayAggregateRepository(db), config, fetcher, now);
     await service.createAuthorizationUrl(user, 'caloriebank://integrations');
-    await db.user.update({ where: { id: user.id }, data: { createdAt: new Date('2026-10-24T00:00:00Z') } }); // synthetic configuration-boundary fixture only
+    config.FATSECRET_PRIVATE_BETA_ACCOUNT_IDS = ''; // explicit synthetic membership removal; no record mutation
     await expect(service.completeAuthorization('synthetic', 'synthetic')).rejects.toMatchObject({ statusCode: 403 });
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(await db.externalProviderConnection.count({ where: { userId: user.id } })).toBe(0);
@@ -152,7 +157,7 @@ describe('default-off public intake contingency with real PostgreSQL', () => {
     expect(await db.bankAccountInitialization.count({ where: { userId: user.id } })).toBe(0);
   });
   it('keeps legacy FatSecret authority, credentials and selected row visible', async () => {
-    const user = await account('2026-09-01T00:00:00Z'); const saved = await connection(user.id);
+    const user = await account(true); const saved = await connection(user.id);
     await repo().update(user, { ...input, authoritativeIntakeProvider: 'fatsecret' });
     const health = await repo().getHealthConnections(user.id);
     expect(health.eaten.selected?.label).toBe('FatSecret');
@@ -191,7 +196,7 @@ describe('default-off public intake contingency with real PostgreSQL', () => {
     expect(await db.dailyIntakeAggregate.count({ where: { userId: user.id } })).toBe(1);
   });
   it('preserves real finalized manual accounting across denied source changes and read projections', async () => {
-    const user = await account('2026-10-20T00:00:00Z');
+    const user = await account(false, '2026-10-20T00:00:00Z');
     const manual = new ManualIntakeRepository(db, true, () => new Date('2026-10-23T18:00:00Z'));
     await manual.mutate(user.id, { operation: 'select', calories: 2500, expectedRevision: 0, selectionRevision: null });
     await db.providerSelection.update({ where: { userId: user.id }, data: { authoritativeExpenditureProvider: 'google_health_fitbit', expenditureSelected: true } });

@@ -5,7 +5,7 @@ const now = Date.parse('2026-10-25T03:00:00Z');
 const valid = { DATABASE_URL: 'postgresql://caloriebank_test_phase5a:synthetic@localhost:5432/caloriebank_test_phase5a',
   FALLBACK_TEST_DATABASE_HOST: 'localhost', APP_ENV: 'local', AUTH_MODE: 'clerk',
   CLERK_PUBLISHABLE_KEY: 'pk_test_synthetic', CLERK_SECRET_KEY: 'sk_test_synthetic',
-  PUBLIC_INTAKE_MODE: 'without_fatsecret', FATSECRET_PRIVATE_BETA_CREATED_BEFORE: '2026-10-01T00:00:00.000Z',
+  PUBLIC_INTAKE_MODE: 'without_fatsecret', FATSECRET_PRIVATE_BETA_ACCOUNT_IDS: '',
   GOOGLE_HEALTH_LOCAL_AUTHORIZATION_PAUSED: '1', FALLBACK_TEST_SYNTHETIC_ONLY: '1',
   CLERK_TELEMETRY_DISABLED: '1',
   FALLBACK_TEST_EXPIRES_AT: '2026-10-26T03:00:00Z' };
