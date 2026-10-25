@@ -51,6 +51,30 @@ upload qualification therefore remains a separate gate requiring a reviewed
 disposable data source and narrowly approved ingestion scope. Do not route founder
 health data through this service. This limitation is explicit, not a passing test.
 
+## Optional clean-device native-intake session (default off)
+
+After confirming a personal-data-free physical device and obtaining explicit
+Nutrition-read permission approval, the harness can admit only the exact
+`POST /v1/me/ingestion/native-intake` route. Configure all four values together:
+`FALLBACK_TEST_NATIVE_INTAKE=1`, `FALLBACK_TEST_NATIVE_SOURCE` (the approved writer
+package), `FALLBACK_TEST_NATIVE_DATE` (the synthetic local date), and
+`FALLBACK_TEST_NATIVE_CALORIES` (one positive integer, at most 10,000).
+
+The normalized eight-day batch must contain exactly one usable total matching
+that source, date and amount; all other days must have no total. Unexpected
+amounts, sources, dates, extra health fields or additional usable days are rejected
+before the ordinary API receives the upload. This is a test-data admission guard,
+not proof of a record's origin: the clean-device confirmation and genuine native
+read remain necessary. Normal authentication, two-subject admission, selection
+revision, freshness and per-account persistence checks still apply. No scheduler,
+provider credentials, activity/burn access, delivery or deletion is enabled.
+
+Keep this mode off until its exact source/deployment and health-permission scope
+are approved. Remove the four fixture variables after qualification or allow the
+existing short session expiry to deny all requests. No new mobile build is
+needed for this harness-only exception. A passing admission test is not physical
+Health Connect qualification.
+
 For cohort simulation, seed separately approved synthetic records under the two
 confirmed test subjects: one explicitly listed internal UUID and one unlisted UUID;
 preserve different IDs and exact selected authorities. Creation time and email

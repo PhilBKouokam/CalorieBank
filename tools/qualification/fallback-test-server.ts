@@ -3,7 +3,7 @@ import express from 'express';
 import { execFileSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { assertFallbackTestEnvironment, blockedFallbackTestRoute } from './fallback-test-policy';
+import { assertFallbackTestEnvironment, blockedFallbackTestRoute, matchesSyntheticNativeFixture } from './fallback-test-policy';
 
 async function main() {
   // Validate before importing any API module or opening a database connection.
@@ -26,8 +26,19 @@ async function main() {
   app.use((request, response, next) => {
     response.setHeader('Cache-Control', 'no-store');
     if (Date.now() >= isolation.expiry) return response.status(503).json({ error: 'This test session expired.' });
-    if (blockedFallbackTestRoute(request)) return response.status(403).json({ error: 'This action is outside the synthetic qualification session.' });
+    if (blockedFallbackTestRoute(request, isolation.nativeFixture)) return response.status(403).json({ error: 'This action is outside the synthetic qualification session.' });
     next();
+  });
+  // Parse only the explicitly enabled exact native route; the ordinary API still
+  // performs authentication, ownership, source selection and freshness checks.
+  app.use((request, response, next) => {
+    if (request.method !== 'POST' || request.path !== '/v1/me/ingestion/native-intake') return next();
+    express.json({ limit: '32kb' })(request, response, error => {
+      if (error || !isolation.nativeFixture || !matchesSyntheticNativeFixture(request.body as unknown, isolation.nativeFixture)) {
+        return response.status(403).json({ error: 'Only the configured synthetic native fixture is permitted.' });
+      }
+      next();
+    });
   });
   app.use(createApp(env, {
     finalizationScheduler: null,
