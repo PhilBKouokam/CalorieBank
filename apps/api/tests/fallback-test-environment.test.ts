@@ -104,6 +104,27 @@ describe('isolated HTTPS fallback service admission', () => {
       expect(() => assertFallbackTestEnvironment({ ...valid, DATABASE_URL: url }, now)).toThrow();
     }
   });
+  it('permits the approved managed credential rotation without widening database or admission boundaries', () => {
+    const rotated = { ...valid, DATABASE_URL: valid.DATABASE_URL.replace(
+      'caloriebank_test_phase5a:synthetic', 'caloriebank_test_phase5f:replacement'),
+      FALLBACK_TEST_ALLOWED_SUBJECTS: 'user_public,user_private' };
+    const accepted = assertFallbackTestEnvironment(rotated, now);
+    expect([...accepted.subjects]).toEqual(['user_public', 'user_private']);
+    expect(accepted.nativeFixture).toBeNull();
+    expect(accepted.iosFixture).toBeNull();
+    for (const DATABASE_URL of [
+      rotated.DATABASE_URL.replace('caloriebank_test_phase5f:', 'caloriebank_test_phase5f_other:'),
+      rotated.DATABASE_URL.replace('/caloriebank_test_phase5a', '/caloriebank_beta'),
+      rotated.DATABASE_URL.replace('localhost', 'production.example'),
+      `${rotated.DATABASE_URL}?schema=production`,
+    ]) expect(() => assertFallbackTestEnvironment({ ...rotated, DATABASE_URL }, now)).toThrow();
+    for (const change of [
+      { CLERK_SECRET_KEY: 'sk_live_synthetic' },
+      { FALLBACK_TEST_ALLOWED_SUBJECTS: 'user_a,user_b,user_c' },
+      { FALLBACK_TEST_EXPIRES_AT: '2026-10-28T03:00:00Z' },
+      { GOOGLE_HEALTH_CLIENT_SECRET: 'synthetic' },
+    ]) expect(() => assertFallbackTestEnvironment({ ...rotated, ...change }, now)).toThrow();
+  });
   it('rejects live Clerk bindings, development-auth bypass and a missing session expiry', () => {
     for (const change of [{ CLERK_SECRET_KEY: 'sk_live_synthetic' }, { CLERK_PUBLISHABLE_KEY: 'pk_live_synthetic' },
       { AUTH_MODE: 'development' }, { FALLBACK_TEST_EXPIRES_AT: '' }, { FALLBACK_TEST_EXPIRES_AT: '2026-10-28T03:00:00Z' }]) {

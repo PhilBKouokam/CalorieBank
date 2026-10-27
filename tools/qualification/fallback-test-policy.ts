@@ -57,7 +57,9 @@ export function assertFallbackTestEnvironment(input: Readonly<Record<string, str
   const url = new URL(input.DATABASE_URL ?? 'invalid:');
   if (!['postgres:', 'postgresql:'].includes(url.protocol)
     || url.pathname !== '/caloriebank_test_phase5a'
-    || decodeURIComponent(url.username) !== 'caloriebank_test_phase5a'
+    // Render rotates credentials by creating a new role in the same database.
+    // Admit only the original and explicitly approved replacement test roles.
+    || !['caloriebank_test_phase5a', 'caloriebank_test_phase5f'].includes(decodeURIComponent(url.username))
     || !input.FALLBACK_TEST_DATABASE_HOST
     || url.hostname !== input.FALLBACK_TEST_DATABASE_HOST
     || url.searchParams.has('schema') || url.hash) {
