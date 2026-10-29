@@ -1,6 +1,7 @@
 import 'dotenv/config';
 
 import { z } from 'zod';
+import { parseGoogleHealthTesterCohort } from './modules/google-health/google-health-admission';
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -20,6 +21,7 @@ const EnvSchema = z.object({
   DEV_USER_EMAIL: z.string().email().default('developer@caloriebank.local'),
   TODAY_INGESTION_MODE: z.enum(['disabled', 'development', 'device']).default('disabled'),
   GOOGLE_HEALTH_CLIENT_ID: z.string().trim().min(1).optional(),
+  GOOGLE_HEALTH_TESTER_COHORT_JSON: z.string().optional(),
   GOOGLE_HEALTH_CLIENT_SECRET: z.string().trim().min(1).optional(),
   GOOGLE_HEALTH_REDIRECT_URI: z.string().url().optional(),
   GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY: z.string().trim().min(1).optional(),
@@ -44,6 +46,11 @@ const EnvSchema = z.object({
   FATSECRET_API_BASE_URL: z.string().url().default('https://platform.fatsecret.com/rest'),
   EXPO_ACCESS_TOKEN: z.string().trim().min(1).optional(),
 }).superRefine((value, context) => {
+  if (value.GOOGLE_HEALTH_TESTER_COHORT_JSON !== undefined
+    && !parseGoogleHealthTesterCohort(value.GOOGLE_HEALTH_TESTER_COHORT_JSON)) {
+    context.addIssue({ code: 'custom', path: ['GOOGLE_HEALTH_TESTER_COHORT_JSON'],
+      message: 'Google Health tester configuration is invalid.' });
+  }
   if (value.APP_ENV !== 'local' && value.AUTH_MODE !== 'clerk') {
     context.addIssue({
       code: 'custom',

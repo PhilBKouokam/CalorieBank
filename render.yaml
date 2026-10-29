@@ -20,7 +20,7 @@ services:
     healthCheckPath: /health/ready
     envVars:
       - key: NODE_VERSION
-        value: 20.19.4
+        value: 20.20.2
       - key: NODE_ENV
         value: production
       - key: APP_ENV
@@ -40,6 +40,8 @@ services:
       - key: CORS_ORIGIN
         sync: false
       - key: GOOGLE_HEALTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_HEALTH_TESTER_COHORT_JSON
         sync: false
       - key: GOOGLE_HEALTH_CLIENT_SECRET
         sync: false

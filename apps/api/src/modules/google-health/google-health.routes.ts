@@ -9,6 +9,7 @@ import { AppError } from '../../errors';
 import { resolveRequestUser, type RequestUserSource } from '../../auth/current-user';
 import { getLocalDateForTimezone } from '../today/today.time';
 import type { GoogleHealthFitbitService } from './google-health.service';
+import { GOOGLE_HEALTH_ADMISSION_CODE } from './google-health-admission';
 
 function timezone(value: unknown) {
   if (typeof value !== 'string' || value.length > 100) throw new AppError('Timezone is invalid.', 400);
@@ -40,9 +41,11 @@ export function createGoogleHealthFitbitRouter(service: GoogleHealthFitbitServic
       const redirect = await service.completeAuthorization(req.query.code, req.query.state);
       res.redirect(`${redirect}${redirect.includes('?') ? '&' : '?'}fitbit=connected`);
       service.logOAuthStage('mobile_redirect_success', { scheme: 'caloriebank' });
-    } catch {
+    } catch (error) {
       // Never echo provider errors/codes into a browser page or a mobile URL.
-      res.redirect('caloriebank://integrations?fitbit=failed');
+      const denied = error instanceof AppError
+        && (error.details as { code?: string } | undefined)?.code === GOOGLE_HEALTH_ADMISSION_CODE;
+      res.redirect(`caloriebank://integrations?fitbit=${denied ? 'unavailable' : 'failed'}`);
     }
   });
   router.post('/sync', async (req, res, next) => {

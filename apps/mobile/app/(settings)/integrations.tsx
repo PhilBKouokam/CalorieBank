@@ -20,7 +20,8 @@ import { composeAppleHealthConnections } from '@/lib/healthkit/health-connection
 import { appleHealthIntakeRefreshMessage } from '@/lib/healthkit/connection-feedback';
 import { refreshFatSecretWithFeedback } from '@/lib/healthkit/fatsecret-feedback';
 import { createSourceOperationGate } from '@/lib/healthkit/source-operation';
-import { ApiHttpError, disconnectFatSecret, disconnectFitbit, fetchHealthConnections, fetchManualIntake, fetchOnboardingStatus, fetchProviderSelection, saveProviderSelection, selectHealthConnectionRole, startFatSecretAuthorization, startFitbitAuthorization, syncFatSecret, syncFitbit } from '@/lib/api/client';
+import { ApiHttpError, disconnectFatSecret, disconnectFitbit, fetchHealthConnections, fetchManualIntake, fetchOnboardingStatus, fetchProviderSelection, saveProviderSelection, selectHealthConnectionRole, startFatSecretAuthorization, startFitbitAuthorization, syncFatSecret, syncFitbit, ProviderAuthorizationError } from '@/lib/api/client';
+import { GOOGLE_HEALTH_CONNECTION_UNAVAILABLE, googleHealthConnectionUnavailable, googleHealthAuthorizationResult } from '@/lib/google-health-connection';
 import { retryIncompleteOpeningAfterSourceChange } from '@/lib/lifecycle/account-lifecycle';
 import type { HealthConnectionOption, HealthConnectionsResponse } from '@caloriebank/schemas';
 
@@ -193,11 +194,13 @@ export default function IntegrationsScreen() {
       const { authorizationUrl } = await startFitbitAuthorization();
       const result = await WebBrowser.openAuthSessionAsync(authorizationUrl, 'caloriebank://integrations');
       if (result.type !== 'success') { setMessage('Fitbit connection was not completed.'); return; }
-      if (new URL(result.url).searchParams.get('fitbit') !== 'connected') { setMessage('We couldn’t connect Fitbit. Try again.'); return; }
+      const outcome = googleHealthAuthorizationResult(result.url);
+      if (outcome === 'unavailable') { setMessage(GOOGLE_HEALTH_CONNECTION_UNAVAILABLE); return; }
+      if (outcome !== 'connected') { setMessage('We couldn’t connect Fitbit. Try again.'); return; }
       await syncFitbit(timezone(), true);
       await selectConnectedLabel('burned', 'Fitbit');
       closeSheets(); void load().catch(() => undefined);
-    } catch { setMessage('Fitbit couldn’t connect. Try again.'); }
+    } catch (error) { setMessage(googleHealthConnectionUnavailable(error) ? GOOGLE_HEALTH_CONNECTION_UNAVAILABLE : 'Fitbit couldn’t connect. Try again.'); }
     finally { operations.current.end(); setBusy(null); }
   }
 
@@ -342,12 +345,18 @@ export default function IntegrationsScreen() {
         : await startFatSecretAuthorization();
       const result = await WebBrowser.openAuthSessionAsync(authorizationUrl, 'caloriebank://integrations');
       if (result.type !== 'success') { setMessage(`${name} connection was not completed.`); return; }
+      if (name === 'Fitbit') {
+        const outcome = googleHealthAuthorizationResult(result.url);
+        if (outcome === 'unavailable') throw new ProviderAuthorizationError('GOOGLE_HEALTH_NOT_AVAILABLE');
+        if (outcome !== 'connected') { setMessage('Fitbit connection was not completed.'); return; }
+      }
       authenticated = true;
       if (name === 'Fitbit') await syncFitbit(timezone(), true); else await syncFatSecret(timezone(), true);
       setConnections(await fetchHealthConnections());
       setMessage(`${name} reconnected.`);
       void load().catch(() => undefined);
-    } catch { setMessage(authenticated ? `${name} reconnected, but we couldn't refresh your latest data. Try again.` : `${name} couldn’t reconnect. Try again.`); }
+    } catch (error) { setMessage(googleHealthConnectionUnavailable(error) ? GOOGLE_HEALTH_CONNECTION_UNAVAILABLE
+      : authenticated ? `${name} reconnected, but we couldn't refresh your latest data. Try again.` : `${name} couldn’t reconnect. Try again.`); }
     finally { operations.current.end(); setBusy(null); }
   }
 

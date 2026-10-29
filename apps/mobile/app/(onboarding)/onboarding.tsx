@@ -11,6 +11,7 @@ import type { OnboardingStage, OnboardingStatusResponse, ProviderSelectionInput,
 import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { GOOGLE_HEALTH_CONNECTION_UNAVAILABLE, googleHealthConnectionUnavailable, googleHealthAuthorizationResult } from '@/lib/google-health-connection';
 import {
   ActivityIndicator,
   Platform,
@@ -211,6 +212,10 @@ export default function OnboardingScreen() {
       const expectedProvider = action === 'fatsecret' ? 'fatsecret'
         : action === 'fitbit' ? 'google_health_fitbit' : 'apple_health';
       const confirmed = sourceRole ? refreshed?.[sourceRole] : null;
+      if (action === 'fitbit' && googleHealthConnectionUnavailable(error)) {
+        setMessage(GOOGLE_HEALTH_CONNECTION_UNAVAILABLE);
+        return;
+      }
       if (confirmed?.provider === expectedProvider && confirmed.connected) {
         setMessageTone('attention');
         setMessage(confirmed.readiness === 'ready' ? null : confirmed.readiness === 'needs_attention'
@@ -294,7 +299,9 @@ export default function OnboardingScreen() {
       const { authorizationUrl } = await startFitbitAuthorization(redirect);
       const result = await WebBrowser.openAuthSessionAsync(authorizationUrl, redirect);
       if (result.type !== 'success') throw cancelledConnectionError();
-      if (new URL(result.url).searchParams.get('fitbit') !== 'connected') throw new Error('Fitbit connection was not completed.');
+      const outcome = googleHealthAuthorizationResult(result.url);
+      if (outcome === 'unavailable') throw new ProviderAuthorizationError('GOOGLE_HEALTH_NOT_AVAILABLE');
+      if (outcome !== 'connected') throw new Error('Fitbit connection was not completed.');
       await selectProvider({
         authoritativeExpenditureProvider: 'google_health_fitbit',
         authoritativeActivityProvider: 'google_health_fitbit',

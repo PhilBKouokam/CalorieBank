@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { createGoogleHealthActivityRequest } from './google-health-request';
+import { requireGoogleHealthTester } from './google-health-admission';
 import { requireExistingRequestAccount, requireLiveAccount } from '../../auth/existing-account';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import {
@@ -82,7 +83,7 @@ const OAUTH_LOG_EVENTS = [
 ];
 const OAUTH_LOG_STATIC_VALUES: Readonly<Record<string, readonly string[]>> = {
   stage: [...OAUTH_LOG_EVENTS, 'callback_validation', 'mobile_redirect_validation',
-    'oauth_attempt_creation', 'refresh_token_validation'],
+    'oauth_attempt_creation', 'refresh_token_validation', 'tester_admission', 'tester_identity_admission'],
   errorType: ['AppError', 'GoogleHealthRemoteError', 'PrismaClientKnownRequestError',
     'Error', 'TypeError', 'SyntaxError', 'object', 'string', 'undefined'],
   googleErrorCode: ['invalid_grant', 'invalid_client', 'invalid_request', 'access_denied',
@@ -90,7 +91,7 @@ const OAUTH_LOG_STATIC_VALUES: Readonly<Record<string, readonly string[]>> = {
     'server_error', 'PERMISSION_DENIED', 'UNAUTHENTICATED', 'RESOURCE_EXHAUSTED', 'UNAVAILABLE',
     'incomplete_token_response', 'malformed_response', 'malformed_identity_response', 'missing_health_user_id'],
   prismaCode: ['P1000', 'P1001', 'P1010', 'P2002', 'P2003', 'P2021', 'P2022', 'P2025', 'P2034'],
-  validationErrorCode: ['INVALID_REDIRECT', 'TEMPORARY_ERROR'],
+  validationErrorCode: ['INVALID_REDIRECT', 'TEMPORARY_ERROR', 'GOOGLE_HEALTH_NOT_AVAILABLE'],
   scheme: ['caloriebank'],
   parsedScheme: ['caloriebank'],
 };
@@ -359,21 +360,26 @@ export class GoogleHealthFitbitService {
       try { return new URL(mobileRedirectUri).protocol.replace(/:$/, ''); } catch { return null; }
     })();
     try {
+      stage = 'tester_admission';
+      await requireGoogleHealthTester(this.db, this.config, user.id);
       const secrets = configured(this.config);
       stage = 'mobile_redirect_validation';
       const safeRedirect = safeMobileRedirect(mobileRedirectUri);
       stage = 'oauth_attempt_creation';
       const state = randomBytes(32).toString('base64url');
       const verifier = randomBytes(48).toString('base64url');
-      await requireExistingRequestAccount(this.db, user);
-      await this.db.googleHealthOAuthAttempt.create({
-        data: {
-          userId: user.id,
-          stateHash: hash(state),
-          encryptedCodeVerifier: encryptGoogleHealthSecret(verifier, secrets.encryptionKey),
-          mobileRedirectUri: safeRedirect,
-          expiresAt: new Date(this.now().getTime() + 10 * 60 * 1000),
-        },
+      await this.db.$transaction(async tx => {
+        await requireExistingRequestAccount(tx, user);
+        await requireGoogleHealthTester(tx, this.config, user.id);
+        await tx.googleHealthOAuthAttempt.create({
+          data: {
+            userId: user.id,
+            stateHash: hash(state),
+            encryptedCodeVerifier: encryptGoogleHealthSecret(verifier, secrets.encryptionKey),
+            mobileRedirectUri: safeRedirect,
+            expiresAt: new Date(this.now().getTime() + 10 * 60 * 1000),
+          },
+        });
       });
       attemptCreated = true;
       const url = new URL(this.config.GOOGLE_HEALTH_AUTHORIZATION_URL);
@@ -498,6 +504,8 @@ export class GoogleHealthFitbitService {
       }
       const owner = await this.db.user.findUnique({ where: { id: attempt.userId }, select: { id: true, email: true, deletionRequestedAt: true } });
       if (!owner || owner.deletionRequestedAt) throw new AppError('This account is unavailable.', 400);
+      stage = 'tester_admission';
+      await requireGoogleHealthTester(this.db, this.config, attempt.userId);
       stage = 'state_validated';
       this.logOAuthStage(stage);
       const verifier = decryptGoogleHealthSecret(attempt.encryptedCodeVerifier, secrets.encryptionKey);
@@ -515,6 +523,8 @@ export class GoogleHealthFitbitService {
       stage = 'identity_lookup_started';
       this.logOAuthStage(stage);
       const identity = await this.getIdentity(token.access_token);
+      stage = 'tester_identity_admission';
+      await requireGoogleHealthTester(this.db, this.config, attempt.userId, identity.healthUserId);
       this.logOAuthStage('identity_lookup_success', {
         healthUserIdPresent: true,
         legacyUserIdPresent: Boolean(identity.legacyUserId),
@@ -548,6 +558,7 @@ export class GoogleHealthFitbitService {
       this.logOAuthStage(stage);
       await this.db.$transaction(async tx => {
         await requireExistingRequestAccount(tx, owner);
+        await requireGoogleHealthTester(tx, this.config, attempt.userId, identity.healthUserId);
         const consumed = await tx.googleHealthOAuthAttempt.updateMany({
           where: { id: attempt.id, userId: owner.id, consumedAt: null, expiresAt: { gt: this.now() } },
           data: { consumedAt: this.now() },

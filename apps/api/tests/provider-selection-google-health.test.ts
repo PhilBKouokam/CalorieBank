@@ -621,13 +621,15 @@ describe('Google OAuth state and token exchange', () => {
       const service = new GoogleHealthFitbitService(
         prisma, repository,
         {
-          ...env,
+          ...env, APP_ENV: 'beta', GOOGLE_HEALTH_TESTER_COHORT_JSON: '{"version":1,"members":[]}',
           GOOGLE_HEALTH_CLIENT_ID: 'client-id', GOOGLE_HEALTH_CLIENT_SECRET: 'client-secret',
           GOOGLE_HEALTH_REDIRECT_URI: 'https://api.example.test/v1/me/integrations/fitbit/callback',
           GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY: key,
         },
         undefined, fetcher, () => now,
       );
+      await expect(service.createAuthorizationUrl({ id, email: `${id}@test.local` }, 'caloriebank://integrations'))
+        .rejects.toMatchObject({ statusCode: 403 });
       expect(await service.resolveRestingBurnEstimate(
         { id, email: `${id}@test.local` }, '2026-08-14', 'America/Chicago',
       )).toBe(true);

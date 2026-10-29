@@ -24,6 +24,8 @@ function config(overrides: Partial<ApiEnv> = {}): ApiEnv {
     GOOGLE_HEALTH_CLIENT_SECRET: 'client-secret',
     GOOGLE_HEALTH_REDIRECT_URI: 'https://sliding-sneer-vendor.ngrok-free.dev/v1/me/integrations/fitbit/callback',
     GOOGLE_HEALTH_TOKEN_ENCRYPTION_KEY: key,
+    GOOGLE_HEALTH_TESTER_COHORT_JSON: JSON.stringify({ version: 1, members: [{ accountId: user.id,
+      clerkSubject: 'synthetic-clerk-subject', healthUserIds: ['health-user', 'new-google-user'] }] }),
     ...overrides,
   };
 }
@@ -43,6 +45,7 @@ function oauthDb(options: {
   persistenceError?: Error;
   unavailableOwner?: boolean;
 } = {}) {
+  let unavailableOwner = options.unavailableOwner ?? false;
   let attempt: StoredAttempt | null = null;
   let connection: Record<string, unknown> | null = options.existingRefreshToken
     ? {
@@ -52,7 +55,7 @@ function oauthDb(options: {
     }
     : null;
   const db = {
-    user: { updateMany: async () => ({ count: 1 }), findUnique: async () => ({ id: 'owner', email: 'synthetic@example.invalid', deletionRequestedAt: options.unavailableOwner ? new Date() : null }) },
+    user: { updateMany: async () => ({ count: 1 }), findUnique: async () => ({ id: user.id, authProvider: 'clerk', authSubject: 'synthetic-clerk-subject', email: 'synthetic@example.invalid', deletionRequestedAt: unavailableOwner ? new Date() : null }) },
     googleHealthOAuthAttempt: {
       updateMany: async () => { if (attempt) attempt.consumedAt = new Date(); return { count: 1 }; },
       create: async ({ data }: { data: Omit<StoredAttempt, 'id' | 'consumedAt'> }) => {
@@ -82,6 +85,7 @@ function oauthDb(options: {
     db: db as unknown as PrismaClient,
     getAttempt: () => attempt,
     getConnection: () => connection,
+    setUnavailableOwner: (value: boolean) => { unavailableOwner = value; },
   };
 }
 
@@ -282,11 +286,12 @@ describe('Google Health OAuth callback', () => {
   });
 
   it.each(['invalid state', 'deleting owner'])('rejects %s before exchanging credentials', async (reason) => {
-    const harness = oauthDb({ unavailableOwner: reason === 'deleting owner' });
+    const harness = oauthDb();
     let calls = 0;
     const service = new GoogleHealthFitbitService(harness.db, {} as TodayAggregateRepository, config(), undefined,
       async () => { calls++; return tokenResponse(); });
     const { state } = await authorizationState(service);
+    if (reason === 'deleting owner') harness.setUnavailableOwner(true);
     await expect(service.completeAuthorization('code', reason === 'invalid state' ? 'unrelated-state' : state)).rejects.toThrow();
     expect(calls).toBe(0);
     expect(harness.getConnection()).toBeNull();

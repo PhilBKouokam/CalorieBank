@@ -146,7 +146,7 @@ export class ApiAuthenticationPendingError extends Error {
 }
 
 export class ProviderAuthorizationError extends Error {
-  constructor(readonly code: 'CONFIGURATION_ERROR' | 'INVALID_REDIRECT' | 'ALREADY_CONNECTED' | 'TEMPORARY_ERROR') {
+  constructor(readonly code: 'CONFIGURATION_ERROR' | 'INVALID_REDIRECT' | 'ALREADY_CONNECTED' | 'TEMPORARY_ERROR' | 'GOOGLE_HEALTH_NOT_AVAILABLE') {
     super('Provider authorization could not start.');
     this.name = 'ProviderAuthorizationError';
   }
@@ -585,7 +585,7 @@ async function providerAuthorizationError(response: Response) {
   const payload = await response.json().catch(() => null) as { error?: { details?: { code?: unknown } } } | null;
   const code = payload?.error?.details?.code;
   throw new ProviderAuthorizationError(
-    code === 'CONFIGURATION_ERROR' || code === 'INVALID_REDIRECT' || code === 'ALREADY_CONNECTED'
+    code === 'CONFIGURATION_ERROR' || code === 'INVALID_REDIRECT' || code === 'ALREADY_CONNECTED' || code === 'GOOGLE_HEALTH_NOT_AVAILABLE'
       ? code
       : 'TEMPORARY_ERROR',
   );
