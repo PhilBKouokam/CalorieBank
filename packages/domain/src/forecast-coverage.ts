@@ -53,8 +53,9 @@ export type PersistedPlanningEvidence = PlanningEvidence & {
   planningAnchorKind?: string | null;
 };
 
-/** An assumption is useful for planning, never proof of complete provider synchronization.
- * Neither a changed calorie value nor a successful fetch renews its lifetime.
+/** A reported interval is partial temporal evidence, never complete synchronization.
+ * Retrieval alone cannot support a numeric rest projection. Keep its legacy metadata
+ * for wire/storage compatibility, but expire it immediately.
  * Progress is a high-water mark so replaying an older correction cannot renew it later.
  */
 export function resolvePlanningEvidence(previous: PersistedPlanningEvidence | null, incoming: PlanningEvidence, receivedAt: Date) {
@@ -75,12 +76,21 @@ export function resolvePlanningEvidence(previous: PersistedPlanningEvidence | nu
   const unchanged = prior?.timezone === incoming.timezone && prior.rawTotalDailyExpenditure === incoming.rawTotalDailyExpenditure &&
     (prior.activeEnergyCalories ?? null) === (incoming.activeEnergyCalories ?? null) && (prior.basalEnergyCalories ?? null) === (incoming.basalEnergyCalories ?? null);
   const progress = !invalid && temporal && (!priorProgress || temporal > priorProgress);
+  const repeatedReportedTotal = kind === 'reported_interval' && unchanged && priorAnchor &&
+    prior?.planningAnchorKind !== 'retrieval_assumption';
   const ttl = (anchor: Date) => new Date(Math.min(end.getTime(), anchor.getTime() + 30 * 60000));
   let planningAnchorAt = priorAnchor ?? retrievedAt;
   let planningExpiresAt = priorExpiry ?? ttl(retrievedAt);
   let planningAnchorKind = (prior?.planningAnchorKind ?? (prior?.forecastCoverageAt ? 'verified_coverage' : 'retrieval_assumption')) as PlanningAnchorKind;
   if (invalid) {
     // Reject future/out-of-window metadata without failing authoritative accounting ingestion.
+    planningExpiresAt = new Date(Math.min(planningExpiresAt.getTime(), receivedAt.getTime() - 1));
+  } else if (repeatedReportedTotal) {
+    // A later aggregation bucket with the same cumulative total is not evidence
+    // that more resting burn is represented. Keep the value/reference pair and
+    // deadline together; do not manufacture a shortfall or renew stale data.
+  } else if (kind === 'reported_interval' && temporal && priorProgress && temporal < priorProgress) {
+    // An older reported bucket cannot date a revised cumulative total safely.
     planningExpiresAt = new Date(Math.min(planningExpiresAt.getTime(), receivedAt.getTime() - 1));
   } else if (progress) {
     planningAnchorAt = temporal;
@@ -91,11 +101,14 @@ export function resolvePlanningEvidence(previous: PersistedPlanningEvidence | nu
     planningAnchorAt = temporal;
     planningAnchorKind = kind;
     planningExpiresAt = new Date(Math.min(planningExpiresAt.getTime(), ttl(temporal).getTime()));
-  } else if (!unchanged && priorAnchor) {
-    // Unknown-timing revision: avoid appending rest over newly included expenditure.
-    // This is explicitly an assumption; the original expiry still applies.
-    planningAnchorAt = retrievedAt;
+  } else if (unchanged && priorAnchor && prior?.planningAnchorKind !== 'retrieval_assumption') {
+    // An optional metadata failure need not discard the same previously dated
+    // value. It cannot advance its reference or its original deadline either.
+  } else {
+    // No measurement/interval reference: neither receipt time nor a changed
+    // calorie value tells us how much elapsed rest is already in this total.
     planningAnchorKind = 'retrieval_assumption';
+    planningExpiresAt = new Date(Math.min(planningExpiresAt.getTime(), receivedAt.getTime() - 1));
   }
   return {
     retrievedAt,
@@ -104,5 +117,29 @@ export function resolvePlanningEvidence(previous: PersistedPlanningEvidence | nu
     reportedIntervalEndAt: incoming.reportedIntervalEndAt && valid(incoming.reportedIntervalEndAt) ? incoming.reportedIntervalEndAt : null,
     planningAnchorAt, planningExpiresAt, planningAnchorKind,
     planningProgressAt: progress ? temporal : priorProgress,
+  };
+}
+
+/** Planning only. Never feed estimated expenditure back into provider aggregates
+ * or accounting. Keeping elapsed and future rest at the same reference proves
+ * that clock advancement alone cannot change the full-day baseline.
+ */
+export function calculateAnchoredRestProjection(input: {
+  observedProviderCalories: number; providerRestCaloriesPerHour: number;
+  anchor: Date; now: Date; localDate: string; timezone: string;
+}) {
+  const { start, end } = getLocalDateUtcBounds(input.localDate, input.timezone);
+  if (!Number.isInteger(input.observedProviderCalories) || input.observedProviderCalories < 0 ||
+    !Number.isFinite(input.providerRestCaloriesPerHour) || input.providerRestCaloriesPerHour <= 0 ||
+    !Number.isFinite(input.anchor.getTime()) || !Number.isFinite(input.now.getTime()) ||
+    input.anchor < start || input.anchor >= end || input.now < input.anchor || input.now >= end) return null;
+  const elapsedRestCalories = input.providerRestCaloriesPerHour * (input.now.getTime() - input.anchor.getTime()) / 3600000;
+  const remainingRestCalories = input.providerRestCaloriesPerHour * (end.getTime() - input.now.getTime()) / 3600000;
+  return {
+    estimatedProviderCaloriesNow: input.observedProviderCalories + elapsedRestCalories,
+    elapsedRestCalories, remainingRestCalories,
+    // Calculate directly from the anchor to avoid cancellation/rounding drift.
+    unroundedProjectedProviderBurnCalories: input.observedProviderCalories +
+      input.providerRestCaloriesPerHour * (end.getTime() - input.anchor.getTime()) / 3600000,
   };
 }

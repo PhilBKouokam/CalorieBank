@@ -1,4 +1,4 @@
-export { resolveForecastCoverage, resolvePlanningEvidence, walkingMidnightFeasibility, type ForecastEvidence } from './forecast-coverage';
+export { resolveForecastCoverage, resolvePlanningEvidence, calculateAnchoredRestProjection, walkingMidnightFeasibility, type ForecastEvidence } from './forecast-coverage';
 export * from './intake-adjustment';
 export { estimateWalkingTime, walkingTimeFromPace, type WalkingTimeSample, type WalkingTimeEstimate } from './walking-time';
 

@@ -151,6 +151,30 @@ describe('provisional finalization and reconciliation persistence', () => {
     expect(await prisma.bankCalculationSnapshot.findMany({ where: { userId: user.id }, orderBy: { version: 'asc' } })).toEqual(snapshots);
   });
 
+  it('preserves the exact raw 3265-to-3334 catch-up and applies the adjustment only once', async () => {
+    const user = testUser();
+    await configureCut(user);
+    await prisma.providerSelection.update({ where: { userId: user.id }, data: {
+      authoritativeExpenditureProvider: 'google_health_fitbit', authoritativeActivityProvider: 'google_health_fitbit',
+    } });
+    let now = new Date('2026-07-22T05:01:00Z');
+    const bank = new PrismaBankHistoryRepository(prisma, { now: () => now });
+    const aggregates = new PrismaTodayAggregateRepository(prisma, { allowSyntheticProviders: false });
+    await aggregates.upsertIntakeAggregate(user, intake(user.id, 2000, now));
+    await aggregates.upsertExpenditureAggregate(user, providerExpenditure(user.id, 'google_health_fitbit', 3265, now));
+    await bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago');
+    const originalLedger = await prisma.calorieLedgerTransaction.findMany({ where: { userId: user.id } });
+    now = new Date('2026-07-22T05:16:00Z');
+    await aggregates.upsertExpenditureAggregate(user, providerExpenditure(user.id, 'google_health_fitbit', 3334, now));
+    await Promise.all([1, 2].map(() => bank.reconcileStoredDay(user, '2026-07-21', 'America/Chicago')));
+    const raw = await prisma.dailyExpenditureAggregate.findFirstOrThrow({ where: { userId: user.id, provider: 'google_health_fitbit' } });
+    expect(raw).toMatchObject({ rawTotalDailyExpenditure: 3334, adjustedDailyExpenditure: 2667 });
+    const snapshots = await prisma.bankCalculationSnapshot.findMany({ where: { userId: user.id }, orderBy: { version: 'asc' } });
+    expect(snapshots.map(row => [row.importedTotalDailyExpenditure, row.adjustedExpenditure, row.dailyBankChange])).toEqual([[3265, 2612, 112], [3334, 2667, 167]]);
+    expect(await prisma.calorieLedgerTransaction.count({ where: { userId: user.id } })).toBe(2);
+    for (const entry of originalLedger) expect(await prisma.calorieLedgerTransaction.findUnique({ where: { id: entry.id } })).toEqual(entry);
+  });
+
   it('posts immediately, appends positive and negative corrections, and ignores zero deltas', async () => {
     const user = testUser();
     await configureCut(user);

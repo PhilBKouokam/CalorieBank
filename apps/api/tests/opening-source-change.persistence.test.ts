@@ -1,3 +1,4 @@
+import { migrationAuditAllowed } from './helpers/migration-audit-policy';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
@@ -137,7 +138,8 @@ describe('Opening Bank source-context recovery', () => {
     expect((await readOpeningImportState(db, user.id, today)).expenditure).toBe('preparing');
   });
 
-it.each(['phase1a', 'phase1b'])('%s metadata migration and intake switching preserve populated Opening Bank, Recovery, History and ledger', async (phase) => {
+// These two legacy cases execute migration SQL, so normal/DDL-prohibited gates skip them.
+it.skipIf(!migrationAuditAllowed(process.env.CALORIEBANK_ALLOW_MIGRATION_AUDIT)).each(['phase1a', 'phase1b'])('%s metadata migration and intake switching preserve populated Opening Bank, Recovery, History and ledger', async (phase) => {
   const user = await account();
   await checked(user.id); await history(user.id);
   expect((await bank.initializeOpeningBank(user, today, zone)).outcome).toBe('initialized');

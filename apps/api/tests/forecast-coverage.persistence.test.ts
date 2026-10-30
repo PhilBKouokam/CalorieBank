@@ -49,7 +49,7 @@ describe('persisted forecast coverage', () => {
       expect((await read()).restOfDayProjection.unroundedProjectedProviderBurnCalories).toBeCloseTo(3438.6666667);
       now = new Date(`${date}T08:32:00Z`);
       await write(2201, null);
-      expect((await read()).restOfDayProjection).toMatchObject({ status: 'ready', coverageStatus: 'uncertain', coverageAt: null, planningAnchorKind: 'retrieval_assumption', planningExpiresAt: `${date}T09:01:00.000Z` });
+      expect((await read()).restOfDayProjection).toMatchObject({ status: 'insufficient_data', coverageStatus: 'uncertain', coverageAt: null, planningAnchorKind: 'retrieval_assumption', projectedProviderBurnCalories: null });
       // Delayed observations cannot borrow the fresh database update time.
       now = new Date(`${date}T09:00:00Z`);
       await write(2260, anchor);
@@ -90,14 +90,17 @@ describe('persisted forecast coverage', () => {
         await db.dailyStepAggregate.upsert({ where: { userId_localDate_provider: { userId: user.id, localDate, provider } }, create: { userId: user.id, localDate, provider, timezone: 'UTC', providerRecordId: 'steps', totalSteps: 2000, importedAt: now, providerUpdatedAt: now, syncSessionId: session.id, isCurrentDay: true, syncStatus: 'ready' }, update: { syncSessionId: session.id, providerUpdatedAt: now } });
       };
       const read = (user: typeof users[number]) => repository().getTodayForUser(user.id, date, 'UTC');
-      await write(users[0]!, 2260);
+      await write(users[0]!, 2260, now);
       const first = await read(users[0]!);
-      expect(first.restOfDayProjection).toMatchObject({ status: 'ready', coverageStatus: 'uncertain', planningAnchorKind: 'retrieval_assumption', unroundedProjectedProviderBurnCalories: 3540, planningExpiresAt: `${date}T08:30:00.000Z` });
+      expect(first.restOfDayProjection).toMatchObject({ status: 'ready', coverageStatus: 'uncertain', planningAnchorKind: 'reported_interval', unroundedProjectedProviderBurnCalories: 3540, planningExpiresAt: `${date}T08:30:00.000Z` });
       now = new Date(`${date}T08:15:00Z`);
-      await write(users[1]!, 1800);
+      await write(users[1]!, 1800, now);
       expect((await read(users[1]!)).burned.raw).toBe(1800);
-      await write(users[0]!, 2260);
-      expect((await read(users[0]!)).restOfDayProjection).toEqual(first.restOfDayProjection);
+      await write(users[0]!, 2260, now);
+      const repeatedBucket = await read(users[0]!);
+      expect(repeatedBucket.restOfDayProjection).toEqual(first.restOfDayProjection);
+      expect(repeatedBucket.burned).toMatchObject({ raw: 2260, adjusted: 1808 });
+      expect(repeatedBucket.restOfDayProjection.planningAnchorAt).toBe(`${date}T08:00:00.000Z`);
       now = new Date(`${date}T08:30:01Z`);
       await write(users[0]!, 2260);
       const expired = await read(users[0]!);
@@ -107,7 +110,7 @@ describe('persisted forecast coverage', () => {
       expect((await read(users[1]!)).restOfDayProjection.status).toBe('ready');
       now = new Date(`${date}T08:35:00Z`);
       await write(users[0]!, 2200); // Unknown-timing revision does not revive an expired forecast.
-      expect((await read(users[0]!)).restOfDayProjection.status).toBe('stale');
+      expect((await read(users[0]!)).restOfDayProjection.status).toBe('insufficient_data');
       now = new Date(`${date}T08:40:00Z`);
       await write(users[0]!, 2300, new Date(`${date}T08:35:00Z`));
       expect((await read(users[0]!)).restOfDayProjection).toMatchObject({ status: 'ready', planningAnchorKind: 'reported_interval', planningExpiresAt: `${date}T09:05:00.000Z` });

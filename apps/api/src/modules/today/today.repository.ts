@@ -8,6 +8,7 @@ import { matchesSelectedIntakeSource } from '../provider-selection/intake-source
 import { requireExistingRequestAccount } from '../../auth/existing-account';
 import {
   calculateRestOfDayBurnProjection,
+  calculateAnchoredRestProjection,
   resolveForecastCoverage,
   resolvePlanningEvidence,
   calculateStepWhatIfProjection,
@@ -771,7 +772,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         ? 'stale' as const : 'known' as const;
     const planningAnchorAt = expenditure?.planningAnchorAt ?? coverageAt;
     const planningExpiresAt = expenditure?.planningExpiresAt ?? (coverageAt ? new Date(coverageAt.getTime() + CURRENT_DAY_STALE_AFTER_MS) : null);
-    const planningValid = planningAnchorAt && planningExpiresAt && planningAnchorAt <= forecastNow && planningAnchorAt >= coverageBounds.start && planningAnchorAt <= coverageBounds.end && expenditure?.timezone === timezone;
+    const planningValid = expenditure?.planningAnchorKind !== 'retrieval_assumption' && planningAnchorAt && planningExpiresAt && forecastNow < coverageBounds.end && planningAnchorAt <= forecastNow && planningAnchorAt >= coverageBounds.start && planningAnchorAt <= coverageBounds.end && expenditure?.timezone === timezone;
     const planningExpired = planningExpiresAt != null && forecastNow > planningExpiresAt;
     const remainingMinutes = planningValid ? getRemainingLocalDayMinutes(localDate, timezone, planningAnchorAt) : 0;
     const exactRemainingMinutes = planningValid ? Math.max(0, (coverageBounds.end.getTime() - planningAnchorAt.getTime()) / 60000) : 0;
@@ -788,6 +789,10 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         adjustmentFactor,
       })
       : null;
+    const anchoredRest = restForecast && expenditure && restingModel && planningAnchorAt
+      ? calculateAnchoredRestProjection({ observedProviderCalories: expenditure.rawTotalDailyExpenditure,
+        providerRestCaloriesPerHour: restingModel.providerKcalPerHour, anchor: planningAnchorAt,
+        now: forecastNow, localDate, timezone }) : null;
     return {
       date: localDate,
       timezone: expenditure?.timezone ?? intake?.timezone ?? steps?.timezone ?? contextSession?.timezone ?? timezone,
@@ -860,8 +865,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         planningAnchorKind: expenditure?.planningAnchorKind as 'verified_coverage' | 'sample_horizon' | 'reported_interval' | 'retrieval_assumption' | null ?? (coverageAt ? 'verified_coverage' : null),
         coverageStatus,
         coverageAt: coverageAt?.toISOString() ?? null,
-        unroundedProjectedProviderBurnCalories: restForecast && expenditure && restingModel
-          ? expenditure.rawTotalDailyExpenditure + restingModel.providerKcalPerHour * exactRemainingMinutes / 60 : null,
+        unroundedProjectedProviderBurnCalories: anchoredRest?.unroundedProjectedProviderBurnCalories ?? null,
         status: restProjectionStatus,
         providerKcalPerHour: restingModel?.providerKcalPerHour ?? null,
         adjustedKcalPerHour: restingModel

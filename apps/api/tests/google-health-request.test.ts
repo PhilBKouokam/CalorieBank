@@ -68,7 +68,7 @@ describe('Fitbit activity request responsibility', () => {
     expect(states).toEqual({ a: 'needs_reconnect', b: 'connected' });
   });
 
-  it.each(['401', '403', '429', '503', 'timeout', 'malformed-json', 'malformed-schema', 'missing'] as const)('imports daily burn and retains bounded fallback after optional %s', async (failure) => {
+  it.each(['401', '403', '429', '503', 'timeout', 'malformed-json', 'malformed-schema', 'missing'] as const)('imports daily burn but withholds undated planning after optional %s', async (failure) => {
     const invalidate = vi.fn(async () => {});
     const request = createGoogleHealthActivityRequest(async (url) => {
       if (url === 'daily') return json(daily);
@@ -86,7 +86,7 @@ describe('Fitbit activity request responsibility', () => {
     const first = await provider.fetchDailyExpenditureAggregate(input);
     expect(first).toMatchObject({ rawTotalDailyExpenditure: 2000, forecastCoverageAt: null, reportedIntervalEndAt: null });
     const anchor = resolvePlanningEvidence(null, first!, clock);
-    expect(anchor).toMatchObject({ planningAnchorKind: 'retrieval_assumption', planningAnchorAt: now, planningExpiresAt: new Date('2026-10-15T08:30:00Z') });
+    expect(anchor).toMatchObject({ planningAnchorKind: 'retrieval_assumption', planningAnchorAt: now, planningExpiresAt: new Date('2026-10-15T07:59:59.999Z') });
     clock = new Date('2026-10-15T08:31:00Z');
     const repeat = await provider.fetchDailyExpenditureAggregate(input);
     const persisted = resolvePlanningEvidence({ ...first!, ...anchor }, repeat!, clock);
