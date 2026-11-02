@@ -1,3 +1,4 @@
+import { GoogleHealthNetStepReader } from './modules/google-health/google-health-net-step-reader';
 import { createIntakeAdjustmentRouter } from './modules/intake-adjustment/intake-adjustment.routes';
 import { createNativeIntakeRouter } from './modules/native-intake/native-intake.routes';
 import cors from 'cors';
@@ -109,6 +110,7 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
   const todayRepository =
     dependencies.todayRepository ??
     new PrismaTodayAggregateRepository(prisma, {
+      stepCalibrationReader: new GoogleHealthNetStepReader(prisma, config),
       allowSyntheticProviders: config.TODAY_INGESTION_MODE === 'development',
       onBankingAggregateChanged: async (user, localDate, timezone, syncSessionId) => {
         await bankHistoryRepository.reconcileStoredDay(

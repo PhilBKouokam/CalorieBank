@@ -1216,3 +1216,5 @@ export function buildActivityOpportunityBody({
 
   return `You're about ${remainingTreatCalories.toLocaleString()} kcal from ${plannedTreatName}. Based on your profile, a ${durationMinutes}-minute ${activityDisplayName} session may burn around ${estimatedLowCalories.toLocaleString()}-${estimatedHighCalories.toLocaleString()} kcal.`;
 }
+
+export { calibrateNetStepRate, type NetStepSample } from './net-step-calibration';

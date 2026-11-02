@@ -1,5 +1,5 @@
 import type { DailyStepAggregate, PrismaClient } from '@prisma/client';
-import { estimateWalkingTime } from '@caloriebank/domain';
+import { estimateWalkingTime, calibrateNetStepRate, type NetStepSample } from '@caloriebank/domain';
 
 export async function estimateWalkingPace(db: Pick<PrismaClient, 'currentDayWorkout'>, userId: string, provider: string, now = new Date()) {
   const workouts = await db.currentDayWorkout.findMany({
@@ -37,7 +37,16 @@ export type WalkingCalibrationSample = {
   activityType: 'walking' | 'running' | 'other';
   totalSteps: number;
   totalEnergyBurned: number;
+  evidence?: NetStepSample;
 };
+export type VerifiedStepCalibration = {
+  accountId: string; provider: string; localDate: string; timezone: string;
+  sourceVersion: string; expiresAt: Date; samples: readonly NetStepSample[];
+};
+export interface StepCalibrationReader {
+  read(userId: string, localDate: string, timezone: string): Promise<VerifiedStepCalibration | null>;
+  validate(db: Pick<PrismaClient, 'user' | 'currentDayWorkout'>, value: VerifiedStepCalibration): Promise<boolean>;
+}
 
 function roundTo(value: number, increment: number) {
   return Math.round(value / increment) * increment;
@@ -46,6 +55,7 @@ function roundTo(value: number, increment: number) {
 export function calculatePersonalizedStepEstimate(
   currentSteps: number | null,
   samples: readonly WalkingCalibrationSample[],
+  now = new Date(),
 ): StepEstimate {
   if (currentSteps === null) {
     return {
@@ -58,41 +68,27 @@ export function calculatePersonalizedStepEstimate(
       estimationStatus: 'unavailable',
     };
   }
-  const valid = samples
-    .filter(
-      (sample) =>
-        (sample.activityType === 'walking' || sample.activityType === 'running') &&
-        sample.totalSteps > 0 &&
-        sample.totalEnergyBurned > 0,
-    )
-    .sort((left, right) => right.startedAt.getTime() - left.startedAt.getTime())
-    .slice(0, MAXIMUM_CALIBRATION_WORKOUTS);
-  if (valid.length === 0) {
-    return {
-      estimatedContributionCalories: null,
-      estimatedCaloriesPer1000Steps: null,
-      caloriesPerStep: null,
-      calibrationWorkoutCount: 0,
-      calibrationTotalSteps: 0,
-      calibrationTotalCalories: 0,
-      estimationStatus: 'unavailable',
-    };
-  }
-  const totals = valid.reduce(
-    (sum, sample) => ({
-      calories: sum.calories + sample.totalEnergyBurned,
-      steps: sum.steps + sample.totalSteps,
-    }),
-    { calories: 0, steps: 0 },
-  );
-  const caloriesPerStep = totals.calories / totals.steps;
+  const evidence = samples.flatMap(s => s.evidence && s.activityType === s.evidence.activityType &&
+    s.totalSteps === s.evidence.steps.count && s.totalEnergyBurned === s.evidence.energy.calories &&
+    s.startedAt.getTime() === s.evidence.steps.start.getTime() ? [s.evidence] : []);
+  const providers = new Set(evidence.map(s => s.provider));
+  const calibration = providers.size === 1 ? calibrateNetStepRate({
+    provider: evidence[0]!.provider, activityType: 'walking', now, samples: evidence,
+  }) : null;
+  if (!calibration) return {
+    estimatedContributionCalories: null, estimatedCaloriesPer1000Steps: null,
+    caloriesPerStep: null, calibrationWorkoutCount: 0, calibrationTotalSteps: 0,
+    calibrationTotalCalories: 0, estimationStatus: 'unavailable',
+  };
+  const caloriesPerStep = calibration.caloriesPerStep;
   return {
     estimatedContributionCalories: roundTo(currentSteps * caloriesPerStep, 10),
     estimatedCaloriesPer1000Steps: Math.round(caloriesPerStep * 1000),
     caloriesPerStep,
-    calibrationWorkoutCount: valid.length,
-    calibrationTotalSteps: totals.steps,
-    calibrationTotalCalories: totals.calories,
+    calibrationWorkoutCount: calibration.sampleCount,
+    calibrationTotalSteps: calibration.steps,
+    // Existing wire summary is integer kcal; the coefficient keeps full precision.
+    calibrationTotalCalories: Math.round(calibration.calories),
     estimationStatus: 'ready',
   };
 }
@@ -103,39 +99,24 @@ export function shouldShowStepsByDefault(stepCounts: readonly number[]) {
 }
 
 export async function estimateStepContribution(
-  db: Pick<PrismaClient, 'currentDayWorkout'>,
+  _db: Pick<PrismaClient, 'currentDayWorkout'>,
   userId: string,
   currentSteps: DailyStepAggregate | null,
+  verified?: VerifiedStepCalibration | null,
+  now = new Date(),
 ): Promise<StepEstimate> {
   if (!currentSteps) return calculatePersonalizedStepEstimate(null, []);
-
-  const oldestDate = new Date(currentSteps.localDate);
-  oldestDate.setUTCDate(oldestDate.getUTCDate() - STEP_ESTIMATION_LOOKBACK_DAYS);
-  const walkingWorkouts = await db.currentDayWorkout.findMany({
-    where: {
-      userId,
-      provider: currentSteps.provider,
-      activityType: { in: ['walking', 'running'] },
-      localDate: { gte: oldestDate, lte: currentSteps.localDate },
-      endedAt: { lte: new Date() },
-      totalSteps: { gt: 0 },
-      totalEnergyBurned: { gt: 0 },
-      syncStatus: 'ready',
-    },
-    orderBy: { startedAt: 'desc' },
-    take: MAXIMUM_CALIBRATION_WORKOUTS,
-  });
-  return calculatePersonalizedStepEstimate(
-    currentSteps.totalSteps,
-    walkingWorkouts.map((workout) => ({
-      startedAt: workout.startedAt,
-      activityType: workout.activityType === 'walking' || workout.activityType === 'running'
-        ? workout.activityType
-        : 'other',
-      totalSteps: workout.totalSteps ?? 0,
-      totalEnergyBurned: workout.totalEnergyBurned ?? 0,
-    })),
-  );
+  // Legacy persisted scalars have no energy-basis/interval metadata. Never
+  // promote them to verified net energy, regardless of the provider name.
+  if (!verified || verified.accountId !== userId || verified.provider !== currentSteps.provider ||
+    verified.localDate !== currentSteps.localDate.toISOString().slice(0,10) ||
+    verified.timezone !== currentSteps.timezone || verified.expiresAt <= now) {
+    return calculatePersonalizedStepEstimate(currentSteps.totalSteps, []);
+  }
+  return calculatePersonalizedStepEstimate(currentSteps.totalSteps, verified.samples.map(evidence => ({
+    startedAt: evidence.steps.start, activityType: evidence.activityType,
+    totalSteps: evidence.steps.count, totalEnergyBurned: evidence.energy.calories, evidence,
+  })), now);
 }
 
 export async function inferInitialStepsVisibility(db: PrismaClient, userId: string) {

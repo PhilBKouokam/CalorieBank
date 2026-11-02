@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  calculatePersonalizedStepEstimate,
+  calculatePersonalizedStepEstimate as rawEstimate,
   shouldShowStepsByDefault,
   type WalkingCalibrationSample,
 } from '../src/modules/today/steps-intelligence';
+
+const calculatePersonalizedStepEstimate = (steps: number | null, samples: readonly WalkingCalibrationSample[]) => rawEstimate(steps,samples,new Date('2026-08-21T12:00:00Z'));
 
 function sample(
   day: number,
@@ -17,6 +19,9 @@ function sample(
     activityType,
     totalSteps,
     totalEnergyBurned,
+    evidence: {id:String(day),provider:'synthetic',activityType,
+      steps:{count:totalSteps,start:new Date(`2026-08-${String(day).padStart(2,'0')}T12:00:00Z`),end:new Date(`2026-08-${String(day).padStart(2,'0')}T13:00:00Z`)},
+      energy:{calories:totalEnergyBurned,start:new Date(`2026-08-${String(day).padStart(2,'0')}T12:00:00Z`),end:new Date(`2026-08-${String(day).padStart(2,'0')}T13:00:00Z`),basis:'active_above_rest'}},
   };
 }
 
@@ -58,16 +63,16 @@ describe('Steps Intelligence', () => {
     });
   });
 
-  it('accepts running but excludes unrelated, zero-step, and zero-calorie workouts', () => {
+  it('excludes running from walking calibration, plus unrelated and invalid workouts', () => {
     const estimate = calculatePersonalizedStepEstimate(10_000, [
       sample(16, 2_000, 120, 'running'), sample(17, 4_000, 400, 'other'),
       sample(18, 0, 200), sample(19, 2_000, 0),
     ]);
     expect(estimate).toMatchObject({
-      calibrationWorkoutCount: 1,
-      calibrationTotalSteps: 2_000,
-      calibrationTotalCalories: 120,
-      estimatedContributionCalories: 600,
+      calibrationWorkoutCount: 0,
+      calibrationTotalSteps: 0,
+      calibrationTotalCalories: 0,
+      estimatedContributionCalories: null,
     });
   });
 

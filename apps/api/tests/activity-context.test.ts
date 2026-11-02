@@ -360,7 +360,7 @@ describe('activity context ingestion', () => {
       }));
   });
 
-  it('returns a provider-aware walking estimate without changing expenditure or ledger state', async () => {
+  it('withholds untyped legacy workout energy without changing expenditure or ledger state', async () => {
     const app = appFor();
     const today = getLocalDateForTimezone(timezone);
     await prisma.user.create({
@@ -412,12 +412,12 @@ describe('activity context ingestion', () => {
     expect(response.body.steps).toMatchObject({
       count: 20_000,
       source: 'Fitbit',
-      estimatedContributionCalories: 1_000,
-      estimatedCaloriesPer1000Steps: 50,
-      calibrationWorkoutCount: 3,
-      calibrationTotalSteps: 30_000,
-      calibrationTotalCalories: 1_500,
-      estimationStatus: 'ready',
+      estimatedContributionCalories: null,
+      estimatedCaloriesPer1000Steps: null,
+      calibrationWorkoutCount: 0,
+      calibrationTotalSteps: 0,
+      calibrationTotalCalories: 0,
+      estimationStatus: 'unavailable',
     });
     expect(response.body.burned).toMatchObject({ adjusted: null, raw: null });
     expect(await prisma.calorieLedgerTransaction.count({ where: { userId: user.id } })).toBe(0);
@@ -456,10 +456,10 @@ describe('activity context ingestion', () => {
       .get(`/v1/me/today?timezone=${encodeURIComponent(timezone)}`)
       .expect(200);
     expect(otherResponse.body.steps).toMatchObject({
-      estimatedContributionCalories: 800,
-      calibrationWorkoutCount: 1,
-      calibrationTotalSteps: 2_000,
-      calibrationTotalCalories: 160,
+      estimatedContributionCalories: null,
+      calibrationWorkoutCount: 0,
+      calibrationTotalSteps: 0,
+      calibrationTotalCalories: 0,
     });
   });
 

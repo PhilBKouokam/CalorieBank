@@ -36,7 +36,7 @@ import { AppError } from '../../errors';
 import { getProviderDisplayName, isSyntheticProvider } from './provider-catalog';
 import { combineTodayFreshness, currentDayFreshness, CURRENT_DAY_STALE_AFTER_MS } from './today.freshness';
 import { readProviderSelection } from '../provider-selection/provider-selection.repository';
-import { estimateStepContribution, estimateWalkingPace } from './steps-intelligence';
+import { type StepCalibrationReader, type VerifiedStepCalibration, estimateStepContribution, estimateWalkingPace } from './steps-intelligence';
 import { getLocalDateForTimezone } from './today.time';
 
 export type AggregateUpsertResult = 'created' | 'updated' | 'unchanged' | 'ignored_stale';
@@ -146,6 +146,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         syncSessionId?: string,
       ) => Promise<void>;
       now?: () => Date;
+      stepCalibrationReader?: StepCalibrationReader;
     } = {
       allowSyntheticProviders: true,
     },
@@ -623,13 +624,14 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
   }
 
   async getTodayForUser(userId: string, localDate: string, timezone: string): Promise<TodayResponse> {
+    const netCalibration = await this.options.stepCalibrationReader?.read(userId, localDate, timezone).catch(() => null) ?? null;
     return this.db.$transaction(
-      (db) => this.readTodaySnapshot(db, userId, localDate, timezone),
+      (db) => this.readTodaySnapshot(db, userId, localDate, timezone, netCalibration),
       { isolationLevel: 'RepeatableRead' },
     );
   }
 
-  private async readTodaySnapshot(db: Prisma.TransactionClient, userId: string, localDate: string, timezone: string): Promise<TodayResponse> {
+  private async readTodaySnapshot(db: Prisma.TransactionClient, userId: string, localDate: string, timezone: string, netCalibration: VerifiedStepCalibration | null): Promise<TodayResponse> {
     const providerFilter = this.options.allowSyntheticProviders
       ? {}
       : { provider: { not: 'development' } };
@@ -739,6 +741,8 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       db,
       userId,
       stepsStatus === 'ready' ? steps : null,
+      netCalibration && await this.options.stepCalibrationReader?.validate(db, netCalibration) ? netCalibration : null,
+      this.options.now?.() ?? new Date(),
     );
     const walkingPace = stepsStatus === 'ready' && steps
       ? await estimateWalkingPace(db, userId, steps.provider) : null;

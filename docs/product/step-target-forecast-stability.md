@@ -438,3 +438,23 @@ is uncommitted. No clean release commit or deployment claim is made.
 Stop under the delivery hold. No production migration, deployment, builds,
 credential change, permission expansion, or new roadmap feature is authorized by
 this correction task. Live provider and physical qualification are still required.
+
+## Explicit net walking calibration — Phase 6H correction
+
+Additional walking on top of a resting baseline uses raw energy **above rest**.
+An explicitly active-energy field is already net: never subtract resting energy
+again. Explicitly gross energy qualifies only with independently supplied resting
+energy over the exact same interval as both energy and steps. A stored exercise
+scalar with unknown basis is not a verified net sample.
+
+The current walking recommendation uses walking samples only. A running-only rate
+must not be applied to walking; a future running mode must request its own scope.
+Use up to five valid recent same-provider samples and keep precision in the pooled
+net-calorie/step ratio. Existing integer diagnostic summaries may round at the wire
+boundary; they must not become the source of the coefficient.
+
+This calibration correction preserves the7c4762a observed-burn/future-rest
+reference policy and0.8adjustment. It supplies no proof about the activity included
+in an independently retrieved cumulative calorie total, and authorizes no
+provisional duplicate credit, historical-minimum cap, Walking Plan, accounting
+change or production deployment.

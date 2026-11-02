@@ -40,7 +40,8 @@ describe('evidence-driven step forecast stability', () => {
     expect(forecast(10000, 4435).totalDailyStepsNeeded - forecast(10000, 3935).totalDailyStepsNeeded).toBe(-10000);
   });
   it('uses workout evidence, never daily total burn divided by steps', () => {
-    const sample = { startedAt: new Date('2026-09-11'), activityType: 'walking' as const, totalSteps: 10000, totalEnergyBurned: 500 };
+    const start=new Date(),end=new Date(start.getTime()-60000);start.setTime(end.getTime()-3600000);
+    const sample = { startedAt:start, activityType:'walking' as const,totalSteps:10000,totalEnergyBurned:500,evidence:{id:'synthetic',provider:'synthetic',activityType:'walking' as const,steps:{count:10000,start,end},energy:{calories:500,start,end,basis:'active_above_rest' as const}} };
     expect(calculatePersonalizedStepEstimate(1000, []).caloriesPerStep).toBeNull();
     expect(calculatePersonalizedStepEstimate(1000, [sample]).caloriesPerStep).toBe(.05);
     expect(calculatePersonalizedStepEstimate(20000, [sample, { ...sample, activityType: 'other', totalEnergyBurned: 900 }]).caloriesPerStep).toBe(.05);
