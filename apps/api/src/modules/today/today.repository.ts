@@ -1,3 +1,4 @@
+import { canonicalRestingEvidenceType } from './resting-evidence-wire';
 import { activeAdjustment, adjustmentValue } from '../intake-adjustment/intake-adjustment.repository';
 import { adjustedIntakeCalories } from '@caloriebank/domain';
 import { requireAdjustmentCapability } from '../../security/intake-capability';
@@ -762,7 +763,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
           adjustmentFactor,
         })
         : null;
-    const modelMatchesProvider = restingModel && expenditure &&
+    const modelMatchesProvider = restingModel && canonicalRestingEvidenceType(restingModel.evidenceType) !== null && expenditure &&
       (restingModel.provider === expenditure.provider || restingModel.provider === 'apple_health');
     const modelAgeMs = restingModel
       ? (this.options.now?.() ?? new Date()).getTime() - restingModel.calculatedAt.getTime()
@@ -879,12 +880,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         projectedProviderBurnCalories: restForecast?.projectedProviderBurnCalories ?? null,
         projectedAdjustedBurnCalories: restForecast?.projectedAdjustedBurnCalories ?? null,
         source: restingModel ? getProviderDisplayName(restingModel.provider) : null,
-        evidenceType: restingModel
-          ? restingModel.evidenceType as
-            | 'provider_resting_energy'
-            | 'historical_low_activity_hours'
-            | 'historical_daily_basal'
-          : null,
+        evidenceType: restingModel ? canonicalRestingEvidenceType(restingModel.evidenceType) : null,
         observationCount: restingModel?.observationCount ?? 0,
         calculatedAt: restingModel?.calculatedAt.toISOString() ?? null,
       },
