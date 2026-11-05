@@ -1,5 +1,5 @@
 import { GOOGLE_LOW_ACTIVITY_EVIDENCE_V2, reusableGoogleLowActivityModel } from './google-health-model-provenance';
-import { pairLowActivityHourlyEvidence } from './google-health-hourly-evidence';
+import { boundedBaselineChunk, pairLowActivityHourlyEvidence } from './google-health-hourly-evidence';
 import { createHash, randomBytes } from 'node:crypto';
 import { createGoogleHealthActivityRequest } from './google-health-request';
 import { requireGoogleHealthTester } from './google-health-admission';
@@ -8,7 +8,6 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import {
   estimateRestingBurnFromLowActivityHours,
   getBankContributionStatus,
-  getLocalDateUtcBounds,
   getProvisionalLockAt,
   selectRestingBurnLookback,
 } from '@caloriebank/domain';
@@ -709,13 +708,10 @@ export class GoogleHealthFitbitService {
 
     for (const targetDays of [14, 30, 90]) {
       while (coveredDays < targetDays) {
-        const chunkDays = Math.min(14, targetDays - coveredDays);
         const chunkEndDate = previousLocalDate(currentLocalDate, coveredDays);
-        const chunkStartDate = previousLocalDate(chunkEndDate, chunkDays);
-        const bounds = {
-          start: getLocalDateUtcBounds(chunkStartDate, timezone).start,
-          end: getLocalDateUtcBounds(chunkEndDate, timezone).start,
-        };
+        const chunk = boundedBaselineChunk(chunkEndDate, targetDays-coveredDays, timezone);
+        const chunkDays=chunk.days,chunkStartDate=chunk.startDate;
+        const bounds = {start:chunk.start,end:chunk.end};
         const rollup = async (dataType: 'total-calories' | 'steps') => {
           const response = await request(
             `${this.config.GOOGLE_HEALTH_API_BASE_URL}/users/me/dataTypes/${dataType}/dataPoints:rollUp`,

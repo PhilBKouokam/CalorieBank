@@ -1,3 +1,16 @@
+import {getLocalDateUtcBounds} from '@caloriebank/domain';
+
+/** Google total-calories rollUp permits at most14 elapsed days, not14 civil days.
+ * Preserve whole local-day boundaries; the next request covers the remainder. */
+export function boundedBaselineChunk(endDate:string,requestedDays:number,timezone:string){
+ const end=getLocalDateUtcBounds(endDate,timezone).start;
+ let days=Math.min(14,requestedDays);
+ const dateBefore=(n:number)=>{const d=new Date(`${endDate}T12:00:00Z`);d.setUTCDate(d.getUTCDate()-n);return d.toISOString().slice(0,10);};
+ let startDate=dateBefore(days),start=getLocalDateUtcBounds(startDate,timezone).start;
+ while(end.getTime()-start.getTime()>14*86_400_000&&days>1){days--;startDate=dateBefore(days);start=getLocalDateUtcBounds(startDate,timezone).start;}
+ return {days,startDate,endDate,start,end};
+}
+
 /** Provider-neutral evidence is not inferred from retrieval or a missing metric.
  * These are matched full-hour reported totals, not physiological basal readings.
  */
