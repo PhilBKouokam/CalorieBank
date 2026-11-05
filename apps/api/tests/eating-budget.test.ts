@@ -25,6 +25,14 @@ function app(read: (userId: string, timezone: string) => Promise<BudgetSnapshot>
   result.use(errorHandler); return result;
 }
 describe('isolated read-only Eating Budget API', () => {
+ it('opt-in projected estimate preserves old wire and never enables step plans',async()=>{
+  const s=snapshot('one');s.model=null;s.expenditure=null;s.projectedEstimate={status:'ready',basis:'caloriebank_adjusted_projection',estimated:true,totalCalories:2200,projectedAdjustedBurnCalories:3000,expiresAt:'2026-10-18T17:30:00Z'};
+  const api=app(async()=>s);
+  const legacy=await request(api).get('/v1/me/eating-budget').set('x-synthetic-user','one').expect(200);expect(legacy.body).not.toHaveProperty('projectedEstimate');
+  const current=await request(api).get('/v1/me/eating-budget?estimate=projected').set('x-synthetic-user','one').expect(200);expect(current.body.projectedEstimate.totalCalories).toBe(2200);expect(current.body.budget.status).toBe('unavailable');expect(current.body.planningAvailable).toBe(false);
+  const plan=await request(api).post('/v1/me/eating-budget/plan').set('x-synthetic-user','one').send({direction:'steps_to_intake',totalSteps:10000}).expect(200);expect(plan.body.snapshot).not.toHaveProperty('projectedEstimate');expect(plan.body.plan.status).toBe('unavailable');
+ });
+
   it('default/off gate makes no repository reads; legacy Today schema unchanged', async () => {
     const read = vi.fn(); await request(app(read, false)).get('/v1/me/eating-budget').set('x-synthetic-user', 'one').expect(404);
     await request(app(read, false)).post('/v1/me/eating-budget/plan').set('x-synthetic-user', 'one').send({ direction: 'steps_to_intake', totalSteps: 10000 }).expect(404);
@@ -117,19 +125,21 @@ describe('isolated read-only Eating Budget API', () => {
       planningAnchorAt: '2026-10-18T17:00:00.000Z', planningExpiresAt: '2026-10-18T17:30:00.000Z', unroundedProjectedProviderBurnCalories: 3000,
     } } as unknown as TodayResponse; // Mock boundary supplies exactly the adapter-consumed read fields.
     const read = vi.spyOn(PrismaTodayAggregateRepository.prototype, 'readTodaySnapshotForBudget').mockResolvedValue(today);
-    let restingProvider = 'apple_health';
+    let restingProvider = 'apple_health';let restingEvidence='historical_low_activity_hours';
     const tx = { userProfile: { findUnique: async () => ({ timezone: 'UTC', dailyBankTargetCalories: 200 }) },
       providerSelection: { findUnique: async () => ({ expenditureSelected: true, authoritativeExpenditureProvider: 'google_health_fitbit' }) },
       goalConfiguration: { findUnique: async () => ({ dailyEnergyAdjustment: -500 }) },
       intakeAuthorityBoundary: { findFirst: async () => null },
-      dailyExpenditureAggregate: { findUnique: async () => ({ isCurrentDay: true, timezone: 'UTC', rawTotalDailyExpenditure: 2000, forecastCoverageAt: new Date(today.restOfDayProjection.coverageAt!) }) },
-      restingBurnEstimate: { findUnique: async () => ({ provider: restingProvider }) } };
+      dailyExpenditureAggregate: { findUnique: async () => ({provider:'google_health_fitbit',isCurrentDay:true,timezone:'UTC',rawTotalDailyExpenditure:2000,forecastCoverageAt:new Date(today.restOfDayProjection.coverageAt!),planningAnchorAt:new Date(today.restOfDayProjection.coverageAt!),planningAnchorKind:'verified_coverage'}) },
+      restingBurnEstimate: { findUnique: async () => ({provider:restingProvider,evidenceType:restingEvidence,calculatedAt:now,providerKcalPerHour:140}) } };
     const db = { $transaction: async (callback: (value: unknown) => Promise<unknown>) => callback(tx) } as unknown as PrismaClient;
     try {
       const repository = new PrismaEatingBudgetRepository(db, () => now);
       expect((await repository.read('synthetic-one', 'UTC')).expenditure).toBeNull();
       restingProvider = 'google_health_fitbit';
-      expect((await repository.read('synthetic-one', 'UTC')).expenditure).not.toBeNull();
+      expect((await repository.read('synthetic-one','UTC')).expenditure).toBeNull();
+      restingEvidence='historical_low_activity_hours_v2';
+      expect((await repository.read('synthetic-one','UTC')).expenditure).not.toBeNull();
     } finally { read.mockRestore(); }
   });
   it('production repository performs scoped reads only, never issues accounting/settings writes', async () => {
@@ -205,7 +215,7 @@ describe('Budget through the current Today snapshot', () => {
           expect(result.body.budget).toMatchObject({ status: 'ready', totalCalories: 1684, comparison: null, expiresAt: expires.toISOString() });
           expect(result.body.intake).toMatchObject({ calories: 1000, semantic: 'observed_current_day_intake', attributionProviders: ['fatsecret'] });
         } else {
-          expect(result.body.budget).toEqual({ status: 'unavailable', reason: 'missing_expenditure' });
+          expect(result.body.budget).toEqual({ status: 'unavailable', reason: 'expenditure_cutoff_unverified' });
           expect(result.body.expenditure.coverage).toBe('unverified');
         }
         expect(transaction).toHaveBeenCalledExactlyOnceWith(expect.any(Function), { isolationLevel: 'RepeatableRead' });
@@ -216,7 +226,7 @@ describe('Budget through the current Today snapshot', () => {
           { direction: 'intake_to_steps', totalIntakeCalories: 1900 },
         ]) {
           const plan = await request(api).post('/v1/me/eating-budget/plan').set('x-synthetic-user', 'one').send(input).expect(200);
-          expect(plan.body.plan).toEqual({ status: 'unavailable', reason: 'qualified_activity_model_unavailable' });
+          expect(plan.body.plan).toEqual({ status: 'unavailable', reason: anchorKind==='verified_coverage'?'walking_calibration_unavailable':'expenditure_cutoff_unverified' });
         }
         expect(fetcher).not.toHaveBeenCalled();
       } finally {
@@ -234,7 +244,7 @@ describe('Budget model evidence boundary',()=>{
    if(kind==='baseline')s.baselineModelVersion='changed';
    if(kind==='cutoff')s.model!.currentStepsAt=new Date('2026-10-18T16:00:00Z');
    const api=app(async()=>s),r=await request(api).get('/v1/me/eating-budget').set('x-synthetic-user','one').expect(200);
-   expect(r.body.budget.status).toBe('ready');expect(r.body.planningAvailable).toBe(false);expect(r.body.planningUnavailableReason).toBe('shared_step_alignment_unverified');
+   expect(r.body.budget.status).toBe('ready');expect(r.body.planningAvailable).toBe(false);expect(r.body.planningUnavailableReason).toBe(({missing:'walking_calibration_unqualified',expired:'walking_calibration_stale',baseline:'baseline_calibration_mismatch',cutoff:'step_alignment_unverified'} as const)[kind]);
    const p=await request(api).post('/v1/me/eating-budget/plan').set('x-synthetic-user','one').send({direction:'steps_to_intake',totalSteps:10000}).expect(200);expect(p.body.plan.status).toBe('unavailable');
   }
  });

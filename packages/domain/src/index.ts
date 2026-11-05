@@ -1237,4 +1237,4 @@ export type { StepPlanningReference, UncoveredWalkingBridge } from './step-plann
 export { calibrateGrossWalkingRate } from './net-step-calibration';
 export { calibrateQuietWalkingRate, calibrateTotalWalkingRate, type GrossWalkingSample } from './net-step-calibration';
 
-export { calculateEatingBudget, planIntakeForSteps, planStepsForIntake, type BudgetContext, type BudgetExpenditure, type BudgetIntake, type EatPlanningModel } from './eating-budget';
+export { calculateEatingBudget, calculateProjectedEatingBudget, resolveBudgetIntakeComparison, planIntakeForSteps, planStepsForIntake, type BudgetContext, type BudgetExpenditure, type BudgetIntake, type EatPlanningModel } from './eating-budget';

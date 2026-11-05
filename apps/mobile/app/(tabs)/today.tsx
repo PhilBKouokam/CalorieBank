@@ -1,5 +1,5 @@
 import {fetchEatingBudget,eatingBudgetEnabled} from '@/lib/api/eating-budget';
-import {selectEatingBudget,eatingBudgetReason} from '@/lib/today/eating-budget-guidance';
+import {selectEatingBudget,selectProjectedEatingBudget,eatingBudgetReason} from '@/lib/today/eating-budget-guidance';
 import { walkingPlanVisible } from '@/lib/today/walking-plan-visibility';
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { WalkingEatingCard } from '@/components/caloriebank/WalkingEatingCard';
@@ -379,8 +379,10 @@ export default function TodayScreen() {
   const {now:guidanceNow}=usePlanningClock(today?.restOfDayProjection);
   const guidanceAllowed=guidanceReadCurrent&&!refreshingHealth&&!firstRunCheckPending&&storedTodayStatus==='ready'&&providerSelection?.expenditure.status==='ready'&&!needsConnectionRecovery(providerSelection);
   const currentBudget=selectEatingBudget(today,budget,budgetClock.now,guidanceAllowed&&eatingBudgetEnabled);
-  const dailyBudget=currentBudget?.budget.status==='ready'?currentBudget.budget.totalCalories:null;
-  const projectedBurn=projectedBurnGuidance(today,guidanceNow,guidanceAllowed);
+  const projectedBurnAllowed=guidanceReadCurrent&&!refreshingHealth&&!firstRunCheckPending&&storedTodayStatus==='ready'&&providerSelection?.expenditure.status==='ready'&&providerSelection.expenditure.selected!==false;
+  const projectedEstimate=selectProjectedEatingBudget(today,budget,budgetClock.now,projectedBurnAllowed&&eatingBudgetEnabled);
+  const dailyBudget=projectedEstimate?.status==='ready'?projectedEstimate.totalCalories:budget?.projectedEstimate?null:currentBudget?.budget.status==='ready'?currentBudget.budget.totalCalories:null;
+  const projectedBurn=projectedBurnGuidance(today,guidanceNow,projectedBurnAllowed);
   const showWalkingPlan=walkingPlanVisible(dashboardPreferences);
   const walkingGuidanceAllowed=guidanceAllowed&&providerSelection?.activityContext?.status==='ready';
 
@@ -435,7 +437,7 @@ export default function TodayScreen() {
 
         {visibleCards.showTodaySoFar ? <Pressable
           accessibilityHint="Opens today's burn details."
-          accessibilityLabel={`Today so far. Burned ${burnedValue}. Eaten ${eatenValue}. Projected burn ${projectedBurn===null?'unavailable':`${projectedBurn.toLocaleString()} kilocalories estimated total today`}. Daily budget ${dailyBudget===null?'unavailable':`${dailyBudget.toLocaleString()} kilocalories estimated total today`}.`}
+          accessibilityLabel={`Today so far. Burned ${burnedValue}. Eaten ${eatenValue}. Projected burn ${projectedBurn===null?'unavailable':`${projectedBurn.toLocaleString()} kilocalories estimated total today`}. Eating budget ${dailyBudget===null?'unavailable':`${dailyBudget.toLocaleString()} kilocalories estimated total today`}.`}
           accessibilityRole="button"
           onPress={() => router.push('/today-burn')}
           style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
@@ -509,11 +511,11 @@ export default function TodayScreen() {
                   <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>{projectedBurn===null?'Unavailable':`${projectedBurn.toLocaleString()} kcal`}</Text>
                   <Text style={styles.metricDetail}>Estimated total today</Text>
                 </Pressable>
-                <View style={styles.todayMetric}>
-                  <Text style={styles.metricLabel}>Daily budget</Text>
+                <Pressable accessibilityRole="button" accessibilityLabel="Eating budget and planning" accessibilityHint="Opens your daily eating estimate and a hypothetical walking plan." onPress={event=>{event.stopPropagation();router.push('/eat-planning');}} style={styles.todayMetric}>
+                  <Text style={styles.metricLabel}>Eating budget</Text>
                   <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>{dailyBudget===null?'Unavailable':`${dailyBudget.toLocaleString()} kcal`}</Text>
-                  <Text style={styles.metricDetail}>{dailyBudget===null?eatingBudgetReason(budget?.budget.status==='unavailable'?budget.budget.reason:null):'Estimated total intake today'}</Text>
-                </View>
+                  <Text style={styles.metricDetail}>{dailyBudget===null?eatingBudgetReason(budget?.projectedEstimate?.status==='unavailable'?budget.projectedEstimate.reason:projectedEstimate?.status==='non_positive'?'non_positive_projected_budget':budget?.budget.status==='unavailable'?budget.budget.reason:null):'Estimated total intake today'}</Text>
+                </Pressable>
               </View>
               <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>
               {!firstRunCheckPending && needsConnectionRecovery(providerSelection) ? (

@@ -8,7 +8,7 @@ let saved: { owner: number; state: State } | null = null;
 onDraftSessionReset(() => { saved = null; });
 const editors: Record<string, Editor> = {
   'edit-calories': 'calorie-correction', 'manual-estimate': 'usual-estimate',
-  'today-burn': 'step-planning', 'steps-detail': 'step-planning',
+  'eat-planning': 'eating-plan', 'today-burn': 'step-planning', 'steps-detail': 'step-planning',
   'goal-settings': 'fitness-goal', 'daily-bank-target': 'daily-bank-target', 'planned-treat': 'banking-goal',
 };
 function routes(state: State): string[] {

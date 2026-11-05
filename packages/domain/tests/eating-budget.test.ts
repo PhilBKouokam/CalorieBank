@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { calculateEatingBudget, planIntakeForSteps, planStepsForIntake, getLocalDateUtcBounds,
+import { calculateProjectedEatingBudget, calculateEatingBudget, planIntakeForSteps, planStepsForIntake, getLocalDateUtcBounds,
   type BudgetContext, type BudgetExpenditure, type BudgetIntake, type EatPlanningModel } from '../src/index';
 
 const context = (): BudgetContext => ({ accountId: 'synthetic-user', expenditureSourceId: 'synthetic-burn', intakeSourceId: 'synthetic-intake',
@@ -179,4 +179,11 @@ test('safe total and safe intake cannot yield an unsafe comparison difference', 
     assert.equal(result.comparisonUnavailable, true);
     assert.equal(result.comparisonExpiresAt, null);
   }
+});
+
+test('projected adjusted burn budget: once-only units, goal signs, bank target and dynamic updates',()=>{
+ for(const [burn,goal,bank,expected] of [[3000,-500,300,2200],[2400,-500,300,1600],[3200,-500,300,2400],[3000,0,300,2700],[3000,300,300,3000],[100,-500,300,-700]]){
+  const result=calculateProjectedEatingBudget({projectedAdjustedBurnCalories:burn,signedGoalAdjustmentCalories:goal,dailyBankTargetCalories:bank});assert.notEqual(result.status,'unavailable');if(result.status!=='unavailable')assert.equal(result.totalCalories,expected);
+ }
+ assert.equal(calculateProjectedEatingBudget({projectedAdjustedBurnCalories:NaN,signedGoalAdjustmentCalories:0,dailyBankTargetCalories:0}).status,'unavailable');
 });

@@ -1,5 +1,5 @@
 /** Same-JS-process memory only. Never serialize this module to disk or an API. */
-export type Editor = 'calorie-correction' | 'usual-estimate' | 'fitness-goal' | 'daily-bank-target' | 'banking-goal' | 'step-planning' | 'walking-eat-planning';
+export type Editor = 'calorie-correction' | 'usual-estimate' | 'fitness-goal' | 'daily-bank-target' | 'banking-goal' | 'step-planning' | 'walking-eat-planning' | 'eating-plan';
 export type Selection = { start: number; end: number };
 export type Draft<T> = {
   context: string; revision: string; value: T; selections: Record<string, Selection>;

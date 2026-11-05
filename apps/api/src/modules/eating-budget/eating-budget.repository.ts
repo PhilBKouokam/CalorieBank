@@ -1,3 +1,5 @@
+import {estimateFromTodayProjection} from './projected-eating-budget';
+import {assessBudgetQualification,qualifiesBudgetBaseline,type BudgetQualification} from './eating-budget.qualification';
 import type { AttributionProviders, EatingBudgetResponse } from '@caloriebank/schemas';
 import type { PrismaClient } from '@prisma/client';
 import { getLocalDateUtcBounds, type BudgetContext, type BudgetExpenditure, type BudgetIntake, type EatPlanningModel } from '@caloriebank/domain';
@@ -13,7 +15,7 @@ export function qualifiedPlanningModel(s:BudgetSnapshot): QualifiedBudgetPlannin
  x?.coverage==='verified'&&m.currentStepsAt?.getTime()===x.coverageAt?.getTime()&&e.expiresAt.getTime()>c.now.getTime()&&
  Number.isFinite(m.providerCaloriesPerAdditionalStep)&&m.providerCaloriesPerAdditionalStep>0&&m.stepsPerMinute!==null&&Number.isFinite(m.stepsPerMinute)&&m.stepsPerMinute>0?m:null;
 }
-export type BudgetSnapshot = { context: BudgetContext; expenditure: BudgetExpenditure | null; intake: BudgetIntake | null; model: QualifiedBudgetPlanningModel | null; baselineModelVersion?: string|null; goalConfigured: boolean; guidanceContextVersion?:string|null; observation?: EatingBudgetResponse['expenditure']; intakeAttributionProviders?: AttributionProviders };
+export type BudgetSnapshot = { context: BudgetContext; expenditure: BudgetExpenditure | null; intake: BudgetIntake | null; model: QualifiedBudgetPlanningModel | null; baselineModelVersion?: string|null; goalConfigured: boolean; projectedEstimate?:NonNullable<EatingBudgetResponse['projectedEstimate']>; qualification?:BudgetQualification; guidanceContextVersion?:string|null; observation?: EatingBudgetResponse['expenditure']; intakeAttributionProviders?: AttributionProviders };
 export interface EatingBudgetRepository { read(userId: string, fallbackTimezone: string): Promise<BudgetSnapshot> }
 /** Read-only repeatable snapshot; no provider fetch, model refresh, finalization or settings writes. */
 export class PrismaEatingBudgetRepository implements EatingBudgetRepository {
@@ -37,10 +39,11 @@ export class PrismaEatingBudgetRepository implements EatingBudgetRepository {
         tx.dailyExpenditureAggregate.findUnique({ where: { userId_localDate_provider: { userId, localDate: date, provider: selection.authoritativeExpenditureProvider } } }),
         tx.restingBurnEstimate.findUnique({ where: { userId } }),
       ]);
+      const baselineQualified=qualifiesBudgetBaseline(restingEstimate,context.expenditureSourceId,now);
       // The existing hypothetical forecast permits a legacy resting-source fallback.
       // Food guidance requires a qualified model from this exact expenditure source.
       const verified =
-        selection.expenditureSelected &&
+        selection.expenditureSelected && baselineQualified &&
         restingEstimate?.provider === selection.authoritativeExpenditureProvider &&
         exactExpenditure?.isCurrentDay && exactExpenditure.timezone === timezone &&
         exactExpenditure.rawTotalDailyExpenditure === today.burned.raw &&
@@ -59,9 +62,16 @@ export class PrismaEatingBudgetRepository implements EatingBudgetRepository {
       const eaten = today.eaten.authoritative;
       const intake: BudgetIntake | null = eaten ? { accountId: userId, sourceId, localDate, timezone,
         calories: eaten.calories, semantic: eaten.semanticKind, coverage: null, correction: null } : null;
+      const qualification=assessBudgetQualification({context,expenditure,intake,model:null,
+        baselineQualified,baselineModelVersion:projection.modelVersion??null,
+        rawEvidence:{present:Boolean(exactExpenditure),sourceMatches:Boolean(selection.expenditureSelected&&exactExpenditure?.provider===context.expenditureSourceId&&exactExpenditure.timezone===timezone&&exactExpenditure.rawTotalDailyExpenditure===today.burned.raw),
+          ready:today.burned.status==='ready'&&Boolean(exactExpenditure?.isCurrentDay),coverageAt:exactExpenditure?.forecastCoverageAt??null,
+          anchorAt:exactExpenditure?.planningAnchorAt??exactExpenditure?.forecastCoverageAt??null,anchorKind:exactExpenditure?.planningAnchorKind??(exactExpenditure?.forecastCoverageAt?'verified_coverage':null),
+          expiresAt:projection.planningExpiresAt?new Date(projection.planningExpiresAt):null}});
       // Today already resolved corrections atomically. Do not apply them a second time.
       // No approved persisted intake SLA or common steps horizon exists: neither is fabricated.
-      return { context, expenditure, intake, model: null, goalConfigured: goal !== null,
+      return { context, expenditure, intake, model: null, qualification,
+        projectedEstimate:estimateFromTodayProjection(today,context,goal!==null,Boolean(selection.expenditureSelected&&exactExpenditure?.provider===context.expenditureSourceId&&exactExpenditure.timezone===timezone&&exactExpenditure.rawTotalDailyExpenditure===today.burned.raw)),goalConfigured: goal !== null,
         guidanceContextVersion:today.guidanceContextVersion??null, baselineModelVersion:today.restOfDayProjection.modelVersion??null,
         intakeAttributionProviders: today.budgetIntakeAttributionProviders ?? [],
         observation: { rawCalories: today.burned.raw, adjustedCalories: today.burned.adjusted,

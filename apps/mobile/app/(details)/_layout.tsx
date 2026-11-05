@@ -17,6 +17,7 @@ export default function DetailsLayout() {
       <Stack.Screen name="bank-history" options={{ title: 'Bank History' }} />
       <Stack.Screen name="today-workouts" options={{ title: "Today's Workouts" }} />
       <Stack.Screen name="steps-detail" options={{ title: 'Steps' }} />
+      <Stack.Screen name="eat-planning" options={{ title: 'Plan today' }} />
       <Stack.Screen name="today-burn" options={{ title: 'Today' }} />
     </Stack>
   );

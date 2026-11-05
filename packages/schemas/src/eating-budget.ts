@@ -6,7 +6,12 @@ export const eatPlanningRequestSchema = z.discriminatedUnion('direction', [
   z.object({ direction: z.literal('steps_to_intake'), totalSteps: integer.nonnegative() }).strict(),
   z.object({ direction: z.literal('intake_to_steps'), totalIntakeCalories: integer.nonnegative() }).strict(),
 ]);
+export const projectedEatingBudgetEstimateSchema=z.discriminatedUnion('status',[
+ z.object({status:z.literal('unavailable'),basis:z.literal('caloriebank_adjusted_projection'),estimated:z.literal(true),reason:z.string().min(1)}).strict(),
+ z.object({status:z.enum(['ready','non_positive']),basis:z.literal('caloriebank_adjusted_projection'),estimated:z.literal(true),totalCalories:integer,projectedAdjustedBurnCalories:integer.nonnegative(),expiresAt:z.string().datetime()}).strict(),
+]);
 export const eatingBudgetResponseSchema = z.object({
+  projectedEstimate:projectedEatingBudgetEstimateSchema.optional(),
   guidanceContextVersion:z.string().regex(/^g1:[a-f0-9]{64}$/).nullable().optional(),
   version: z.literal(1), localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), timezone: z.string().min(1),
   signedGoalAdjustmentCalories: integer.nullable(), dailyBankTargetCalories: integer.min(0).max(2000),

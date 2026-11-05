@@ -299,7 +299,7 @@ describe('Phase 1 consumer release invariants', () => {
     expect(home.indexOf('>Today so far</Text>')).toBeLessThan(home.indexOf('<WalkingEatingCard'));
     expect(home.indexOf('>Burned</Text>')).toBeLessThan(home.indexOf('>Eaten</Text>'));
     expect(home.indexOf('>Eaten</Text>')).toBeLessThan(home.indexOf('>Projected burn</Text>'));
-    expect(home.indexOf('>Projected burn</Text>')).toBeLessThan(home.indexOf('>Daily budget</Text>'));
+    expect(home.indexOf('>Projected burn</Text>')).toBeLessThan(home.indexOf('>Eating budget</Text>'));
     expect(home).not.toContain('>Banking Goal</Text>');expect(home).not.toContain('fetchPlannedTreat');
     expect(source('app/(tabs)/settings.tsx')).toContain("href: '/planned-treat'");
     expect(home).not.toContain('createOrReplacePlannedTreat');
@@ -372,7 +372,7 @@ it.each([[320,1],[390,1],[320,2],[390,2]])('renders the actual new walking card 
  const today={date:'2026-02-10',timezone:'UTC',burned:{status:'ready',adjustmentFactor:.8,source:'Fitbit'},steps:{status:'ready',source:'Fitbit',count:10000,caloriesPerStep:null,planningSnapshotReady:true,quietWalkingForecast:q},restOfDayProjection:{status:'ready',evidenceType:'historical_low_activity_hours',modelVersion:'synthetic-model',providerKcalPerHour:60,planningAnchorAt:now.toISOString(),planningExpiresAt:new Date(now.getTime()+30*60000).toISOString(),unroundedProjectedProviderBurnCalories:1920}} as unknown as TodayResponse;
  const open=vi.fn(),rendered=await render(React.createElement(WalkingEatingCard,{today,pending:false,onOpenDetails:open}));
  const input=rendered.root.find(node=>String(node.type)==='TextInput');expect(input.props.selectTextOnFocus).toBe(true);
- await act(async()=>input.props.onChangeText('24500'));expect(textContent(rendered.root)).toContain('2,000 kcal');expect(textContent(rendered.root)).toContain('Your daily budget isn’t available yet.');
+ await act(async()=>input.props.onChangeText('24500'));expect(textContent(rendered.root)).toContain('2,000 kcal');expect(textContent(rendered.root)).toContain('Your eating budget isn’t available yet.');
  expect(input.props.style).toEqual(expect.arrayContaining([expect.objectContaining({maxWidth:'100%',minHeight:48})]));
  const action=rendered.root.find(node=>String(node.type)==='Pressable');await act(async()=>action.props.onPress());expect(open).toHaveBeenCalledOnce();
  await act(async()=>rendered.update(React.createElement(WalkingEatingCard,{today,pending:false,guidanceAllowed:false,onOpenDetails:open})));expect(textContent(rendered.root)).not.toContain('2,000 kcal');

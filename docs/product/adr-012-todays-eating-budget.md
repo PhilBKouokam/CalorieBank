@@ -442,3 +442,11 @@ These decisions block implementation of a numeric Today's Eating Budget. They do
 - Existing current-day and finalized-bank read models remain unchanged until a separate implementation milestone approves contracts.
 - Today's Eating Budget must be independently available, stale, or unavailable without changing Available Bank.
 - No schema, API, calculation utility, dashboard card, notification, or analytics implementation is approved by this documentation-only decision.
+
+## 2026-11-05: projected whole-day eating estimate
+
+The founder explicitly approved a separate estimate using the ready, already-adjusted Projected Burn shown on Today. Whole-day eating budget = adjusted projected daily burn + signed fitness-goal adjustment − daily banking goal. For example, 3,000 − 500 − 300 = 2,200 kcal. A higher projection raises this estimate. Apply the provider 0.8 adjustment only upstream, once; do not subtract Available Bank or food already eaten from this whole-day total.
+
+This supersedes the earlier verified-expenditure-watermark requirement for this projected total estimate only. It is labeled estimated, uses the existing Today projection's provenance and expiry rules, and keeps observed burn separate. It does not relax the verified-input Budget path, walking-plan alignment/calibration rules, or provider-specific observed-intake freshness needed for Remaining Today. The opt-in response basis is `caloriebank_adjusted_projection`; old requests retain their existing response. Missing, stale or nonpositive guidance remains honestly unavailable. Feature flags remain off pending separate activation approval.
+
+Consumer label: **Eating budget** on Today, detail headings, accessibility labels and unavailable copy. Supporting text still identifies this as an estimated whole-day total, including food already eaten.

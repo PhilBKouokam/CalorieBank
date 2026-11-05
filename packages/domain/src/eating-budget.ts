@@ -45,7 +45,8 @@ function contextBounds(c: BudgetContext) {
   } catch { return null; }
 }
 
-function intakeComparison(c: BudgetContext, total: number, input: BudgetIntake | null): BudgetComparison | null {
+export function resolveBudgetIntakeComparison(c: BudgetContext, total: number, input: BudgetIntake | null): BudgetComparison | null {
+  if (!contextBounds(c) || !Number.isSafeInteger(total)) return null;
   if (!input || !identityMatches(input, c, c.intakeSourceId) || (input.semantic !== 'observed_current_day_intake' && input.semantic !== 'estimated_total_day_intake')) return null;
   let semantic = input.semantic;
   if (input.calories !== null && !whole(input.calories)) return null;
@@ -88,7 +89,7 @@ export function calculateEatingBudget(context: BudgetContext, expenditure: Budge
   const rawProjectedProviderCalories = expenditure.rawProviderCalories + rest;
   const totalCalories = Math.round(V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE * rawProjectedProviderCalories) + context.signedGoalAdjustmentCalories - context.dailyBankTargetCalories;
   if (!nonnegative(rawProjectedProviderCalories) || !Number.isSafeInteger(totalCalories)) return { status: 'unavailable', reason: 'invalid_value' };
-  const comparison = intakeComparison(context, totalCalories, intake);
+  const comparison = resolveBudgetIntakeComparison(context, totalCalories, intake);
   return { status: totalCalories > 0 ? 'ready' : 'non_positive', estimated: true, totalCalories, rawProjectedProviderCalories,
     comparison, comparisonUnavailable: comparison === null,
     comparisonExpiresAt: comparison === null ? null : new Date(Math.min(expiresAt.getTime(), comparison.kind === 'remaining_today' ? intake!.coverage!.expiresAt.getTime() : expiresAt.getTime())), expiresAt };
@@ -139,4 +140,14 @@ export function planStepsForIntake(context: BudgetContext, expenditure: BudgetEx
   const result = finishPlan(context, budget, model, steps.totalDailyStepsNeeded);
   if (result.status === 'ready' && result.totalIntakeCalories < targetTotalIntakeCalories) return { status: 'unavailable', reason: 'invalid_target' };
   return result;
+}
+
+/** Whole-day ESTIMATE from the already-adjusted projection shown by CalorieBank.
+ * No observed food subtraction, Available Bank use, or second expenditure factor. */
+export function calculateProjectedEatingBudget(input:{projectedAdjustedBurnCalories:number;signedGoalAdjustmentCalories:number;dailyBankTargetCalories:number}){
+ const {projectedAdjustedBurnCalories:burn,signedGoalAdjustmentCalories:goal,dailyBankTargetCalories:target}=input;
+ if(!Number.isSafeInteger(burn)||burn<0||!Number.isSafeInteger(goal)||!Number.isSafeInteger(target)||target<0||target>2000)return {status:'unavailable' as const,reason:'invalid_projected_budget_input'};
+ const totalCalories=burn+goal-target;
+ if(!Number.isSafeInteger(totalCalories))return {status:'unavailable' as const,reason:'invalid_projected_budget_input'};
+ return {status:totalCalories>0?'ready' as const:'non_positive' as const,totalCalories,projectedAdjustedBurnCalories:burn};
 }

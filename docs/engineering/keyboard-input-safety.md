@@ -264,3 +264,13 @@ this patch adds no offsets, padding workarounds, font limits or Activity suppres
 Physical Android 200% geometry and keyboard qualification of the corrected binary
 remain pending. The prior iPhone build-15 physical pass is not proof for this shared
 JavaScript change.
+
+## Eating plan detail (local, default off)
+
+`/(details)/eat-planning` adds one planned-total-calories TextInput through
+`EatingPlanPanel`. Its only scrolling/keyboard owner is `KeyboardSafeScrollView`.
+The field, hypothetical result and Refresh estimate action share that scroll host.
+`eating-plan` drafts and route restoration are same-session memory only, isolated
+from Home's walking input; no input is keyed by font scale or written as intake.
+Current inventory is eleven TextInputs across nine input-owning files; prior surfaces are unchanged.
+Rendered font-scale/width checks do not replace physical device keyboard qualification.

@@ -51,3 +51,9 @@ it('waits for authentication hydration before restoring a saved route', async ()
   await act(async () => root.update(React.createElement(HydratingRoot, { ready: true })));
   expect(nav.reset).toHaveBeenCalledExactlyOnceWith(selected); await act(async () => root.unmount());
 });
+
+it('preserves a same-session eating-plan draft and clears it when leaving the editor',()=>{
+ const route:State={routes:[{name:'(details)',state:{routes:[{name:'eat-planning'}]}}]};
+ openDraft('eating-plan','synthetic-day','','2000');rememberNavigation(route);expect(openDraft('eating-plan','synthetic-day','','').value).toBe('2000');
+ rememberNavigation({routes:[{name:'(tabs)',state:{routes:[{name:'today'}]}}]});expect(openDraft('eating-plan','synthetic-day','','').value).toBe('');
+});
