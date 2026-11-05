@@ -1,3 +1,9 @@
+import { guidanceContextVersion } from './guidance-context';
+import type { AttributionProviders } from '@caloriebank/schemas';
+import { intakeAttributions } from '../attribution/fatsecret-attribution';
+import { buildQuietWalkingForecast, quietBaselineVersion } from './quiet-walking-forecast';
+import { canonicalRestingEvidenceType, qualifiedRestingModelProvenance, GOOGLE_LOW_ACTIVITY_EVIDENCE_V2 } from '../google-health/google-health-model-provenance';
+import { calibrateGrossWalkingRate, qualifyOrdinaryStepForecast } from '@caloriebank/domain';
 import { activeAdjustment, adjustmentValue } from '../intake-adjustment/intake-adjustment.repository';
 import { adjustedIntakeCalories } from '@caloriebank/domain';
 import { requireAdjustmentCapability } from '../../security/intake-capability';
@@ -139,6 +145,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     private readonly db: PrismaClient,
     private readonly options: {
       allowSyntheticProviders: boolean;
+      includeGuidanceContext?: boolean;
       onBankingAggregateChanged?: (
         user: DevelopmentUser,
         localDate: string,
@@ -631,7 +638,13 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     );
   }
 
-  private async readTodaySnapshot(db: Prisma.TransactionClient, userId: string, localDate: string, timezone: string, netCalibration: VerifiedStepCalibration | null): Promise<TodayResponse> {
+  /** Borrow the caller transaction and clock; never getTodayForUser or provider calibration. */
+  readTodaySnapshotForBudget(db:Prisma.TransactionClient,userId:string,localDate:string,timezone:string,now:Date) {
+    return this.readTodaySnapshot(db,userId,localDate,timezone,null,{now});
+  }
+
+  private async readTodaySnapshot(db: Prisma.TransactionClient, userId: string, localDate: string, timezone: string, netCalibration: VerifiedStepCalibration | null,budgetSnapshot?:{now:Date}): Promise<TodayResponse & {budgetIntakeAttributionProviders?:AttributionProviders}> {
+    const snapshotNow=budgetSnapshot?.now;
     const providerFilter = this.options.allowSyntheticProviders
       ? {}
       : { provider: { not: 'development' } };
@@ -722,30 +735,36 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
     const burnedStatus = currentDayFreshness(
       expenditure ? syncStatus(expenditure.syncStatus) : categoryStatus(expenditureSession?.expenditureStatus, selection.expenditureSelected),
       expenditure?.updatedAt ?? expenditureSyncedAt,
+      snapshotNow,
     );
     const eatenStatus = manual || intakeAdjustment?.mode === 'replace' ? 'ready' : currentDayFreshness(
       intake ? syncStatus(intake.syncStatus) : categoryStatus(intakeSession?.intakeStatus, selection.intakeSelected),
       intake?.updatedAt ?? intakeSyncedAt,
+      snapshotNow,
     );
     const stepsStatus = currentDayFreshness(
       steps ? syncStatus(steps.syncStatus) : categoryStatus(contextSession?.stepsStatus),
       steps?.updatedAt ?? contextSyncedAt,
+      snapshotNow,
     );
     const firstWorkout = workouts[0];
     const workoutsStatus = currentDayFreshness(
       firstWorkout ? syncStatus(firstWorkout.syncStatus) : categoryStatus(contextSession?.workoutsStatus),
       firstWorkout?.updatedAt ?? contextSyncedAt,
+      snapshotNow,
     );
 
+    const verifiedCalibration = netCalibration && await this.options.stepCalibrationReader?.validate(db, netCalibration)
+      ? netCalibration : null;
     const stepEstimate = await estimateStepContribution(
       db,
       userId,
       stepsStatus === 'ready' ? steps : null,
-      netCalibration && await this.options.stepCalibrationReader?.validate(db, netCalibration) ? netCalibration : null,
-      this.options.now?.() ?? new Date(),
+      verifiedCalibration,
+      snapshotNow??this.options.now?.()??new Date(),
     );
     const walkingPace = stepsStatus === 'ready' && steps
-      ? await estimateWalkingPace(db, userId, steps.provider) : null;
+      ? await estimateWalkingPace(db, userId, steps.provider,snapshotNow) : null;
     const adjustmentFactor =
       expenditure?.adjustmentFactor.toNumber() ?? V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE;
     const stepProjection =
@@ -762,12 +781,13 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
           adjustmentFactor,
         })
         : null;
-    const modelMatchesProvider = restingModel && expenditure &&
-      (restingModel.provider === expenditure.provider || restingModel.provider === 'apple_health');
     const modelAgeMs = restingModel
-      ? (this.options.now?.() ?? new Date()).getTime() - restingModel.calculatedAt.getTime()
+      ? (snapshotNow??this.options.now?.()??new Date()).getTime()-restingModel.calculatedAt.getTime()
       : Number.POSITIVE_INFINITY;
-    const forecastNow = this.options.now?.() ?? new Date();
+    const modelMatchesProvider = restingModel && qualifiedRestingModelProvenance(restingModel) && expenditure &&
+      (restingModel.provider !== 'google_health_fitbit' || restingModel.evidenceType !== GOOGLE_LOW_ACTIVITY_EVIDENCE_V2 || (Number.isFinite(modelAgeMs) && modelAgeMs >= 0)) &&
+      (restingModel.provider === expenditure.provider || restingModel.provider === 'apple_health');
+    const forecastNow = snapshotNow??this.options.now?.()??new Date();
     const coverageAt = expenditure?.forecastCoverageAt ?? null;
     const coverageBounds = getLocalDateUtcBounds(localDate, timezone);
     const coverageStatus = !coverageAt || coverageAt > forecastNow || coverageAt < coverageBounds.start || coverageAt > coverageBounds.end || expenditure?.timezone !== timezone
@@ -797,7 +817,52 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
       ? calculateAnchoredRestProjection({ observedProviderCalories: expenditure.rawTotalDailyExpenditure,
         providerRestCaloriesPerHour: restingModel.providerKcalPerHour, anchor: planningAnchorAt,
         now: forecastNow, localDate, timezone }) : null;
+    const planningSnapshotReady = Boolean(expenditure && steps &&
+      expenditure.provider === steps.provider && expenditure.syncSessionId &&
+      expenditure.syncSessionId === steps.syncSessionId &&
+      expenditureSession?.id === expenditure.syncSessionId &&
+      (expenditureSession.status === 'completed' || expenditureSession.status === 'partially_completed'));
+    const modelVersion = restingModel && modelMatchesProvider ? quietBaselineVersion(restingModel) : null;
+    const quietWalkingForecast = buildQuietWalkingForecast({
+      accountId:userId, provider:steps?.provider??null, source:steps?getProviderDisplayName(steps.provider):null,
+      localDate,timezone,now:forecastNow,currentInputsQualified:planningSnapshotReady&&Boolean(planningValid)&&!planningExpired&&burnedStatus==='ready'&&stepsStatus==='ready',
+      baselineQualified:restProjectionStatus==='ready'&&canonicalRestingEvidenceType(restingModel?.evidenceType??'')==='historical_low_activity_hours',
+      model:restingModel,modelVersion,rawProjectedBurnBeforeWalking:anchoredRest?.unroundedProjectedProviderBurnCalories??null,
+      planningAnchorAt:planningAnchorAt??null,planningExpiresAt:planningExpiresAt??null,calibration:verifiedCalibration,
+    });
+    const ordinaryHistory = verifiedCalibration?.ordinaryHistory;
+    const paired = verifiedCalibration && ordinaryHistory
+      ? calibrateGrossWalkingRate({ provider: verifiedCalibration.provider, activityType: 'walking', now: forecastNow, samples: verifiedCalibration.samples })
+      : null;
+    const ordinary = ordinaryHistory && paired && verifiedCalibration && expenditure && steps &&
+      planningSnapshotReady && planningValid && !planningExpired &&
+      burnedStatus === 'ready' && stepsStatus === 'ready' &&
+      selection.authoritativeExpenditureProvider === expenditure.provider && selection.authoritativeActivityProvider === steps.provider &&
+      expenditure.provider === verifiedCalibration.provider && steps.timezone === timezone &&
+      adjustmentFactor === V1_TOTAL_EXPENDITURE_ADJUSTMENT_RATE
+      ? qualifyOrdinaryStepForecast({
+        accountId: userId, sourceId: verifiedCalibration.sourceVersion, timezone, localDate, now: forecastNow,
+        history: ordinaryHistory.history,
+        observation: {
+          accountId: userId, sourceId: verifiedCalibration.sourceVersion, timezone, localDate,
+          cutoff: planningAnchorAt, expiresAt: planningExpiresAt, rawProviderKcal: expenditure.rawTotalDailyExpenditure,
+          currentSteps: steps.totalSteps, coverage: 'reported_reference',
+        },
+        calibration: {
+          accountId: userId, sourceId: verifiedCalibration.sourceVersion, timezone, expiresAt: verifiedCalibration.expiresAt,
+          energyBasis: 'matched_total_interval', rawGrossWalkingKcalPerStep: paired.rawGrossWalkingKcalPerStep, stepsPerMinute: paired.stepsPerMinute,
+        },
+      })
+      : null;
+    const guidance=this.options.includeGuidanceContext?await Promise.all([
+      db.providerSelection.findUnique({where:{userId},select:{updatedAt:true}}),db.goalConfiguration.findUnique({where:{userId}}),db.userProfile.findUnique({where:{userId}}),
+    ]):null;
+    const contextVersion=guidance?guidanceContextVersion({ownerId:userId,localDate,timezone,
+      selectionVersion:guidance[0]?.updatedAt?.toISOString(),goalVersion:guidance[1]?.updatedAt?.toISOString(),profileVersion:guidance[2]?.updatedAt?.toISOString(),
+      evidence:[selection,datedIntake,expenditure,intake,steps,workouts,expenditureSession,intakeSession,contextSession,restingModel,manual?.value??null,adjustmentRow,guidance[1],guidance[2]]}):null;
     return {
+      ...(this.options.includeGuidanceContext?{guidanceContextVersion:contextVersion}:{}),
+      ...(budgetSnapshot?{budgetIntakeAttributionProviders:effectiveCalories!==null&&intakeAdjustment?.mode!=='replace'&&intake?intakeAttributions({intakeProvider:intake.provider,intakeWriterBundleIdentifier:intake.writerBundleIdentifier,intakeSourceId:intake.sourceId,intakeProviderRecordId:intake.providerRecordId}):[]}:{}),
       date: localDate,
       timezone: expenditure?.timezone ?? intake?.timezone ?? steps?.timezone ?? contextSession?.timezone ?? timezone,
       isCurrentDay: true,
@@ -839,11 +904,20 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         status: eatenStatus,
       },
       steps: {
-        planningSnapshotReady: Boolean(expenditure && steps &&
-          expenditure.provider === steps.provider && expenditure.syncSessionId &&
-          expenditure.syncSessionId === steps.syncSessionId &&
-          expenditureSession?.id === expenditure.syncSessionId &&
-          (expenditureSession.status === 'completed' || expenditureSession.status === 'partially_completed')),
+        quietWalkingForecast,
+        planningSnapshotReady,
+        ...(ordinary?.status === 'ready' && paired ? { ordinaryProjection: {
+          basis: ordinary.history.basis,
+          sessionCoverage: ordinary.history.sessionCoverage,
+          ...(ordinary.history.basis === 'recorded_sessions_proxy' ? { historySelection: 'low_activity_at_most_100_steps_per_hour' as const } : {}),
+          expiresAt: ordinary.expiresAt.toISOString(),
+          rawProjectedBurnBeforeWalking: ordinary.plannerInput.projectedProviderBurnAtRest,
+          rawIncrementalKcalPerStep: ordinary.plannerInput.providerCaloriesPerStep,
+          stepsPerMinute: ordinary.stepsPerMinute,
+          walkingSampleCount: paired.sampleCount,
+          includedHistoryHours: ordinary.history.includedHours,
+          missingHistoryHours: ordinary.history.missingHours,
+        } } : {}),
         walkingPace,
         count: steps?.totalSteps ?? null,
         source: steps || contextSession ? getProviderDisplayName(steps?.provider ?? contextProvider) : null,
@@ -864,6 +938,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
           stepProjection?.nonStepAdjustedBurnBaselineCalories ?? null,
       },
       restOfDayProjection: {
+        modelVersion,
         planningAnchorAt: planningAnchorAt?.toISOString() ?? null,
         planningExpiresAt: planningExpiresAt?.toISOString() ?? null,
         planningAnchorKind: expenditure?.planningAnchorKind as 'verified_coverage' | 'sample_horizon' | 'reported_interval' | 'retrieval_assumption' | null ?? (coverageAt ? 'verified_coverage' : null),
@@ -879,12 +954,7 @@ export class PrismaTodayAggregateRepository implements TodayAggregateRepository 
         projectedProviderBurnCalories: restForecast?.projectedProviderBurnCalories ?? null,
         projectedAdjustedBurnCalories: restForecast?.projectedAdjustedBurnCalories ?? null,
         source: restingModel ? getProviderDisplayName(restingModel.provider) : null,
-        evidenceType: restingModel
-          ? restingModel.evidenceType as
-            | 'provider_resting_energy'
-            | 'historical_low_activity_hours'
-            | 'historical_daily_basal'
-          : null,
+        evidenceType: restingModel ? canonicalRestingEvidenceType(restingModel.evidenceType) : null,
         observationCount: restingModel?.observationCount ?? 0,
         calculatedAt: restingModel?.calculatedAt.toISOString() ?? null,
       },

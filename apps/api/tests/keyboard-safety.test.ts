@@ -35,6 +35,7 @@ describe('permanent input surface inventory', () => {
       'components/caloriebank/IntakeAdjustmentEditor.tsx: 1',
       'components/caloriebank/ManualEstimateEditor.tsx: 1',
       'components/caloriebank/StepPlanningCards.tsx: 2',
+      'components/caloriebank/WalkingEatingCard.tsx: 1',
     ]);
   });
 

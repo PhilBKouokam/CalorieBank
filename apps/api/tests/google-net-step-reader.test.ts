@@ -50,3 +50,92 @@ describe('Google explicit net-energy read path',()=>{
   f.state.user.googleHealthConnection.accessTokenExpiresAt=now;expect(await f.reader.read('synthetic-account','2026-10-30','UTC')).toBeNull();expect(f.fetcher).not.toHaveBeenCalled();
  });
 });
+
+
+it('shares a hard twenty-call budget between calibration and ordinary history', async () => {
+ const f=fixture();
+ f.state.workouts=Array.from({length:5},(_,i)=>({...f.state.workouts[0]!,id:`walk-${i}`,startedAt:new Date(`2026-10-${29-i}T08:00:00Z`),endedAt:new Date(`2026-10-${29-i}T09:00:00Z`)}));
+ let exercisePages=0;
+ const fetcher=vi.fn(async(url:string|URL|Request)=>{
+  const parsed=new URL(String(url));
+  if(parsed.pathname.endsWith('dataPoints:reconcile')){
+   const filter=parsed.searchParams.get('filter')!;
+   const from=Date.parse(filter.match(/>= "([^"]+)"/)![1]!);
+   const active=parsed.pathname.includes('active-energy-burned');
+   return Response.json({dataPoints:Array.from({length:60},(_,i)=>{
+    const interval={startTime:new Date(from+i*60000).toISOString(),endTime:new Date(from+(i+1)*60000).toISOString()};
+    return active?{activeEnergyBurned:{interval,kcal:4}}:{steps:{interval,count:100}};
+   })});
+  }
+  if(parsed.pathname.endsWith('/exercise/dataPoints'))return Response.json({dataPoints:[],...(++exercisePages<3?{nextPageToken:`page-${exercisePages}`}:{})});
+  return Response.json({rollupDataPoints:[]});
+ }) as unknown as typeof fetch;
+ const result=await new GoogleHealthNetStepReader(f.db,config,fetcher,()=>now,'recorded_sessions_proxy').read('synthetic-account','2026-10-30','UTC');
+ expect(result?.samples).toHaveLength(2);
+ expect(fetcher).toHaveBeenCalledTimes(20);
+ expect(result?.ordinaryHistory?.history.hours).toHaveLength(0);
+});
+
+
+it.each(['complete', 'missing', 'duplicate', 'paging'])('pairs optional gross minute totals without subtracting low-activity energy: %s', async mode => {
+ const f=fixture();
+ const fetcher=vi.fn(async(url:string|URL|Request,init?:RequestInit)=>{
+  const parsed=new URL(String(url));
+  if(parsed.pathname.endsWith('dataPoints:reconcile'))return f.fetcher(url,init);
+  if(parsed.pathname.endsWith('/exercise/dataPoints'))return Response.json({dataPoints:[]});
+  const body=JSON.parse(String(init?.body));
+  if(body.windowSize!=='60s')return Response.json({rollupDataPoints:[]});
+  const start=Date.parse(body.range.startTime);let rows=Array.from({length:59},(_,i)=>({
+   startTime:new Date(start+i*60000).toISOString(),endTime:new Date(start+(i+1)*60000).toISOString(),totalCalories:{kcalSum:400/60},
+  }));
+  if(mode==='missing')rows=rows.slice(1);
+  if(mode==='duplicate')rows.push(rows[0]!);
+  return Response.json({rollupDataPoints:rows,...(mode==='paging'?{nextPageToken:'more'}:{})});
+ }) as unknown as typeof fetch;
+ const result=await new GoogleHealthNetStepReader(f.db,config,fetcher,()=>now,'recorded_sessions_proxy').read('synthetic-account','2026-10-30','UTC');
+ expect(result?.samples).toHaveLength(1);
+ expect(calibrateNetStepRate({provider:'google_health_fitbit',activityType:'walking',now,samples:result!.samples})?.caloriesPerStep).toBeCloseTo(320/6000);
+ if(mode==='complete')expect(result?.samples[0]?.grossEnergy?.calories).toBeCloseTo(400*59/60);
+ else expect(result?.samples[0]?.grossEnergy).toBeUndefined();
+});
+
+it.each(['complete','active_503','gross_503','missing_steps','gross_duplicate','gross_paging'])('quiet planning keeps total evidence independent: %s',async mode=>{
+ const f=fixture();
+ const fetcher=vi.fn(async(url:string|URL|Request,init?:RequestInit)=>{
+  if(String(url).includes('active-energy-burned')&&mode==='active_503')return new Response('{}',{status:503});
+  if(!String(url).includes(':rollUp')){
+   const response=await f.fetcher(url,init);
+   if(mode==='missing_steps'&&String(url).includes('/steps/')){const body=await response.json();body.dataPoints=body.dataPoints.slice(1);return Response.json(body);}
+   return response;
+  }
+  if(mode==='gross_503')return new Response('{}',{status:503});
+  const body=JSON.parse(String(init?.body)),start=Date.parse(body.range.startTime);
+  const rows=Array.from({length:59},(_,i)=>({startTime:new Date(start+i*60000).toISOString(),endTime:new Date(start+(i+1)*60000).toISOString(),totalCalories:{kcalSum:500/60}}));
+  if(mode==='gross_duplicate')rows.push(rows[0]!);
+  return Response.json({rollupDataPoints:rows,...(mode==='gross_paging'?{nextPageToken:'more'}:{})});
+ }) as unknown as typeof fetch;
+ const result=await new GoogleHealthNetStepReader(f.db,config,fetcher,()=>now,undefined,true).read('synthetic-account','2026-10-30','UTC');
+ if(mode==='missing_steps'){expect(result).toBeNull();expect(fetcher).toHaveBeenCalledTimes(1);return;}
+ expect(result?.samples).toHaveLength(mode==='active_503'?0:1);
+ expect(result?.grossWalkingSamples).toHaveLength(mode==='complete'||mode==='active_503'?1:0);
+ expect(fetcher).toHaveBeenCalledTimes(3);
+});
+
+it('caps combined active and total requests at twenty and keeps the same deadline',async()=>{
+ const f=fixture();f.state.workouts=Array.from({length:10},(_,i)=>({...f.state.workouts[0]!,id:`synthetic-${i}`,startedAt:new Date(start.getTime()-i*86400000),endedAt:new Date(end.getTime()-i*86400000)}));
+ // Ten fully paired step windows could require thirty calls. Total503 keeps
+ // the gross quota unfilled, so the reader must hit the shared cap, not stop at five.
+ const fetcher=vi.fn(async(url:string|URL|Request)=>{
+  if(String(url).includes(':rollUp'))return new Response('{}',{status:503});
+  const filter=new URL(String(url)).searchParams.get('filter')??'';
+  const match=filter.match(/start_time >= "([^"]+)"/);if(!match)throw Error('Missing synthetic range');
+  const s=Date.parse(match[1]!)+60000,active=String(url).includes('active-energy-burned');
+  const points=Array.from({length:59},(_,i)=>({interval:{startTime:new Date(s+i*60000).toISOString(),endTime:new Date(s+(i+1)*60000).toISOString()}}));
+  return Response.json({dataPoints:points.map(p=>active?{activeEnergyBurned:{...p,kcal:320/60}}:{steps:{...p,count:100}})});
+ }) as unknown as typeof fetch;
+ const result=await new GoogleHealthNetStepReader(f.db,config,fetcher,()=>now,undefined,true).read('synthetic-account','2026-10-30','UTC');
+ expect(result?.samples.length).toBeGreaterThan(0);expect(result?.grossWalkingSamples).toHaveLength(0);
+ expect(fetcher).toHaveBeenCalledTimes(20);
+ const clock=vi.spyOn(performance,'now').mockReturnValueOnce(0).mockReturnValue(9000);
+ try {const blocked=fixture();expect(await new GoogleHealthNetStepReader(blocked.db,config,blocked.fetcher,()=>now,undefined,true).read('synthetic-account','2026-10-30','UTC')).toBeNull();expect(blocked.fetcher).not.toHaveBeenCalled();}finally{clock.mockRestore();}
+});

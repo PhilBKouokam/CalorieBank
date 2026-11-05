@@ -21,7 +21,7 @@ describe('persisted planning snapshot', () => {
       const common = { userId, provider, localDate, timezone: 'UTC', importedAt: now, providerUpdatedAt: now, isCurrentDay: true, syncStatus: 'ready' as const, syncSessionId: session.id };
       const burn = await db.dailyExpenditureAggregate.create({ data: { ...common, forecastCoverageAt: now, providerRecordId: 'burn', rawTotalDailyExpenditure: 3000, adjustedDailyExpenditure: 2400, adjustmentFactor: .8 } });
       const steps = await db.dailyStepAggregate.create({ data: { ...common, providerRecordId: 'steps', totalSteps: 10000 } });
-      await db.restingBurnEstimate.create({ data: { userId, provider, providerKcalPerHour: 80, evidenceType: 'historical_low_activity_hours', observationCount: 20, lookbackStartDate: localDate, lookbackEndDate: localDate, calculatedAt: now } });
+      await db.restingBurnEstimate.create({ data: { userId, provider, providerKcalPerHour: 80, evidenceType: 'historical_low_activity_hours_v2', observationCount: 20, lookbackStartDate: localDate, lookbackEndDate: localDate, calculatedAt: now } });
       const accounting = () => Promise.all([
         db.calorieLedgerTransaction.findMany({ where: { userId } }),
         db.bankCalculationSnapshot.findMany({ where: { userId } }),
@@ -31,6 +31,24 @@ describe('persisted planning snapshot', () => {
       const before = await accounting();
       const first = await repository.getTodayForUser(userId, date, 'UTC');
       expect(first.steps.planningSnapshotReady).toBe(true);
+      expect(first.restOfDayProjection.evidenceType).toBe('historical_low_activity_hours');
+      for (const evidenceType of ['historical_low_activity_hours', 'unknown_producer']) {
+        await db.restingBurnEstimate.update({ where: { userId }, data: { evidenceType } });
+        const unqualified = await repository.getTodayForUser(userId, date, 'UTC');
+        expect(unqualified.restOfDayProjection.status).toBe('insufficient_data');
+        expect(unqualified.restOfDayProjection.projectedAdjustedBurnCalories).toBeNull();
+        expect(unqualified.burned.raw).toBe(first.burned.raw);
+        expect((await db.restingBurnEstimate.findUniqueOrThrow({ where: { userId } })).calculatedAt).toEqual(now);
+        expect(await accounting()).toEqual(before);
+      }
+      await db.restingBurnEstimate.update({ where: { userId }, data: { evidenceType: 'historical_low_activity_hours_v2', calculatedAt: new Date(now.getTime() - 8 * 86400000) } });
+      expect((await repository.getTodayForUser(userId, date, 'UTC')).restOfDayProjection.status).toBe('ready');
+      await db.restingBurnEstimate.update({ where: { userId }, data: { calculatedAt: new Date(now.getTime() - 31 * 86400000) } });
+      expect((await repository.getTodayForUser(userId, date, 'UTC')).restOfDayProjection.status).toBe('stale');
+      await db.restingBurnEstimate.update({ where: { userId }, data: { calculatedAt: new Date(now.getTime() + 60000) } });
+      expect((await repository.getTodayForUser(userId, date, 'UTC')).restOfDayProjection.status).toBe('insufficient_data');
+      await db.restingBurnEstimate.update({ where: { userId }, data: { calculatedAt: now } });
+
       readAt = new Date(now.getTime() + 15 * 60 * 1000);
       const later = await repository.getTodayForUser(userId, date, 'UTC');
       expect(later.restOfDayProjection).toEqual(first.restOfDayProjection);

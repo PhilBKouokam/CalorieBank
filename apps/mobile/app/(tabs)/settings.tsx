@@ -15,6 +15,7 @@ import { detachMorningBankUpdateDevice } from '@/lib/notifications/morning-bank-
 const settingsRows: { href: Href; icon: keyof typeof Ionicons.glyphMap; label: string; detail: string }[] = [
   { href: '/goal-settings', icon: 'flag-outline', label: 'Fitness Goal', detail: 'Set your weight goal and daily adjustment.' },
   { href: '/daily-bank-target' as Href, icon: 'calendar-outline', label: 'Daily Bank Target', detail: 'Choose how much you’d like to bank each day.' },
+  { href: '/planned-treat', icon: 'gift-outline', label: 'Banking Goal', detail: 'Manage the goal you’re saving for.' },
   { href: '/integrations', icon: 'heart-outline', label: 'Health Connections', detail: 'Manage the apps that share your calorie data.' },
   { href: '/customize-today', icon: 'options-outline', label: 'Customize Today', detail: 'Choose what appears on Today.' },
   { href: '/morning-bank-update' as Href, icon: 'notifications-outline', label: 'Morning Bank Update', detail: 'Choose whether to receive your morning bank update.' },
@@ -62,7 +63,7 @@ export default function SettingsScreen() {
           </View>
           {signOutError ? <Text accessibilityLiveRegion="assertive" style={styles.signOutError}>We couldn’t finish signing you out. Please try again.</Text> : null}
         </> : null}
-        {Platform.OS === 'android' ? <View style={styles.group}><PrivacyPolicyRow /></View> : null}
+        <View style={styles.group}><PrivacyPolicyRow /></View>
       </ScrollView>
     </SafeAreaView>
   );

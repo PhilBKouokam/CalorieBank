@@ -70,8 +70,9 @@ const GoogleHealthExerciseDataPointSchema = z.object({
   }).passthrough(),
 }).passthrough();
 
-const GoogleHealthExerciseListSchema = z.object({
+export const GoogleHealthExerciseListSchema = z.object({
   dataPoints: z.array(GoogleHealthExerciseDataPointSchema).default([]),
+  nextPageToken: z.string().optional(),
 });
 
 export interface GoogleHealthTotalCaloriesTransport {

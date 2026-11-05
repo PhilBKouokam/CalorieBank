@@ -1,9 +1,16 @@
+import {fetchEatingBudget,eatingBudgetEnabled} from '@/lib/api/eating-budget';
+import {selectEatingBudget,eatingBudgetReason} from '@/lib/today/eating-budget-guidance';
+import { walkingPlanVisible } from '@/lib/today/walking-plan-visibility';
+import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
+import { WalkingEatingCard } from '@/components/caloriebank/WalkingEatingCard';
+import { usePlanningClock } from '@/lib/today/use-planning-clock';
+import { projectedBurnGuidance } from '@/lib/today/projected-burn-guidance';
 import {
   formatGoalAdjustmentMagnitude,
   getGoalModeLabel,
+  type EatingBudgetResponse,
   type BankSummaryResponse,
   type GoalConfigurationResponse,
-  type PlannedTreatGetResponse,
   type TodayResponse,
   type DashboardPreferencesResponse,
   type ProviderSelectionResponse,
@@ -19,7 +26,6 @@ import {
   Modal,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
@@ -33,7 +39,6 @@ import {
   fetchDashboardPreferences,
   fetchGoalConfiguration,
   fetchOnboardingStatus,
-  fetchPlannedTreat,
   fetchProviderSelection,
   fetchToday,
   getApiBaseUrl,
@@ -45,7 +50,6 @@ import {
   emptyTodayValue,
   firstRunTodayEmptyState,
   needsConnectionRecovery,
-  formatStepContributions,
   formatWorkoutCalorieLines,
   hasLatestCompletedContribution,
   hasUsableBankSummary,
@@ -122,12 +126,6 @@ function latestSyncTime(today: TodayResponse | null) {
   return new Date(Math.max(...times)).toISOString();
 }
 
-function isActivePlannedTreat(
-  plannedTreat: PlannedTreatGetResponse | null,
-): plannedTreat is Exclude<PlannedTreatGetResponse, { status: 'no_plan' }> {
-  return plannedTreat !== null && plannedTreat.status !== 'no_plan';
-}
-
 export default function TodayScreen() {
   const { fontScale } = useWindowDimensions();
   const router = useRouter();
@@ -136,9 +134,6 @@ export default function TodayScreen() {
   const [goalConfiguration, setGoalConfiguration] = useState<GoalConfigurationResponse | null>(null);
   const [configurationStatus, setConfigurationStatus] =
     useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
-  const [plannedTreat, setPlannedTreat] = useState<PlannedTreatGetResponse | null>(null);
-  const [plannedTreatStatus, setPlannedTreatStatus] =
-    useState<'loading' | 'ready' | 'empty' | 'error'>('loading');
   const [storedToday, setToday] = useState<TodayResponse | null>(null);
   const [storedTodayStatus, setTodayStatus] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
   const today = currentDateSnapshot(storedToday);
@@ -152,18 +147,22 @@ export default function TodayScreen() {
   const [refreshingHealth, setRefreshingHealth] = useState(false);
   const [showWhyEighty, setShowWhyEighty] = useState(false);
   const readGeneration = useRef(0);
+  const [guidanceReadCurrent,setGuidanceReadCurrent]=useState(false);
+  const [budget,setBudget]=useState<EatingBudgetResponse|null>(null);
+  const budgetClock=usePlanningClock(today?.restOfDayProjection,budget?.budget.status!=='unavailable'?budget?.budget.expiresAt:undefined);
 
   const [dashboardPreferences, setDashboardPreferences] =
     useState<DashboardPreferencesResponse | null>(null);
 
   const refreshVisibleReadModels = useCallback(async () => {
     const generation = ++readGeneration.current;
+    setGuidanceReadCurrent(false);setBudget(null);
     setTodayStatus((current) => current === 'error' ? 'loading' : current);
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const [summaryResult, todayResult, providerResult] = await Promise.allSettled([
+    const [summaryResult, todayResult, providerResult,budgetResult] = await Promise.allSettled([
       fetchBankSummary(),
       fetchToday(timezone),
-      fetchProviderSelection(),
+      fetchProviderSelection(),fetchEatingBudget(timezone),
     ]);
     if (generation !== readGeneration.current) return;
     if (summaryResult.status === 'fulfilled') {
@@ -177,10 +176,13 @@ export default function TodayScreen() {
       setTodayStatus('error');
     }
     if (providerResult.status === 'fulfilled') setProviderSelection(providerResult.value);
+    setBudget(budgetResult.status==='fulfilled'?budgetResult.value:null);
+    setGuidanceReadCurrent(todayResult.status==='fulfilled'&&providerResult.status==='fulfilled');
   }, []);
 
   useEffect(() => subscribeToAccountLifecycleActivity((running) => {
     setFirstRunCheckPending(running);
+    if(running){setGuidanceReadCurrent(false);setBudget(null);}
     if (running) setHealthSyncDetail(null);
   }), []);
 
@@ -200,6 +202,7 @@ export default function TodayScreen() {
   ) => {
     try {
       setRefreshingHealth(force);
+      setGuidanceReadCurrent(false);setBudget(null);
       setHealthSyncDetail(null);
       const result = await runAccountLifecycle({ force });
       setHealthSyncDetail(result.detail);
@@ -217,27 +220,25 @@ export default function TodayScreen() {
 
       async function loadToday() {
         const generation = ++readGeneration.current;
+        setGuidanceReadCurrent(false);setBudget(null);
         const apiBaseUrl = getApiBaseUrl();
 
         if (!apiBaseUrl) {
           setConfigurationStatus('error');
           setBankStatus('error');
-          setPlannedTreatStatus('error');
           setTodayStatus('error');
           return;
         }
 
         setConfigurationStatus('loading');
-        setPlannedTreatStatus('loading');
         setFirstRunCheckPending(isAccountLifecycleRunning());
-        const [configurationResult, bankSummaryResult, plannedTreatResult, todayResult, preferencesResult, providerResult, onboardingResult] = await Promise.allSettled([
+        const [configurationResult, bankSummaryResult, todayResult, preferencesResult, providerResult, onboardingResult,budgetResult] = await Promise.allSettled([
           fetchGoalConfiguration(),
           fetchBankSummary(),
-          fetchPlannedTreat(),
           fetchToday(Intl.DateTimeFormat().resolvedOptions().timeZone),
           fetchDashboardPreferences(),
           fetchProviderSelection(),
-          fetchOnboardingStatus(),
+          fetchOnboardingStatus(),fetchEatingBudget(Intl.DateTimeFormat().resolvedOptions().timeZone),
         ]);
         if (!isMounted) return;
 
@@ -259,14 +260,6 @@ export default function TodayScreen() {
           setBankStatus((current) => current === 'ready' ? current : 'error');
         }
 
-        if (plannedTreatResult.status === 'fulfilled') {
-          setPlannedTreat(plannedTreatResult.value);
-          setPlannedTreatStatus(plannedTreatResult.value.status === 'no_plan' ? 'empty' : 'ready');
-        } else {
-          setPlannedTreat(null);
-          setPlannedTreatStatus('error');
-        }
-
         if (generation === readGeneration.current && todayResult.status === 'fulfilled') {
           setToday(todayResult.value);
           setTodayStatus(
@@ -282,6 +275,8 @@ export default function TodayScreen() {
           setDashboardPreferences(preferencesResult.value);
         }
         if (generation === readGeneration.current && providerResult.status === 'fulfilled') setProviderSelection(providerResult.value);
+        if(generation===readGeneration.current)setBudget(budgetResult.status==='fulfilled'?budgetResult.value:null);
+        if(generation===readGeneration.current)setGuidanceReadCurrent(todayResult.status==='fulfilled'&&providerResult.status==='fulfilled');
         if (onboardingResult.status === 'fulfilled') setOnboardingStatus(onboardingResult.value);
 
       }
@@ -344,15 +339,6 @@ export default function TodayScreen() {
         : configurationStatus === 'error'
           ? 'Unavailable'
           : 'Not set';
-  const activePlannedTreat = isActivePlannedTreat(plannedTreat) ? plannedTreat : null;
-  const plannedTreatAccessibility =
-    plannedTreatStatus === 'loading'
-      ? 'Banking Goal, loading'
-      : activePlannedTreat
-        ? `Banking Goal, ${activePlannedTreat.name}, ${activePlannedTreat.progressPercent} percent ready`
-        : plannedTreatStatus === 'error'
-          ? 'Banking Goal, unavailable'
-          : 'Banking Goal. Example: Crumbl cookies, 5,000 calories. Create a Banking Goal';
   const burnedValue =
     todayStatus === 'loading'
       ? 'Loading...'
@@ -390,36 +376,17 @@ export default function TodayScreen() {
     showCurrentGoal: false,
     updatedAt: new Date(0).toISOString(),
   };
-  const stepsValue =
-    todayStatus === 'loading'
-      ? 'Loading...'
-      : today?.steps.count === null || today?.steps.count === undefined
-        ? emptyTodayValue(today?.steps.status ?? 'unavailable', 'steps')
-        : today.steps.count.toLocaleString();
-  const stepsEstimate = today?.steps.estimationStatus === 'ready' &&
-      today.steps.estimatedContributionCalories !== null &&
-      today.steps.currentAdjustedContributionCalories !== null &&
-      today.burned.raw !== null &&
-      today.burned.adjusted !== null
-    ? formatStepContributions({
-      providerContributionCalories: today.steps.estimatedContributionCalories,
-      actualContributionCalories: today.steps.currentAdjustedContributionCalories,
-      providerTotalBurnCalories: today.burned.raw,
-      actualTotalBurnCalories: today.burned.adjusted,
-      burnSource: today.burned.source,
-    })
-    : null;
-  const stepsEstimateFallback = !stepsEstimate &&
-      today?.steps.count !== null && today?.steps.count !== undefined
-    ? 'Walking calorie estimate unavailable'
-    : null;
-  const stepsAccessibility = stepsEstimate
-    ? `${stepsEstimate.providerContribution}, ${stepsEstimate.providerContext}. ${stepsEstimate.actualContribution}, ${stepsEstimate.actualContext}`
-    : stepsEstimateFallback;
+  const {now:guidanceNow}=usePlanningClock(today?.restOfDayProjection);
+  const guidanceAllowed=guidanceReadCurrent&&!refreshingHealth&&!firstRunCheckPending&&storedTodayStatus==='ready'&&providerSelection?.expenditure.status==='ready'&&!needsConnectionRecovery(providerSelection);
+  const currentBudget=selectEatingBudget(today,budget,budgetClock.now,guidanceAllowed&&eatingBudgetEnabled);
+  const dailyBudget=currentBudget?.budget.status==='ready'?currentBudget.budget.totalCalories:null;
+  const projectedBurn=projectedBurnGuidance(today,guidanceNow,guidanceAllowed);
+  const showWalkingPlan=walkingPlanVisible(dashboardPreferences);
+  const walkingGuidanceAllowed=guidanceAllowed&&providerSelection?.activityContext?.status==='ready';
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
+      <KeyboardSafeScrollView
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
@@ -431,7 +398,7 @@ export default function TodayScreen() {
       >
         <View style={styles.header}>
           <View style={styles.mark}>
-            <Text style={styles.markText}>CB</Text>
+            <Text allowFontScaling={false} style={styles.markText}>CB</Text>
           </View>
           <Text style={styles.wordmark}>CalorieBank</Text>
         </View>
@@ -454,8 +421,6 @@ export default function TodayScreen() {
             <Text style={styles.supportingText}>{throughText}</Text>
             {visibleCards.showLatestFinalizedContribution ? <CompletedContribution sentence={latestChangeValue} /> : null}
             {bankStatus === 'loading' ? <ActivityIndicator color={colors.primary} /> : null}
-          </Pressable>
-
         {bankSummary && bankSummary.recoveryCalories > 0 ? (
           <View accessibilityRole="summary" style={styles.recoverySurface}>
             <Text style={styles.recoveryLabel}>Recovery</Text>
@@ -466,77 +431,11 @@ export default function TodayScreen() {
           </View>
         ) : null}
 
-        {(
-          <Pressable
-            accessibilityHint="Opens Banking Goal setup."
-            accessibilityLabel={plannedTreatAccessibility}
-            accessibilityRole="button"
-            onPress={() => router.push('/planned-treat')}
-            style={({ pressed }) => [
-              styles.secondaryCard,
-              styles.plannedTreatCard,
-              pressed && styles.pressedCard,
-            ]}
-          >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardLabel}>Banking Goal</Text>
-                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-              </View>
-              {plannedTreatStatus === 'loading' ? (
-                <View style={styles.inlineState}>
-                  <ActivityIndicator color={colors.primary} />
-                  <Text style={styles.supportingText}>Loading your plan.</Text>
-                </View>
-              ) : activePlannedTreat ? (
-                <>
-                  <View style={styles.treatTitleRow}>
-                    <Text adjustsFontSizeToFit numberOfLines={3} style={styles.treatName}>
-                      {activePlannedTreat.name}
-                    </Text>
-                    {activePlannedTreat.status === 'ready' ? (
-                      <Text style={styles.readyBadge}>Ready</Text>
-                    ) : null}
-                  </View>
-                  <Text style={styles.supportingText}>
-                    {activePlannedTreat.progressCalories.toLocaleString()} /{' '}
-                    {activePlannedTreat.requiredCalories.toLocaleString()} kcal
-                  </Text>
-                  <View
-                    accessibilityElementsHidden
-                    importantForAccessibility="no-hide-descendants"
-                    style={styles.progressTrack}
-                  >
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${Math.max(activePlannedTreat.progressPercent, 2)}%` },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.supportingText}>
-                    {activePlannedTreat.status === 'ready'
-                      ? 'Your Available Bank has reached this goal'
-                      : `${activePlannedTreat.progressPercent}% ready · ${activePlannedTreat.remainingCalories.toLocaleString()} kcal to go`}
-                  </Text>
-                </>
-              ) : plannedTreatStatus === 'error' ? (
-                <>
-                  <Text style={styles.secondaryValue}>Unavailable</Text>
-                  <Text style={styles.supportingText}>Your plan could not load. Try again later.</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.treatName}>Bank for something you love.</Text>
-                  <Text accessibilityLabel="Example Banking Goal: Crumbl cookies, 5,000 calories" style={styles.supportingText}>Example: Crumbl cookies · 5,000 kcal</Text>
-                  <Text style={styles.retryButtonText}>Create a Banking Goal</Text>
-                </>
-              )}
           </Pressable>
-        )}
 
         {visibleCards.showTodaySoFar ? <Pressable
           accessibilityHint="Opens today's burn details."
-          accessibilityLabel={`Today so far. Burned ${burnedValue}. Eaten ${eatenValue}.`}
+          accessibilityLabel={`Today so far. Burned ${burnedValue}. Eaten ${eatenValue}. Projected burn ${projectedBurn===null?'unavailable':`${projectedBurn.toLocaleString()} kilocalories estimated total today`}. Daily budget ${dailyBudget===null?'unavailable':`${dailyBudget.toLocaleString()} kilocalories estimated total today`}.`}
           accessibilityRole="button"
           onPress={() => router.push('/today-burn')}
           style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
@@ -604,6 +503,18 @@ export default function TodayScreen() {
                   <Text style={styles.metricDetail}>{eatenDetail}</Text>
                 </View>
               </View>
+              <View style={[styles.todayMetrics,fontScale>1.3&&{flexDirection:'column'}]}>
+                <Pressable accessibilityRole="button" accessibilityHint="Opens today's burn estimate." onPress={event=>{event.stopPropagation();router.push('/today-burn');}} style={styles.todayMetric}>
+                  <Text style={styles.metricLabel}>Projected burn</Text>
+                  <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>{projectedBurn===null?'Unavailable':`${projectedBurn.toLocaleString()} kcal`}</Text>
+                  <Text style={styles.metricDetail}>Estimated total today</Text>
+                </Pressable>
+                <View style={styles.todayMetric}>
+                  <Text style={styles.metricLabel}>Daily budget</Text>
+                  <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>{dailyBudget===null?'Unavailable':`${dailyBudget.toLocaleString()} kcal`}</Text>
+                  <Text style={styles.metricDetail}>{dailyBudget===null?eatingBudgetReason(budget?.budget.status==='unavailable'?budget.budget.reason:null):'Estimated total intake today'}</Text>
+                </View>
+              </View>
               <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>
               {!firstRunCheckPending && needsConnectionRecovery(providerSelection) ? (
                 <Pressable
@@ -621,6 +532,8 @@ export default function TodayScreen() {
             </>
           )}
         </Pressable> : null}
+
+        {showWalkingPlan ? <WalkingEatingCard budget={currentBudget} today={today} pending={todayStatus==='loading'||refreshingHealth||firstRunCheckPending} guidanceAllowed={walkingGuidanceAllowed} onOpenDetails={()=>router.push('/steps-detail')} /> : null}
 
         {visibleCards.showCurrentGoal ?
           <Pressable
@@ -640,45 +553,6 @@ export default function TodayScreen() {
             <Text style={styles.supportingText}>{formatGoalDetail(goalConfiguration)}</Text>
           </Pressable>
         : null}
-
-        {visibleCards.showSteps ? (
-          <Pressable
-            accessibilityHint="Opens step contribution and what-if details."
-            accessibilityLabel={`Steps today, ${stepsValue}${stepsAccessibility ? `. ${stepsAccessibility}` : ''}`}
-            accessibilityRole="button"
-            onPress={() => router.push('/steps-detail')}
-            style={({ pressed }) => [
-              styles.secondaryCard,
-              pressed && styles.pressedCard,
-            ]}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>Steps today</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-            </View>
-            <Text adjustsFontSizeToFit numberOfLines={1} style={styles.secondaryValue}>
-              {stepsValue}
-            </Text>
-            {stepsEstimate ? (
-              <View style={styles.stepEstimates}>
-                <View style={styles.stepEstimateGroup}>
-                  <Text style={styles.stepEstimateValue}>{stepsEstimate.providerContribution}</Text>
-                  <Text style={styles.stepEstimateLabel}>{stepsEstimate.providerContext}</Text>
-                </View>
-                <View style={styles.stepEstimateGroup}>
-                  <Text style={styles.stepEstimateValue}>{stepsEstimate.actualContribution}</Text>
-                  <Text style={styles.stepEstimateLabel}>{stepsEstimate.actualContext}</Text>
-                </View>
-              </View>
-            ) : stepsEstimateFallback ? (
-              <Text style={styles.supportingText}>{stepsEstimateFallback}</Text>
-            ) : null}
-            <Text style={styles.supportingText}>
-              {today?.steps.source ? `${getConsumerSourceName(today.steps.source)} · ` : ''}
-              {formatRelativeSyncTime(today?.steps.lastSyncedAt)}
-            </Text>
-          </Pressable>
-        ) : null}
 
         {visibleCards.showWorkouts ? (
           <View style={styles.secondaryCard}>
@@ -725,7 +599,7 @@ export default function TodayScreen() {
           </View>
         ) : null}
 
-      </ScrollView>
+      </KeyboardSafeScrollView>
       <Modal
         animationType="fade"
         onRequestClose={() => setShowWhyEighty(false)}

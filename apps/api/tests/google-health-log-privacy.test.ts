@@ -24,7 +24,7 @@ describe('Google Health default diagnostic output — synthetic only', () => {
       googleHealthConnection: { findUnique: vi.fn().mockResolvedValue({ status: 'connected' }) },
       restingBurnEstimate: { findUnique: vi.fn().mockResolvedValue({
         provider: 'google_health_fitbit', providerKcalPerHour: 123.45,
-        evidenceType: 'synthetic_private_evidence', observationCount: 42,
+        evidenceType: 'historical_low_activity_hours_v2', observationCount: 42,
         calculatedAt: new Date('2026-10-21T11:00:00Z'),
         lookbackStartDate: new Date('2026-10-01'), lookbackEndDate: new Date('2026-10-20'),
       }) },

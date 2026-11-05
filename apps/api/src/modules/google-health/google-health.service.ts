@@ -1,3 +1,5 @@
+import { GOOGLE_LOW_ACTIVITY_EVIDENCE_V2, reusableGoogleLowActivityModel } from './google-health-model-provenance';
+import { pairLowActivityHourlyEvidence } from './google-health-hourly-evidence';
 import { createHash, randomBytes } from 'node:crypto';
 import { createGoogleHealthActivityRequest } from './google-health-request';
 import { requireGoogleHealthTester } from './google-health-admission';
@@ -647,8 +649,7 @@ export class GoogleHealthFitbitService {
 
     const existing = await this.db.restingBurnEstimate.findUnique({ where: { userId: user.id } });
     if (
-      existing?.provider === GOOGLE_HEALTH_FITBIT_PROVIDER_ID &&
-      this.now().getTime() - existing.calculatedAt.getTime() < 7 * 24 * 60 * 60 * 1000
+      existing && reusableGoogleLowActivityModel(existing, this.now())
     ) {
       this.oauthLogger('resting_model_resolved', {
         provider: 'fitbit',
@@ -664,9 +665,13 @@ export class GoogleHealthFitbitService {
     }
 
     const accessToken = await this.accessToken(user.id);
+    let requestCount = 0;
+    const deadline = Date.now() + 8_000;
     const request = async (url: string, init: RequestInit) => {
+      if (++requestCount > 96 || Date.now() >= deadline) throw new Error('Baseline request budget exhausted');
       const response = await this.fetcher(url, {
         ...init,
+        signal: AbortSignal.timeout(Math.max(1, Math.min(5_000, deadline - Date.now()))),
         headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', ...init.headers },
       });
       if (response.status === 401) {
@@ -724,12 +729,16 @@ export class GoogleHealthFitbitService {
               }),
             },
           );
+          if ((response as { nextPageToken?: string }).nextPageToken) throw new Error('Incomplete baseline hourly coverage');
           return GoogleHealthHourlyRollupSchema.parse(response).rollupDataPoints;
         };
         const fetchExercises = async () => {
           const dataPoints: unknown[] = [];
           let pageToken: string | undefined;
+          const seenTokens = new Set<string>();
+          let pages = 0;
           do {
+            if (++pages > 10) throw new Error('Baseline exercise page budget exhausted');
             const url = new URL(`${this.config.GOOGLE_HEALTH_API_BASE_URL}/users/me/dataTypes/exercise/dataPoints`);
             url.searchParams.set('filter', `exercise.interval.civil_start_time >= "${chunkStartDate}" AND exercise.interval.civil_start_time < "${chunkEndDate}"`);
             url.searchParams.set('pageSize', '25');
@@ -740,6 +749,8 @@ export class GoogleHealthFitbitService {
             };
             dataPoints.push(...(payload.dataPoints ?? []));
             pageToken = payload.nextPageToken;
+            if (pageToken && seenTokens.has(pageToken)) throw new Error('Repeated baseline exercise page');
+            if (pageToken) seenTokens.add(pageToken);
           } while (pageToken);
           return dataPoints;
         };
@@ -757,23 +768,7 @@ export class GoogleHealthFitbitService {
           const end = point.exercise?.interval?.endTime;
           if (start && end) exercises.push({ start: new Date(start), end: new Date(end) });
         }
-        const stepsByStart = new Map(steps.map((point) => [
-          new Date(point.startTime).getTime(),
-          point.steps?.countSum ?? 0,
-        ]));
-        for (const point of calories) {
-          if (!point.totalCalories) continue;
-          const stepCount = stepsByStart.get(new Date(point.startTime).getTime());
-          if (stepCount === undefined) continue;
-          const start = new Date(point.startTime);
-          const end = new Date(point.endTime);
-          observations.push({
-            calories: point.totalCalories.kcalSum,
-            steps: stepCount,
-            overlapsWorkout: exercises.some((workout) => workout.start < end && workout.end > start),
-            observedAt: start,
-          });
-        }
+        observations.push(...pairLowActivityHourlyEvidence(calories, steps, exercises));
         coveredDays += chunkDays;
       }
       attemptedWindows.push(targetDays);
@@ -785,7 +780,7 @@ export class GoogleHealthFitbitService {
         await this.todayRepository.upsertRestingBurnEstimate?.(user, {
           provider: GOOGLE_HEALTH_FITBIT_PROVIDER_ID,
           providerKcalPerHour: estimate.providerKcalPerHour,
-          evidenceType: 'historical_low_activity_hours',
+          evidenceType: GOOGLE_LOW_ACTIVITY_EVIDENCE_V2,
           observationCount: estimate.observationCount,
           lookbackStartDate: getLocalDateForTimezone(timezone, estimate.lookbackStartDate),
           lookbackEndDate: getLocalDateForTimezone(timezone, estimate.lookbackEndDate),
@@ -893,151 +888,13 @@ export class GoogleHealthFitbitService {
     const expenditureProvider = new GoogleHealthFitbitExpenditureProvider(expenditureTransport, this.now);
     const stepProvider = new GoogleHealthFitbitStepProvider(stepTransport, this.now);
     const workoutProvider = new GoogleHealthFitbitWorkoutProvider(exerciseTransport, this.now);
-    const refreshRestingBurnEstimate = async () => {
-      const attemptedWindows: number[] = [];
-      const observations: Array<{
-        calories: number;
-        steps: number;
-        overlapsWorkout: boolean;
-        observedAt: Date;
-      }> = [];
-      const exercises: Array<{ start: Date; end: Date }> = [];
-      const lookbackWindows: Array<{
-        days: number;
-        observations: typeof observations;
-      }> = [];
-      let coveredDays = 0;
-      let hourlyCaloriesAvailable = false;
-      let hourlyStepsAvailable = false;
-      let qualifyingRestHours = 0;
-      for (const targetDays of [14, 30, 90]) {
-        while (coveredDays < targetDays) {
-          const chunkDays = Math.min(14, targetDays - coveredDays);
-          const chunkEndDate = previousLocalDate(currentLocalDate, coveredDays);
-          const chunkStartDate = previousLocalDate(chunkEndDate, chunkDays);
-          const bounds = {
-            start: getLocalDateUtcBounds(chunkStartDate, timezone).start,
-            end: getLocalDateUtcBounds(chunkEndDate, timezone).start,
-          };
-          const rollup = async (dataType: 'total-calories' | 'steps') => {
-            const response = await request(
-              `${this.config.GOOGLE_HEALTH_API_BASE_URL}/users/me/dataTypes/${dataType}/dataPoints:rollUp`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  range: { startTime: bounds.start.toISOString(), endTime: bounds.end.toISOString() },
-                  windowSize: '3600s',
-                  dataSourceFamily: 'users/me/dataSourceFamilies/all-sources',
-                }),
-              },
-            );
-            return GoogleHealthHourlyRollupSchema.parse(response).rollupDataPoints;
-          };
-          const fetchExercises = async () => {
-            const dataPoints: unknown[] = [];
-            let pageToken: string | undefined;
-            do {
-              const url = new URL(`${this.config.GOOGLE_HEALTH_API_BASE_URL}/users/me/dataTypes/exercise/dataPoints`);
-              url.searchParams.set('filter', `exercise.interval.civil_start_time >= "${chunkStartDate}" AND exercise.interval.civil_start_time < "${chunkEndDate}"`);
-              url.searchParams.set('pageSize', '25');
-              if (pageToken) url.searchParams.set('pageToken', pageToken);
-              const payload = await request(url.toString(), { method: 'GET' }) as {
-                dataPoints?: unknown[];
-                nextPageToken?: string;
-              };
-              dataPoints.push(...(payload.dataPoints ?? []));
-              pageToken = payload.nextPageToken;
-            } while (pageToken);
-            return { dataPoints };
-          };
-          const [calories, steps, exercisePayload] = await Promise.all([
-            rollup('total-calories'),
-            rollup('steps'),
-            fetchExercises(),
-          ]);
-          hourlyCaloriesAvailable ||= calories.some((point) => Boolean(point.totalCalories));
-          hourlyStepsAvailable ||= steps.length > 0;
-          const parsedExercises = (exercisePayload as { dataPoints?: Array<{ exercise?: { interval?: { startTime?: string; endTime?: string } } }> }).dataPoints ?? [];
-          for (const point of parsedExercises) {
-            const start = point.exercise?.interval?.startTime;
-            const end = point.exercise?.interval?.endTime;
-            if (start && end) exercises.push({ start: new Date(start), end: new Date(end) });
-          }
-          const stepsByStart = new Map(steps.map((point) => [
-            new Date(point.startTime).getTime(),
-            point.steps?.countSum ?? 0,
-          ]));
-          for (const point of calories) {
-            if (!point.totalCalories) continue;
-            const stepCount = stepsByStart.get(new Date(point.startTime).getTime());
-            if (stepCount === undefined) continue;
-            const start = new Date(point.startTime);
-            const end = new Date(point.endTime);
-            observations.push({
-              calories: point.totalCalories.kcalSum,
-              steps: stepCount,
-              overlapsWorkout: exercises.some((workout) => workout.start < end && workout.end > start),
-              observedAt: start,
-            });
-          }
-          coveredDays += chunkDays;
-        }
-        attemptedWindows.push(targetDays);
-        lookbackWindows.push({ days: targetDays, observations: [...observations] });
-        const currentEstimate = estimateRestingBurnFromLowActivityHours(observations);
-        qualifyingRestHours = currentEstimate?.observationCount ?? 0;
-        const estimate = selectRestingBurnLookback(lookbackWindows);
-        if (estimate) {
-          await this.todayRepository.upsertRestingBurnEstimate?.(user, {
-            provider: GOOGLE_HEALTH_FITBIT_PROVIDER_ID,
-            providerKcalPerHour: estimate.providerKcalPerHour,
-            evidenceType: 'historical_low_activity_hours',
-            observationCount: estimate.observationCount,
-            lookbackStartDate: getLocalDateForTimezone(timezone, estimate.lookbackStartDate),
-            lookbackEndDate: getLocalDateForTimezone(timezone, estimate.lookbackEndDate),
-            calculatedAt: this.now(),
-          });
-          return;
-        }
-      }
+    // One producer and provenance policy for both Today and sync entry points.
+    await this.resolveRestingBurnEstimate(user, currentLocalDate, timezone).catch((error) => {
       this.oauthLogger('resting_burn_estimate_failed', {
-        provider: 'fitbit',
-        attemptedWindows,
-        explicitRestingEnergyAvailable: false,
-        hourlyCaloriesAvailable,
-        hourlyStepsAvailable,
-        qualifyingRestHours,
-        rejectionReason: hourlyCaloriesAvailable && hourlyStepsAvailable
-          ? 'fewer_than_three_qualifying_low_activity_hours'
-          : !hourlyCaloriesAvailable
-            ? 'no_hourly_total_calories'
-            : 'no_hourly_steps',
+        provider: 'fitbit', rejectionReason: 'baseline_refresh_failed',
+        errorType: error instanceof Error ? error.name : typeof error,
       });
-    };
-    const existingRestingModel = await this.db.restingBurnEstimate.findUnique({
-      where: { userId: user.id },
     });
-    if (
-      !existingRestingModel ||
-      existingRestingModel.provider !== GOOGLE_HEALTH_FITBIT_PROVIDER_ID ||
-      this.now().getTime() - existingRestingModel.calculatedAt.getTime() >= 7 * 24 * 60 * 60 * 1000
-    ) {
-      await refreshRestingBurnEstimate().catch((error) => {
-        this.oauthLogger('resting_burn_estimate_failed', {
-          provider: 'fitbit',
-          attemptedWindows: [14, 30, 90],
-          explicitRestingEnergyAvailable: false,
-          hourlyCaloriesAvailable: false,
-          hourlyStepsAvailable: false,
-          qualifyingRestHours: 0,
-          rejectionReason: error instanceof GoogleHealthRemoteError
-            ? error.googleErrorCode ?? 'google_health_request_failed'
-            : 'unexpected_calibration_error',
-          errorType: error instanceof Error ? error.name : typeof error,
-        });
-      });
-    }
     const updatedDates = new Set<string>();
     const historicalWorkoutDatesUpdated = new Set<string>();
     const historicalWorkoutDatesQueried: string[] = [];

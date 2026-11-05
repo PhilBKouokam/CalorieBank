@@ -1,3 +1,4 @@
+import { walkingPlanVisible } from '@/lib/today/walking-plan-visibility';
 import type {
   DashboardPreferencesPatch,
   DashboardPreferencesResponse,
@@ -17,7 +18,7 @@ const optionalCards: {
   { key: 'showLatestFinalizedContribution', label: 'Latest completed contribution' },
   { key: 'showCurrentGoal', label: 'Fitness Goal' },
   { key: 'showTodaySoFar', label: 'Today so far' },
-  { key: 'showSteps', label: 'Steps today' },
+  { key: 'showSteps', label: 'Walking plan' },
   { key: 'showWorkouts', label: 'Logged workouts' },
 ];
 
@@ -74,7 +75,7 @@ export default function CustomizeTodayScreen() {
                   disabled={savingKey !== null}
                   onValueChange={(value) => void toggle(card.key, value)}
                   trackColor={{ false: colors.border, true: colors.primary }}
-                  value={preferences[card.key]}
+                  value={card.key==='showSteps'?walkingPlanVisible(preferences):preferences[card.key]}
                 />
               </View>
             ))

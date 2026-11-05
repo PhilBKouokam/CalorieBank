@@ -1,3 +1,5 @@
+import { PrismaEatingBudgetRepository, type EatingBudgetRepository } from './modules/eating-budget/eating-budget.repository';
+import { createEatingBudgetRouter } from './modules/eating-budget/eating-budget.routes';
 import { GoogleHealthNetStepReader } from './modules/google-health/google-health-net-step-reader';
 import { createIntakeAdjustmentRouter } from './modules/intake-adjustment/intake-adjustment.routes';
 import { createNativeIntakeRouter } from './modules/native-intake/native-intake.routes';
@@ -84,6 +86,7 @@ import { createMorningBankUpdateRouter } from './modules/morning-bank-update/mor
 import { ExpoPushTransport, MorningBankUpdateService } from './modules/morning-bank-update/morning-bank-update.service';
 
 type AppDependencies = {
+  eatingBudgetRepository?: EatingBudgetRepository;
   goalConfigurationRepository?: GoalConfigurationRepository;
   bankHistoryRepository?: BankHistoryRepository;
   plannedTreatRepository?: PlannedTreatRepository;
@@ -110,7 +113,9 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
   const todayRepository =
     dependencies.todayRepository ??
     new PrismaTodayAggregateRepository(prisma, {
-      stepCalibrationReader: new GoogleHealthNetStepReader(prisma, config),
+      includeGuidanceContext: config.EATING_BUDGET_ENABLED==='1',
+      stepCalibrationReader: new GoogleHealthNetStepReader(prisma, config, undefined, undefined,
+        config.GOOGLE_HEALTH_ORDINARY_FORECAST_MODE === 'recorded_sessions_proxy' ? 'recorded_sessions_proxy' : undefined, true),
       allowSyntheticProviders: config.TODAY_INGESTION_MODE === 'development',
       onBankingAggregateChanged: async (user, localDate, timezone, syncSessionId) => {
         await bankHistoryRepository.reconcileStoredDay(
@@ -260,6 +265,7 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
     '/v1/me/dashboard-preferences',
     createDashboardPreferencesRouter(dashboardPreferencesRepository, currentUser),
   );
+  app.use('/v1/me/eating-budget',createEatingBudgetRouter(dependencies.eatingBudgetRepository??new PrismaEatingBudgetRepository(prisma),currentUser,config.EATING_BUDGET_ENABLED==='1'));
   app.use('/v1/me/daily-bank-target', createDailyBankTargetRouter(new DailyBankTargetRepository(prisma), currentUser));
   app.use('/v1/me/intake-adjustment', createIntakeAdjustmentRouter(prisma, currentUser));
   app.use('/v1/me/manual-intake', createManualIntakeRouter(prisma, currentUser, config.MANUAL_INTAKE_SELECTION_ENABLED === '1'));

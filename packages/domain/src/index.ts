@@ -689,9 +689,14 @@ export function calculateBurnToStepPlan(input: {
     };
   }
   const additionalSteps = additionalProviderCaloriesNeeded / input.providerCaloriesPerStep;
+  const hundreds = (input.currentSteps + additionalSteps) / 100;
+  // Arithmetic at an exact 100-step boundary can land one or two ULPs above
+  // it (for example an incremental rate calculated as 0.054 - 0.004).
+  // Remove only floating-point noise, not a real fractional step requirement.
+  const boundaryNoise = 4 * Number.EPSILON * Math.max(1, Math.abs(hundreds));
   const totalDailyStepsNeeded = Math.max(
     input.currentSteps,
-    Math.ceil((input.currentSteps + additionalSteps) / 100) * 100,
+    Math.ceil(hundreds - boundaryNoise) * 100,
   );
   return {
     alreadyOnTrack: false,
@@ -1218,3 +1223,18 @@ export function buildActivityOpportunityBody({
 }
 
 export { calibrateNetStepRate, type NetStepSample } from './net-step-calibration';
+export {
+  estimateFiveDayOrdinaryRate,
+  qualifyOrdinaryStepForecast,
+  type OrdinaryForecastHistory,
+  type OrdinaryForecastObservation,
+  type OrdinaryWalkingCalibration,
+} from './ordinary-step-forecast';
+
+export { prepareStepPlanningSnapshot, traceBurnToStepPlan } from './step-planning-trace';
+export type { StepPlanningReference, UncoveredWalkingBridge } from './step-planning-trace';
+
+export { calibrateGrossWalkingRate } from './net-step-calibration';
+export { calibrateQuietWalkingRate, calibrateTotalWalkingRate, type GrossWalkingSample } from './net-step-calibration';
+
+export { calculateEatingBudget, planIntakeForSteps, planStepsForIntake, type BudgetContext, type BudgetExpenditure, type BudgetIntake, type EatPlanningModel } from './eating-budget';

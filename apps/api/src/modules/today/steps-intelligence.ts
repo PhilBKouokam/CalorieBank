@@ -1,5 +1,6 @@
+import type { GrossWalkingSample } from '@caloriebank/domain';
 import type { DailyStepAggregate, PrismaClient } from '@prisma/client';
-import { estimateWalkingTime, calibrateNetStepRate, type NetStepSample } from '@caloriebank/domain';
+import { estimateWalkingTime, calibrateNetStepRate, type NetStepSample, type OrdinaryForecastHistory } from '@caloriebank/domain';
 
 export async function estimateWalkingPace(db: Pick<PrismaClient, 'currentDayWorkout'>, userId: string, provider: string, now = new Date()) {
   const workouts = await db.currentDayWorkout.findMany({
@@ -42,6 +43,8 @@ export type WalkingCalibrationSample = {
 export type VerifiedStepCalibration = {
   accountId: string; provider: string; localDate: string; timezone: string;
   sourceVersion: string; expiresAt: Date; samples: readonly NetStepSample[];
+  grossWalkingSamples?: readonly GrossWalkingSample[];
+  ordinaryHistory?: { history: OrdinaryForecastHistory; rawLowActivityTotalKcalPerHour: number | null };
 };
 export interface StepCalibrationReader {
   read(userId: string, localDate: string, timezone: string): Promise<VerifiedStepCalibration | null>;

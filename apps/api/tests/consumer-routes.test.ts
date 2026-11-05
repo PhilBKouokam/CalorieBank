@@ -154,7 +154,9 @@ describe('consumer routes', () => {
     expect(source).toContain('kcal estimated actual burn');
     expect(source).toContain('formatContributionPercentage(contribution, total)');
     expect(source).toContain('` (${percentage}%)`');
-    expect(today).toContain('formatStepContributions({');
+    expect(today).toContain('<WalkingEatingCard');
+    expect(today).not.toContain('formatStepContributions({');
+    expect(mobileFile('components/caloriebank/WalkingEatingCard.tsx')).toContain('Estimated daily burn at this step total');
     expect(source).not.toContain('kcal actual burn`');
   });
 
@@ -238,15 +240,20 @@ describe('consumer routes', () => {
     const burn = mobileFile('app/(details)/today-burn.tsx');
 
     expect(today).toContain("router.push('/steps-detail')");
-    expect(today).toContain("router.push('/planned-treat')");
+    expect(today).not.toContain("router.push('/planned-treat')");
+    const settings = mobileFile('app/(tabs)/settings.tsx');
+    expect(settings).toContain("href: '/planned-treat'");
+    expect(settings).toContain("label: 'Banking Goal'");
     expect(today).toContain("router.push('/today-burn')");
-    expect(today).toContain('accessibilityHint="Opens step contribution and what-if details."');
+    const walking = mobileFile('components/caloriebank/WalkingEatingCard.tsx');
+    expect(walking).toContain('accessibilityHint="Opens your current steps and walking estimates."');
+    expect(walking).toContain('See walking details');
     expect(today).toContain('accessibilityHint="Opens today\'s burn details."');
     const planning = mobileFile('components/caloriebank/StepPlanningCards.tsx');
     expect(steps).toContain('<StepPlanningCards today={today} />');
     expect(burn).toContain('<StepPlanningCards today={today} />');
     expect(planning).toContain('calculateStepToBurnPlan');
-    expect(planning).toContain('calculateBurnToStepPlan');
+    expect(planning).toContain('traceBurnToStepPlan');
     expect(planning).toContain('suggestNextStepTarget');
     expect(steps).toContain('`${stepSource} reported`');
     expect(steps).toContain('currentProviderBurn.toLocaleString()');

@@ -9,10 +9,17 @@ import { calculateBurnToStepPlan, calculateStepToBurnPlan, walkingTimeFromPace }
 import { completedContributionSentence } from '../../mobile/lib/today/presentation';
 import { foodTrackerGuidance } from '../../mobile/lib/healthkit/food-tracker-guidance';
 
+const budgetStore=vi.hoisted(()=>({enabled:false,plan:vi.fn(),read:vi.fn(async()=>null)}));
+vi.mock('../../mobile/lib/api/eating-budget',()=>({get eatingBudgetEnabled(){return budgetStore.enabled;},fetchEatingBudget:()=>budgetStore.enabled?budgetStore.read():Promise.resolve(null),fetchEatingPlan:(...args:unknown[])=>budgetStore.plan(...args)}));
 const targetStore = vi.hoisted(() => ({ calories: 0, writes: [] as number[] }));
 const homeStore = vi.hoisted(() => ({ recovery: 0 }));
+const navigation=vi.hoisted(()=>({push:vi.fn(),replace:vi.fn()}));
+const viewport=vi.hoisted(()=>({width:390,fontScale:1}));
 const appStateStore = vi.hoisted(() => ({ onChange: null as null | ((state: string) => void) }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useFocusEffect: (callback: () => void) => React.useEffect(callback, [callback]), Link: 'Link' }));
+vi.mock('expo-router', () => ({ useRouter: () => navigation, useFocusEffect: (callback: () => void) => React.useEffect(callback, [callback]), Link: 'Link' }));
+vi.mock('expo-web-browser',()=>({openBrowserAsync:vi.fn()}));
+vi.mock('../../mobile/lib/notifications/morning-bank-update',()=>({detachMorningBankUpdateDevice:vi.fn()}));
+vi.mock('@clerk/expo',()=>({useClerk:()=>({signOut:vi.fn()})}));
 vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
 vi.mock('../../mobile/lib/lifecycle/account-lifecycle', () => ({ isAccountLifecycleRunning: () => false, subscribeToAccountLifecycleActivity: () => () => {}, subscribeToAccountLifecycle: () => () => {}, runAccountLifecycle: async () => ({ detail: null }) }));
 vi.mock('../../mobile/lib/api/settings-concurrency', () => ({ SettingsConflictError: class extends Error {},
@@ -25,7 +32,7 @@ vi.mock('../../mobile/lib/api/client', () => ({
   fetchBankSummary: async () => ({ openingBankStatus: 'initialized', availableBankCalories: homeStore.recovery ? 0 : 2843, recoveryCalories: homeStore.recovery, latestCompletedDate: '2026-09-10', latestDailyBankChange: 547 }),
   fetchPlannedTreat: async () => ({ status: 'no_plan' }),
   fetchToday: async () => ({ burned: { status: 'unavailable' }, eaten: { status: 'unavailable' }, steps: { status: 'unavailable' }, workouts: { items: [], status: 'unavailable' }, dashboardVisibility: { showTodaySoFar: false, showSteps: false, showCurrentGoal: false, showWorkouts: false } }),
-  fetchDashboardPreferences: async () => ({ showLatestFinalizedContribution: true, showTodaySoFar: false, showCurrentGoal: false, showSteps: false, showWorkouts: false }),
+  fetchDashboardPreferences: async () => ({ showLatestFinalizedContribution: true, showTodaySoFar: true, showCurrentGoal: false, showSteps: true, showWorkouts: false }),
   fetchProviderSelection: async () => ({ expenditure: {}, intake: {} }),
   fetchOnboardingStatus: async () => ({ completed: true, stage: 'complete', preparation: { history: 'complete' }, expenditure: { provider: 'google_health_fitbit' }, intake: { provider: 'apple_health' } }),
   fetchDailyBankTarget: async () => ({ calories: targetStore.calories, chosen: targetStore.writes.length > 0 }),
@@ -33,7 +40,7 @@ vi.mock('../../mobile/lib/api/client', () => ({
   fetchGoalConfiguration: async () => ({ goalMode: 'maintain', adjustmentSource: 'manual_calories', dailyEnergyAdjustment: 0 }),
   saveGoalConfiguration: async (value: unknown) => value,
 }));
-beforeEach(() => { targetStore.calories = 0; targetStore.writes = []; });
+beforeEach(() => { budgetStore.enabled=false;budgetStore.plan.mockReset(); targetStore.calories = 0; targetStore.writes = []; });
 
 vi.mock('expo', () => ({ requireNativeModule: () => ({ watch: vi.fn(), unwatch: vi.fn(), measure: vi.fn(), addListener: () => ({ remove: vi.fn() }) }) }));
 vi.mock('react-native', () => ({
@@ -42,7 +49,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   Text: 'Text', View: 'View', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView',
   ActivityIndicator: 'ActivityIndicator', RefreshControl: 'RefreshControl',
-  useWindowDimensions: () => ({ width: 390, fontScale: 1 }),
+  useWindowDimensions: () => viewport,
   StyleSheet: { create: <T,>(value: T) => value },
   Modal: ({ visible, children }: { visible: boolean; children: React.ReactNode }) => visible ? children : null,
 }));
@@ -78,6 +85,40 @@ describe('Phase 1 consumer release invariants', () => {
     expect(inputs.map(input => input.props.value)).toEqual(['4000', '4000']);
   });
 
+  it('uses the ordinary baseline in both cards and withholds on expiry rather than changing models', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-30T12:00:00Z'));
+    const { StepPlanningCards } = await import(resolve(__dirname, '../../mobile/components/caloriebank/StepPlanningCards.tsx')) as { StepPlanningCards: React.ComponentType<{ today: TodayResponse }> };
+    const today = {
+      date: '2026-10-30', timezone: 'UTC', burned: { status: 'ready', source: 'Fitbit', adjustmentFactor: 0.8 },
+      steps: {
+        status: 'ready', count: 9000, caloriesPerStep: 0.04, planningSnapshotReady: true,
+        ordinaryProjection: {
+          basis: 'recorded_sessions_proxy', expiresAt: '2026-10-30T12:05:00Z',
+          rawProjectedBurnBeforeWalking: 2000, rawIncrementalKcalPerStep: 0.04 + (50 - 75) / 6000,
+          stepsPerMinute: 100, walkingSampleCount: 2, includedHistoryHours: 117, missingHistoryHours: 0,
+        },
+      },
+      restOfDayProjection: { status: 'ready', planningExpiresAt: '2026-10-30T12:30:00Z',
+        projectedProviderBurnCalories: 1700, unroundedProjectedProviderBurnCalories: 1700 },
+    } as unknown as TodayResponse;
+    const rendered = await render(React.createElement(StepPlanningCards, { today }));
+    const inputs = rendered.root.findAll(node => String(node.type) === 'TextInput');
+    await act(async () => { inputs[0]!.props.onChangeText('2000'); inputs[1]!.props.onChangeText('14000'); });
+    expect(textContent(rendered.root)).toContain('14,000 extra walking steps');
+    expect(textContent(rendered.root)).not.toContain('23,000 total steps');
+    expect(textContent(rendered.root)).toContain('14,000 extra walking steps remaining');
+    expect(textContent(rendered.root)).toContain('~2,500 kcal');
+    expect(textContent(rendered.root)).toContain('Some exercise may be included.');
+    await act(async () => { vi.advanceTimersByTime(5 * 60000 + 1); });
+    expect(textContent(rendered.root)).not.toContain('29,000 total steps');
+    expect(textContent(rendered.root)).not.toContain('20,000 steps remaining');
+    expect(textContent(rendered.root)).not.toContain('Rest-only estimate.');
+    expect(textContent(rendered.root)).toContain('Waiting for newer activity data.');
+    expect(textContent(rendered.root)).not.toContain('Some exercise may be included.');
+    expect(inputs.map(input => input.props.value)).toEqual(['2000', '14000']);
+  });
+
   it('expires a persisted assumption on both cards across refresh and remount without losing edits', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-15T08:00:00Z'));
@@ -105,8 +146,9 @@ describe('Phase 1 consumer release invariants', () => {
     const { default: Home } = await import(resolve(__dirname, '../../mobile/app/(tabs)/today.tsx')) as { default: React.ComponentType };
     const rendered = await render(React.createElement(Home));
     const labels = rendered.root.findAll(node => String(node.type) === 'Text').map(node => node.children.join(''));
-    const ordered = labels.filter(label => ['Available Bank', 'Recovery', 'Banking Goal'].includes(label));
-    expect(ordered).toEqual(recovery ? ['Available Bank', 'Recovery', 'Banking Goal'] : ['Available Bank', 'Banking Goal']);
+    const ordered = labels.filter(label => ['Available Bank', 'Recovery', 'Today so far', 'If I walk…'].includes(label));
+    expect(ordered).toEqual(recovery ? ['Available Bank', 'Recovery', 'Today so far', 'If I walk…'] : ['Available Bank', 'Today so far', 'If I walk…']);
+    expect(labels).not.toContain('Banking Goal');
   });
   it.each([true, false])('renders compact planning inputs and unchanged answers; walking evidence=%s', async (hasPace) => {
     const { StepPlanningCards } = await import(resolve(__dirname, '../../mobile/components/caloriebank/StepPlanningCards.tsx')) as { StepPlanningCards: React.ComponentType<{ today: TodayResponse }> };
@@ -209,8 +251,8 @@ describe('Phase 1 consumer release invariants', () => {
   it('planning results remain prominent while using unchanged domain functions', () => {
     const planning = source('components/caloriebank/StepPlanningCards.tsx');
     expect(planning).toContain("result: { color: colors.primaryDark, fontSize: 26, fontWeight: '800'");
-    expect(planning).toContain('calculateBurnToStepPlan({ ...shared');
-    expect(planning).toContain('calculateStepToBurnPlan({ ...shared');
+    expect(planning).toContain('traceBurnToStepPlan(snapshot,');
+    expect(planning).toContain('calculateStepToBurnPlan({ ...snapshot.plannerInput');
     expect(planning.match(/<WalkingTime steps=/g)).toHaveLength(2);
   });
   it('does not calculate a step target from a mixed sync generation', async () => {
@@ -250,18 +292,16 @@ describe('Phase 1 consumer release invariants', () => {
   it('never calls an older completed date yesterday', () => {
     expect(completedContributionSentence(-83, 'on September 4')).toBe('You enjoyed 83 kcal on September 4.');
   });
-  it('keeps Home bank-first and example content presentation-only', () => {
-    const home = source('app/(tabs)/today.tsx');
-    expect(home.indexOf('>Available Bank</Text>')).toBeLessThan(home.indexOf('>Banking Goal</Text>'));
+  it('keeps the approved Home hierarchy and Banking Goal in Settings only', () => {
+    const home=source('app/(tabs)/today.tsx');
     expect(home.indexOf('>Available Bank</Text>')).toBeLessThan(home.indexOf('>Recovery</Text>'));
-    expect(home.indexOf('>Recovery</Text>')).toBeLessThan(home.indexOf('>Banking Goal</Text>'));
-    expect(home).toContain('bankSummary && bankSummary.recoveryCalories > 0 ? (');
-    expect(home.indexOf('>Banking Goal</Text>')).toBeLessThan(home.indexOf('>Today so far</Text>'));
-    expect(home.indexOf('<CompletedContribution')).toBeLessThan(home.indexOf('>Banking Goal</Text>'));
+    expect(home.indexOf('>Recovery</Text>')).toBeLessThan(home.indexOf('>Today so far</Text>'));
+    expect(home.indexOf('>Today so far</Text>')).toBeLessThan(home.indexOf('<WalkingEatingCard'));
     expect(home.indexOf('>Burned</Text>')).toBeLessThan(home.indexOf('>Eaten</Text>'));
-    expect(home).not.toContain('>Steps</Text>');
-    expect(home).toContain('Steps today');
-    expect(home).toContain('Example Banking Goal: Crumbl cookies');
+    expect(home.indexOf('>Eaten</Text>')).toBeLessThan(home.indexOf('>Projected burn</Text>'));
+    expect(home.indexOf('>Projected burn</Text>')).toBeLessThan(home.indexOf('>Daily budget</Text>'));
+    expect(home).not.toContain('>Banking Goal</Text>');expect(home).not.toContain('fetchPlannedTreat');
+    expect(source('app/(tabs)/settings.tsx')).toContain("href: '/planned-treat'");
     expect(home).not.toContain('createOrReplacePlannedTreat');
   });
   it('keeps legacy model naming out of consumer screens', () => {
@@ -307,4 +347,60 @@ describe('Phase 1 consumer release invariants', () => {
     await act(async () => rendered.root.findAll((node) => String(node.type) === 'Pressable')[1]!.props.onPress());
     expect(JSON.stringify(rendered.toJSON())).not.toContain('Connect Apps & Devices');
   });
+});
+
+it('renders quiet-compatible forward/inverse with no active contribution and withholds on expiry without active fallback',async()=>{
+ vi.useFakeTimers();const now=new Date('2026-02-10T12:00:00Z');vi.setSystemTime(now);
+ const {StepPlanningCards}=await import(resolve(__dirname,'../../mobile/components/caloriebank/StepPlanningCards.tsx'));
+ const today={date:'2026-02-10',timezone:'UTC',burned:{status:'ready',source:'Fitbit',adjustmentFactor:.8,raw:1200},steps:{status:'ready',source:'Fitbit',count:10000,caloriesPerStep:null,estimationStatus:'unavailable',planningSnapshotReady:true,quietWalkingForecast:{status:'ready',basis:'matched_total_above_selected_quiet',rawIncrementalKcalPerStep:.04,baselineModelVersion:'synthetic-model',calibrationVersion:'synthetic-calibration',baselineProviderKcalPerHour:60,rawProjectedBurnBeforeWalking:1920,planningAnchorAt:now.toISOString(),expiresAt:new Date(now.getTime()+5*60000).toISOString(),localDate:'2026-02-10',timezone:'UTC',source:'Fitbit',stepsPerMinute:100,walkingSampleCount:1}},restOfDayProjection:{status:'ready',evidenceType:'historical_low_activity_hours',modelVersion:'synthetic-model',providerKcalPerHour:60,planningAnchorAt:now.toISOString(),planningExpiresAt:new Date(now.getTime()+30*60000).toISOString(),coverageStatus:'known',unroundedProjectedProviderBurnCalories:1920,projectedProviderBurnCalories:1920}} as unknown as TodayResponse;
+ const rendered=await render(React.createElement(StepPlanningCards,{today}));const inputs=rendered.root.findAll(node=>String(node.type)==='TextInput');
+ await act(async()=>{inputs[0]!.props.onChangeText('2000');inputs[1]!.props.onChangeText('24500');});
+ expect(textContent(rendered.root)).toContain('24,500 total steps');expect(textContent(rendered.root)).toContain('14,500 steps remaining');expect(textContent(rendered.root)).toContain('2,000 kcal');
+ await act(async()=>{vi.advanceTimersByTime(5*60000+1);});
+ expect(textContent(rendered.root)).not.toContain('24,500 total steps');
+});
+it('a new client does not relabel an old API active coefficient as quiet-compatible',async()=>{
+ const {StepPlanningCards}=await import(resolve(__dirname,'../../mobile/components/caloriebank/StepPlanningCards.tsx'));
+ const now=new Date(),today={date:now.toISOString().slice(0,10),timezone:'UTC',burned:{status:'ready',source:'Fitbit',adjustmentFactor:.8},steps:{status:'ready',source:'Fitbit',count:10000,caloriesPerStep:.02},restOfDayProjection:{status:'ready',evidenceType:'historical_low_activity_hours',coverageAt:now.toISOString(),unroundedProjectedProviderBurnCalories:1920,projectedProviderBurnCalories:1920}} as unknown as TodayResponse;
+ const rendered=await render(React.createElement(StepPlanningCards,{today}));expect(textContent(rendered.root)).toContain('This estimate needs recent step and calorie-burn data.');
+});
+
+it.each([[320,1],[390,1],[320,2],[390,2]])('renders the actual new walking card at width%s scale%s with honest eating state',async(width,fontScale)=>{
+ viewport.width=width;viewport.fontScale=fontScale;vi.useFakeTimers();const now=new Date('2026-02-10T12:00:00Z');vi.setSystemTime(now);
+ const {WalkingEatingCard}=await import(resolve(__dirname,'../../mobile/components/caloriebank/WalkingEatingCard.tsx'));
+ const q={status:'ready',basis:'matched_total_above_selected_quiet',rawIncrementalKcalPerStep:.04,baselineModelVersion:'synthetic-model',calibrationVersion:'synthetic-cal',baselineProviderKcalPerHour:60,rawProjectedBurnBeforeWalking:1920,planningAnchorAt:now.toISOString(),expiresAt:new Date(now.getTime()+5*60000).toISOString(),localDate:'2026-02-10',timezone:'UTC',source:'Fitbit',stepsPerMinute:100,walkingSampleCount:1};
+ const today={date:'2026-02-10',timezone:'UTC',burned:{status:'ready',adjustmentFactor:.8,source:'Fitbit'},steps:{status:'ready',source:'Fitbit',count:10000,caloriesPerStep:null,planningSnapshotReady:true,quietWalkingForecast:q},restOfDayProjection:{status:'ready',evidenceType:'historical_low_activity_hours',modelVersion:'synthetic-model',providerKcalPerHour:60,planningAnchorAt:now.toISOString(),planningExpiresAt:new Date(now.getTime()+30*60000).toISOString(),unroundedProjectedProviderBurnCalories:1920}} as unknown as TodayResponse;
+ const open=vi.fn(),rendered=await render(React.createElement(WalkingEatingCard,{today,pending:false,onOpenDetails:open}));
+ const input=rendered.root.find(node=>String(node.type)==='TextInput');expect(input.props.selectTextOnFocus).toBe(true);
+ await act(async()=>input.props.onChangeText('24500'));expect(textContent(rendered.root)).toContain('2,000 kcal');expect(textContent(rendered.root)).toContain('Your daily budget isn’t available yet.');
+ expect(input.props.style).toEqual(expect.arrayContaining([expect.objectContaining({maxWidth:'100%',minHeight:48})]));
+ const action=rendered.root.find(node=>String(node.type)==='Pressable');await act(async()=>action.props.onPress());expect(open).toHaveBeenCalledOnce();
+ await act(async()=>rendered.update(React.createElement(WalkingEatingCard,{today,pending:false,guidanceAllowed:false,onOpenDetails:open})));expect(textContent(rendered.root)).not.toContain('2,000 kcal');
+ await act(async()=>rendered.update(React.createElement(WalkingEatingCard,{today,pending:true,onOpenDetails:open})));expect(textContent(rendered.root)).not.toContain('2,000 kcal');
+ await act(async()=>rendered.update(React.createElement(WalkingEatingCard,{today:{...today,steps:{...today.steps,ordinaryProjection:{expiresAt:new Date(now.getTime()+3600000).toISOString()} as never}},pending:false,onOpenDetails:open})));expect(textContent(rendered.root)).not.toContain('2,000 kcal');
+ await act(async()=>rendered.update(React.createElement(WalkingEatingCard,{today,pending:false,onOpenDetails:open})));await act(async()=>{vi.advanceTimersByTime(5*60000+1);});expect(textContent(rendered.root)).not.toContain('2,000 kcal');
+ viewport.width=390;viewport.fontScale=1;
+});
+
+it('keeps Banking Goal accessible through the actual Settings row without placing it in History',async()=>{
+ navigation.push.mockClear();const {default:Settings}=await import(resolve(__dirname,'../../mobile/app/(tabs)/settings.tsx'));
+ const rendered=await render(React.createElement(Settings));const row=rendered.root.find(node=>String(node.type)==='Pressable'&&node.props.accessibilityLabel==='Banking Goal');
+ await act(async()=>row.props.onPress());expect(navigation.push).toHaveBeenCalledWith('/planned-treat');
+});
+
+it('renders qualified total intake and discards an in-flight plan after refresh/source generation changes',async()=>{
+ vi.useFakeTimers();vi.setSystemTime(new Date('2026-02-10T12:00:00Z'));budgetStore.enabled=true;
+ const {WalkingEatingCard}=await import(resolve(__dirname,'../../mobile/components/caloriebank/WalkingEatingCard.tsx'));
+ const anchor='2026-02-10T12:00:00.000Z',expiresAt='2026-02-10T12:05:00.000Z',context=`g1:${'a'.repeat(64)}`;
+ const q={status:'ready',basis:'matched_total_above_selected_quiet',rawIncrementalKcalPerStep:.04,baselineModelVersion:'synthetic-model',calibrationVersion:'synthetic-cal',baselineProviderKcalPerHour:60,rawProjectedBurnBeforeWalking:1920,planningAnchorAt:anchor,expiresAt,localDate:'2026-02-10',timezone:'UTC',source:'Synthetic',stepsPerMinute:100,walkingSampleCount:1};
+ const today={date:'2026-02-10',timezone:'UTC',guidanceContextVersion:context,burned:{status:'ready',adjustmentFactor:.8,source:'Synthetic'},steps:{status:'ready',source:'Synthetic',count:10000,planningSnapshotReady:true,quietWalkingForecast:q},restOfDayProjection:{status:'ready',evidenceType:'historical_low_activity_hours',modelVersion:'synthetic-model',providerKcalPerHour:60,planningAnchorAt:anchor,planningExpiresAt:expiresAt,unroundedProjectedProviderBurnCalories:1920}} as unknown as TodayResponse;
+ const budget={version:1,localDate:today.date,timezone:today.timezone,guidanceContextVersion:context,signedGoalAdjustmentCalories:0,dailyBankTargetCalories:0,intake:{calories:null,semantic:'unknown'},budget:{status:'ready',estimated:true,totalCalories:1536,comparison:null,comparisonExpiresAt:null,expiresAt},planningAvailable:true,planningModel:{basis:q.basis,baselineModelVersion:q.baselineModelVersion,calibrationVersion:q.calibrationVersion,coverageAt:anchor,currentSteps:10000,rawProviderCaloriesPerAdditionalStep:.04,stepsPerMinute:100,expiresAt}} as import('@caloriebank/schemas').EatingBudgetResponse;
+ let complete:(value:unknown)=>void=()=>{};budgetStore.plan.mockImplementation(()=>new Promise(resolve=>{complete=resolve;}));
+ const rendered=await render(React.createElement(WalkingEatingCard,{today,budget,pending:false,onOpenDetails:()=>{}}));
+ const input=rendered.root.find(node=>String(node.type)==='TextInput');await act(async()=>input.props.onChangeText('12000'));await act(async()=>{vi.advanceTimersByTime(301);});
+ const response={version:1,localDate:today.date,timezone:today.timezone,snapshot:budget,plan:{status:'ready',hypothetical:true,totalSteps:12000,additionalSteps:2000,totalIntakeCalories:1600,expiresAt}};
+ await act(async()=>complete(response));expect(textContent(rendered.root)).toContain('1,600 kcal');
+ await act(async()=>input.props.onChangeText('13000'));await act(async()=>{vi.advanceTimersByTime(301);});
+ await act(async()=>rendered.update(React.createElement(WalkingEatingCard,{today,budget,pending:true,guidanceAllowed:false,onOpenDetails:()=>{}})));
+ await act(async()=>complete({...response,plan:{...response.plan,totalSteps:13000,totalIntakeCalories:1632}}));expect(textContent(rendered.root)).not.toContain('1,632 kcal');expect(textContent(rendered.root)).not.toContain('1,600 kcal');
 });

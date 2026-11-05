@@ -24,7 +24,7 @@ describe('explicit net calibration through the real Today route and database',()
    const fetcher=vi.fn(async(url:string|URL|Request)=>new Response(JSON.stringify({dataPoints:Array.from({length:60},(_,i)=>{const interval={startTime:new Date(Date.parse('2026-10-29T08:00:00Z')+i*60000).toISOString(),endTime:new Date(Date.parse('2026-10-29T08:01:00Z')+i*60000).toISOString()};return String(url).includes('active-energy-burned')?{activeEnergyBurned:{interval,kcal:320/60}}:{steps:{interval,count:100}};})}),{status:200})) as unknown as typeof fetch;
    const reader=new GoogleHealthNetStepReader(db,config,fetcher,()=>now);
    const repo=new PrismaTodayAggregateRepository(db,{allowSyntheticProviders:false,now:()=>now,stepCalibrationReader:reader});
-   await db.restingBurnEstimate.create({data:{userId:user.id,provider,providerKcalPerHour:80,evidenceType:'historical_low_activity_hours',observationCount:20,lookbackStartDate:localDate,lookbackEndDate:localDate,calculatedAt:now}});
+   await db.restingBurnEstimate.create({data:{userId:user.id,provider,providerKcalPerHour:80,evidenceType:'historical_low_activity_hours_v2',observationCount:20,lookbackStartDate:localDate,lookbackEndDate:localDate,calculatedAt:now}});
    const session=await db.ingestionSyncSession.create({data:{userId:user.id,provider,localDate,timezone:'UTC',trigger:'app_foreground',startedAt:now,completedAt:now,status:'completed'}});
    const write=async(raw:number,steps:number)=>{
     vi.setSystemTime(now);

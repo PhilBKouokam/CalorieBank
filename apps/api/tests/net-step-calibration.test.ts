@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {calibrateNetStepRate,calculateAnchoredRestProjection,calculateBurnToStepPlan,type NetStepSample} from '@caloriebank/domain';
+import {calibrateGrossWalkingRate,calibrateNetStepRate,calculateAnchoredRestProjection,calculateBurnToStepPlan,type NetStepSample} from '@caloriebank/domain';
 const start=new Date('2026-10-30T08:00:00Z'),end=new Date('2026-10-30T09:00:00Z'),now=new Date('2026-10-30T10:00:00Z');
 const sample=(basis:NetStepSample['energy']['basis']='active_above_rest'):NetStepSample=>({id:'synthetic',provider:'synthetic',activityType:'walking',steps:{count:6000,start,end},energy:{calories:320,start,end,basis},restingEnergy:{calories:80,start,end}});
 const rate=(samples:NetStepSample[],activityType:'walking'|'running'='walking')=>calibrateNetStepRate({provider:'synthetic',activityType,now,samples});
@@ -44,4 +44,19 @@ describe('explicit raw net step calibration',()=>{
   const old=sample();old.steps.start=new Date('2026-08-01T08:00:00Z');old.steps.end=new Date('2026-08-01T09:00:00Z');old.energy.start=old.steps.start;old.energy.end=old.steps.end;expect(rate([old])).toBeNull();
   expect(calibrateNetStepRate({provider:'synthetic',activityType:'walking',now:start,samples:[sample()]})).toBeNull();
  });
+});
+
+
+it('requires matching gross walking intervals without changing active-only calibration', () => {
+ const active=sample();active.grossEnergy={calories:400,start,end};
+ expect(rate([active])?.caloriesPerStep).toBeCloseTo(320/6000);
+ expect(calibrateGrossWalkingRate({provider:'synthetic',activityType:'walking',now,samples:[active]})).toMatchObject({
+  rawGrossWalkingKcalPerStep:400/6000,stepsPerMinute:100,energyBasis:'matched_total_interval',
+ });
+ expect(calibrateGrossWalkingRate({provider:'synthetic',activityType:'walking',now,samples:[active,active]})?.rawGrossWalkingKcalPerStep).toBeCloseTo(400/6000);
+ const conflict={...active,grossEnergy:{...active.grossEnergy!,calories:401}};
+ expect(calibrateGrossWalkingRate({provider:'synthetic',activityType:'walking',now,samples:[active,conflict]})).toBeNull();
+ active.grossEnergy.end=new Date(end.getTime()+60000);
+ expect(calibrateGrossWalkingRate({provider:'synthetic',activityType:'walking',now,samples:[active]})).toBeNull();
+ expect(rate([active])?.caloriesPerStep).toBeCloseTo(320/6000);
 });

@@ -8,8 +8,9 @@ const h = vi.hoisted(() => ({
   completion: null as null | ((result: { detail: string | null }) => void),
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }), useFocusEffect: (effect: () => void) => React.useEffect(effect, [effect]), Link: 'Link' }));
+vi.mock('../../mobile/components/caloriebank/KeyboardSafeScrollView',()=>({KeyboardSafeScrollView:(props:object)=>React.createElement('ScrollView',props)}));
 vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
-vi.mock('react-native', () => ({ Text: 'Text', View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', RefreshControl: 'RefreshControl', ActivityIndicator: 'ActivityIndicator',
+vi.mock('react-native', () => ({ Text: 'Text', View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', TextInput:'TextInput',AppState:{addEventListener:()=>({remove:()=>{}})}, RefreshControl: 'RefreshControl', ActivityIndicator: 'ActivityIndicator',
   Modal: () => null, useWindowDimensions: () => ({ fontScale: 1 }), StyleSheet: { create: <T,>(value: T) => value } }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('../../mobile/lib/lifecycle/account-lifecycle', () => ({
@@ -20,11 +21,11 @@ vi.mock('../../mobile/lib/lifecycle/account-lifecycle', () => ({
 }));
 vi.mock('../../mobile/lib/api/client', () => ({
   getApiBaseUrl: () => 'https://fixture.invalid', fetchToday: h.fetch,
-  fetchProviderSelection: async () => ({ expenditure: { selected: true, status: 'ready', displayName: 'Fitbit' }, intake: { selected: true, status: h.status, displayName: 'Cronometer' } }),
+  fetchProviderSelection: async () => ({ expenditure: { selected: true, status: 'ready', displayName: 'Fitbit' }, activityContext:{status:'ready'}, intake: { selected: true, status: h.status, displayName: 'Cronometer' } }),
   fetchGoalConfiguration: async () => ({ goalMode: 'maintain' }), fetchPlannedTreat: async () => ({ status: 'no_plan' }),
   fetchBankSummary: async () => ({ openingBankStatus: 'initialized', availableBankCalories: 0, recoveryCalories: 0 }),
   fetchOnboardingStatus: async () => ({ completed: true, preparation: { history: 'complete' } }),
-  fetchDashboardPreferences: async () => ({ showTodaySoFar: true }),
+  fetchDashboardPreferences: async () => ({ showTodaySoFar: true, showSteps:true }),
 }));
 let screen: ReactTestRenderer;
 const output = () => screen.root.findAll(node => String(node.type) === 'Text').map(node =>
@@ -79,4 +80,16 @@ describe('rendered Today startup', () => {
     await act(async () => h.completion!({ detail: null }));
     expect(output()).toContain('125');
   });
+});
+
+it('withholds cached projected and walking guidance during lifecycle, failed or unresolved reads while preserving observations',async()=>{
+ vi.useFakeTimers();const now=new Date('2026-02-10T12:00:00Z');vi.setSystemTime(now);h.running=false;h.status='ready';
+ const q={status:'ready',basis:'matched_total_above_selected_quiet',rawIncrementalKcalPerStep:.04,baselineModelVersion:'synthetic-model',calibrationVersion:'synthetic-cal',baselineProviderKcalPerHour:60,rawProjectedBurnBeforeWalking:1920,planningAnchorAt:now.toISOString(),expiresAt:new Date(now.getTime()+5*60000).toISOString(),localDate:'2026-02-10',timezone:'UTC',source:'Fitbit',stepsPerMinute:100,walkingSampleCount:1};
+ const ready={...model(1000),burned:{raw:1200,adjusted:960,adjustmentFactor:.8,status:'ready',source:'Fitbit'},steps:{count:10000,source:'Fitbit',status:'ready',planningSnapshotReady:true,quietWalkingForecast:q},restOfDayProjection:{status:'ready',evidenceType:'historical_low_activity_hours',modelVersion:'synthetic-model',providerKcalPerHour:60,projectedAdjustedBurnCalories:1540,unroundedProjectedProviderBurnCalories:1920,planningAnchorAt:now.toISOString(),planningExpiresAt:new Date(now.getTime()+30*60000).toISOString()}};
+ h.fetch.mockResolvedValue(ready);await mount();expect(output()).toContain('1,540 kcal');
+ expect(output().indexOf('Burned')).toBeLessThan(output().indexOf('Eaten'));expect(output().indexOf('Eaten')).toBeLessThan(output().indexOf('Projected burn'));expect(output().indexOf('Projected burn')).toBeLessThan(output().indexOf('Daily budget'));
+ await act(async()=>h.activity?.(true));expect(output()).not.toContain('1,540 kcal');expect(output()).toContain('960 kcal');
+ h.fetch.mockRejectedValueOnce(Error('synthetic offline'));await act(async()=>{h.activity?.(false);h.completion?.({detail:null});});expect(output()).not.toContain('1,540 kcal');expect(output()).toContain('960 kcal');
+ h.fetch.mockResolvedValue(ready);await act(async()=>h.completion?.({detail:null}));expect(output()).toContain('1,540 kcal');
+ h.status='needs_attention';await act(async()=>h.completion?.({detail:null}));expect(output()).not.toContain('1,540 kcal');
 });

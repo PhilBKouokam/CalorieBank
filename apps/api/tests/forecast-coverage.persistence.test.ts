@@ -18,7 +18,7 @@ describe('persisted forecast coverage', () => {
     try {
       await db.user.create({ data: { ...user, providerSelection: { create: { authoritativeExpenditureProvider: provider, authoritativeActivityProvider: provider, authoritativeIntakeProvider: 'fatsecret' } } } });
       const session = await db.ingestionSyncSession.create({ data: { userId: user.id, provider, localDate, timezone: 'UTC', trigger: 'app_foreground', startedAt: now, completedAt: now, status: 'completed' } });
-      await db.restingBurnEstimate.create({ data: { userId: user.id, provider, providerKcalPerHour: 80, evidenceType: 'historical_low_activity_hours', observationCount: 20, lookbackStartDate: localDate, lookbackEndDate: localDate, calculatedAt: anchor } });
+      await db.restingBurnEstimate.create({ data: { userId: user.id, provider, providerKcalPerHour: 80, evidenceType: 'historical_low_activity_hours_v2', observationCount: 20, lookbackStartDate: localDate, lookbackEndDate: localDate, calculatedAt: anchor } });
       await db.dailyStepAggregate.create({ data: { userId: user.id, provider, localDate, timezone: 'UTC', providerRecordId: 'steps', importedAt: anchor, providerUpdatedAt: anchor, isCurrentDay: true, syncStatus: 'ready', syncSessionId: session.id, totalSteps: 2000 } });
       const write = (burn: number, forecastCoverageAt: Date | null, updated = now) => repo.upsertExpenditureAggregate(user, normalizeDailyExpenditureAggregate({ userId: user.id, provider, localDate: date, timezone: 'UTC', providerRecordId: 'burn', importedAt: now, providerUpdatedAt: updated, isCurrentDay: true, syncStatus: 'ready', syncSessionId: session.id, rawTotalDailyExpenditure: burn, forecastCoverageAt }));
       const read = () => repo.getTodayForUser(user.id, date, 'UTC');
@@ -82,7 +82,7 @@ describe('persisted forecast coverage', () => {
     try {
       for (const user of users) {
         await db.user.create({ data: { ...user, providerSelection: { create: { authoritativeExpenditureProvider: provider, authoritativeActivityProvider: provider, authoritativeIntakeProvider: 'fatsecret' } } } });
-        await db.restingBurnEstimate.create({ data: { userId: user.id, provider, providerKcalPerHour: 80, evidenceType: 'historical_low_activity_hours', observationCount: 20, lookbackStartDate: localDate, lookbackEndDate: localDate, calculatedAt: now } });
+        await db.restingBurnEstimate.create({ data: { userId: user.id, provider, providerKcalPerHour: 80, evidenceType: 'historical_low_activity_hours_v2', observationCount: 20, lookbackStartDate: localDate, lookbackEndDate: localDate, calculatedAt: now } });
       }
       const write = async (user: typeof users[number], burn: number, reportedIntervalEndAt?: Date) => {
         const session = await db.ingestionSyncSession.create({ data: { userId: user.id, provider, localDate, timezone: 'UTC', trigger: 'app_foreground', startedAt: now, completedAt: now, status: 'completed' } });

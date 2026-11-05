@@ -617,6 +617,7 @@ export const todaySoFarAwarenessSchema = z.object({
 const todaySourceStatusSchema = todaySoFarDataFreshnessStatusSchema;
 
 export const todayResponseSchema = z.object({
+  guidanceContextVersion: z.string().regex(/^g1:[a-f0-9]{64}$/).nullable().optional(),
   date: dateStringSchema,
   timezone: z.string().min(1),
   isCurrentDay: z.literal(true),
@@ -640,6 +641,31 @@ export const todayResponseSchema = z.object({
   }),
   steps: z.object({
     planningSnapshotReady: z.boolean().optional(),
+    quietWalkingForecast: z.discriminatedUnion('status', [
+      z.object({ status: z.literal('unavailable'), reason: z.enum(['unqualified_baseline', 'unqualified_calibration', 'unqualified_current_inputs']) }),
+      z.object({
+        status: z.literal('ready'), basis: z.literal('matched_total_above_selected_quiet'),
+        rawIncrementalKcalPerStep: z.number().finite().positive(),
+        baselineModelVersion: z.string().min(1), calibrationVersion: z.string().min(1),
+        baselineProviderKcalPerHour: z.number().finite().positive(),
+        rawProjectedBurnBeforeWalking: z.number().finite().nonnegative(),
+        planningAnchorAt: z.string().datetime(), expiresAt: z.string().datetime(),
+        localDate: z.string(), timezone: z.string().min(1), source: z.string().min(1),
+        stepsPerMinute: z.number().min(10).max(250), walkingSampleCount: z.number().int().min(1).max(5),
+      }),
+    ]).optional(),
+    ordinaryProjection: z.object({
+      basis: z.enum(['classified_activity', 'recorded_sessions_proxy']),
+      sessionCoverage: z.enum(['overlaps_complete', 'start_window_only']).optional(),
+      historySelection: z.literal('low_activity_at_most_100_steps_per_hour').optional(),
+      expiresAt: z.string().datetime(),
+      rawProjectedBurnBeforeWalking: z.number().finite().nonnegative(),
+      rawIncrementalKcalPerStep: z.number().finite().positive(),
+      stepsPerMinute: z.number().min(10).max(250),
+      walkingSampleCount: z.number().int().min(1).max(5),
+      includedHistoryHours: z.number().finite().positive(),
+      missingHistoryHours: z.number().finite().nonnegative(),
+    }).optional(),
     walkingPace: z.object({ stepsPerMinute: z.number().min(10).max(250), sampleCount: z.number().int().min(2).max(5) }).nullable().optional(),
     count: z.number().int().nonnegative().nullable(),
     source: z.string().min(1).nullable(),
@@ -659,6 +685,7 @@ export const todayResponseSchema = z.object({
     nonStepAdjustedBurnBaselineCalories: z.number().int().nonnegative().nullable(),
   }),
   restOfDayProjection: z.object({
+    modelVersion: z.string().min(1).nullable().optional(),
     coverageStatus: z.enum(['known', 'uncertain', 'stale']).optional(),
     coverageAt: z.string().datetime().nullable().optional(),
     planningAnchorAt: z.string().datetime().nullable().optional(),
@@ -1087,3 +1114,6 @@ export function formatGoalAdjustmentMagnitude(configuration: Pick<GoalConfigurat
 export function formatWeeklyWeightChange(value: number | null | undefined) {
   return value ? `${value.toFixed(1)} lb/week` : 'Not set';
 }
+
+export { eatingBudgetResponseSchema, eatPlanningRequestSchema, eatPlanningResponseSchema, type EatingBudgetResponse, type EatPlanningRequest, type EatPlanningResponse } from './eating-budget';
+export { type AttributionProviders } from './attribution';
