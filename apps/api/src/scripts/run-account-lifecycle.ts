@@ -33,7 +33,7 @@ async function run() {
       bankHistory,
       new ExpoPushTransport(env.EXPO_ACCESS_TOKEN ? { accessToken: env.EXPO_ACCESS_TOKEN } : {}),
       undefined,
-      new Set((env.MORNING_BANK_DETAILED_USER_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean)),
+      new Set((env.MORNING_BANK_DETAILED_CLERK_SUBJECTS ?? '').split(',').map(id => id.trim()).filter(Boolean)),
     ),
   );
   await coordinator.runDueAccounts();

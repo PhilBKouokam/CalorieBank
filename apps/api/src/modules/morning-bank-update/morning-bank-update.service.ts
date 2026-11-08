@@ -146,7 +146,7 @@ export class MorningBankUpdateService {
     private readonly bankHistory: BankHistoryRepository,
     private readonly transport: PushTransport,
     private readonly now: () => Date = () => new Date(),
-    private readonly detailedSummaryUserIds: ReadonlySet<string> = new Set(),
+    private readonly detailedSummaryClerkSubjects: ReadonlySet<string> = new Set(),
   ) {}
 
   async settings(userId: string) {
@@ -260,12 +260,12 @@ export class MorningBankUpdateService {
     if (!delivery) return { status: 'already_handled' as const };
     // Only separately consented accounts may share calorie values with push processors.
     const summary = await this.bankHistory.getSummary(userId);
-    const account = await this.db.user.findUnique({ where: { id: userId }, select: { deletionRequestedAt: true } });
+    const account = await this.db.user.findUnique({ where: { id: userId }, select: { deletionRequestedAt: true, authProvider: true, authSubject: true } });
     if (!account || account.deletionRequestedAt) return { status: 'not_eligible' as const };
     structuredLog('info', 'morning_bank_update_delivery_started', { attempt: delivery.attemptCount });
     const result = await this.transport.send({
       token: device.expoPushToken,
-      ...(this.detailedSummaryUserIds.has(userId) ? { summary: {
+      ...(account.authProvider === 'clerk' && account.authSubject !== null && this.detailedSummaryClerkSubjects.has(account.authSubject) ? { summary: {
         availableBankCalories: summary.availableBankCalories,
         contributionCalories: completedDay.effectiveDailyBankChange,
       } } : {}),

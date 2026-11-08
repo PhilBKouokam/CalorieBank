@@ -47,9 +47,9 @@ const EnvSchema = z.object({
   FATSECRET_ACCESS_TOKEN_URL: z.string().url().default('https://authentication.fatsecret.com/oauth/access_token'),
   FATSECRET_API_BASE_URL: z.string().url().default('https://platform.fatsecret.com/rest'),
   // Operational record of explicit calorie-sharing approval; empty stays generic.
-  MORNING_BANK_DETAILED_USER_IDS: z.string().default('').refine(
-    value => value === '' || value.split(',').every(id => z.string().uuid().safeParse(id.trim()).success),
-    'Detailed notification account IDs must be comma-separated UUIDs.',
+  MORNING_BANK_DETAILED_CLERK_SUBJECTS: z.string().default('').refine(
+    value => value === '' || value.split(',').every(id => /^user_[A-Za-z0-9]+$/.test(id.trim())),
+    'Detailed notification identities must be comma-separated Clerk subjects.',
   ),
   EXPO_ACCESS_TOKEN: z.string().trim().min(1).optional(),
 }).superRefine((value, context) => {

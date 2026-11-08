@@ -52,10 +52,10 @@ not certify all processor, account-access, retention or Limited Use controls.
 The founder explicitly approved restoring his own available-bank balance and
 banked/enjoyed calorie amount through Expo and Apple after lock-screen visibility
 and processor transmission were explained. This is not other users' consent.
-`MORNING_BANK_DETAILED_USER_IDS` records verified internal account IDs with this
+`MORNING_BANK_DETAILED_CLERK_SUBJECTS` records verified Clerk subjects with this
 approval; empty/unlisted accounts retain the generic envelope. Invalid calorie
 values fall back to generic copy. Configure the same scoped approval on the
-hourly lifecycle service that produces notifications. No user ID is sent in the
+hourly lifecycle service that produces notifications. Match the stored authProvider=clerk/authSubject identity, never email. No user ID is sent in the
 payload. Do not infer authorization from names or email addresses.
 
 Only available-bank balance and yesterday's effective signed bank contribution

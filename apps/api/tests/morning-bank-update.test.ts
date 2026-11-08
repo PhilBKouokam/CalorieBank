@@ -8,11 +8,14 @@ import {
   type PushTransport,
 } from '../src/modules/morning-bank-update/morning-bank-update.service';
 
+const clerkSubject = 'user_syntheticApprovedAccount';
 const userId = '00000000-0000-4000-8000-000000000001';
 
 function fixture(options: {
   now?: Date;
-  detailedSummaryUserIds?: string[];
+  detailedSummaryClerkSubjects?: string[];
+  authProvider?: string;
+  authSubject?: string | null;
   enabled?: boolean;
   token?: boolean;
   completed?: boolean;
@@ -34,7 +37,7 @@ function fixture(options: {
   type MutationArgs = { create: Record<string, unknown>; update: Record<string, unknown> };
   type WhereArgs = { where: Record<string, unknown> };
   const delegates = {
-    user: { findUnique: vi.fn(async () => ({ deletionRequestedAt: null as Date | null })) },
+    user: { findUnique: vi.fn(async () => ({ deletionRequestedAt: null as Date | null, authProvider: options.authProvider ?? 'clerk', authSubject: options.authSubject === undefined ? clerkSubject : options.authSubject })) },
     morningBankUpdatePreference: {
       findUnique: vi.fn(async () => preference),
       upsert: vi.fn(async ({ create, update }: MutationArgs) => { preference = { ...preference, ...(preference ? update : create) }; return preference; }),
@@ -74,7 +77,7 @@ function fixture(options: {
     { getSummary: vi.fn(async () => ({ availableBankCalories: options.availableBank ?? 2843 })) } as never,
     transport,
     () => options.now ?? new Date('2026-09-05T13:15:00.000Z'),
-    new Set(options.detailedSummaryUserIds ?? []),
+    new Set(options.detailedSummaryClerkSubjects ?? []),
   );
   return { service, transport, db, getDelivery: () => delivery, getRegistration: () => registration };
 }
@@ -90,7 +93,7 @@ describe('Morning Bank Update copy', () => {
 describe('Morning Bank Update eligibility and delivery', () => {
   it('does not send while account deletion is pending', async () => {
     const { service, transport, db } = fixture();
-    db.user.findUnique.mockResolvedValue({ deletionRequestedAt: new Date() });
+    db.user.findUnique.mockResolvedValue({ deletionRequestedAt: new Date(), authProvider: 'clerk', authSubject: clerkSubject });
     expect(await service.deliverForUser(userId, 'America/Chicago')).toEqual({ status: 'not_eligible' });
     expect(transport.send).not.toHaveBeenCalled();
   });
@@ -220,7 +223,7 @@ describe('remote notification privacy boundary', () => {
   ])('restores approved account copy without extra metadata: $contribution', async (values) => {
     const { transport, fetchImpl } = expo();
     const logs = vi.spyOn(console, 'info').mockImplementation(() => undefined);
-    const { service } = fixture({ ...values, transport, detailedSummaryUserIds: [userId] });
+    const { service } = fixture({ ...values, transport, detailedSummaryClerkSubjects: [clerkSubject] });
     expect(await service.deliverForUser(userId, 'America/Chicago')).toEqual({ status: 'delivered' });
     expect(await service.deliverForUser(userId, 'America/Chicago')).toEqual({ status: 'already_handled' });
     expect(fetchImpl).toHaveBeenCalledOnce();
@@ -235,10 +238,18 @@ describe('remote notification privacy boundary', () => {
   });
 
   it('never applies another account approval to this user', async () => {
-    const { service, transport } = fixture({ detailedSummaryUserIds: ['00000000-0000-4000-8000-000000000002'] });
+    const { service, transport } = fixture({ detailedSummaryClerkSubjects: ['user_someOtherAccount'] });
     await service.deliverForUser(userId, 'America/Chicago');
     expect(transport.send).toHaveBeenCalledWith({ token: 'ExpoPushToken[test-token]' });
   });
+
+  it.each([{ authProvider: 'other', authSubject: clerkSubject }, { authProvider: 'clerk', authSubject: null }])(
+    'does not authorize an absent or different-provider identity', async identity => {
+      const { service, transport } = fixture({ ...identity, detailedSummaryClerkSubjects: [clerkSubject] });
+      await service.deliverForUser(userId, 'America/Chicago');
+      expect(transport.send).toHaveBeenCalledWith({ token: 'ExpoPushToken[test-token]' });
+    },
+  );
 
   it.each([NaN, Infinity, -1, 1.5])('falls back to generic copy for invalid balance %s', value => {
     expect(morningBankUpdateCopy({ availableBankCalories: value, contributionCalories: 5 }))
