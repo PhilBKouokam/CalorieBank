@@ -159,6 +159,8 @@ export function createApp(config: ApiEnv = env, dependencies: AppDependencies = 
     prisma,
     bankHistoryRepository,
     new ExpoPushTransport(config.EXPO_ACCESS_TOKEN ? { accessToken: config.EXPO_ACCESS_TOKEN } : {}),
+      undefined,
+      new Set((config.MORNING_BANK_DETAILED_USER_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean)),
   );
   const lifecycleCoordinator = finalizationScheduler
     ? new AccountLifecycleCoordinator(

@@ -46,3 +46,22 @@ not certify all processor, account-access, retention or Limited Use controls.
 - The API owns authenticated preference and token endpoints.
 - The hosted lifecycle owns eligibility, authoritative copy, durable idempotency, retries, Expo delivery, and receipt handling.
 - Expo/APNs credentials are deployment configuration and never enter tracked source or `EXPO_PUBLIC_*` values.
+
+## November 8, 2026 account-scoped restoration
+
+The founder explicitly approved restoring his own available-bank balance and
+banked/enjoyed calorie amount through Expo and Apple after lock-screen visibility
+and processor transmission were explained. This is not other users' consent.
+`MORNING_BANK_DETAILED_USER_IDS` records verified internal account IDs with this
+approval; empty/unlisted accounts retain the generic envelope. Invalid calorie
+values fall back to generic copy. Configure the same scoped approval on the
+hourly lifecycle service that produces notifications. No user ID is sent in the
+payload. Do not infer authorization from names or email addresses.
+
+Only available-bank balance and yesterday's effective signed bank contribution
+are formatted. No total intake, raw expenditure, dates, source identities,
+Recovery value, arbitrary caller text or URLs are added. Static routing,
+sanitized logs/errors, morning window, account deletion guard and no-resend
+semantics remain unchanged. No schema migration or mobile rebuild is required.
+Previously delivered notifications are not resent. Full consumer consent UI is
+outside this narrowly approved account restoration.

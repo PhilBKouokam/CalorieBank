@@ -34,7 +34,20 @@ export function isMorningBankUpdateWindow(timezone: string, now: Date) {
   return Number.isInteger(hour) && hour >= MORNING_START_HOUR && hour < MORNING_END_HOUR;
 }
 
-export function morningBankUpdateCopy() {
+export type MorningBankSummary = { availableBankCalories: number; contributionCalories: number };
+
+export function morningBankUpdateCopy(summary?: MorningBankSummary) {
+  if (summary && Number.isSafeInteger(summary.availableBankCalories) && summary.availableBankCalories >= 0
+    && Number.isSafeInteger(summary.contributionCalories)) {
+    const { availableBankCalories, contributionCalories } = summary;
+    const magnitude = Math.abs(contributionCalories).toLocaleString('en-US');
+    return {
+      title: `Available Bank: ${availableBankCalories.toLocaleString('en-US')} kcal${contributionCalories > 0 ? ' 🎉' : ''}`,
+      body: contributionCalories > 0 ? `You banked ${magnitude} kcal yesterday.`
+        : contributionCalories < 0 ? `You enjoyed ${magnitude} kcal yesterday.`
+          : 'You were right on target yesterday.',
+    };
+  }
   return { title: 'CalorieBank', body: 'Your daily banking summary is ready.' };
 }
 
@@ -46,7 +59,7 @@ type PushResult =
 type ReceiptResult = { status: 'ok' | 'retryable_failure' | 'permanent_failure'; code?: string };
 
 export interface PushTransport {
-  send(input: { token: string }): Promise<PushResult>;
+  send(input: { token: string; summary?: MorningBankSummary }): Promise<PushResult>;
   receipts(ticketIds: string[]): Promise<Map<string, ReceiptResult>>;
 }
 
@@ -73,15 +86,16 @@ export class ExpoPushTransport implements PushTransport {
     };
   }
 
-  async send(input: { token: string }): Promise<PushResult> {
+  async send(input: { token: string; summary?: MorningBankSummary }): Promise<PushResult> {
     try {
       const response = await this.fetchImpl('https://exp.host/--/api/v2/push/send', {
         method: 'POST', headers: this.headers(),
         // Construct the allowlisted envelope at the last external boundary. Never
-        // forward caller-provided text, identifiers, dates, health values or URLs.
+        // forward caller text, identifiers, dates or URLs. Only explicitly approved
+        // summary values may appear in the display copy.
         body: JSON.stringify({
           to: input.token,
-          ...morningBankUpdateCopy(),
+          ...morningBankUpdateCopy(input.summary),
           data: { route: '/today', category: 'morning_bank_update' },
           sound: 'default',
         }),
@@ -132,6 +146,7 @@ export class MorningBankUpdateService {
     private readonly bankHistory: BankHistoryRepository,
     private readonly transport: PushTransport,
     private readonly now: () => Date = () => new Date(),
+    private readonly detailedSummaryUserIds: ReadonlySet<string> = new Set(),
   ) {}
 
   async settings(userId: string) {
@@ -243,13 +258,17 @@ export class MorningBankUpdateService {
     }
     const delivery = await this.claim(userId, completedLocalDate);
     if (!delivery) return { status: 'already_handled' as const };
-    // Preserve the existing summary/locking step, but never pass its values to push.
-    await this.bankHistory.getSummary(userId);
+    // Only separately consented accounts may share calorie values with push processors.
+    const summary = await this.bankHistory.getSummary(userId);
     const account = await this.db.user.findUnique({ where: { id: userId }, select: { deletionRequestedAt: true } });
     if (!account || account.deletionRequestedAt) return { status: 'not_eligible' as const };
     structuredLog('info', 'morning_bank_update_delivery_started', { attempt: delivery.attemptCount });
     const result = await this.transport.send({
       token: device.expoPushToken,
+      ...(this.detailedSummaryUserIds.has(userId) ? { summary: {
+        availableBankCalories: summary.availableBankCalories,
+        contributionCalories: completedDay.effectiveDailyBankChange,
+      } } : {}),
     });
     if (result.status === 'accepted') {
       await this.db.morningBankUpdateDelivery.update({

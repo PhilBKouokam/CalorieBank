@@ -12,6 +12,7 @@ const userId = '00000000-0000-4000-8000-000000000001';
 
 function fixture(options: {
   now?: Date;
+  detailedSummaryUserIds?: string[];
   enabled?: boolean;
   token?: boolean;
   completed?: boolean;
@@ -73,6 +74,7 @@ function fixture(options: {
     { getSummary: vi.fn(async () => ({ availableBankCalories: options.availableBank ?? 2843 })) } as never,
     transport,
     () => options.now ?? new Date('2026-09-05T13:15:00.000Z'),
+    new Set(options.detailedSummaryUserIds ?? []),
   );
   return { service, transport, db, getDelivery: () => delivery, getRegistration: () => registration };
 }
@@ -208,6 +210,44 @@ describe('remote notification privacy boundary', () => {
       const event = JSON.parse(String(line)) as Record<string, unknown>;
       expect(Object.keys(event).every(key => ['level', 'event', 'attempt'].includes(key))).toBe(true);
     }
+  });
+
+  it.each([
+    { availableBank: 2843, contribution: 547, title: 'Available Bank: 2,843 kcal 🎉', body: 'You banked 547 kcal yesterday.' },
+    { availableBank: 188, contribution: -83, title: 'Available Bank: 188 kcal', body: 'You enjoyed 83 kcal yesterday.' },
+    { availableBank: 0, contribution: -2468, title: 'Available Bank: 0 kcal', body: 'You enjoyed 2,468 kcal yesterday.' },
+    { availableBank: 2843, contribution: 0, title: 'Available Bank: 2,843 kcal', body: 'You were right on target yesterday.' },
+  ])('restores approved account copy without extra metadata: $contribution', async (values) => {
+    const { transport, fetchImpl } = expo();
+    const logs = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const { service } = fixture({ ...values, transport, detailedSummaryUserIds: [userId] });
+    expect(await service.deliverForUser(userId, 'America/Chicago')).toEqual({ status: 'delivered' });
+    expect(await service.deliverForUser(userId, 'America/Chicago')).toEqual({ status: 'already_handled' });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body))).toEqual({
+      to: 'ExpoPushToken[test-token]', title: values.title, body: values.body,
+      data: { route: '/today', category: 'morning_bank_update' }, sound: 'default',
+    });
+    for (const [line] of logs.mock.calls) {
+      expect(Object.keys(JSON.parse(String(line)) as Record<string, unknown>)
+        .every(key => ['level', 'event', 'attempt'].includes(key))).toBe(true);
+    }
+  });
+
+  it('never applies another account approval to this user', async () => {
+    const { service, transport } = fixture({ detailedSummaryUserIds: ['00000000-0000-4000-8000-000000000002'] });
+    await service.deliverForUser(userId, 'America/Chicago');
+    expect(transport.send).toHaveBeenCalledWith({ token: 'ExpoPushToken[test-token]' });
+  });
+
+  it.each([NaN, Infinity, -1, 1.5])('falls back to generic copy for invalid balance %s', value => {
+    expect(morningBankUpdateCopy({ availableBankCalories: value, contributionCalories: 5 }))
+      .toEqual(morningBankUpdateCopy());
+  });
+
+  it.each([NaN, Infinity, 1.5])('falls back to generic copy for invalid contribution %s', value => {
+    expect(morningBankUpdateCopy({ availableBankCalories: 50, contributionCalories: value }))
+      .toEqual(morningBankUpdateCopy());
   });
 
   it('discards extra caller text, health metadata and deep-link query strings at the external boundary', async () => {
