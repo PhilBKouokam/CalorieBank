@@ -66,7 +66,7 @@ export const intakeCapabilityBoundary: RequestHandler = (req, res, next) => {
 };
 
 function containsAdjustment(value: unknown): boolean {
-  if (typeof value === 'string') return value.includes(':adjustment:') || / \+ [\d,]+ kcal added$/.test(value) || value === 'Your total for today';
+  if (typeof value === 'string') return value.includes(':adjustment:') || / \+ [\d,]+ kcal added$/.test(value) || value === 'Your total for today' || value === 'Your total';
   if (!value || typeof value !== 'object') return false;
   return Object.entries(value).some(([key, item]) => (key === 'intakeAdjustment' && item !== null) || containsAdjustment(item));
 }

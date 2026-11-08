@@ -46,6 +46,8 @@ import {
   classifyCompletedDayGap,
   completedLocalDates,
   continuityMessage,
+  recoverySourceName,
+  nativeHistoryRecoveryMessage,
 } from './history-continuity';
 
 export type PostProvisionalDailyBankRecordInput = {
@@ -396,9 +398,9 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       const recoveryProvider = missingFood ? intakeProvider : missingBurn ? expenditureProvider : null;
       const recoveryDevice = recoveryProvider === 'health_connect' ? 'android' as const
         : recoveryProvider === 'apple_health' ? 'ios' as const : null;
-      const recoveryLabel = missingFood
+      const recoveryLabel = recoverySourceName(missingFood
         ? authority.selectedIntake?.label ?? consumerProviderName(intakeProvider ?? '')
-        : authority.selectedExpenditure?.label ?? consumerProviderName(expenditureProvider ?? '');
+        : authority.selectedExpenditure?.label ?? consumerProviderName(expenditureProvider ?? ''));
       const state = processingByDate.get(logDate);
       const syncFailed = Boolean(state?.lastErrorCode)
         || (burnSessions[0]?.status === 'failed' || burnSessions[0]?.expenditureStatus === 'error')
@@ -416,10 +418,10 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         logDate,
         status,
         message: recoveryDevice
-          ? `Waiting for ${recoveryLabel} ${missingFood ? 'calories eaten' : 'calories burned'}.`
+          ? `Refresh ${recoveryLabel} to update this day.`
           : continuityMessage(status),
         recoveryDevice,
-        ...(recoveryDevice ? { recoveryMessage: `CalorieBank still needs ${missingFood ? 'calories eaten' : 'calories burned'} for this day from ${recoveryLabel}. Open ${recoveryLabel} to sync, then refresh CalorieBank on your ${recoveryDevice === 'ios' ? 'iPhone' : 'Android phone'}.` } : {}),
+        ...(recoveryDevice ? { recoveryMessage: nativeHistoryRecoveryMessage(recoveryLabel, recoveryDevice) } : {}),
         canRetry: recoverableDates.has(logDate)
           && (status !== 'waiting_for_data' || !state?.nextRetryAt || state.nextRetryAt <= this.now()),
       });
@@ -1197,8 +1199,18 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
     timezone: string,
     triggerSyncSessionId?: string,
   ): Promise<ReconciliationResult> {
+    return this.db.$transaction(transaction => this.reconcileStoredDayInTransaction(transaction, user, logDate, timezone, triggerSyncSessionId));
+  }
+
+  /** Share the accounting transaction with an authorized intake correction. */
+  async reconcileStoredDayInTransaction(
+    transaction: Prisma.TransactionClient,
+    user: DevelopmentUser,
+    logDate: string,
+    timezone: string,
+    triggerSyncSessionId?: string,
+  ): Promise<ReconciliationResult> {
     const processedAt = this.now();
-    return this.db.$transaction(async (transaction) => {
       await this.lockDay(transaction, user.id, logDate);
       const date = parseLogDate(logDate);
       const initialization = await transaction.bankAccountInitialization.findUnique({
@@ -1333,7 +1345,6 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         processedAt,
         true,
       );
-    });
   }
 
   async prepareForGoalChange(user: DevelopmentUser) {

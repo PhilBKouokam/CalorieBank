@@ -87,14 +87,14 @@ export async function transitionIntakeAuthority(
   });
 }
 
-/** Bounded rolling-window resolution: five queries, independent of date count. */
+/** Bounded rolling-window resolution: six queries, independent of date count. */
 export async function intakeRefreshPlan(
   db: Prisma.TransactionClient, userId: string, dates: string[], legacy: Selection,
 ) {
   const values = dates.map((date) => new Date(`${date}T00:00:00.000Z`));
   const last = [...values].sort((a, b) => b.getTime() - a.getTime())[0];
   if (!last) return [];
-  const [boundaries, snapshots, overrides, initialization, dated] = await Promise.all([
+  const [boundaries, snapshots, overrides, initialization, dated, adjustments] = await Promise.all([
     db.intakeAuthorityBoundary.findMany({
       where: { userId, OR: [{ effectiveFrom: { lte: last } }, { effectiveFrom: null }] },
       orderBy: { effectiveFrom: { sort: 'desc', nulls: 'last' } }, take: dates.length + 1,
@@ -106,14 +106,21 @@ export async function intakeRefreshPlan(
     db.historicalSourceAuthorityOverride.findMany({ where: { userId, localDate: { in: values }, role: 'INTAKE' } }),
     db.bankAccountInitialization.findUnique({ where: { userId }, select: { status: true } }),
     db.intakeAuthorityBoundary.findFirst({ where: { userId, effectiveFrom: { not: null } }, select: { id: true } }),
+    db.dailyIntakeAdjustment.findMany({ where: { userId, localDate: { in: values } } }),
   ]);
   return dates.map((localDate) => {
     const date = new Date(`${localDate}T00:00:00.000Z`);
     const override = overrides.find((row) => row.localDate.getTime() === date.getTime());
     const snapshot = snapshots.find((row) => row.finalizedDailyBankRecord.logDate.getTime() === date.getTime());
     const boundary = boundaries.find((row) => row.effectiveFrom === null || row.effectiveFrom <= date);
+    const adjustment = adjustments.find((row) => row.localDate.getTime() === date.getTime());
+    // A replacement changes accounting evidence, not the tracker we refresh.
+    // Keep importing its original source so removing the replacement uses fresh data.
+    const replacementSource = snapshot?.intakeProviderRecordId.startsWith('replacement:adjustment:')
+      ? adjustment : null;
     // Explicit historical import is allowed only while Opening Bank is incomplete.
     const identity = override ? { provider: override.provider, writerId: override.intakeWriterBundleIdentifier, sourceId: override.intakeSourceId }
+      : replacementSource ? { provider: replacementSource.provider, writerId: replacementSource.writerId, sourceId: replacementSource.sourceId }
       : snapshot ? { provider: snapshot.intakeProvider, writerId: snapshot.intakeWriterBundleIdentifier, sourceId: snapshot.intakeSourceId }
       : initialization?.status !== 'INITIALIZED' && legacy.authoritativeIntakeProvider !== 'manual_estimate' ? selectionIdentity(legacy)
       : dated ? boundary ?? selectionIdentity(legacy) : selectionIdentity(legacy);

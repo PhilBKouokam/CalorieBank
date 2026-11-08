@@ -50,3 +50,12 @@ export function continuityMessage(status: CompletedDayContinuityStatus) {
   if (status === 'unprocessed') return 'CalorieBank is missing data for this day.';
   return 'Waiting for calorie data.';
 }
+
+/** Recovery names the app to open, never an accounting adjustment label. */
+export function recoverySourceName(label: string) {
+  return label.replace(/ \+ [\d,.]+ kcal added$/, '');
+}
+export function nativeHistoryRecoveryMessage(label: string, device: 'ios' | 'android') {
+  const source = recoverySourceName(label);
+  return `Open ${source} and refresh, then return to CalorieBank on your ${device === 'ios' ? 'iPhone' : 'Android phone'} and tap Try again.`;
+}

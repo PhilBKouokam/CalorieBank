@@ -4,6 +4,8 @@ import {
   classifyCompletedDayGap,
   completedLocalDates,
   continuityMessage,
+  nativeHistoryRecoveryMessage,
+  recoverySourceName,
 } from '../src/modules/bank-history/history-continuity';
 
 describe('completed-day continuity', () => {
@@ -100,4 +102,10 @@ describe('completed-day continuity', () => {
     expect(continuityMessage('missing_food_data')).toBe('Food data is unavailable.');
     expect(continuityMessage('unprocessed')).not.toContain('0 kcal');
   });
+});
+
+it('names the tracker, not added calories, in recovery instructions', () => {
+  expect(recoverySourceName('Cronometer + 4,075 kcal added')).toBe('Cronometer');
+  expect(nativeHistoryRecoveryMessage('Cronometer + 4,075 kcal added', 'ios')).toBe('Open Cronometer and refresh, then return to CalorieBank on your iPhone and tap Try again.');
+  expect(nativeHistoryRecoveryMessage('Health Connect', 'android')).toContain('Android phone');
 });

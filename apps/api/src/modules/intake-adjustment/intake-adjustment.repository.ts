@@ -29,7 +29,7 @@ export function adjustAccountingRecord(base: DailyIntakeAggregate | null, row: D
     id: `adjustment:${row.revision}`, userId: row.userId, localDate: row.localDate, timezone: row.timezone,
     provider: 'manual_estimate', providerRecordId: `replacement:adjustment:${row.revision}:${row.calories}`,
     totalCaloriesConsumed: calories, writerBundleIdentifier: null, writerDisplayName: null,
-    sourceId: '', sourceDisplayName: 'Your total for today', evidenceObservedAt: row.updatedAt,
+    sourceId: '', sourceDisplayName: 'Your total', evidenceObservedAt: row.updatedAt,
     importedAt: row.updatedAt, providerUpdatedAt: null, syncStatus: 'ready', isCurrentDay: false,
     syncSessionId: null, createdAt: row.updatedAt, updatedAt: row.updatedAt,
   };
