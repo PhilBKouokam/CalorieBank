@@ -1,9 +1,10 @@
+vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 import React from 'react';
 import { resolve } from 'node:path';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({ load: vi.fn(), save: vi.fn() }));
-vi.mock('react-native', () => ({ ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: <T,>(x: T) => x } }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { flatten: (value: unknown) => Object.assign({}, ...[value].flat(Infinity).filter(Boolean)), create: <T,>(x: T) => x } }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock('../../mobile/components/caloriebank/PlaceholderScreen', () => ({ PlaceholderScreen: ({ children }: { children: React.ReactNode }) => React.createElement('screen', null, children) }));
 vi.mock('../../mobile/lib/api/settings-concurrency', () => ({

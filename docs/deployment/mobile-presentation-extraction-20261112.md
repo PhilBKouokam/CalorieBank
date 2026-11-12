@@ -53,3 +53,27 @@ Fresh combined gate: **138 tests passed in15 suites**, including rendered Histor
 Verified empty diff against ba09e402 for backend runtime, Prisma, domain/schema/config packages, Expo/EAS configuration, API clients and draft ownership code. No synthetic entry/transport/config was introduced.
 
 Remaining qualification: actual on-device rendering/scroll/blur/keyboard/accessibility/share checks for this full-app candidate, frozen cloud environment flags, whole-release regression gate and store readiness. This is not pixel-identical to the synthetic candidate's newer planning/scenario flows; those behavior changes require a separately reviewed contract-compatible integration. No public release or build occurred.
+
+## Whole-release and local bundle qualification — 12 November
+
+The repository release:friends-family wrapper completed with exit0 on Node20.20.2:
+- Prisma client generation and schema validation passed using worktree-private generated output.
+- All40 baseline migrations applied to a newly created dedicated localhost database. No existing or remote database was used.
+- All workspace typechecks and lint passed; domain/schema/API compilation and diff whitespace checks passed.
+- **1,442 tests passed across141 suites;2 migration-audit tests remained intentionally skipped** behind the existing explicit DDL-audit guard. No guard was disabled or relaxed.
+
+Full-gate discoveries were addressed in test scaffolding: missing existing daily-intake-adjustment fixture delegate, native visual/keyboard mocks, the established dynamic-import boundary for mobile hook tests and obsolete pre-redesign color/component-tag assertions. Calculation, source ownership, persistence, lifecycle and account assertions remain. The initial rc-named test database was rejected by several stricter persistence guards; a second fresh test-named local database was used instead of changing those guards.
+
+Local offline bundle export also found a real platform boundary: web was statically importing native screenshot capture dependencies despite being unsupported. Added native-screenshot.web.ts returning null plus an explicit regression. iOS/Android screenshot code remains unchanged.
+
+Verified **offline exports for all platforms** succeeded: Android Hermes bundle (1,862 modules), iOS Hermes bundle (1,925 modules), web bundle and47 static routes. Inert .invalid API/auth fixture settings were used; nothing was authenticated, published or uploaded. Installed dependencies were copied locally with APFS copy-on-write to remove an initial symlink resolution limitation. Temporary Metro configuration was removed. These exports are compiler evidence, not signed native apps, device tests or release-config qualification.
+
+Evidence logs:
+- /private/tmp/caloriebank-whole-release-gate-20261112-final.log
+- /private/tmp/caloriebank-release-web-export-final.log
+- /private/tmp/caloriebank-release-all-bundles.log
+Local non-shipping exports: /private/tmp/caloriebank-release-all-bundles-20261112.
+
+Disposable PostgreSQL cluster /private/tmp/caloriebank-release-gate-pg-20261112 is stopped (verified no server running). No production/server settings, credentials, live data, shared source or paid services changed. Backend, Prisma, shared runtime packages, API clients, draft ownership, Expo/EAS profiles and ordinary app IDs still match ba09e402.
+
+Remaining boundaries: full-app physical-device QA; cloud configuration/signing and approved private artifacts; store/privacy/rights/reviewer gates. Screenshot prompt supports iOS and Android API34+; the previously used Samsung API33 device cannot qualify the prompt. No native installation or paid build was attempted.

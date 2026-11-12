@@ -95,6 +95,7 @@ describe('account lifecycle coordinator', () => {
     const db = {
       user: { findUnique: vi.fn().mockResolvedValue({ id: 'synthetic', email: 'synthetic@example.invalid', deletionRequestedAt: null }) },
       intakeAuthorityBoundary: { findMany: vi.fn().mockResolvedValue([]), findFirst: vi.fn().mockResolvedValue(null) },
+      dailyIntakeAdjustment: { findMany: vi.fn().mockResolvedValue([]) },
       bankCalculationSnapshot: { findMany: vi.fn().mockResolvedValue([]) },
       bankAccountInitialization: { findUnique: vi.fn().mockResolvedValue(options.openingIncomplete ? { status: 'WAITING_FOR_OPENING_DATA' } : null) },
       ingestionSyncSession: { findMany: vi.fn().mockResolvedValue([]) },

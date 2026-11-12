@@ -12,7 +12,8 @@ vi.mock('../../mobile/lib/api/client',()=>({fetchToday:(...args:unknown[])=>cont
 vi.mock('../../mobile/lib/lifecycle/account-lifecycle',()=>({isAccountLifecycleRunning:()=>controls.running,subscribeToAccountLifecycle:()=>()=>{},subscribeToAccountLifecycleActivity:()=>()=>{}}));
 vi.mock('../../mobile/lib/today/local-date-change',()=>({subscribeToLocalDateChange:()=>()=>{}}));
 let EatingPlanPanel:React.ComponentType<{today:TodayResponse|null;budget:EatingBudgetResponse|null;pending:boolean;allowed:boolean;projectionAllowed?:boolean;enabled?:boolean}>;
-import {useEatingBudgetReadModel} from '../../mobile/lib/today/use-eating-budget-read-model';
+let useEatingBudgetReadModel: () => { today: TodayResponse | null; budget: EatingBudgetResponse | null; pending: boolean; allowed: boolean; failed: boolean };
+beforeEach(async () => { ({ useEatingBudgetReadModel } = await import(resolve(__dirname, '../../mobile/lib/today/use-eating-budget-read-model.ts'))); });
 import {selectStepsForIntake,eatingComparison} from '../../mobile/lib/today/eating-budget-guidance';
 import {setDraftSession,terminateDraftSession} from '../../mobile/lib/drafts/session-drafts';
 const anchor='2026-02-10T12:00:00.000Z',expiry='2026-02-10T12:30:00.000Z',context=`g1:${'a'.repeat(64)}`;

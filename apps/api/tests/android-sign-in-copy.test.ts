@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ os: 'android' }));
-vi.mock('react-native', () => ({ Platform: { get OS() { return state.os; } }, ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', StyleSheet: { create: <T,>(x: T) => x } }));
+vi.mock('react-native', () => ({ View: 'View', Platform: { get OS() { return state.os; } }, ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', StyleSheet: { flatten: (value: unknown) => Object.assign({}, ...[value].flat(Infinity).filter(Boolean)), create: <T,>(x: T) => x } }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('@clerk/expo', () => ({ useAuth: () => ({ isLoaded: true, isSignedIn: false }) }));
 vi.mock('@clerk/expo/hosted-auth', () => ({ useHostedAuth: () => ({ startHostedAuth: vi.fn() }) }));

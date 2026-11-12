@@ -141,9 +141,8 @@ describe('consumer routes', () => {
     const source = mobileFile('app/(settings)/customize-today.tsx');
     expect(source).toContain("label: 'Latest completed contribution'");
     expect(source).not.toContain("label: 'Latest finalized contribution'");
+    expect(source).not.toContain("key: 'showCurrentGoal'");
     expect(source.indexOf("key: 'showLatestFinalizedContribution'"))
-      .toBeLessThan(source.indexOf("key: 'showCurrentGoal'"));
-    expect(source.indexOf("key: 'showCurrentGoal'"))
       .toBeLessThan(source.indexOf("key: 'showTodaySoFar'"));
   });
 
@@ -318,7 +317,7 @@ describe('consumer routes', () => {
     expect(source).toContain("openSourcePicker('expenditure')");
     expect(source).toContain("openSourcePicker('intake')");
     expect(source).toContain("if (value < 0) return 'Enjoyed'");
-    expect(source).toContain('<Text style={styles.dayChange}>');
+    expect(source).toContain('style={[styles.dayChange,');
     expect(source).not.toMatch(/dailyBankChange < 0[\s\S]*negativeChange/);
     expect(source).toContain("flexBasis: '48%'");
     expect(source).toContain("textAlign: 'left'");
@@ -326,7 +325,7 @@ describe('consumer routes', () => {
     expect(source).not.toMatch(/Credited|% adjusted burn|goal deficit|goal surplus/);
     expect(source).not.toMatch(/Adjusted from|Original contribution|Effective contribution|Sources:/);
     // The freshness addendum allows a provisional note in details, not list rows.
-    expect(source.slice(0, source.indexOf('<View style={styles.breakdownPanel}>'))).not.toContain('May still update');
+    expect(source.slice(0, source.indexOf('<FrostedView style={styles.breakdownPanel}>'))).not.toContain('May still update');
     expect(source).toContain("selectedDay.status === 'provisional'");
   });
 });

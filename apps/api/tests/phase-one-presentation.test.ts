@@ -45,12 +45,13 @@ beforeEach(() => { budgetStore.enabled=false;budgetStore.plan.mockReset(); targe
 vi.mock('expo', () => ({ requireNativeModule: () => ({ watch: vi.fn(), unwatch: vi.fn(), measure: vi.fn(), addListener: () => ({ remove: vi.fn() }) }) }));
 vi.mock('react-native', () => ({
   findNodeHandle: () => null,
+  Keyboard: { isVisible: () => false, addListener: () => ({ remove: vi.fn() }) },
   AppState: { addEventListener: (_event: string, callback: (state: string) => void) => { appStateStore.onChange = callback; return { remove: vi.fn() }; } },
   Platform: { OS: 'ios' },
   Text: 'Text', View: 'View', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView',
   ActivityIndicator: 'ActivityIndicator', RefreshControl: 'RefreshControl',
   useWindowDimensions: () => viewport,
-  StyleSheet: { create: <T,>(value: T) => value },
+  StyleSheet: { flatten: (value: unknown) => Object.assign({}, ...[value].flat(Infinity).filter(Boolean)), create: <T,>(value: T) => value },
   Modal: ({ visible, children }: { visible: boolean; children: React.ReactNode }) => visible ? children : null,
 }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
@@ -204,14 +205,14 @@ describe('Phase 1 consumer release invariants', () => {
     expect(remaining.props.style.fontSize).toBeLessThan(total.props.style.fontSize);
     const walkRemaining = rendered.root.findAll(node => String(node.type) === 'Text').find(node => textContent(node) === `About ${forward.additionalSteps.toLocaleString()} more steps`)!;
     expect(walkRemaining.props.style).toEqual(remaining.props.style);
-    expect(total.props.style.color).toBe('#17483C');
+    expect(total.props.style.color).toBe('#176E61');
     if (hasPace) {
       const times = rendered.root.findAll(node => String(node.type) === 'Text' && textContent(node).startsWith('About ') && textContent(node).includes(' hr'));
       expect(times).toHaveLength(2);
-      for (const time of times) expect(time.props.style.color).toBe(total.props.style.color);
+      for (const time of times) expect(time.props.style.color).toBe('#17483C');
     }
     const actual = rendered.root.findAll(node => String(node.type) === 'Text').find(node => textContent(node) === `${forward.projectedAdjustedBurnCalories.toLocaleString()} kcal`)!;
-    expect(actual.props.style.color).toBe(total.props.style.color);
+    expect(actual.props.style.color).toBe('#17483C');
     expect(actual.props.style.fontWeight).toBe('800');
     let paragraph = actual.parent!;
     while (String(paragraph.type) !== 'Text') paragraph = paragraph.parent!;
@@ -233,8 +234,8 @@ describe('Phase 1 consumer release invariants', () => {
   });
   it('places burned, eaten, and steps within the same first detail card', () => {
     const detail = source('app/(details)/today-burn.tsx');
-    const summary = detail.slice(detail.indexOf('<View style={styles.card}>'), detail.indexOf('<Text style={styles.sectionTitle}>'));
-    expect(summary.match(/<View style=\{styles.card\}>/g)).toHaveLength(1);
+    const summary = detail.slice(detail.indexOf('<FrostedView style={styles.card}>'), detail.indexOf('<Text style={styles.sectionTitle}>'));
+    expect(summary.match(/<FrostedView style=\{styles.card\}>/g)).toHaveLength(1);
     expect(summary.indexOf('>Burned</Text>')).toBeLessThan(summary.indexOf('>Eaten</Text>'));
     expect(summary.indexOf('>Eaten</Text>')).toBeLessThan(summary.indexOf('>Steps</Text>'));
     expect(summary).toContain('adjustmentFactor');
@@ -250,7 +251,7 @@ describe('Phase 1 consumer release invariants', () => {
   });
   it('planning results remain prominent while using unchanged domain functions', () => {
     const planning = source('components/caloriebank/StepPlanningCards.tsx');
-    expect(planning).toContain("result: { color: colors.primaryDark, fontSize: 26, fontWeight: '800'");
+    expect(planning).toContain("result: { color: '#176E61', fontSize: 28, fontWeight: '800'");
     expect(planning).toContain('traceBurnToStepPlan(snapshot,');
     expect(planning).toContain('calculateStepToBurnPlan({ ...snapshot.plannerInput');
     expect(planning.match(/<WalkingTime steps=/g)).toHaveLength(2);

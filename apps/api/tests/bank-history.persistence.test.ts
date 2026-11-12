@@ -163,8 +163,8 @@ describe('bank history PostgreSQL persistence', () => {
       const history = await new PrismaBankHistoryRepository(prisma, { now: () => new Date('2026-09-25T17:00:00Z') }).getHistory(userId, 'ALL');
       expect(history.missingDays).toHaveLength(1);
       expect(history.missingDays[0]).toMatchObject({ recoveryDevice: 'android', status: 'missing_food_data' });
-      expect(history.missingDays[0]?.message).toBe('Waiting for Cronometer calories eaten.');
-      expect(history.missingDays[0]?.recoveryMessage).toContain('calories eaten for this day from Cronometer');
+      expect(history.missingDays[0]?.message).toBe('Refresh Cronometer to update this day.');
+      expect(history.missingDays[0]?.recoveryMessage).toContain('Open Cronometer and refresh');
       expect(history.missingDays[0]?.recoveryMessage).toContain('Android phone');
       expect(await prisma.calorieLedgerTransaction.count({ where: { userId } })).toBe(0);
     } finally { await prisma.user.delete({ where: { id: userId } }); }

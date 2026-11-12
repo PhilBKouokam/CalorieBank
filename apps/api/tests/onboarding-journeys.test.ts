@@ -45,7 +45,7 @@ vi.mock('react-native', () => ({
   AppState: { addEventListener: () => ({ remove() {} }) },
   TextInput: 'TextInput', useWindowDimensions: () => ({ width: 390, fontScale: 1 }),
   ActivityIndicator: 'ActivityIndicator', KeyboardAvoidingView: 'KeyboardAvoidingView', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View',
-  Platform: { get OS() { return h.os; } }, StyleSheet: { create: <T,>(styles: T) => styles, hairlineWidth: 1 },
+  Platform: { get OS() { return h.os; } }, StyleSheet: { flatten: (value: unknown) => Object.assign({}, ...[value].flat(Infinity).filter(Boolean)), create: <T,>(styles: T) => styles, hairlineWidth: 1 },
   Modal: ({ visible, children }: { visible: boolean; children: React.ReactNode }) => visible ? children : null,
   Linking: { openSettings: vi.fn() },
 }));
