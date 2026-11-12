@@ -5,7 +5,7 @@ import { Text } from '@/components/caloriebank/ScaleAwareText';
 import type { IntakeAdjustmentState } from '@caloriebank/schemas';
 import { KeyboardSafeScrollView } from './KeyboardSafeScrollView';
 import { ApiHttpError, saveIntakeAdjustment } from '@/lib/api/client';
-import { colors, spacing } from '@/constants/caloriebank-theme';
+import { colors } from '@/constants/caloriebank-theme';
 
 export function IntakeAdjustmentEditor({ state, onSaved, onCancel }: {
   state: IntakeAdjustmentState; onSaved: () => void; onCancel: () => void;
@@ -69,14 +69,20 @@ export function IntakeAdjustmentEditor({ state, onSaved, onCancel }: {
   </KeyboardSafeScrollView>;
 }
 const styles = StyleSheet.create({
-  container: { flex: 1 }, content: { padding: spacing.lg, gap: spacing.md },
-  title: { fontSize: 26, fontWeight: '700', color: colors.text },
-  detail: { fontSize: 16, color: colors.textMuted }, label: { fontSize: 16, fontWeight: '600', color: colors.text },
-  choice: { minHeight: 48, padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 6 },
-  selected: { borderColor: colors.primary, backgroundColor: colors.surface }, choiceText: { fontSize: 17, fontWeight: '600', color: colors.text },
-  inputFrame: { borderWidth: 1, borderColor: colors.border, borderRadius: 6 }, input: { padding: 16, minHeight: 52, fontSize: 24, color: colors.text },
-  result: { fontSize: 18, fontWeight: '600', color: colors.primary }, error: { fontSize: 16, color: colors.danger },
-  save: { minHeight: 48, padding: 16, borderRadius: 6, backgroundColor: colors.primary, alignItems: 'center' },
-  saveText: { fontSize: 18, color: colors.surface, fontWeight: '700' },
-  action: { minHeight: 48, padding: 14, alignItems: 'center' }, link: { fontSize: 17, color: colors.primary, fontWeight: '600' },
+container: { flex: 1 },
+content: { padding: 16, paddingBottom: 48, gap: 20 },
+title: { fontSize: 26, fontWeight: '700', color: colors.text },
+detail: { lineHeight: 24, fontSize: 16, color: colors.textMuted },
+label: { fontSize: 16, fontWeight: '600', color: colors.text },
+choice: { minHeight: 48, padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 12 },
+selected: { borderColor: colors.primary, backgroundColor: colors.surface },
+choiceText: { fontSize: 17, fontWeight: '600', color: colors.text },
+inputFrame: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12 },
+input: { padding: 16, minHeight: 52, fontSize: 24, color: colors.text },
+result: { fontSize: 20, fontWeight: '700', color: '#245BA6' },
+error: { fontSize: 16, color: colors.danger },
+save: { minHeight: 48, padding: 16, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center' },
+saveText: { fontSize: 18, color: colors.surface, fontWeight: '700' },
+action: { minHeight: 48, padding: 14, alignItems: 'center' },
+link: { fontSize: 17, color: colors.primary, fontWeight: '600' }
 });

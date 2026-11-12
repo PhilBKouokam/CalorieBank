@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
 import { useRouter } from 'expo-router';
 import type { IntakeAdjustmentState } from '@caloriebank/schemas';
 import { fetchIntakeAdjustment } from '@/lib/api/client';

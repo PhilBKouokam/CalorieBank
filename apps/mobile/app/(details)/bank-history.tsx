@@ -1,3 +1,4 @@
+import { FrostedView } from '@/components/caloriebank/FrostedSurface';
 import { trackerChoices } from '@/lib/native-health/tracker-choices';
 import { sourceLabel } from '@/lib/native-health/copy';
 import type {
@@ -8,13 +9,15 @@ import type {
   HistoricalSourceOptionsResponse,
 } from '@caloriebank/schemas';
 import * as Crypto from 'expo-crypto';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
 
 import { PlaceholderScreen } from '@/components/caloriebank/PlaceholderScreen';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
+import { compactGlassCard } from '@/constants/card-surface';
 import {
   ApiHttpError,
   changeHistoricalSource,
@@ -80,11 +83,15 @@ function contributionEquation(day: BankHistoryDayDetailResponse) {
   return `${adjusted} − ${eaten} = ${result}`;
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({ label, value, tone }: {
+  label: string;
+  value: string;
+  tone?: 'burned' | 'eaten';
+}) {
   return (
     <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text adjustsFontSizeToFit minimumFontScale={0.8} numberOfLines={1} style={styles.detailValue}>
+      <Text style={[styles.detailLabel, tone === 'burned' && styles.burnedText, tone === 'eaten' && styles.eatenText]}>{label}</Text>
+      <Text style={[styles.detailValue, tone === 'burned' && styles.burnedText, tone === 'eaten' && styles.eatenText]}>
         {value}
       </Text>
     </View>
@@ -111,6 +118,10 @@ async function refreshHistoricalSources() {
 }
 
 export default function BankHistoryScreen() {
+  const { width, fontScale } = useWindowDimensions();
+  const [dayListWidth, setDayListWidth] = useState<number | null>(null);
+  // Reserve readable columns rather than squeezing date/status around a scaled amount.
+  const stackDayRows = ((dayListWidth ?? width - 32) - 34) / fontScale < 250;
   const [selectedRange, setSelectedRange] = useState<BankHistoryRange>('W');
   const [history, setHistory] = useState<BankHistoryResponse | null>(null);
   const [selectedLogDate, setSelectedLogDate] = useState<string | null>(null);
@@ -269,24 +280,29 @@ export default function BankHistoryScreen() {
 
   return (
     <PlaceholderScreen
-      eyebrow="History"
-      title="Available Bank"
-      description="See how completed days changed your bank."
+      showBrand={false}
+      bareContent
+      eyebrow=""
+      title="History"
+      description=""
     >
-      <View style={styles.hero}>
-        <Text style={styles.heroLabel}>Available Bank</Text>
-        <Text style={styles.heroValue}>{bankValue}</Text>
+      <FrostedView style={styles.hero}>
+        <View style={styles.heroHeading}>
+          <Text style={styles.heroLabel}>Available Bank</Text>
+          <Ionicons accessibilityElementsHidden importantForAccessibility="no" name="wallet-outline" size={22} color="#246B5B" />
+        </View>
+        <Text style={[styles.heroValue, !hasInitializedBank && styles.heroUnavailable]}>{bankValue}</Text>
         <Text style={styles.heroDetail}>{throughText}</Text>
-      </View>
+      </FrostedView>
 
       {history && history.recoveryCalories > 0 ? (
-        <View accessibilityRole="summary" style={styles.recoverySummary}>
+        <FrostedView accessibilityRole="summary" style={styles.recoverySummary}>
           <Text style={styles.sectionTitle}>Recovery</Text>
           <Text style={styles.recoveryValue}>
             {history.recoveryCalories.toLocaleString()} kcal to recover
           </Text>
           <Text style={styles.mutedText}>New deposits will restore your bank first.</Text>
-        </View>
+        </FrostedView>
       ) : null}
 
       <View style={styles.rangeRow} accessibilityLabel="History range">
@@ -308,9 +324,10 @@ export default function BankHistoryScreen() {
 
       <View style={styles.timelinePanel}>
         <Text style={styles.sectionTitle}>Completed days</Text>
-        {status === 'loading' ? <ActivityIndicator color={colors.primary} /> : null}
+        <FrostedView style={styles.dayList} onLayout={event => setDayListWidth(event.nativeEvent.layout.width)}>
+        {status === 'loading' ? <View style={styles.listState}><ActivityIndicator accessibilityLabel="Loading completed days" color={colors.primary} /></View> : null}
         {status === 'error' ? (
-          <View style={styles.errorState}>
+          <View style={[styles.listState, styles.errorState]}>
             <Text style={styles.errorText}>Bank history is unavailable.</Text>
             <Pressable
               accessibilityRole="button"
@@ -322,10 +339,10 @@ export default function BankHistoryScreen() {
           </View>
         ) : null}
         {status === 'empty' ? (
-          <>
+          <View style={styles.listState}>
             <Text style={styles.bodyText}>No completed days yet.</Text>
             <Text style={styles.mutedText}>Your history will appear after CalorieBank receives a complete day of burn and food data.</Text>
-          </>
+          </View>
         ) : null}
         {status === 'ready'
           ? [
@@ -340,10 +357,13 @@ export default function BankHistoryScreen() {
                     accessibilityRole="button"
                     key={item.day.logDate}
                     onPress={() => showMissingDay(item.day)}
-                    style={styles.dayRow}
+                    style={({ pressed }) => [styles.dayRow, stackDayRows && styles.stackedDayRow, pressed && styles.pressedRow]}
                   >
-                    <Text style={styles.dayDate}>{formatDate(item.day.logDate)}</Text>
-                    <Text style={styles.missingDayText}>{item.day.message}</Text>
+                    <View style={[styles.dayIdentity, stackDayRows && styles.stackedDayIdentity]}>
+                      <Text style={styles.dayDate}>{formatDate(item.day.logDate)}</Text>
+                      <Text style={styles.missingDayText}>{item.day.message}</Text>
+                    </View>
+                    <Ionicons style={stackDayRows ? styles.stackedDayIndicator : undefined} accessibilityElementsHidden importantForAccessibility="no" name="information-circle-outline" size={20} color={colors.textMuted} />
                   </Pressable>
                 );
               }
@@ -352,26 +372,31 @@ export default function BankHistoryScreen() {
               return (
                 <Pressable
                   accessibilityHint="Loads bank details for this completed day."
-                  accessibilityLabel={`${day.logDate}, ${formatCalories(day.dailyBankChange)}`}
+                  accessibilityLabel={`${day.logDate}, ${contributionVerb(day.dailyBankChange)}, ${formatCalories(day.dailyBankChange)}`}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
                   key={day.logDate}
                   onPress={() => void handleSelectDay(day.logDate)}
-                  style={[styles.dayRow, selected && styles.selectedDayRow]}
+                  style={({ pressed }) => [styles.dayRow, stackDayRows && styles.stackedDayRow, selected && styles.selectedDayRow, pressed && styles.pressedRow]}
                 >
-                  <Text style={styles.dayDate}>{formatDate(day.logDate)}</Text>
-                  <View style={styles.dayAmount}>
-                    <Text style={styles.dayChange}>
+                  <View style={[styles.dayIdentity, stackDayRows && styles.stackedDayIdentity]}>
+                    <Text style={styles.dayDate}>{formatDate(day.logDate)}</Text>
+                    <Text style={[styles.dayOutcome, day.dailyBankChange < 0 && styles.enjoyedText]}>{contributionVerb(day.dailyBankChange)}</Text>
+                  </View>
+                  <View style={[styles.dayAmount, stackDayRows && styles.stackedDayAmount]}>
+                    <Text style={[styles.dayChange, stackDayRows && styles.stackedDayChange, day.dailyBankChange < 0 && styles.enjoyedText, day.dailyBankChange === 0 && styles.neutralText]}>
                       {formatCalories(day.dailyBankChange)}
                     </Text>
                   </View>
+                  <Ionicons style={stackDayRows ? styles.stackedDayIndicator : undefined} accessibilityElementsHidden importantForAccessibility="no" name="chevron-forward" size={16} color={selected ? '#176C65' : '#7D8987'} />
                 </Pressable>
               );
             })
           : null}
+        </FrostedView>
       </View>
 
-      <View style={styles.breakdownPanel}>
+      <FrostedView style={styles.breakdownPanel}>
         <Text style={styles.sectionTitle}>Day details</Text>
         {detailStatus === 'idle' ? <Text style={styles.mutedText}>Select a completed day.</Text> : null}
         {detailStatus === 'loading' ? <ActivityIndicator color={colors.primary} /> : null}
@@ -379,7 +404,7 @@ export default function BankHistoryScreen() {
         {detailStatus === 'ready' && selectedDay ? (
           <>
             <Text style={styles.dayTitle}>{formatDate(selectedDay.logDate)}</Text>
-            <Text style={styles.changeText}>
+            <Text style={[styles.changeText, selectedDay.dailyBankChange < 0 && styles.enjoyedText, selectedDay.dailyBankChange === 0 && styles.neutralText]}>
               {contributionVerb(selectedDay.dailyBankChange)} {Math.abs(selectedDay.dailyBankChange).toLocaleString()} kcal
             </Text>
             {selectedDay.status === 'provisional' ? (
@@ -388,16 +413,21 @@ export default function BankHistoryScreen() {
 
             <View style={styles.breakdownRows}>
               <DetailRow
+                tone="burned"
                 label={`${sourceOptions?.expenditure.selected.label
                   ?? getConsumerSourceName(selectedDay.versions.at(-1)?.expenditureProvider)} burn`}
                 value={`${selectedDay.importedTotalDailyExpenditure.toLocaleString()} kcal`}
               />
               <DetailRow
+                tone="burned"
                 label="Estimated actual burn"
                 value={`× ${Number(selectedDay.expenditureAdjustmentRate.toFixed(2))} = ${selectedDay.adjustedExpenditure.toLocaleString()} kcal`}
               />
               <DetailRow label="Goal" value={goalAdjustmentText(selectedDay)} />
-              <DetailRow label="Eaten" value={`${selectedDay.importedCalorieIntake.toLocaleString()} kcal`} />
+              <View style={styles.eatenRow}>
+                <View style={styles.eatenValue}><DetailRow label="Eaten" tone="eaten" value={`${selectedDay.importedCalorieIntake.toLocaleString()} kcal`} /></View>
+
+              </View>
             </View>
 
             <Text style={styles.compactMath}>{contributionEquation(selectedDay)}</Text>
@@ -412,24 +442,24 @@ export default function BankHistoryScreen() {
               {selectedDay.versions.at(-1) ? (
                 <>
                   <View style={styles.sourceRow}>
-                    <Text style={styles.mutedText}>
+                    <Text style={[styles.mutedText, styles.sourceLabel]}>
                       Calories burned · {sourceLabel(sourceOptions?.expenditure.selected.label
                         ?? getConsumerSourceName(selectedDay.versions.at(-1)!.expenditureProvider))}
                     </Text>
                     {sourceOptions?.expenditure.canChange ? (
-                      <Pressable accessibilityRole="button" onPress={() => openSourcePicker('expenditure')}>
+                      <Pressable accessibilityRole="button" accessibilityLabel="Change calories burned source" onPress={() => openSourcePicker('expenditure')} style={styles.changeSourceButton}>
                         <Text style={styles.changeSourceText}>Change</Text>
                       </Pressable>
                     ) : null}
                   </View>
                   <View style={styles.sourceRow}>
-                    <Text style={styles.mutedText}>
+                    <Text style={[styles.mutedText, styles.sourceLabel]}>
                       Calories eaten · {sourceLabel(sourceOptions?.intake.selected.label
                         ?? selectedDay.versions.at(-1)!.intakeSourceDisplayName
                         ?? getConsumerSourceName(selectedDay.versions.at(-1)!.intakeProvider))}
                     </Text>
                     {sourceOptions?.intake.canChange && trackerChoices(sourceOptions.intake.options.filter((option) => option.id !== sourceOptions.intake.selected.id), sourceOptions.intake.selected).length > 1 ? (
-                      <Pressable accessibilityRole="button" onPress={() => openSourcePicker('intake')}>
+                      <Pressable accessibilityRole="button" accessibilityLabel="Change calories eaten source" onPress={() => openSourcePicker('intake')} style={styles.changeSourceButton}>
                         <Text style={styles.changeSourceText}>Change</Text>
                       </Pressable>
                     ) : null}
@@ -439,7 +469,7 @@ export default function BankHistoryScreen() {
             </View>
           </>
         ) : null}
-      </View>
+      </FrostedView>
 
       <Modal
         animationType="fade"
@@ -484,134 +514,192 @@ export default function BankHistoryScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    backgroundColor: colors.background,
-    padding: spacing.lg,
+    ...compactGlassCard,
+    gap: 10,
+    borderColor: '#DCEBE3',
+    backgroundColor: '#EDF6F1',
+    padding: 22,
+  },
+  heroHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
   heroLabel: {
-    color: colors.textMuted,
+    flex: 1,
+    color: '#246B5B',
     fontSize: typography.body,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   heroValue: {
-    color: colors.text,
-    fontSize: 38,
+    color: '#17483C',
+    fontSize: 36,
+    letterSpacing: -1,
     fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  heroUnavailable: {
+    fontSize: 28,
+    letterSpacing: -0.5,
   },
   heroDetail: {
-    color: colors.textMuted,
-    fontSize: typography.body,
+    color: '#61776E',
+    fontSize: 14,
+    lineHeight: 20,
   },
   rangeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    borderRadius: 16,
+    backgroundColor: '#E7ECEB',
+    padding: 4,
   },
   recoverySummary: {
-    gap: spacing.xs,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    ...compactGlassCard,
+    gap: spacing.sm,
+    padding: 18,
   },
   recoveryValue: {
-    color: colors.text,
-    fontSize: typography.heading,
-    fontWeight: '800',
+    color: '#56636C',
+    fontSize: 22,
+    fontWeight: '700',
   },
   rangeButton: {
     minHeight: 44,
     minWidth: 44,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    paddingHorizontal: 4,
+    paddingVertical: spacing.sm,
   },
   selectedRangeButton: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#254B40',
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
   rangeText: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: '700',
+    color: '#616D6B',
+    fontSize: 14,
+    fontWeight: '600',
   },
   selectedRangeText: {
-    color: colors.surface,
+    color: '#176C65',
+    fontWeight: '800',
   },
   timelinePanel: {
+    gap: 12,
+  },
+  dayList: {
+    ...compactGlassCard,
+    padding: 0,
+    overflow: 'hidden',
+  },
+  listState: {
     gap: spacing.sm,
+    padding: 20,
   },
   dayRow: {
-    minHeight: 52,
+    minHeight: 76,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    backgroundColor: colors.surface,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E9EEEC',
+    borderLeftWidth: 3,
+    borderLeftColor: 'transparent',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 14,
   },
+  stackedDayRow: { flexDirection: 'column', alignItems: 'stretch', gap: 10, paddingRight: 38 },
+  stackedDayIndicator: { position: 'absolute', right: 16, top: 18 },
+  stackedDayIdentity: { flex: undefined, flexGrow: 0, flexShrink: 0, flexBasis: 'auto', width: '100%' },
+  stackedDayAmount: { alignItems: 'flex-start', width: '100%' },
+  stackedDayChange: { textAlign: 'left' },
   selectedDayRow: {
-    borderColor: colors.primary,
+    borderLeftColor: '#176C65',
+    backgroundColor: '#EAF4F1',
+  },
+  pressedRow: {
+    backgroundColor: '#E0EDE9',
+  },
+  dayIdentity: {
+    flex: 1,
+    gap: 5,
   },
   dayDate: {
     color: colors.text,
     fontSize: typography.body,
     fontWeight: '700',
   },
+  dayOutcome: {
+    color: '#64736F',
+    fontSize: typography.caption,
+    lineHeight: 18,
+  },
   dayAmount: {
     alignItems: 'flex-end',
-    gap: spacing.xs,
+    flexShrink: 1,
   },
   dayChange: {
-    color: colors.primaryDark,
+    color: '#176C65',
     fontSize: typography.body,
-    fontWeight: '800',
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    textAlign: 'right',
+  },
+  enjoyedText: {
+    color: '#70558D',
+  },
+  neutralText: {
+    color: '#626D69',
+  },
+  burnedText: {
+    color: '#A45B1F',
+  },
+  eatenText: {
+    color: '#345FAD',
   },
   missingDayText: {
     color: colors.textMuted,
-    flex: 1,
     fontSize: typography.caption,
-    marginLeft: spacing.md,
-    textAlign: 'right',
+    lineHeight: 19,
   },
   breakdownPanel: {
-    gap: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.md,
+    ...compactGlassCard,
+    gap: 12,
+    padding: 20,
   },
   sectionTitle: {
-    color: colors.text,
+    color: '#465650',
     fontSize: typography.body,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   dayTitle: {
     color: colors.text,
-    fontSize: typography.subheading,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '700',
   },
   changeText: {
-    color: colors.primaryDark,
-    fontSize: typography.heading,
+    color: '#176C65',
+    fontSize: 26,
     fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
   breakdownRows: {
-    gap: spacing.xs,
+    gap: 14,
+    paddingVertical: spacing.sm,
   },
   detailNotes: {
     gap: spacing.xs,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: '#E1E8E5',
     paddingTop: spacing.md,
   },
   sourceRow: {
@@ -621,10 +709,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
+  sourceLabel: {
+    flex: 1,
+  },
+  changeSourceButton: {
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   changeSourceText: {
-    color: colors.primaryDark,
-    fontSize: typography.body,
-    fontWeight: '800',
+    color: '#176C65',
+    fontSize: 14,
+    fontWeight: '700',
   },
   modalBackdrop: {
     flex: 1,
@@ -633,9 +730,9 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   sourceSheet: {
+    ...compactGlassCard,
     gap: spacing.sm,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
+    backgroundColor: '#F7F9F8',
     padding: spacing.lg,
   },
   sourceSheetTitle: {
@@ -668,6 +765,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  eatenRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  eatenValue: { flex: 1 },
+  editButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EDF2FB', borderRadius: 12 },
   detailRow: {
     alignItems: 'flex-start',
     flexDirection: 'row',
@@ -677,21 +777,25 @@ const styles = StyleSheet.create({
     flexBasis: '48%',
     flexShrink: 0,
     color: colors.textMuted,
-    fontSize: typography.body,
-    lineHeight: 23,
+    fontSize: 14,
+    lineHeight: 21,
   },
   detailValue: {
     color: colors.text,
     flex: 1,
-    fontSize: typography.body,
-    fontWeight: '800',
-    lineHeight: 23,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 21,
+    fontVariant: ['tabular-nums'],
     textAlign: 'left',
   },
   compactMath: {
     color: colors.textMuted,
     fontSize: typography.caption,
     lineHeight: 19,
+    backgroundColor: '#F0F4F2',
+    borderRadius: 12,
+    padding: 12,
   },
   bodyText: {
     color: colors.text,

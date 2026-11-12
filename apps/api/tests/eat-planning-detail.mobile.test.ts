@@ -1,10 +1,11 @@
+vi.mock('react-native-safe-area-context', () => ({SafeAreaView: 'SafeAreaView'}));
 import React from 'react';
 import {resolve} from 'node:path';
 import {act,create,type ReactTestRenderer,type ReactTestInstance} from 'react-test-renderer';
 import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest';
 import type {EatingBudgetResponse,EatPlanningResponse,TodayResponse} from '@caloriebank/schemas';
 const controls=vi.hoisted(()=>({enabled:true,running:false,fontScale:1,width:390,plan:vi.fn(),budget:vi.fn(),today:vi.fn(),provider:vi.fn()}));
-vi.mock('react-native',()=>({Text:'Text',TextInput:'TextInput',View:'View',Pressable:'Pressable',StyleSheet:{create:(x:unknown)=>x,flatten:(x:unknown)=>x},useWindowDimensions:()=>({fontScale:controls.fontScale,width:controls.width}),AppState:{addEventListener:()=>({remove:()=>{}})}}));
+vi.mock('react-native',()=>({ Platform: { OS: 'android' }, Keyboard: { isVisible: () => false, addListener: () => ({remove: () => {}}) }, Text:'Text',TextInput:'TextInput',View:'View',Pressable:'Pressable',StyleSheet:{create:(x:unknown)=>x,flatten:(x:unknown)=>x},useWindowDimensions:()=>({fontScale:controls.fontScale,width:controls.width}),AppState:{addEventListener:()=>({remove:()=>{}})}}));
 vi.mock('expo-router',()=>({useFocusEffect:(callback:()=>void)=>React.useEffect(callback,[callback])}));
 vi.mock('../../mobile/lib/api/eating-budget',()=>({get eatingBudgetEnabled(){return controls.enabled;},fetchEatingPlan:(...args:unknown[])=>controls.plan(...args),fetchEatingBudget:(...args:unknown[])=>controls.budget(...args)}));
 vi.mock('../../mobile/lib/api/client',()=>({fetchToday:(...args:unknown[])=>controls.today(...args),fetchProviderSelection:(...args:unknown[])=>controls.provider(...args)}));

@@ -38,3 +38,18 @@ No remote action, deployment, native build, migration, billing, credential or pr
 ## Next integration work
 
 Port overlapping screens one at a time with baseline contract fixtures. Separate purely visual layout from newly introduced guidance/scenario/reserve behavior; do not resolve overlaps by wholesale taking newer source. Then run the full baseline regression gate and native iPhone/Android qualification with explicitly reconciled profile flags. This subset alone does not meet all-page parity or public-release readiness.
+
+## Follow-up integration completed — 12 November
+
+The eight overlapping files listed above now have reviewed presentation ports. Their earlier baseline-only status is superseded by this section.
+
+- Today uses the qualified responsive activity rail, measured sticky-header threshold and keyboard unpin behavior. Fitness Goal no longer appears as a Today card; the existing Settings route remains available. Other Today lifecycle, data-fetch, account and guidance gates remain baseline.
+- History now uses the redesigned single-title/balance treatment, signed semantic colors and responsive day rows. Range selection, detail loading, missing-data explanation, source-choice cancellation and exact-date source change remain existing behavior. New historical-calorie pencil/navigation is deliberately not imported because the baseline editor does not accept its date route contract.
+- Settings and planning/editor panels received frosted wrappers and matching styles without importing reserve exposure, account-auth refactoring, revised walking models or the newer local deficit/banking scenario calculation.
+- Current-day calorie editing retains the baseline save API and draft/conflict behavior. Planning retains the baseline readiness, expiry and request ownership semantics.
+
+Fresh combined gate: **138 tests passed in15 suites**, including rendered History/source changes, responsive detail layouts, sticky rail/keyboard release, startup lifecycle and failed reads, account/draft isolation, inverse/forward planning, editor saves, screenshot sharing, materials and native permission policy. Existing behavioral assertions were kept; three test mocks were extended for newly-used native visual/keyboard APIs. Mobile TypeScript and scoped ESLint both pass without warnings/errors. Diff whitespace check passes.
+
+Verified empty diff against ba09e402 for backend runtime, Prisma, domain/schema/config packages, Expo/EAS configuration, API clients and draft ownership code. No synthetic entry/transport/config was introduced.
+
+Remaining qualification: actual on-device rendering/scroll/blur/keyboard/accessibility/share checks for this full-app candidate, frozen cloud environment flags, whole-release regression gate and store readiness. This is not pixel-identical to the synthetic candidate's newer planning/scenario flows; those behavior changes require a separately reviewed contract-compatible integration. No public release or build occurred.

@@ -1,13 +1,14 @@
+import { compactGlassCard } from '@/constants/card-surface';
+import { FrostedView, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
 import { healthConnectQualificationEnabled } from '@/lib/health-connect/capabilities';
 import { useClerk } from '@clerk/expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
+import { colors, spacing, typography } from '@/constants/caloriebank-theme';
 import { SettingsRow } from '@/components/caloriebank/SettingsRow';
 import { PrivacyPolicyRow } from '@/components/caloriebank/PrivacyPolicyRow';
 import { detachMorningBankUpdateDevice } from '@/lib/notifications/morning-bank-update';
@@ -46,34 +47,39 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Settings</Text>
         <Text style={styles.sectionLabel}>CalorieBank</Text>
-        <View style={styles.group}>
+        <FrostedView style={styles.group}>
           {settingsRows.map((row, index) => (
             <SettingsRow key={row.label} title={row.label} description={row.detail} icon={row.icon}
               onPress={() => router.push(row.href)} separator={index < settingsRows.length - 1} />
           ))}
-        </View>
+        </FrostedView>
 
         {Platform.OS === 'android' && healthConnectQualificationEnabled() ? <SettingsRow title="Health Connect qualification" description="Read-only Android data checks." icon="construct-outline" onPress={() => router.push('/health-diagnostics')} /> : null}
 
         {usesClerk ? <>
           <Text style={styles.sectionLabel}>Account</Text>
-          <View style={styles.group}>
+          <FrostedView style={styles.group}>
             <SettingsRow title={signingOut ? 'Signing out…' : 'Sign Out'} disabled={signingOut} icon="log-out-outline" navigation={false} separator onPress={() => void signOutSafely()} />
             <SettingsRow title="Delete Account" disabled={signingOut} icon="trash-outline" destructive onPress={() => router.push('/delete-account')} />
-          </View>
+          </FrostedView>
           {signOutError ? <Text accessibilityLiveRegion="assertive" style={styles.signOutError}>We couldn’t finish signing you out. Please try again.</Text> : null}
         </> : null}
-        <View style={styles.group}><PrivacyPolicyRow /></View>
+        <FrostedView style={styles.group}><PrivacyPolicyRow /></FrostedView>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
-  container: { gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.xxl },
-  title: { color: colors.text, fontSize: typography.title, fontWeight: '800' },
-  sectionLabel: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '800', marginTop: spacing.sm, textTransform: 'uppercase' },
-  group: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, overflow: 'hidden' },
-  signOutError: { color: colors.danger, fontSize: typography.caption, lineHeight: 18 },
+safeArea: { flex: 1, backgroundColor: 'transparent' },
+container: { gap: 20, padding: 16, paddingTop: 20, paddingBottom: spacing.xxl },
+title: { color: colors.text, fontSize: typography.title, fontWeight: '800' },
+sectionLabel: { color: '#53615D', fontSize: typography.caption, fontWeight: '700', marginTop: 4, marginLeft: 4 },
+group: { ...compactGlassCard, padding: 0, overflow: 'hidden' },
+signOutError: { color: colors.danger, fontSize: typography.caption, lineHeight: 18 },
+section: { gap: 10 },
+introduction: { color: colors.textMuted, fontSize: typography.body, lineHeight: 23, marginTop: -12 },
+accountInfo: { gap: spacing.xs, padding: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+accountLabel: { color: colors.textMuted, fontSize: typography.caption },
+accountEmail: { color: colors.text, fontSize: typography.body, fontWeight: '600', flexShrink: 1 }
 });

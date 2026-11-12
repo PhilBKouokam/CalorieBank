@@ -1,3 +1,4 @@
+import { FrostedView } from '@/components/caloriebank/FrostedSurface';
 import {useEffect,useRef,useState} from 'react';
 import {StyleSheet,TextInput,View} from 'react-native';
 import type {EatingBudgetResponse,TodayResponse} from '@caloriebank/schemas';
@@ -28,13 +29,13 @@ export function EatingPlanPanel({today,budget,pending,allowed,projectionAllowed=
  const comparison=eatingComparison(current,now),total=projected?.status==='ready'?projected.totalCalories:budget?.projectedEstimate?null:current?.budget.status==='ready'?current.budget.totalCalories:null;
  const unavailable=eatingBudgetReason(budget?.projectedEstimate?.status==='unavailable'?budget.projectedEstimate.reason:projected?.status==='non_positive'?'non_positive_projected_budget':budget?.budget.status==='unavailable'?budget.budget.reason:budget?.planningUnavailableReason);
  return <View style={styles.container}>
-  <View style={styles.card}>
+  <FrostedView style={styles.card}>
    <Text accessibilityRole="header" style={styles.title}>Eating budget</Text>
    <Text style={styles.value}>{total===null?'Unavailable':`${total.toLocaleString()} kcal`}</Text>
    <Text style={styles.detail}>{total===null?(pending?'Updating your estimate…':unavailable):'Estimated total intake today'}</Text>
    {total!==null&&!projected?(comparison.kind==='remaining_today'?<View><Text style={styles.label}>Remaining Today</Text><Text style={styles.body}>{comparison.calories<0?`${Math.abs(comparison.calories).toLocaleString()} kcal over this budget`:`${comparison.calories.toLocaleString()} kcal`}</Text></View>:comparison.kind==='estimated_day_difference'?<View><Text style={styles.label}>Compared with your whole-day estimate</Text><Text style={styles.body}>{Math.abs(comparison.calories).toLocaleString()} kcal {comparison.calories<0?'above':'below'} this budget</Text></View>:<Text style={styles.detail}>{comparison.text}</Text>):null}
-  </View>
-  <View style={styles.card}>
+  </FrostedView>
+  <FrostedView style={styles.card}>
    <Text accessibilityRole="header" style={styles.title}>If I eat…</Text>
    <Text style={styles.detail}>Total calories for the day</Text>
    <TextInput accessibilityLabel="Planned total calories today" keyboardType="number-pad" maxLength={6} selectTextOnFocus placeholder="Calories" editable={enabled&&!pending} value={draft.value.calories} {...draft.selection('calories')} onChangeText={calories=>draft.update({calories:calories.replace(/\D/g,'')})} style={styles.input}/>
@@ -43,7 +44,7 @@ export function EatingPlanPanel({today,budget,pending,allowed,projectionAllowed=
     <Text style={styles.value}>{plan.totalSteps.toLocaleString()}</Text>
     <Text style={styles.body}>{plan.additionalSteps===0?'No extra walking in this estimate.':`About ${plan.additionalSteps.toLocaleString()} more walking steps`}</Text>
    </View>:<Text accessibilityLiveRegion="polite" style={styles.detail}>{!enabled?'Eating planning isn’t available yet.':pending?'Updating your estimate…':!canPlan?unavailable:!valid?'Enter a total to explore your walking estimate.':'Your walking plan is unavailable. Try refreshing your estimate.'}</Text>}
-  </View>
+  </FrostedView>
   <Text style={styles.detail}>A hypothetical plan. This does not log food or change your bank.</Text>
  </View>;
 }

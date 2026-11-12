@@ -1,3 +1,5 @@
+import { compactGlassCard } from '@/constants/card-surface';
+import { FrostedView } from '@/components/caloriebank/FrostedSurface';
 import { selectQuietWalkingForecast } from '@/lib/today/quiet-walking-forecast';
 import { prepareStepPlanningSnapshot, traceBurnToStepPlan, calculateStepToBurnPlan, suggestNextStepTarget, walkingTimeFromPace, walkingMidnightFeasibility } from '@caloriebank/domain';
 import type { TodayResponse } from '@caloriebank/schemas';
@@ -80,7 +82,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
   const inverse = snapshot ? traceBurnToStepPlan(snapshot, Number(burn) || 0).plan : null;
   const forward = snapshot ? calculateStepToBurnPlan({ ...snapshot.plannerInput, targetSteps: ordinary ? snapshot.plannerInput.currentSteps + (Number(steps) || 0) : Number(steps) || 0 }) : null;
   return <>
-    <View style={styles.card}>
+    <FrostedView style={styles.card}>
       <Text style={styles.title}>If I want to burn…</Text>
       <View style={styles.inputRow}><TextInput accessibilityLabel="Desired estimated actual calories burned today" keyboardType="number-pad" maxLength={6} selectTextOnFocus
         {...draft.selection('burn')} value={burn} onChangeText={(v) => setBurn(v.replace(/\D/g, ''))} style={inputStyle} />
@@ -94,8 +96,8 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         <DeadlineNotice steps={inverse.remainingSteps} today={today} now={now} pace={pace} />
         <Text style={styles.detail}>{basis}</Text>
       </View> : <Text style={styles.detail}>{ordinaryExpired || coverageExpired || today.restOfDayProjection.coverageStatus === 'uncertain' ? 'Waiting for newer activity data.' : today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
-    </View>
-    <View style={styles.card}>
+    </FrostedView>
+    <FrostedView style={styles.card}>
       <Text style={styles.title}>If I walk…</Text>
       <View style={styles.inputRow}><TextInput accessibilityLabel={ordinaryProjection ? 'Planned extra walking steps beyond usual activity' : 'Target total steps today'} keyboardType="number-pad" maxLength={6} selectTextOnFocus
         {...draft.selection('steps')} value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} style={inputStyle} />
@@ -113,25 +115,25 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         <WalkingTime steps={forward.additionalSteps} pace={pace} />
         <DeadlineNotice steps={forward.additionalSteps} today={today} now={now} pace={pace} />
       </View> : <Text style={styles.detail}>{ordinaryExpired || coverageExpired || today.restOfDayProjection.coverageStatus === 'uncertain' ? 'Waiting for newer activity data.' : today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
-    </View>
+    </FrostedView>
   </>;
 }
 const styles = StyleSheet.create({
-  card: { gap: spacing.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.surface },
-  title: { color: colors.text, fontSize: typography.subheading, fontWeight: '700' },
-  result: { color: colors.primaryDark, fontSize: 26, fontWeight: '800', marginTop: spacing.sm },
-  detail: { color: colors.textMuted, fontSize: typography.body },
-  supporting: { color: colors.text, fontSize: typography.body, fontWeight: '600' },
-  remainingSteps: { color: colors.text, fontSize: 20, fontWeight: '700' },
-  timePlan: { gap: spacing.xs, marginVertical: spacing.sm },
-  time: { color: colors.primaryDark, fontSize: 21, fontWeight: '700' },
-  sessions: { color: colors.text, fontSize: typography.body, fontWeight: '600' },
-  results: { gap: spacing.md },
-  burnGroup: { gap: spacing.sm },
-  burnValue: { color: colors.text, fontSize: 21, fontWeight: '700' },
-  actualBurn: { color: colors.text, fontSize: 21, fontWeight: '800' },
-  actualBurnResult: { color: colors.primaryDark, fontSize: 21, fontWeight: '800' },
-  inputRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
-  unit: { color: colors.text, fontSize: typography.body },
-  input: { width: 132, maxWidth: '100%', minHeight: 48, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.sm, color: colors.text, fontSize: typography.heading, fontWeight: '700' },
+card: { ...compactGlassCard, padding: 18, gap: 16 },
+title: { color: '#B54708', fontSize: typography.subheading, fontWeight: '700' },
+result: { color: '#176E61', fontSize: 28, fontWeight: '800', marginTop: spacing.sm },
+detail: { color: colors.textMuted, fontSize: typography.body, lineHeight: 23 },
+supporting: { color: colors.text, fontSize: typography.body, fontWeight: '600' },
+remainingSteps: { color: colors.text, fontSize: 20, fontWeight: '700' },
+timePlan: { gap: spacing.xs, marginVertical: spacing.sm },
+time: { color: colors.primaryDark, fontSize: 21, fontWeight: '700' },
+sessions: { color: colors.text, fontSize: typography.body, fontWeight: '600' },
+results: { gap: spacing.md },
+burnGroup: { gap: spacing.sm },
+burnValue: { color: colors.text, fontSize: 21, fontWeight: '700' },
+actualBurn: { color: colors.text, fontSize: 21, fontWeight: '800' },
+actualBurnResult: { color: colors.primaryDark, fontSize: 21, fontWeight: '800' },
+inputRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
+unit: { color: colors.text, fontSize: typography.body },
+input: { width: 132, maxWidth: '100%', minHeight: 48, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.sm, color: '#B54708', fontSize: typography.heading, fontWeight: '700' }
 });

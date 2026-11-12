@@ -1,3 +1,5 @@
+import { compactGlassCard } from '@/constants/card-surface';
+import { FrostedView } from '@/components/caloriebank/FrostedSurface';
 import { calculateStepToBurnPlan, suggestNextStepTarget } from '@caloriebank/domain';
 import {useEffect,useRef,useState} from 'react';
 import {fetchEatingPlan,eatingBudgetEnabled} from '../../lib/api/eating-budget';
@@ -39,7 +41,7 @@ export function WalkingEatingCard({today,budget=null,pending,guidanceAllowed=tru
     return()=>{clearTimeout(timer);if(requestGeneration.current===generation)requestGeneration.current=generation+1;};
   },[ready,context,budget,requestedSteps,quiet]);
   const eatingPlan=selectEatingPlan(current,budget,eatingResponse,requestedSteps,now,Boolean(ready)&&eatingBudgetEnabled);
-  return <View style={styles.card}>
+  return <FrostedView style={styles.card}>
     <Text accessibilityRole="header" style={styles.heading}>If I walk…</Text>
     <View style={styles.inputRow}>
       <TextInput accessibilityLabel="Walking plan total steps today" keyboardType="number-pad" maxLength={6} selectTextOnFocus editable={Boolean(current)&&!pending&&guidanceAllowed} placeholder="Steps"
@@ -57,16 +59,23 @@ export function WalkingEatingCard({today,budget=null,pending,guidanceAllowed=tru
     <Pressable accessibilityRole="button" accessibilityHint="Opens your current steps and walking estimates." onPress={onOpenDetails} style={styles.action}>
       <Text style={styles.actionText}>See walking details</Text>
     </Pressable>
-  </View>;
+  </FrostedView>;
 }
 const styles=StyleSheet.create({
- card:{backgroundColor:colors.surface,borderColor:colors.border,borderWidth:1,borderRadius:radii.lg,padding:spacing.lg,gap:spacing.sm},
- heading:{color:colors.text,fontSize:typography.body,fontWeight:'800'},
- inputRow:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:spacing.sm},
- input:{maxWidth:'100%',minHeight:48,padding:spacing.sm,borderWidth:1,borderColor:colors.border,borderRadius:radii.sm,color:colors.text,fontSize:typography.heading,fontWeight:'700'},
- unit:{color:colors.text,fontSize:typography.body,flexShrink:1},
- detail:{color:colors.textMuted,fontSize:typography.caption,lineHeight:20},
- unavailable:{color:colors.textMuted,fontSize:typography.heading,fontWeight:'700'},
- estimate:{gap:spacing.xs},value:{color:colors.primaryDark,fontSize:typography.heading,fontWeight:'800'},
- action:{minHeight:48,justifyContent:'center'},actionText:{color:colors.primaryDark,fontSize:typography.body,fontWeight:'700'},
+card:{...compactGlassCard,padding:18,gap:16},
+heading:{color:'#176E61',fontSize:typography.subheading,fontWeight:'700'},
+inputRow:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:spacing.sm},
+input:{maxWidth:'100%',minHeight:48,padding:spacing.sm,borderWidth:1,borderColor:colors.border,borderRadius:radii.sm,color:'#176E61',fontSize:typography.heading,fontWeight:'700'},
+unit:{color:colors.text,fontSize:typography.body,flexShrink:1},
+detail:{color:colors.textMuted,fontSize:typography.body,lineHeight:23},
+unavailable:{color:colors.textMuted,fontSize:typography.body,fontWeight:'700'},
+estimate:{gap:spacing.xs},
+value:{color:'#176E61',fontSize:28,fontWeight:'800'},
+action:{minHeight:48,justifyContent:'center'},
+actionText:{color:colors.primaryDark,fontSize:typography.body,fontWeight:'700'},
+scenario:{gap:spacing.sm},
+calorieInput:{fontSize:typography.body,paddingHorizontal:spacing.sm},
+targetLink:{minHeight:44,maxWidth:'100%',flexShrink:1,justifyContent:'center'},
+targetLinkText:{color:colors.primaryDark,fontSize:typography.body,fontWeight:'600',textDecorationLine:'underline'},
+answerLabel:{color:colors.text,fontSize:typography.body,fontWeight:'600'}
 });

@@ -1,3 +1,6 @@
+import { TodayActivityCards, canStickTodayActivityHeader } from '@/components/caloriebank/TodayStepsCard';
+import { compactGlassCard } from '@/constants/card-surface';
+import { FrostedView, FrostedPressable, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
 import {fetchEatingBudget,eatingBudgetEnabled} from '@/lib/api/eating-budget';
 import {selectEatingBudget,selectProjectedEatingBudget,eatingBudgetReason} from '@/lib/today/eating-budget-guidance';
 import { walkingPlanVisible } from '@/lib/today/walking-plan-visibility';
@@ -6,8 +9,6 @@ import { WalkingEatingCard } from '@/components/caloriebank/WalkingEatingCard';
 import { usePlanningClock } from '@/lib/today/use-planning-clock';
 import { projectedBurnGuidance } from '@/lib/today/projected-burn-guidance';
 import {
-  formatGoalAdjustmentMagnitude,
-  getGoalModeLabel,
   type EatingBudgetResponse,
   type BankSummaryResponse,
   type GoalConfigurationResponse,
@@ -23,6 +24,7 @@ import { Link, useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Modal,
   Pressable,
   RefreshControl,
@@ -31,7 +33,6 @@ import {
   View,
 } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import {
@@ -71,15 +72,6 @@ function formatDisplayDate(dateString: string | null | undefined) {
     month: 'long',
     day: 'numeric',
   }).format(new Date(year, month - 1, day));
-}
-
-function formatGoalDetail(configuration: GoalConfigurationResponse | null) {
-  if (!configuration) return 'Complete setup to choose your goal.';
-  if (configuration.goalMode === 'maintain') return 'No daily adjustment';
-
-  const adjustment = formatGoalAdjustmentMagnitude(configuration);
-  const direction = configuration.goalMode === 'cut' ? 'daily deficit' : 'daily surplus';
-  return `${adjustment} ${direction}`;
 }
 
 function latestResultLabel(summary: BankSummaryResponse | null) {
@@ -129,10 +121,21 @@ function latestSyncTime(today: TodayResponse | null) {
 export default function TodayScreen() {
   const { fontScale } = useWindowDimensions();
   const router = useRouter();
+  const [activityHeaderHeight, setActivityHeaderHeight] = useState(0);
+  const [scrollViewportHeight, setScrollViewportHeight] = useState(0);
+  const [keyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    // iOS begins moving the keyboard before didShow; unpin early for focus scrolling.
+    const willShow = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+    return () => { show.remove(); hide.remove(); willShow.remove(); };
+  }, []);
+  const pinActivityHeader = canStickTodayActivityHeader(activityHeaderHeight, scrollViewportHeight, keyboardVisible);
   const [bankSummary, setBankSummary] = useState<BankSummaryResponse | null>(null);
   const [bankStatus, setBankStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading');
-  const [goalConfiguration, setGoalConfiguration] = useState<GoalConfigurationResponse | null>(null);
-  const [configurationStatus, setConfigurationStatus] =
+  const [, setGoalConfiguration] = useState<GoalConfigurationResponse | null>(null);
+  const [, setConfigurationStatus] =
     useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
   const [storedToday, setToday] = useState<TodayResponse | null>(null);
   const [storedTodayStatus, setTodayStatus] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
@@ -331,14 +334,6 @@ export default function TodayScreen() {
         : bankStatus === 'error'
           ? 'Unavailable'
           : 'No completed day yet';
-  const currentGoalValue =
-    configurationStatus === 'loading'
-      ? 'Loading...'
-      : goalConfiguration
-        ? getGoalModeLabel(goalConfiguration.goalMode)
-        : configurationStatus === 'error'
-          ? 'Unavailable'
-          : 'Not set';
   const burnedValue =
     todayStatus === 'loading'
       ? 'Loading...'
@@ -390,6 +385,8 @@ export default function TodayScreen() {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardSafeScrollView
         contentContainerStyle={styles.container}
+        stickyHeaderIndices={pinActivityHeader ? [0] : []}
+        onLayout={event => setScrollViewportHeight(event.nativeEvent.layout.height)}
         refreshControl={
           <RefreshControl
             refreshing={refreshingHealth}
@@ -398,14 +395,23 @@ export default function TodayScreen() {
           />
         }
       >
-        <View style={styles.header}>
-          <View style={styles.mark}>
-            <Text allowFontScaling={false} style={styles.markText}>CB</Text>
-          </View>
-          <Text style={styles.wordmark}>CalorieBank</Text>
+        <View
+          testID="today-sticky-activity-header"
+          collapsable={false}
+          onLayout={event => setActivityHeaderHeight(event.nativeEvent.layout.height)}
+          style={styles.activityHeader}
+        >
+        <TodayActivityCards
+          today={today}
+          now={guidanceNow}
+          restingAllowed={projectedBurnAllowed}
+          walkingAllowed={projectedBurnAllowed && providerSelection?.activityContext?.status === 'ready'}
+          pending={todayStatus === 'loading' || refreshingHealth}
+          refreshFailed={storedTodayStatus === 'error'}
+        />
         </View>
 
-          <Pressable
+          <FrostedPressable
             onPress={() => router.push('/history')}
             accessibilityHint="Opens Bank History."
             accessibilityLabel={`Available Bank, ${bankValue}, ${throughText}${visibleCards.showLatestFinalizedContribution ? `, ${latestChangeValue}` : ''}${bankSummary?.recoveryCalories ? `, Recovery, ${bankSummary.recoveryCalories} calories to recover` : ''}`}
@@ -433,9 +439,9 @@ export default function TodayScreen() {
           </View>
         ) : null}
 
-          </Pressable>
+          </FrostedPressable>
 
-        {visibleCards.showTodaySoFar ? <Pressable
+        {visibleCards.showTodaySoFar ? <FrostedPressable
           accessibilityHint="Opens today's burn details."
           accessibilityLabel={`Today so far. Burned ${burnedValue}. Eaten ${eatenValue}. Projected burn ${projectedBurn===null?'unavailable':`${projectedBurn.toLocaleString()} kilocalories estimated total today`}. Eating budget ${dailyBudget===null?'unavailable':`${dailyBudget.toLocaleString()} kilocalories estimated total today`}.`}
           accessibilityRole="button"
@@ -533,31 +539,14 @@ export default function TodayScreen() {
               {!firstRunCheckPending && healthSyncDetail ? <Text style={styles.supportingText}>{healthSyncDetail}</Text> : null}
             </>
           )}
-        </Pressable> : null}
+        </FrostedPressable> : null}
 
         {showWalkingPlan ? <WalkingEatingCard budget={currentBudget} today={today} pending={todayStatus==='loading'||refreshingHealth||firstRunCheckPending} guidanceAllowed={walkingGuidanceAllowed} onOpenDetails={()=>router.push('/steps-detail')} /> : null}
 
-        {visibleCards.showCurrentGoal ?
-          <Pressable
-            onPress={() => router.push('/goal-settings')}
-            accessibilityHint="Opens Fitness Goal."
-            accessibilityLabel={`Fitness Goal, ${currentGoalValue}`}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressedCard]}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>Fitness Goal</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-            </View>
-            <Text adjustsFontSizeToFit numberOfLines={1} style={styles.secondaryValue}>
-              {currentGoalValue}
-            </Text>
-            <Text style={styles.supportingText}>{formatGoalDetail(goalConfiguration)}</Text>
-          </Pressable>
-        : null}
+
 
         {visibleCards.showWorkouts ? (
-          <View style={styles.secondaryCard}>
+          <FrostedView style={styles.secondaryCard}>
             <Text style={styles.cardLabel}>Logged workouts</Text>
             {todayStatus === 'loading' ? (
               <View style={styles.inlineState}>
@@ -598,7 +587,7 @@ export default function TodayScreen() {
             ) : (
               <Text style={styles.supportingText}>No workouts logged today</Text>
             )}
-          </View>
+          </FrostedView>
         ) : null}
 
       </KeyboardSafeScrollView>
@@ -647,25 +636,26 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
-  container: {
+container: {
     flexGrow: 1,
-    gap: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: spacing.xxl,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
-  header: {
+header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     marginBottom: spacing.xs,
   },
-  mark: {
+mark: {
+    flexShrink: 0,
     width: 34,
     height: 34,
     alignItems: 'center',
@@ -673,57 +663,42 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     backgroundColor: colors.primary,
   },
-  markText: {
+markText: {
     color: colors.surface,
     fontSize: typography.caption,
     fontWeight: '800',
   },
-  wordmark: {
+wordmark: {
+    flex: 1,
+    minWidth: 0,
     color: colors.text,
     fontSize: typography.subheading,
     fontWeight: '800',
   },
-  heroCard: {
-    minHeight: 210,
-    justifyContent: 'center',
-    gap: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.lg,
-    backgroundColor: colors.surface,
-    padding: spacing.xl,
-  },
-  secondaryCard: {
-    minHeight: 132,
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.lg,
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-  },
-  recoverySurface: {
+heroCard: { ...compactGlassCard, backgroundColor: '#EDF6F1', borderColor: '#DCEBE3', padding: 18, gap: 8 },
+secondaryCard: { ...compactGlassCard, padding: 18, gap: 16 },
+recoverySurface: {
     gap: spacing.xs,
     borderLeftWidth: 3,
     borderLeftColor: colors.primary,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
-  recoveryLabel: {
+recoveryLabel: {
     color: colors.textMuted,
     fontSize: typography.body,
     fontWeight: '700',
   },
-  recoveryValue: {
+recoveryValue: {
     color: colors.text,
     fontSize: typography.heading,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  pressedCard: {
+pressedCard: {
     opacity: 0.76,
   },
-  retryButton: {
+retryButton: {
     minHeight: 44,
     alignSelf: 'flex-start',
     justifyContent: 'center',
@@ -731,83 +706,83 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
     paddingHorizontal: spacing.md,
   },
-  retryButtonText: {
+retryButtonText: {
     color: colors.primaryDark,
     fontSize: typography.body,
     fontWeight: '700',
   },
-  cardHeader: {
+cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
   },
-  cardLabel: {
+cardLabel: {
     color: colors.textMuted,
     fontSize: typography.body,
     fontWeight: '700',
   },
-  bankValue: {
-    color: colors.text,
-    fontSize: 44,
+bankValue: {
+    color: '#17483C',
+    fontSize: 34,
     fontWeight: '900',
     fontVariant: ['tabular-nums'],
     flexShrink: 1,
   },
-  bankAmountRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: spacing.xs },
-  bankUnit: { color: colors.text, fontSize: typography.subheading, fontWeight: '700' },
-  secondaryValue: {
+bankAmountRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: spacing.xs },
+bankUnit: { color: '#246B5B', fontSize: typography.subheading, fontWeight: '700' },
+secondaryValue: {
     color: colors.text,
     fontSize: 30,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  contributionValue: {
+contributionValue: {
     color: colors.primaryDark,
     fontSize: 28,
   },
-  supportingText: {
+supportingText: {
     color: colors.textMuted,
-    fontSize: typography.body,
-    lineHeight: 23,
+    fontSize: typography.caption,
+    lineHeight: 18,
   },
-  stepEstimates: {
+stepEstimates: {
     gap: spacing.md,
   },
-  stepEstimateGroup: {
+stepEstimateGroup: {
     gap: spacing.xs,
   },
-  stepEstimateLabel: {
+stepEstimateLabel: {
     color: colors.textMuted,
     fontSize: typography.caption,
     fontWeight: '700',
   },
-  stepEstimateValue: {
+stepEstimateValue: {
     color: colors.text,
     fontSize: typography.body,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  plannedTreatCard: {
+plannedTreatCard: {
     minHeight: 164,
   },
-  inlineState: {
+inlineState: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  treatTitleRow: {
+treatTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  treatName: {
+treatName: {
     flex: 1,
     color: colors.text,
     fontSize: typography.heading,
     fontWeight: '800',
   },
-  readyBadge: {
+readyBadge: {
     overflow: 'hidden',
     borderRadius: radii.sm,
     backgroundColor: colors.surfaceMuted,
@@ -817,55 +792,56 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
-  progressTrack: {
+progressTrack: {
     height: 10,
     overflow: 'hidden',
     borderRadius: 999,
     backgroundColor: colors.border,
   },
-  progressFill: {
+progressFill: {
     height: '100%',
     borderRadius: 999,
     backgroundColor: colors.primary,
   },
-  todayMetrics: {
+todayMetrics: {
     flexDirection: 'row',
     gap: spacing.md,
   },
-  todayMetric: {
+todayMetric: {
     flex: 1,
     minWidth: 0,
     gap: spacing.xs,
   },
-  metricLabel: {
+metricLabel: {
     color: colors.textMuted,
     fontSize: typography.caption,
     fontWeight: '800',
   },
-  metricValue: {
+metricValue: {
     color: colors.text,
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
-  metricDetail: {
+metricDetail: {
     color: colors.textMuted,
     fontSize: typography.caption,
     lineHeight: 18,
   },
-  burnDetailRow: { alignItems: 'flex-start', gap: spacing.xs },
-  burnDetail: { flexShrink: 1 },
-  metricHeader: { minHeight: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  editEstimateButton: { width: 44, height: 44, marginVertical: -10, marginRight: -10, justifyContent: 'center', alignItems: 'center' },
-  whyButton: { minHeight: 44, justifyContent: 'center' },
-  whyButtonText: { color: colors.primaryDark, fontSize: typography.caption, fontWeight: '700' },
-  modalBackdrop: {
+burnDetailRow: { alignItems: 'flex-start', gap: spacing.xs },
+burnDetail: { flexShrink: 1 },
+metricHeader: { minHeight: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+editEstimateButton: { width: 44, height: 44, marginVertical: -10, marginRight: -10, justifyContent: 'center', alignItems: 'center' },
+whyButton: { width: 44, minHeight: 44, marginVertical: -10, alignItems: 'flex-end', justifyContent: 'center' },
+whyButtonText: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '700' },
+modalBackdrop: {
     flex: 1,
     justifyContent: 'center',
     backgroundColor: 'rgba(18, 24, 22, 0.42)',
     padding: spacing.lg,
   },
-  whyModal: {
+whyModal: {
+    maxHeight: '90%',
     maxWidth: 440,
     width: '100%',
     alignSelf: 'center',
@@ -874,30 +850,54 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: spacing.lg,
   },
-  modalHeader: {
+modalHeader: {
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
   },
-  modalTitle: { flex: 1, color: colors.text, fontSize: typography.heading, fontWeight: '800' },
-  modalClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  modalCopy: { color: colors.text, fontSize: typography.body, lineHeight: 24 },
-  workoutRow: {
+modalTitle: { flex: 1, color: colors.text, fontSize: typography.heading, fontWeight: '800' },
+modalClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+modalCopy: { color: colors.text, fontSize: typography.body, lineHeight: 24 },
+workoutRow: {
     gap: spacing.xs,
     paddingVertical: spacing.xs,
   },
-  workoutName: {
+workoutName: {
     color: colors.text,
     fontSize: typography.body,
     fontWeight: '700',
   },
-  inlineLink: {
+inlineLink: {
     minHeight: 44,
     color: colors.primaryDark,
     fontSize: typography.body,
     fontWeight: '700',
     paddingVertical: spacing.sm,
   },
+activityHeader: {
+    // The pills own their material. Keep the shared canvas visible between them.
+    backgroundColor: 'transparent',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginHorizontal: -16,
+    marginTop: -8,
+    marginBottom: -8,
+  },
+settingsButton: {
+    width: 44,
+    height: 44,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+forecastSurface: { backgroundColor: '#F3F4F8', borderRadius: 16, padding: 14, gap: 12 },
+forecastEyebrow: { color: '#616979', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+forecastValue: { fontSize: 21, fontWeight: '700', fontVariant: ['tabular-nums'] }
 });

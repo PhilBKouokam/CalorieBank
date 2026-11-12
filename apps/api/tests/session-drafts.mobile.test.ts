@@ -6,8 +6,8 @@ import type { IntakeAdjustmentState, ManualIntakeState } from '@caloriebank/sche
 import { setDraftSession, terminateDraftSession, openDraft, draftSessionGeneration, ownsDraft } from '../../mobile/lib/drafts/session-drafts';
 
 const api = vi.hoisted(() => ({ save: vi.fn(), manual: vi.fn(), goal: vi.fn(), saveGoal: vi.fn(), target: vi.fn(), saveTarget: vi.fn(), treat: vi.fn(), saveTreat: vi.fn() }));
-vi.mock('react-native', () => ({ Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', View: 'View', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
-  StyleSheet: { create: <T,>(s: T) => s }, useWindowDimensions: () => ({ fontScale: 2, width: 390, height: 800, scale: 2 }) }));
+vi.mock('react-native', () => ({ Platform: { OS: 'android' }, Keyboard: { isVisible: () => false, addListener: () => ({remove: () => {}}) },  Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', View: 'View', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
+  StyleSheet: { flatten: (value: unknown) => Object.assign({}, ...[value].flat(Infinity).filter(Boolean)), create: <T,>(s: T) => s }, useWindowDimensions: () => ({ fontScale: 2, width: 390, height: 800, scale: 2 }) }));
 vi.mock('../../mobile/lib/today/use-planning-clock', () => ({ usePlanningClock: () => ({ now: new Date('2026-10-15T12:00:00Z'), expired: false }) }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn() }), useNavigationContainerRef: () => ({}) }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'View' }));

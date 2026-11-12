@@ -11,8 +11,8 @@ vi.mock('../../mobile/lib/api/eating-budget',()=>({get eatingBudgetEnabled(){ret
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }), useFocusEffect: (effect: () => void) => React.useEffect(effect, [effect]), Link: 'Link' }));
 vi.mock('../../mobile/components/caloriebank/KeyboardSafeScrollView',()=>({KeyboardSafeScrollView:(props:object)=>React.createElement('ScrollView',props)}));
 vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
-vi.mock('react-native', () => ({ Text: 'Text', View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', TextInput:'TextInput',AppState:{addEventListener:()=>({remove:()=>{}})}, RefreshControl: 'RefreshControl', ActivityIndicator: 'ActivityIndicator',
-  Modal: () => null, useWindowDimensions: () => ({ fontScale: 1 }), StyleSheet: { create: <T,>(value: T) => value } }));
+vi.mock('react-native', () => ({ Platform: { OS: 'android' }, Keyboard: { isVisible: () => false, addListener: () => ({remove: () => {}}) },  Text: 'Text', View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', TextInput:'TextInput',AppState:{addEventListener:()=>({remove:()=>{}})}, RefreshControl: 'RefreshControl', ActivityIndicator: 'ActivityIndicator',
+  Modal: () => null, useWindowDimensions: () => ({ fontScale: 1 }), StyleSheet: { flatten: (value: unknown) => Object.assign({}, ...[value].flat(Infinity).filter(Boolean)), create: <T,>(value: T) => value } }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('../../mobile/lib/lifecycle/account-lifecycle', () => ({
   isAccountLifecycleRunning: () => h.running,
