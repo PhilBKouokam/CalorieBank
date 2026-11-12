@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
 import { UPDATE_REQUIRED_MESSAGE } from '@caloriebank/schemas';
 import { isUpdateRequired, subscribeToProtocolState } from '@/lib/api/protocol-state';
 import { colors, spacing, typography } from '@/constants/caloriebank-theme';

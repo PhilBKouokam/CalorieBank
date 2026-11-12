@@ -1,0 +1,20 @@
+import React from 'react';
+import { resolve } from 'node:path';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+const state=vi.hoisted(()=>({os:'ios',query:vi.fn(),subscribe:vi.fn(),remove:vi.fn(),listener:null as null|((value:boolean)=>void)}));
+vi.mock('react-native',()=>({View:'View',Pressable:'Pressable',Platform:{get OS(){return state.os;}},AccessibilityInfo:{isReduceTransparencyEnabled:()=>state.query(),addEventListener:(_event:string,listener:(v:boolean)=>void)=>{state.subscribe();state.listener=listener;return {remove:state.remove};}},StyleSheet:{absoluteFillObject:{position:'absolute'},flatten:(style:unknown):Record<string,unknown>=>Array.isArray(style)?Object.assign({},...style.map(s=>s&&typeof s==='object'?s:{})):style&&typeof style==='object'?style as Record<string,unknown>:{}}}));
+vi.mock('react-native-safe-area-context',()=>({SafeAreaView:'SafeAreaView'}));
+let FrostedScreen:React.ComponentType<Record<string,unknown>>,FrostedView:React.ComponentType<Record<string,unknown>>,FrostedPressable:React.ComponentType<Record<string,unknown>>;
+beforeAll(async()=>{({FrostedScreen,FrostedView,FrostedPressable}=await import(resolve(__dirname,'../../mobile/components/caloriebank/FrostedSurface.tsx')));});
+let tree:ReactTestRenderer;
+beforeEach(()=>{state.os='ios';state.query=vi.fn(()=>new Promise(()=>{}));state.subscribe.mockReset();state.remove.mockReset();});
+afterEach(()=>{if(tree)act(()=>tree.unmount());});
+async function render(){await act(async()=>{tree=create(React.createElement(FrostedScreen,{},React.createElement(FrostedView,{testID:'card',style:{borderRadius:22,padding:18,backgroundColor:'#EDF6F1'}},'Content')));});}
+const surface=()=>tree.root.findByProps({testID:'card'}).find(node=>String(node.type)==='View').props.style.at(-1);
+it('keeps loading and rejected preference opaque',async()=>{await render();expect(surface().backgroundColor).toBe('#EDF6F1');await act(async()=>tree.unmount());state.query.mockRejectedValue(Error('Unavailable'));await render();expect(surface().backgroundColor).toBe('#EDF6F1');});
+it('subscribes once per screen, applies events and removes subscription',async()=>{state.query.mockResolvedValue(false);await render();expect(surface().backgroundColor).toBe('rgba(237,246,241,0.84)');expect(state.subscribe).toHaveBeenCalledTimes(1);act(()=>state.listener?.(true));expect(surface().backgroundColor).toBe('#EDF6F1');expect(surface().shadowOpacity).toBe(0);act(()=>tree.unmount());expect(state.remove).toHaveBeenCalledTimes(1);});
+it('does not let pending query overwrite newer preference event',async()=>{let resolve!:(v:boolean)=>void;state.query.mockImplementation(()=>new Promise(r=>{resolve=r;}));await render();act(()=>state.listener?.(true));await act(async()=>resolve(false));expect(surface().backgroundColor).toBe('#EDF6F1');});
+it('subscription throw fails opaque',async()=>{state.subscribe.mockImplementationOnce(()=>{throw Error('Missing native API');});await render();expect(surface().backgroundColor).toBe('#EDF6F1');});
+it('keeps pressable events, disabled state, children and layout',async()=>{const press=vi.fn();await act(async()=>{tree=create(React.createElement(FrostedPressable,{testID:'press',disabled:true,onPress:press,style:{padding:19,borderRadius:22}},'Keep me'));});const p=tree.root.find(node=>String(node.type)==='Pressable');expect(p.props.disabled).toBe(true);expect(p.props.onPress).toBe(press);expect(p.props.children).toBe('Keep me');expect(p.props.style({pressed:false})[0].padding).toBe(19);});
+it('web reduced preference explicitly disables blur',async()=>{state.os='web';vi.stubGlobal('window',{matchMedia:()=>({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()})});await render();expect(surface().backdropFilter).toBe('none');expect(surface().backgroundColor).toBe('#EDF6F1');vi.unstubAllGlobals();});

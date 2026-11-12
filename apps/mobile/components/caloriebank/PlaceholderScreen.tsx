@@ -1,9 +1,9 @@
+import { FrostedView, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
 import { KeyboardSafeScrollView } from './KeyboardSafeScrollView';
 import { Link, type Href } from 'expo-router';
 import { type ReactNode, type RefObject } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 
@@ -37,6 +37,8 @@ type PlaceholderScreenProps = {
   children?: ReactNode;
   links?: RouteLink[];
   keyboardAware?: boolean;
+  showBrand?: boolean;
+  bareContent?: boolean;
   scrollViewRef?: RefObject<ScrollView | null>;
 };
 
@@ -48,40 +50,42 @@ export function PlaceholderScreen({
   children,
   links = [],
   keyboardAware = false,
+  showBrand = true,
+  bareContent = false,
   scrollViewRef,
 }: PlaceholderScreenProps) {
   const ContentScrollView = keyboardAware ? KeyboardSafeScrollView : ScrollView;
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, bareContent && { backgroundColor: 'transparent' }]}>
       <ContentScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, bareContent && { backgroundColor: 'transparent', padding: 16, gap: 20 }]}
         ref={scrollViewRef}
       >
-        <View style={styles.brandRow}>
+        {showBrand ? <View style={styles.brandRow}>
           <View style={styles.mark}>
             <Text style={styles.markText}>CB</Text>
           </View>
           <Text style={styles.brand}>CalorieBank</Text>
-        </View>
+        </View> : null}
 
         <View style={styles.header}>
-          <Text style={styles.eyebrow}>{eyebrow}</Text>
+          {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.description}>{description}</Text>
+          {description ? <Text style={styles.description}>{description}</Text> : null}
         </View>
 
         {metrics.length > 0 ? (
           <View style={styles.metricsGrid}>
             {metrics.map((metric) => (
-              <View key={metric.label} style={styles.metricCard}>
+              <FrostedView key={metric.label} style={styles.metricCard}>
                 <Text style={styles.metricLabel}>{metric.label}</Text>
                 <Text style={styles.metricValue}>{metric.value}</Text>
-              </View>
+              </FrostedView>
             ))}
           </View>
         ) : null}
 
-        {children ? <View style={styles.panel}>{children}</View> : null}
+        {children ? (bareContent ? <View style={styles.barePanel}>{children}</View> : <FrostedView style={styles.panel}>{children}</FrostedView>) : null}
 
         {links.length > 0 ? (
           <View style={styles.actions}>
@@ -104,14 +108,14 @@ export function PlaceholderScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
   container: {
     flexGrow: 1,
-    gap: spacing.lg,
-    padding: spacing.lg,
-    paddingTop: spacing.xl,
-    backgroundColor: colors.background,
+    gap: 20,
+    padding: 16,
+    paddingTop: 20,
+    backgroundColor: 'transparent',
   },
   brandRow: {
     flexDirection: 'row',
@@ -179,13 +183,14 @@ const styles = StyleSheet.create({
     fontSize: typography.heading,
     fontWeight: '800',
   },
+  barePanel: { gap: 20 },
   panel: {
-    gap: spacing.sm,
+    gap: 12,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
+    borderColor: '#E4EBE8',
+    borderRadius: 22,
     backgroundColor: colors.surface,
-    padding: spacing.md,
+    padding: 18,
   },
   actions: {
     gap: spacing.sm,

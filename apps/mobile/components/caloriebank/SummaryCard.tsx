@@ -1,7 +1,8 @@
+import { FrostedView, FrostedPressable } from '@/components/caloriebank/FrostedSurface';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
@@ -33,11 +34,11 @@ export function SummaryCard(props: SummaryCardProps) {
   const cardContent = <CardContent {...props} interactive={Boolean(props.href)} />;
 
   if (!props.href) {
-    return <View style={styles.card}>{cardContent}</View>;
+    return <FrostedView style={styles.card}>{cardContent}</FrostedView>;
   }
 
   return (
-      <Pressable
+      <FrostedPressable
         onPress={() => props.href && router.push(props.href)}
         accessibilityHint={props.accessibilityHint}
         accessibilityLabel={props.accessibilityLabel}
@@ -45,7 +46,7 @@ export function SummaryCard(props: SummaryCardProps) {
         style={({ pressed }) => [styles.card, styles.interactiveCard, pressed && styles.pressedCard]}
       >
         {cardContent}
-      </Pressable>
+      </FrostedPressable>
   );
 }
 

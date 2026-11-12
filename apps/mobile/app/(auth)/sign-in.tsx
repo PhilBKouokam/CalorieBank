@@ -1,14 +1,15 @@
+import { FrostedView, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
 import { hostedAuthRedirectForPlatform } from '@/lib/auth/platform-redirect';
 import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import Constants from 'expo-constants';
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
+import { compactGlassCard } from '@/constants/card-surface';
+import { colors, spacing, typography } from '@/constants/caloriebank-theme';
 import {
   hostedAuthErrorMetadata,
   hostedAuthResultMetadata,
@@ -89,30 +90,37 @@ export default function SignInScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.eyebrow}>CALORIEBANK</Text>
-        <Text style={styles.title}>{Platform.OS === 'android' ? 'Your calorie bank is waiting.' : 'Your calorie bank, private to you'}</Text>
-        <Text style={styles.detail}>{Platform.OS === 'android' ? 'Sign in to see your bank and keep planning your day.' : 'Sign in to access your bank and connected health services.'}</Text>
-        {message ? <Text style={styles.error}>{message}</Text> : null}
-        <Pressable accessibilityRole="button" accessibilityLabel="Sign in" accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => void authenticate('sign-in')} style={styles.primary}>
-          {busy ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>Sign in</Text>}
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Create account" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void authenticate('sign-up')} style={styles.secondary}>
-          <Text style={styles.secondaryText}>Create account</Text>
-        </Pressable>
+        <View style={styles.introduction}>
+          <Text style={styles.eyebrow}>CalorieBank</Text>
+          <Text style={styles.title}>{Platform.OS === 'android' ? 'Your calorie bank is waiting.' : 'Your calorie bank, private to you'}</Text>
+          <Text style={styles.detail}>{Platform.OS === 'android' ? 'Sign in to see your bank and keep planning your day.' : 'Sign in to access your bank and connected health services.'}</Text>
+        </View>
+        <FrostedView style={styles.actions}>
+          {message ? <Text accessibilityLiveRegion="polite" style={styles.error}>{message}</Text> : null}
+          <Pressable accessibilityRole="button" accessibilityLabel="Sign in" accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => void authenticate('sign-in')} style={({ pressed }) => [styles.primary, pressed && styles.pressed, busy && styles.disabled]}>
+            {busy ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>Sign in</Text>}
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Create account" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void authenticate('sign-up')} style={({ pressed }) => [styles.secondary, pressed && styles.pressed, busy && styles.disabled]}>
+            <Text style={styles.secondaryText}>Create account</Text>
+          </Pressable>
+        </FrostedView>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
-  container: { flexGrow: 1, justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
-  eyebrow: { color: colors.primary, fontSize: 13, fontWeight: '800' },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
+  container: { flexGrow: 1, justifyContent: 'center', gap: 28, padding: 20 },
+  introduction: { gap: 16 },
+  actions: { ...compactGlassCard, padding: 18, gap: 12 },
+  eyebrow: { color: '#176E61', fontSize: 16, fontWeight: '700' },
   title: { color: colors.text, fontSize: typography.heading, fontWeight: '800' },
-  detail: { color: colors.textMuted, fontSize: typography.body, lineHeight: 24, marginBottom: spacing.md },
-  error: { color: colors.text, fontSize: typography.body },
-  primary: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radii.sm, minHeight: 52, justifyContent: 'center', padding: spacing.md },
+  detail: { color: colors.textMuted, fontSize: typography.body, lineHeight: 24 },
+  error: { color: '#A52C26', fontSize: typography.body, lineHeight: 24 },
+  primary: { alignItems: 'center', backgroundColor: '#176E61', borderRadius: 14, minHeight: 52, justifyContent: 'center', padding: spacing.md },
   primaryText: { color: colors.surface, fontSize: typography.body, fontWeight: '700' },
-  secondary: { alignItems: 'center', borderColor: colors.border, borderRadius: radii.sm, borderWidth: 1, minHeight: 52, justifyContent: 'center', padding: spacing.md },
+  pressed: { opacity: 0.72 }, disabled: { opacity: 0.65 },
+  secondary: { backgroundColor: '#EDF6F1', alignItems: 'center', borderColor: colors.border, borderRadius: 14, borderWidth: 1, minHeight: 52, justifyContent: 'center', padding: spacing.md },
   secondaryText: { color: colors.text, fontSize: typography.body, fontWeight: '700' },
 });

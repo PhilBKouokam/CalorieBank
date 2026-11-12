@@ -17,6 +17,12 @@ type SettingsRowProps = {
 
 export function SettingsRow({ title, description, icon, onPress, destructive = false, navigation = true, separator = false, disabled = false }: SettingsRowProps) {
   const tint = destructive ? colors.danger : colors.text;
+  const accent = destructive ? colors.danger : icon === 'heart-outline' ? '#9C3D66'
+    : icon === 'notifications-outline' ? '#8A5A12'
+    : icon === 'options-outline' || icon === 'log-out-outline' ? '#245BA6' : '#176E61';
+  const iconSurface = destructive ? '#FCEDEA' : icon === 'heart-outline' ? '#F9EDF3'
+    : icon === 'notifications-outline' ? '#FBF2DF'
+    : icon === 'options-outline' || icon === 'log-out-outline' ? '#EAF1FB' : '#E8F3EE';
   return (
     <Pressable
       accessibilityRole="button"
@@ -27,8 +33,8 @@ export function SettingsRow({ title, description, icon, onPress, destructive = f
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.icon}>
-        <Ionicons name={icon} size={23} color={destructive ? colors.danger : colors.primaryDark} />
+      <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.icon, { backgroundColor: iconSurface }]}>
+        <Ionicons name={icon} size={23} color={accent} />
       </View>
       <View style={styles.content}>
         <Text style={[styles.title, { color: tint }]}>{title}</Text>
@@ -43,12 +49,12 @@ export function SettingsRow({ title, description, icon, onPress, destructive = f
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, minHeight: 60 },
-  icon: { width: 28, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 18, minHeight: 72 },
+  icon: { width: 38, height: 38, borderRadius: 12, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
   content: { flex: 1, minWidth: 0, gap: spacing.xs },
   title: { fontSize: typography.body, fontWeight: '700', flexShrink: 1 },
   description: { color: colors.textMuted, fontSize: typography.caption, lineHeight: 19, flexShrink: 1 },
   chevron: { width: 20, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
-  separator: { position: 'absolute', left: spacing.md + 28 + spacing.sm, right: 0, bottom: 0, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  separator: { position: 'absolute', left: 16 + 38 + 12, right: 0, bottom: 0, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   pressed: { backgroundColor: colors.surfaceMuted },
 });

@@ -1,12 +1,13 @@
+import { FrostedView, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
+import { compactGlassCard } from '@/constants/card-surface';
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { StepPlanningCards } from '@/components/caloriebank/StepPlanningCards';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
+import { colors, spacing, typography } from '@/constants/caloriebank-theme';
 import { usePlanningClock } from '@/lib/today/use-planning-clock';
 import { useTodayReadModel } from '@/lib/today/use-today-read-model';
 import { getConsumerSourceName, intakeAdjustmentDescription } from '@/lib/providers/presentation';
@@ -26,9 +27,9 @@ export default function TodayBurnDetailScreen() {
         {failed ? <Text style={styles.unavailable}>Today’s values could not load.</Text> : null}
         {today ? (
           <>
-            <View style={styles.card}>
+            <FrostedView style={styles.card}>
               <View style={styles.metricBlock}>
-                <Text style={styles.metricLabel}>Burned</Text>
+                <Text style={[styles.metricLabel, {color:'#B54708'}]}>Burned</Text>
                 <Text style={styles.metricValue}>
                   {today.burned.adjusted === null ? 'Unavailable' : `${today.burned.adjusted.toLocaleString()} kcal`}
                 </Text>
@@ -39,7 +40,7 @@ export default function TodayBurnDetailScreen() {
                 </Text>
               </View>
               <View style={styles.metricBlock}>
-                <View style={styles.metricHeader}><Text style={styles.metricLabel}>Eaten</Text>
+                <View style={styles.metricHeader}><Text style={[styles.metricLabel, {color:'#245BA6'}]}>Eaten</Text>
                   <Pressable accessibilityRole="button" accessibilityLabel={`Edit calories eaten, ${today.eaten.calories ?? 0} kilocalories`}
                     onPress={() => router.push('/edit-calories')} style={styles.editButton}>
                     <Ionicons name="pencil-outline" size={20} color={colors.primary} />
@@ -52,9 +53,9 @@ export default function TodayBurnDetailScreen() {
 
               </View>
               <View style={styles.metricBlock}><Text style={styles.metricLabel}>Steps</Text><Text style={styles.metricValue}>{today.steps.count?.toLocaleString() ?? 'Unavailable'}</Text></View>
-            </View>
+            </FrostedView>
             <Text style={styles.sectionTitle}>If you rested for the rest of today</Text>
-            <View style={styles.card}>
+            <FrostedView style={styles.card}>
               {!expired && today.restOfDayProjection.status === 'ready' &&
               today.restOfDayProjection.projectedProviderBurnCalories !== null &&
               today.restOfDayProjection.projectedAdjustedBurnCalories !== null &&
@@ -78,13 +79,13 @@ export default function TodayBurnDetailScreen() {
                       : 'Estimate will appear as your watch collects more data.'}
                 </Text>
               )}
-            </View>
+            </FrostedView>
 
             <StepPlanningCards today={today} />
 
             {today.restOfDayProjection.providerKcalPerHour !== null &&
             today.restOfDayProjection.adjustedKcalPerHour !== null ? (
-              <View style={styles.card}>
+              <FrostedView style={styles.card}>
                 <Text style={styles.cardTitle}>At rest, you burn</Text>
                 <MetricRow
                   label={`${burnSource} reported`}
@@ -94,7 +95,7 @@ export default function TodayBurnDetailScreen() {
                   label="Estimated actual"
                   value={`${Math.round(today.restOfDayProjection.providerKcalPerHour).toLocaleString()} × ${today.burned.adjustmentFactor} = ~${Math.round(today.restOfDayProjection.adjustedKcalPerHour).toLocaleString()} kcal/hour`}
                 />
-              </View>
+              </FrostedView>
             ) : null}
           </>
         ) : null}
@@ -113,11 +114,12 @@ function MetricRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.xxl },
   title: { color: colors.text, fontSize: typography.heading, fontWeight: '800' },
   sectionTitle: { color: colors.text, fontSize: typography.subheading, fontWeight: '800', marginTop: spacing.sm },
-  card: { gap: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface, padding: spacing.lg },
+  card: {
+    ...compactGlassCard, gap: spacing.md },
   cardTitle: { color: colors.text, fontSize: typography.subheading, fontWeight: '800' },
   metricHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 28 },
   editButton: { width: 44, height: 44, marginVertical: -8, alignItems: 'center', justifyContent: 'center' },

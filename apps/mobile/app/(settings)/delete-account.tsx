@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import { deleteCalorieBankAccount } from '@/lib/api/client';
@@ -48,7 +48,7 @@ export default function DeleteAccountScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
-  container: { gap: spacing.md, padding: spacing.lg },
+  container: { gap: 20, padding: 16 },
   title: { color: colors.text, fontSize: typography.title, fontWeight: '800' },
   body: { color: colors.textMuted, fontSize: typography.body, lineHeight: 24 },
   label: { color: colors.text, fontSize: typography.body, fontWeight: '700' },

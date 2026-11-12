@@ -1,10 +1,10 @@
 import {Pressable,StyleSheet} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {FrostedScreen as SafeAreaView} from '@/components/caloriebank/FrostedSurface';
 import {KeyboardSafeScrollView} from '@/components/caloriebank/KeyboardSafeScrollView';
 import {EatingPlanPanel} from '@/components/caloriebank/EatingPlanPanel';
 import {Text} from '@/components/caloriebank/ScaleAwareText';
 import {useEatingBudgetReadModel} from '@/lib/today/use-eating-budget-read-model';
-import {colors,spacing,typography} from '@/constants/caloriebank-theme';
+import {colors,typography} from '@/constants/caloriebank-theme';
 export default function EatingPlanningScreen(){
  const model=useEatingBudgetReadModel();
  return <SafeAreaView edges={['bottom']} style={styles.safeArea}>
@@ -15,4 +15,4 @@ export default function EatingPlanningScreen(){
   </KeyboardSafeScrollView>
  </SafeAreaView>;
 }
-const styles=StyleSheet.create({safeArea:{flex:1,backgroundColor:colors.background},container:{padding:spacing.lg,gap:spacing.lg},detail:{color:colors.textMuted,fontSize:typography.body},action:{minHeight:48,justifyContent:'center'},actionText:{color:colors.primaryDark,fontSize:typography.body,fontWeight:'700'}});
+const styles=StyleSheet.create({safeArea:{flex:1,backgroundColor:colors.background},container:{padding:16,gap:20},detail:{color:colors.textMuted,fontSize:typography.body},action:{minHeight:48,justifyContent:'center'},actionText:{color:colors.primaryDark,fontSize:typography.body,fontWeight:'700'}});

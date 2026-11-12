@@ -1,14 +1,14 @@
 export const colors = {
-  background: '#F7F7F2',
+  background: '#F4F6F7',
   surface: '#FFFFFF',
-  surfaceMuted: '#ECEBE4',
+  surfaceMuted: '#EDF1F1',
   text: '#171717',
   textMuted: '#62645F',
   primary: '#256D5A',
   primaryDark: '#17483C',
   accent: '#D99A2B',
   danger: '#B42318',
-  border: '#D8D6CB',
+  border: '#E4EBE8',
   tabInactive: '#7A7D76',
 } as const;
 

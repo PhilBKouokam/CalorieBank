@@ -1,3 +1,5 @@
+import { FrostedView, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
+import { compactGlassCard } from '@/constants/card-surface';
 import { walkingPlanVisible } from '@/lib/today/walking-plan-visibility';
 import type {
   DashboardPreferencesPatch,
@@ -6,9 +8,8 @@ import type {
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
+import { colors, spacing, typography } from '@/constants/caloriebank-theme';
 import { fetchDashboardPreferences, updateDashboardPreferences } from '@/lib/api/client';
 
 const optionalCards: {
@@ -16,7 +17,6 @@ const optionalCards: {
   label: string;
 }[] = [
   { key: 'showLatestFinalizedContribution', label: 'Latest completed contribution' },
-  { key: 'showCurrentGoal', label: 'Fitness Goal' },
   { key: 'showTodaySoFar', label: 'Today so far' },
   { key: 'showSteps', label: 'Walking plan' },
   { key: 'showWorkouts', label: 'Logged workouts' },
@@ -54,10 +54,10 @@ export default function CustomizeTodayScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Customize Today</Text>
         <Text style={styles.description}>
-          Choose which supporting cards appear. Available Bank always stays first.
+          Choose which supporting cards appear. Available Bank always stays visible.
         </Text>
 
-        <View style={styles.list}>
+        <FrostedView style={styles.list}>
           <View style={styles.row}>
             <View style={styles.labelGroup}>
               <Text style={styles.label}>Available Bank</Text>
@@ -82,7 +82,7 @@ export default function CustomizeTodayScreen() {
           ) : !message ? (
             <ActivityIndicator color={colors.primary} />
           ) : null}
-        </View>
+        </FrostedView>
         {message ? <Text style={styles.error}>{message}</Text> : null}
       </ScrollView>
     </SafeAreaView>
@@ -91,18 +91,19 @@ export default function CustomizeTodayScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
-  container: { gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.xxl },
+  container: { gap: 20, padding: 16, paddingBottom: spacing.xxl },
   title: { color: colors.text, fontSize: typography.heading, fontWeight: '800' },
   description: { color: colors.textMuted, fontSize: typography.body, lineHeight: 23 },
   list: {
+    ...compactGlassCard,
+    padding: 0,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.lg,
     backgroundColor: colors.surface,
   },
   row: {
-    minHeight: 58,
+    minHeight: 72,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -110,7 +111,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: 18,
   },
   labelGroup: { flex: 1, gap: spacing.xs },
   label: { flex: 1, color: colors.text, fontSize: typography.body, fontWeight: '600' },

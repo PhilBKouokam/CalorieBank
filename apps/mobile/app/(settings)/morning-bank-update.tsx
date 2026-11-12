@@ -1,9 +1,10 @@
+import { FrostedView, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
+import { compactGlassCard } from '@/constants/card-surface';
 import { notificationSettingsName } from '@/lib/native-health/copy';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import {
@@ -63,13 +64,13 @@ export default function MorningBankUpdateSettingsScreen() {
 
   return <SafeAreaView style={styles.safeArea} edges={['bottom']}>
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.row}>
+      <FrostedView style={styles.row}>
         <View style={styles.copy}>
           <Text style={styles.title}>Morning Bank Update</Text>
           <Text style={styles.detail}>Wake up knowing how your bank updated overnight.</Text>
         </View>
         <Switch disabled={loading} accessibilityLabel="Morning Bank Update" accessibilityState={{ busy: loading, disabled: loading }} onValueChange={(value) => void change(value)} value={enabled} />
-      </View>
+      </FrostedView>
       {loading ? <ActivityIndicator accessibilityLabel="Updating notification settings" color={colors.primary} /> : <Text style={styles.status}>{permission === 'denied' ? `Notifications are off in ${notificationSettingsName}` : enabled ? 'On' : 'Off'}</Text>}
       {permission === 'denied' ? <Pressable accessibilityRole="button" onPress={() => void openNotificationSettings().then((opened) => { if (!opened) setMessage('Open Settings on your iPhone, then choose CalorieBank and Notifications.'); })} style={styles.button}><Text style={styles.buttonText}>Open Notification Settings</Text></Pressable> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
@@ -80,8 +81,8 @@ export default function MorningBankUpdateSettingsScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
-  container: { gap: spacing.md, padding: spacing.lg },
-  row: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
+  container: { gap: 20, padding: 16 },
+  row: { ...compactGlassCard, alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 22, borderWidth: 1, flexDirection: 'row', gap: spacing.md, padding: 18 },
   copy: { flex: 1, gap: spacing.xs }, title: { color: colors.text, fontSize: typography.subheading, fontWeight: '800' },
   detail: { color: colors.textMuted, fontSize: typography.body, lineHeight: 23 }, status: { color: colors.text, fontSize: typography.body, fontWeight: '700' },
   button: { alignItems: 'center', borderColor: colors.primary, borderRadius: radii.sm, borderWidth: 1, minHeight: 50, justifyContent: 'center', padding: spacing.md },

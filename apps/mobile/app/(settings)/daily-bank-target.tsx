@@ -5,7 +5,7 @@ import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScr
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
 import { DailyBankTargetInput } from '@/components/caloriebank/DailyBankTargetInput';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import { fetchProtectedTarget, saveProtectedTarget } from '@/lib/api/settings-concurrency';
@@ -52,7 +52,7 @@ export default function DailyBankTargetScreen() {
 }
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  container: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
+  container: { padding: 16, gap: 20, paddingBottom: spacing.xxl },
   message: { color: colors.text, fontSize: typography.body },
   button: { minHeight: 48, padding: spacing.md, borderRadius: radii.sm, backgroundColor: colors.primary, alignItems: 'center' },
   buttonText: { color: colors.surface, fontSize: typography.body, fontWeight: '700' },

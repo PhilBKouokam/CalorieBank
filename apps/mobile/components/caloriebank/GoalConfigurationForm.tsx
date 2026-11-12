@@ -328,7 +328,7 @@ export function GoalConfigurationForm({ mode, onSaved }: GoalConfigurationFormPr
 
 const styles = StyleSheet.create({
   form: {
-    gap: spacing.sm,
+    gap: 16,
   },
   loadingPanel: {
     alignItems: 'center',
@@ -415,6 +415,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     alignItems: 'center',
+    minHeight: 52,
     borderRadius: radii.sm,
     backgroundColor: colors.primary,
     padding: spacing.md,

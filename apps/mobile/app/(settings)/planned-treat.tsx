@@ -1,3 +1,4 @@
+import { FrostedView } from '@/components/caloriebank/FrostedSurface';
 import { useSettingsConflict } from '@/lib/drafts/use-settings-conflict';
 import { SettingsConflictNotice } from '@/components/caloriebank/SettingsConflictNotice';
 import { useEditorDraft } from '@/lib/drafts/use-editor-draft';
@@ -130,6 +131,7 @@ export default function PlannedTreatScreen() {
 
   return (
     <PlaceholderScreen
+      showBrand={false}
       eyebrow="Banking Goal"
       title={activeTreat ? 'Edit your plan' : 'Choose something to save for'}
       description="Name one food, meal, or event. CalorieBank compares it with your real Available Bank without spending it automatically."
@@ -151,7 +153,7 @@ export default function PlannedTreatScreen() {
           <View style={styles.form}>
             {conflict.latest ? <SettingsConflictNotice latest={conflict.latest.value.status === 'no_plan' ? 'No Banking Goal' : `${conflict.latest.value.name}, ${conflict.latest.value.requiredCalories} kcal${conflict.latest.value.targetDate ? `, ${conflict.latest.value.targetDate}` : ''}`} onReview={() => { setExistingTreat(conflict.latest!.value); conflict.review(); }} /> : null}
             {activeTreat ? (
-              <View style={styles.progressPanel}>
+              <FrostedView style={styles.progressPanel}>
                 <Text style={styles.progressLabel}>
                   {activeTreat.status === 'ready' ? 'Ready' : `${activeTreat.progressPercent}% ready`}
                 </Text>
@@ -160,7 +162,7 @@ export default function PlannedTreatScreen() {
                     ? 'Your Available Bank has reached this goal. Saving this plan does not change your bank.'
                     : `${activeTreat.remainingCalories.toLocaleString()} kcal to go.`}
                 </Text>
-              </View>
+              </FrostedView>
             ) : null}
 
             <Text style={styles.label}>Treat name</Text>
@@ -228,7 +230,7 @@ export default function PlannedTreatScreen() {
 
 const styles = StyleSheet.create({
   form: {
-    gap: spacing.sm,
+    gap: 16,
   },
   loadingPanel: {
     alignItems: 'center',
@@ -238,7 +240,7 @@ const styles = StyleSheet.create({
   progressPanel: {
     gap: spacing.xs,
     borderRadius: radii.md,
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: '#EDF6F1',
     padding: spacing.md,
   },
   progressLabel: {

@@ -1,3 +1,4 @@
+import { FrostedView, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
 import { clearEditorDraft, onboardingDraftStage } from '@/lib/drafts/session-drafts';
 import { sourceLabel } from '@/lib/native-health/copy';
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
@@ -20,12 +21,12 @@ import {
   View,
 } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GoalConfigurationForm } from '@/components/caloriebank/GoalConfigurationForm';
 import { DailyBankTargetForm } from '@/components/caloriebank/DailyBankTargetForm';
 import { FoodTrackerHelp } from '@/components/caloriebank/FoodTrackerHelp';
 import { refreshFatSecretWithFeedback } from '@/lib/healthkit/fatsecret-feedback';
+import { compactGlassCard } from '@/constants/card-surface';
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import {
   completeOnboarding,
@@ -702,21 +703,21 @@ export default function OnboardingScreen() {
           <PreparationRow label="Calories burned" source={status.expenditure.displayName} state={status.preparation.expenditure} waitingLabel={status.expenditure.provider === 'apple_health' ? 'Waiting for Apple Health data' : undefined} />
           <PreparationRow label="Calories eaten" source={sourceLabel(status.intake.displayName)} state={status.preparation.intake} waitingLabel={status.intake.provider === 'apple_health' ? 'Waiting for Apple Health data' : undefined} />
           <PrimaryButton busy={busy === 'preparing'} label={status.expenditure.provider === 'apple_health' || status.intake.provider === 'apple_health' ? 'Refresh Apple Health' : 'Try again'} onPress={() => void prepareBank()} />
-          <Pressable accessibilityRole="button" accessibilityLabel="Check connections" onPress={() => router.push({ pathname: '/integrations', params: { returnTo: 'onboarding' } })}><Text style={styles.linkText}>Check connections</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Check connections" style={styles.linkButton} onPress={() => router.push({ pathname: '/integrations', params: { returnTo: 'onboarding' } })}><Text style={styles.linkText}>Check connections</Text></Pressable>
           <BackButton label="Edit setup" onPress={() => showStage(preparationEditStage(status))} />
         </>;
       case 'ready':
         return <>
           <Text style={styles.eyebrow}>Setup complete</Text>
           <Text style={styles.title}>Your bank is ready.</Text>
-          <View accessibilityRole="summary" style={styles.balancePanel}>
+          <FrostedView accessibilityRole="summary" style={styles.balancePanel}>
             <Text style={styles.balanceLabel}>Starting balance</Text>
-            <Text adjustsFontSizeToFit numberOfLines={1} style={styles.balanceValue}>{status.openingBankCalories.toLocaleString()} kcal</Text>
-          </View>
+            <Text style={styles.balanceValue}>{status.openingBankCalories.toLocaleString()} kcal</Text>
+          </FrostedView>
           {status.intake.provider === 'manual_estimate' || status.preparation.history === 'no_history'
             ? <Text style={styles.detail}>You’re ready. Your bank will start with your first completed day.</Text>
             : status.openingBankCalories === 0 ? <Text style={styles.detail}>Today’s a fresh start.</Text> : null}
-          <View style={styles.morningUpdatePanel}>
+          <FrostedView style={styles.morningUpdatePanel}>
             <Text style={styles.providerTitle}>Get your Morning Bank Update</Text>
             <Text style={styles.note}>Wake up knowing how your bank updated overnight.</Text>
             {morningUpdateState === 'enabled' ? <Text style={styles.connectedLabel}>Enabled</Text> : (
@@ -733,7 +734,7 @@ export default function OnboardingScreen() {
             )}
             {morningUpdateState === 'denied' ? <Text style={styles.note}>Notifications are off. You can turn them on later in Settings.</Text> : null}
             {morningUpdateState === 'error' ? <Text style={styles.error}>We couldn’t turn on notifications. You can try again later in Settings.</Text> : null}
-          </View>
+          </FrostedView>
           <PrimaryButton busy={busy === 'complete'} label="Go to Today" onPress={() => void run('complete', async () => {
             await completeOnboarding();
             // Completion changes lifecycle eligibility without changing Clerk identity.
@@ -768,11 +769,11 @@ function SetupLoadError({ onRetry }: { onRetry: () => void }) {
 }
 
 function PrimaryButton({ label, busy, onPress }: { label: string; busy: boolean; onPress: () => void }) {
-  return <Pressable accessibilityLabel={label} accessibilityRole="button" disabled={busy} onPress={onPress} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>{label}</Text>}</Pressable>;
+  return <Pressable accessibilityLabel={label} accessibilityRole="button" accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={onPress} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryButtonText}>{label}</Text>}</Pressable>;
 }
 
 function ProviderOption({ title, detail, busy, disabled, connected = false, onPress }: { title: string; detail: string; busy: boolean; disabled: boolean; connected?: boolean; onPress: () => void }) {
-  return <View style={[styles.providerCard, Platform.OS === 'android' && styles.androidProviderCard, connected && styles.connectedCard]}><View style={[styles.providerCopy, Platform.OS === 'android' && styles.androidProviderCopy]}><Text style={styles.providerTitle}>{title}</Text><Text style={styles.note}>{connected ? 'Connected' : detail}</Text></View><Pressable accessibilityLabel={connected ? `${title} connected` : `Connect ${title}`} accessibilityRole="button" disabled={disabled || connected} onPress={onPress} style={({ pressed }) => [styles.connectButton, connected && styles.connectedButton, pressed && styles.pressed, disabled && !busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.surface} /> : <Text style={[styles.connectButtonText, connected && styles.connectedButtonText]}>{connected ? 'Connected' : 'Connect'}</Text>}</Pressable></View>;
+  return <FrostedView style={[styles.providerCard, Platform.OS === 'android' && styles.androidProviderCard, connected && styles.connectedCard]}><View style={[styles.providerCopy, Platform.OS === 'android' && styles.androidProviderCopy]}><Text style={styles.providerTitle}>{title}</Text><Text style={styles.note}>{connected ? 'Connected' : detail}</Text></View><Pressable accessibilityLabel={connected ? `${title} connected` : `Connect ${title}`} accessibilityRole="button" accessibilityState={{ disabled: disabled || connected, busy }} disabled={disabled || connected} onPress={onPress} style={({ pressed }) => [styles.connectButton, connected && styles.connectedButton, pressed && styles.pressed, disabled && !busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.surface} /> : <Text style={[styles.connectButtonText, connected && styles.connectedButtonText]}>{connected ? 'Connected' : 'Connect'}</Text>}</Pressable></FrostedView>;
 }
 
 function ConnectedSource({
@@ -805,7 +806,7 @@ function ConnectedSource({
         ? `${source} needs attention before it can be used.`
         : waitingDetail;
   return <>
-    <View style={styles.waitingCard}>
+    <FrostedView style={styles.waitingCard}>
       <Text style={styles.connectedLabel}>Connected</Text>
       <Text style={styles.providerTitle}>{source}</Text>
       <Text accessibilityLiveRegion="polite" style={styles.note}>{detail}</Text>
@@ -814,17 +815,17 @@ function ConnectedSource({
       <Pressable accessibilityLabel="Choose a different source" accessibilityRole="button" disabled={busy} onPress={onChange} style={({ pressed }) => [styles.linkButton, pressed && styles.pressed, busy && styles.disabled]}>
         <Text style={styles.linkText}>Choose a different source</Text>
       </Pressable>
-    </View>
+    </FrostedView>
     <BackButton onPress={onBack} />
   </>;
 }
 
 function SecondaryButton({ label, busy, onPress }: { label: string; busy: boolean; onPress: () => void }) {
-  return <Pressable accessibilityLabel={label} accessibilityRole="button" disabled={busy} onPress={onPress} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed, busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.secondaryButtonText}>{label}</Text>}</Pressable>;
+  return <Pressable accessibilityLabel={label} accessibilityRole="button" accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={onPress} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed, busy && styles.disabled]}>{busy ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.secondaryButtonText}>{label}</Text>}</Pressable>;
 }
 
 function BackButton({ label = 'Back', onPress }: { label?: string; onPress: () => void }) {
-  return <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress}><Text style={styles.linkText}>{label}</Text></Pressable>;
+  return <Pressable accessibilityLabel={label} accessibilityRole="button" style={styles.linkButton} onPress={onPress}><Text style={styles.linkText}>{label}</Text></Pressable>;
 }
 
 function PreparationRow({ label, source, state, waitingLabel }: {
@@ -834,37 +835,37 @@ function PreparationRow({ label, source, state, waitingLabel }: {
   waitingLabel?: string;
 }) {
   const stateLabel = state === 'complete' ? 'Checked' : state === 'retry_needed' ? 'Couldn’t refresh · Try again' : waitingLabel ?? 'Waiting for recent data';
-  return <View style={styles.preparationRow}><Text style={styles.providerTitle}>{label}</Text><Text style={styles.note}>{source} · {stateLabel}</Text></View>;
+  return <FrostedView style={styles.preparationRow}><Text style={styles.providerTitle}>{label}</Text><Text style={styles.note}>{source} · {stateLabel}</Text></FrostedView>;
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background }, fill: { flex: 1 },
-  container: { flexGrow: 1, gap: spacing.md, justifyContent: 'center', padding: spacing.lg, paddingBottom: spacing.xxl },
+  safeArea: { flex: 1, backgroundColor: 'transparent' }, fill: { flex: 1 },
+  container: { flexGrow: 1, gap: 20, justifyContent: 'center', padding: 20, paddingBottom: 32 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
   progress: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '700' },
-  sectionLabel: { color: colors.text, fontSize: typography.caption, fontWeight: '800', marginTop: spacing.sm, textTransform: 'uppercase' },
+  sectionLabel: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '700', marginTop: spacing.sm },
   eyebrow: { color: colors.primaryDark, fontSize: typography.caption, fontWeight: '800', textTransform: 'uppercase' },
   title: { color: colors.text, fontSize: typography.title, fontWeight: '800', lineHeight: 38 },
   detail: { color: colors.textMuted, fontSize: typography.body, lineHeight: 24 },
   note: { color: colors.textMuted, flexShrink: 1, fontSize: typography.caption, lineHeight: 19 },
-  providerCard: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, flexDirection: 'row', gap: spacing.md, minHeight: 88, padding: spacing.md },
+  providerCard: { ...compactGlassCard, alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 16, minHeight: 88, padding: 18 },
   androidProviderCard: { flexWrap: 'wrap' },
   androidProviderCopy: { minWidth: 160 },
-  connectedCard: { borderColor: colors.primary },
-  providerCopy: { flex: 1, gap: spacing.xs }, providerTitle: { color: colors.text, fontSize: typography.subheading, fontWeight: '800' },
-  connectButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radii.sm, justifyContent: 'center', minHeight: 48, minWidth: 92, paddingHorizontal: spacing.md },
+  connectedCard: { backgroundColor: '#EDF6F1', borderColor: '#DCEBE3' },
+  providerCopy: { flex: 1, minWidth: 150, gap: spacing.xs }, providerTitle: { color: colors.text, fontSize: typography.subheading, fontWeight: '800' },
+  connectButton: { alignItems: 'center', backgroundColor: '#176E61', borderRadius: 14, justifyContent: 'center', minHeight: 48, minWidth: 92, paddingHorizontal: spacing.md, paddingVertical: 12 },
   connectButtonText: { color: colors.surface, fontSize: typography.body, fontWeight: '700' },
   connectedButton: { backgroundColor: colors.background, borderColor: colors.primary, borderWidth: 1 },
   connectedButtonText: { color: colors.primaryDark },
-  primaryButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radii.sm, justifyContent: 'center', marginTop: spacing.sm, minHeight: 52, paddingHorizontal: spacing.lg },
+  primaryButton: { alignItems: 'center', backgroundColor: '#176E61', borderRadius: 14, justifyContent: 'center', marginTop: spacing.sm, minHeight: 52, paddingHorizontal: spacing.lg, paddingVertical: 14 },
   primaryButtonText: { color: colors.surface, fontSize: typography.body, fontWeight: '800' },
-  secondaryButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.primary, borderRadius: radii.sm, borderWidth: 1, justifyContent: 'center', minHeight: 52, paddingHorizontal: spacing.lg },
+  secondaryButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.primary, borderRadius: radii.sm, borderWidth: 1, justifyContent: 'center', minHeight: 52, paddingHorizontal: spacing.lg, paddingVertical: 14 },
   secondaryButtonText: { color: colors.primaryDark, fontSize: typography.body, fontWeight: '800' },
-  balancePanel: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, gap: spacing.xs, padding: spacing.lg },
-  morningUpdatePanel: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, gap: spacing.sm, padding: spacing.lg },
-  balanceLabel: { color: colors.textMuted, fontSize: typography.body, fontWeight: '700' }, balanceValue: { color: colors.text, fontSize: 38, fontWeight: '800' },
-  preparationRow: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.sm, borderWidth: 1, gap: spacing.xs, padding: spacing.md },
-  waitingCard: { backgroundColor: colors.surface, borderColor: colors.primary, borderRadius: radii.md, borderWidth: 1, gap: spacing.sm, padding: spacing.lg },
+  balancePanel: { ...compactGlassCard, backgroundColor: '#EDF6F1', borderColor: '#DCEBE3', gap: 8, padding: 22 },
+  morningUpdatePanel: { ...compactGlassCard, gap: 12, padding: 20 },
+  balanceLabel: { color: colors.textMuted, fontSize: typography.body, fontWeight: '700' }, balanceValue: { color: '#17483C', fontSize: 38, fontWeight: '800' },
+  preparationRow: { ...compactGlassCard, gap: 8, padding: 18 },
+  waitingCard: { ...compactGlassCard, gap: 16, padding: 20 },
   linkButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44 },
   connectedLabel: { color: colors.primaryDark, fontSize: typography.caption, fontWeight: '800', textTransform: 'uppercase' },
   attention: { color: colors.accent, fontSize: typography.body, lineHeight: 22 }, error: { color: colors.danger, fontSize: typography.body, lineHeight: 22 }, pressed: { opacity: 0.72 }, disabled: { opacity: 0.65 },

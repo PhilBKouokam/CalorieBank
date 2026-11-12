@@ -54,10 +54,10 @@ export function ManualEstimateEditor({ state, mode, onSaved, onCancel }: {
   </KeyboardSafeScrollView>;
 }
 const styles = StyleSheet.create({
-  container: { flex: 1 }, content: { padding: spacing.lg, gap: spacing.md },
+  container: { flex: 1 }, content: { padding: 16, paddingBottom: 48, gap: 20 },
   title: { fontSize: typography.heading, fontWeight: '700', color: colors.text },
-  detail: { fontSize: typography.body, color: colors.textMuted },
-  inputFrame: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.sm, minHeight: 52 },
+  detail: { lineHeight: 24, fontSize: typography.body, color: colors.textMuted },
+  inputFrame: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.sm, minHeight: 52 },
   input: { padding: spacing.md, fontSize: 24, color: colors.text, minHeight: 50 },
   save: { minHeight: 48, backgroundColor: colors.primary, borderRadius: radii.sm, padding: spacing.md, alignItems: 'center' },
   saveText: { color: colors.surface, fontSize: typography.body, fontWeight: '700' },

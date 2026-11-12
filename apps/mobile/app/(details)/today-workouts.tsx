@@ -1,10 +1,11 @@
+import { FrostedView, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
+import { compactGlassCard } from '@/constants/card-surface';
 import type { TodayResponse } from '@caloriebank/schemas';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
+import { colors, spacing, typography } from '@/constants/caloriebank-theme';
 import { fetchToday } from '@/lib/api/client';
 import { getConsumerSourceName } from '@/lib/providers/presentation';
 import { formatWorkoutCalorieLines } from '@/lib/today/presentation';
@@ -26,7 +27,7 @@ export default function TodayWorkoutsScreen() {
         <Text style={styles.description}>
           {today?.workouts.source ? `Workouts imported from ${getConsumerSourceName(today.workouts.source)} today.` : 'Workouts imported from your selected activity source today.'}
         </Text>
-        <View style={styles.card}>
+        <FrostedView style={styles.card}>
           {!today && !failed ? <ActivityIndicator color={colors.primary} /> : null}
           {failed ? <Text style={styles.description}>Workouts could not load. Try again later.</Text> : null}
           {today && today.workouts.items.length === 0 ? (
@@ -55,7 +56,7 @@ export default function TodayWorkoutsScreen() {
               </Text>
             </View>
           ))}
-        </View>
+        </FrostedView>
       </ScrollView>
     </SafeAreaView>
   );
@@ -63,18 +64,15 @@ export default function TodayWorkoutsScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
-  container: { gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.xxl },
+  container: { gap: 20, padding: 16, paddingBottom: spacing.xxl },
   title: { color: colors.text, fontSize: typography.heading, fontWeight: '800' },
   description: { color: colors.textMuted, fontSize: typography.body, lineHeight: 23 },
   card: {
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.lg,
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
+    ...compactGlassCard,
+    gap: 16,
+    padding: 18,
   },
-  row: { gap: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: spacing.sm },
+  row: { gap: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: 14 },
   workoutName: { color: colors.text, fontSize: typography.body, fontWeight: '700' },
   source: { color: colors.textMuted, fontSize: typography.caption },
 });

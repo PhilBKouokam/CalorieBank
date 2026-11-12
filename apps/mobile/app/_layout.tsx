@@ -1,3 +1,4 @@
+import { ScreenshotSharePrompt } from '@/components/caloriebank/ScreenshotSharePrompt';
 import { setDraftSession } from '@/lib/drafts/session-drafts';
 import { restorableNavigation, useSessionNavigation } from '@/lib/drafts/use-session-navigation';
 import { ClerkProvider, useAuth } from '@clerk/expo';
@@ -38,6 +39,7 @@ function AppStack({ sessionReady = true }: { sessionReady?: boolean }) {
           <Stack.Screen name="(settings)" options={{ headerShown: false }} />
           <Stack.Screen name="(modals)" options={{ presentation: 'modal', headerShown: false }} />
         </Stack>
+        <ScreenshotSharePrompt ready={sessionReady} />
         <StatusBar style="dark" />
       </View>
     </FontScaleProvider>

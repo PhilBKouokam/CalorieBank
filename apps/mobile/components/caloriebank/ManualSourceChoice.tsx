@@ -1,3 +1,4 @@
+import { FrostedView } from '@/components/caloriebank/FrostedSurface';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
@@ -18,7 +19,7 @@ export function ManualSourceChoice({ disabled = false, onOpen }: { disabled?: bo
   const openEditor = () => {
     onOpen?.(); router.push({ pathname: '/manual-estimate', params: { mode: state.selected ? 'usual' : 'select' } });
   };
-  return <View style={styles.card}>
+  return <FrostedView style={styles.card}>
     {state.selected ? <View style={styles.action}>
       <Text style={styles.title}>{usualEstimateSourceLabel(state.estimate?.usualCalories)}</Text>
       <Text style={styles.detail}>Usual daily estimate</Text>
@@ -29,7 +30,7 @@ export function ManualSourceChoice({ disabled = false, onOpen }: { disabled?: bo
       <Text style={styles.title}>I don’t track calories</Text>
       <Text style={styles.detail}>Tell CalorieBank about how many calories you usually eat in a day. You can adjust today’s number anytime.</Text>
     </Pressable>}
-  </View>;
+  </FrostedView>;
 }
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radii.md },

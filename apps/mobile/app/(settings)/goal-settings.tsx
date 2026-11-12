@@ -8,6 +8,7 @@ export default function GoalSettingsScreen() {
 
   return (
     <PlaceholderScreen
+      showBrand={false}
       keyboardAware
       eyebrow="Fitness Goal"
       title="Update your Fitness Goal"

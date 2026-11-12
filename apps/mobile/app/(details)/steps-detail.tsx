@@ -1,8 +1,10 @@
+import { FrostedView, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
+import { compactGlassCard } from '@/constants/card-surface';
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { StepPlanningCards } from '@/components/caloriebank/StepPlanningCards';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing, typography } from '@/constants/caloriebank-theme';
 import { useTodayReadModel } from '@/lib/today/use-today-read-model';
@@ -27,11 +29,9 @@ export default function StepsDetailScreen() {
         {failed ? <Text style={styles.unavailable}>Steps could not load.</Text> : null}
         {today ? (
           <>
-            <View style={styles.card}>
+            <FrostedView style={styles.card}>
               <Text style={styles.cardTitle}>Steps today</Text>
-              <Text adjustsFontSizeToFit numberOfLines={1} style={styles.heroValue}>
-                {today.steps.count === null ? 'Unavailable' : today.steps.count.toLocaleString()}
-              </Text>
+              {today.steps.count === null ? <Text style={styles.heroValue}>Unavailable</Text> : <StepCount count={today.steps.count} />}
               {providerContributionReady || actualContributionReady ? (
                 <>
                   {providerContributionReady ? (
@@ -53,9 +53,9 @@ export default function StepsDetailScreen() {
                 <Text style={styles.unavailable}>Walking calorie estimate unavailable</Text>
               )}
               <Text style={styles.source}>{stepSource}</Text>
-            </View>
+            </FrostedView>
 
-            <View style={styles.card}>
+            <FrostedView style={styles.card}>
               <Text style={styles.cardTitle}>Your walking rate</Text>
               <MetricRow
                 label={`${stepSource} reported`}
@@ -70,7 +70,7 @@ export default function StepsDetailScreen() {
                   ? 'Unavailable'
                   : `${today.steps.providerReportedCaloriesPer1000Steps.toLocaleString()} × ${today.burned.adjustmentFactor} = ${today.steps.adjustedCaloriesPer1000Steps.toLocaleString()} kcal / 1,000 steps`}
               />
-            </View>
+            </FrostedView>
 
             <StepPlanningCards today={today} />
           </>
@@ -78,6 +78,30 @@ export default function StepsDetailScreen() {
       </KeyboardSafeScrollView>
     </SafeAreaView>
   );
+}
+
+/** Keep an exact number intact at accessibility sizes; only this metric can scroll sideways. */
+export function StepCount({ count }: { count: number }) {
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const [contentWidth, setContentWidth] = useState(0);
+  const overflows = viewportWidth > 0 && contentWidth > viewportWidth + 1;
+  return <View style={styles.countContainer}>
+    <ScrollView
+      horizontal
+      scrollEnabled={overflows}
+      showsHorizontalScrollIndicator={overflows}
+      style={styles.countScroll}
+      onLayout={event => setViewportWidth(event.nativeEvent.layout.width)}
+      onContentSizeChange={width => setContentWidth(width)}
+    >
+      <Text
+        accessibilityLabel={`${count.toLocaleString()} steps today`}
+        numberOfLines={1}
+        style={[styles.heroValue, styles.unbrokenCount]}
+      >{count.toLocaleString()}</Text>
+    </ScrollView>
+    {overflows ? <Text style={styles.source}>Scroll sideways to see the full count.</Text> : null}
+  </View>;
 }
 
 function MetricRow({ label, value }: { label: string; value: string }) {
@@ -111,9 +135,12 @@ function ContributionBlock({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
-  container: { gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.xxl },
-  heroValue: { color: colors.text, fontSize: 44, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  card: { gap: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface, padding: spacing.lg },
+  container: { gap: 20, padding: 16, paddingBottom: spacing.xxl },
+  countContainer: { gap: 6 },
+  countScroll: { flexGrow: 0, alignSelf: 'stretch' },
+  unbrokenCount: { flexShrink: 0 },
+  heroValue: { color: '#B54708', fontSize: 44, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  card: { ...compactGlassCard, gap: 16, padding: 18 },
   cardTitle: { color: colors.text, fontSize: typography.subheading, fontWeight: '800' },
   metricRow: { gap: spacing.xs },
   metricLabel: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '700' },
