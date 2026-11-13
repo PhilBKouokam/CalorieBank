@@ -35,8 +35,11 @@
       "distribution": "store",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_HEALTH_CONNECT_QUALIFICATION": "0"
-      }
+        "EXPO_PUBLIC_HEALTH_CONNECT_QUALIFICATION": "0",
+        "EXPO_PUBLIC_EATING_BUDGET_ENABLED": "1",
+        "CALORIEBANK_IOS_ALLOW_LOCAL_HTTP": "0"
+      },
+      "node": "20.20.2"
     },
     "production": {
       "channel": "production",
@@ -52,11 +55,15 @@
       "environment": "preview",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_HEALTH_CONNECT_QUALIFICATION": "0"
+        "EXPO_PUBLIC_HEALTH_CONNECT_QUALIFICATION": "0",
+        "EXPO_PUBLIC_EATING_BUDGET_ENABLED": "1",
+        "CALORIEBANK_IOS_ALLOW_LOCAL_HTTP": "0"
       },
       "android": {
-        "buildType": "app-bundle"
-      }
+        "buildType": "app-bundle",
+        "resourceClass": "medium"
+      },
+      "node": "20.20.2"
     }
   },
   "submit": {
