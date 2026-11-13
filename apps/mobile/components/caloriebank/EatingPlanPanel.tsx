@@ -5,7 +5,7 @@ import type {EatingBudgetResponse,TodayResponse} from '@caloriebank/schemas';
 import {Text} from './ScaleAwareText';
 import {colors,radii,spacing,typography} from '../../constants/caloriebank-theme';
 import {fetchEatingPlan,eatingBudgetEnabled} from '../../lib/api/eating-budget';
-import {eatingBudgetReason,eatingComparison,selectEatingBudget,selectProjectedEatingBudget,selectStepsForIntake,type BoundIntakePlan} from '../../lib/today/eating-budget-guidance';
+import {eatingBudgetReason,selectEatingBudgetReason,eatingPlanningReason,selectEatingPlanningReason,eatingComparison,selectEatingBudget,selectProjectedEatingBudget,selectStepsForIntake,type BoundIntakePlan} from '../../lib/today/eating-budget-guidance';
 import {usePlanningClock} from '../../lib/today/use-planning-clock';
 import {selectQuietWalkingForecast} from '../../lib/today/quiet-walking-forecast';
 import {useEditorDraft} from '../../lib/drafts/use-editor-draft';
@@ -27,7 +27,8 @@ export function EatingPlanPanel({today,budget,pending,allowed,projectionAllowed=
  const plan=valid?selectStepsForIntake(today,current,bound,desired,now,enabled&&allowed&&!pending):null;
  const projected=selectProjectedEatingBudget(today,budget,now,enabled&&projectionAllowed&&!pending);
  const comparison=eatingComparison(current,now),total=projected?.status==='ready'?projected.totalCalories:budget?.projectedEstimate?null:current?.budget.status==='ready'?current.budget.totalCalories:null;
- const unavailable=eatingBudgetReason(budget?.projectedEstimate?.status==='unavailable'?budget.projectedEstimate.reason:projected?.status==='non_positive'?'non_positive_projected_budget':budget?.budget.status==='unavailable'?budget.budget.reason:budget?.planningUnavailableReason);
+ const planningUnavailable=eatingPlanningReason(selectEatingPlanningReason(today,budget,now,enabled&&allowed&&!pending));
+ const unavailable=eatingBudgetReason(selectEatingBudgetReason(today,budget,now,enabled&&projectionAllowed&&!pending));
  return <View style={styles.container}>
   <FrostedView style={styles.card}>
    <Text accessibilityRole="header" style={styles.title}>Eating budget</Text>
@@ -43,7 +44,7 @@ export function EatingPlanPanel({today,budget,pending,allowed,projectionAllowed=
     <Text style={styles.label}>Estimated total steps today</Text>
     <Text style={styles.value}>{plan.totalSteps.toLocaleString()}</Text>
     <Text style={styles.body}>{plan.additionalSteps===0?'No extra walking in this estimate.':`About ${plan.additionalSteps.toLocaleString()} more walking steps`}</Text>
-   </View>:<Text accessibilityLiveRegion="polite" style={styles.detail}>{!enabled?'Eating planning isn’t available yet.':pending?'Updating your estimate…':!canPlan?unavailable:!valid?'Enter a total to explore your walking estimate.':'Your walking plan is unavailable. Try refreshing your estimate.'}</Text>}
+   </View>:<Text accessibilityLiveRegion="polite" style={styles.detail}>{!enabled?'Eating planning isn’t available yet.':pending?'Updating your estimate…':!canPlan?planningUnavailable:!valid?'Enter a total to explore your walking estimate.':'Your walking plan is unavailable. Try refreshing your estimate.'}</Text>}
   </FrostedView>
   <Text style={styles.detail}>A hypothetical plan. This does not log food or change your bank.</Text>
  </View>;

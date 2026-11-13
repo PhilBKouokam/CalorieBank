@@ -2,7 +2,7 @@ import { TodayActivityCards, canStickTodayActivityHeader } from '@/components/ca
 import { compactGlassCard } from '@/constants/card-surface';
 import { FrostedView, FrostedPressable, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
 import {fetchEatingBudget,eatingBudgetEnabled} from '@/lib/api/eating-budget';
-import {selectEatingBudget,selectProjectedEatingBudget,eatingBudgetReason} from '@/lib/today/eating-budget-guidance';
+import {selectEatingBudget,selectProjectedEatingBudget,eatingBudgetReason,selectEatingBudgetReason,selectEatingPlanningReason} from '@/lib/today/eating-budget-guidance';
 import { walkingPlanVisible } from '@/lib/today/walking-plan-visibility';
 import { KeyboardSafeScrollView } from '@/components/caloriebank/KeyboardSafeScrollView';
 import { WalkingEatingCard } from '@/components/caloriebank/WalkingEatingCard';
@@ -520,7 +520,7 @@ export default function TodayScreen() {
                 <Pressable accessibilityRole="button" accessibilityLabel="Eating budget and planning" accessibilityHint="Opens your daily eating estimate and a hypothetical walking plan." onPress={event=>{event.stopPropagation();router.push('/eat-planning');}} style={styles.todayMetric}>
                   <Text style={styles.metricLabel}>Eating budget</Text>
                   <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>{dailyBudget===null?'Unavailable':`${dailyBudget.toLocaleString()} kcal`}</Text>
-                  <Text style={styles.metricDetail}>{dailyBudget===null?eatingBudgetReason(budget?.projectedEstimate?.status==='unavailable'?budget.projectedEstimate.reason:projectedEstimate?.status==='non_positive'?'non_positive_projected_budget':budget?.budget.status==='unavailable'?budget.budget.reason:null):'Estimated total intake today'}</Text>
+                  <Text style={styles.metricDetail}>{dailyBudget===null?eatingBudgetReason(selectEatingBudgetReason(today,budget,budgetClock.now,projectedBurnAllowed&&eatingBudgetEnabled)):'Estimated total intake today'}</Text>
                 </Pressable>
               </View>
               <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>
@@ -541,7 +541,7 @@ export default function TodayScreen() {
           )}
         </FrostedPressable> : null}
 
-        {showWalkingPlan ? <WalkingEatingCard budget={currentBudget} today={today} pending={todayStatus==='loading'||refreshingHealth||firstRunCheckPending} guidanceAllowed={walkingGuidanceAllowed} onOpenDetails={()=>router.push('/steps-detail')} /> : null}
+        {showWalkingPlan ? <WalkingEatingCard budget={currentBudget} planningUnavailableReason={selectEatingPlanningReason(today,budget,budgetClock.now,projectedBurnAllowed&&eatingBudgetEnabled)} today={today} pending={todayStatus==='loading'||refreshingHealth||firstRunCheckPending} guidanceAllowed={walkingGuidanceAllowed} onOpenDetails={()=>router.push('/steps-detail')} /> : null}
 
 
 

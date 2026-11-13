@@ -47,9 +47,48 @@ export function eatingBudgetReason(reason?:string|null){
  return 'Your eating budget isn’t available yet.';
 }
 
+/** Diagnostic-only selection. An unavailable snapshot never becomes a numeric planning input. */
+export function selectEatingPlanningReason(today:TodayResponse|null,budget:EatingBudgetResponse|null,now:Date,allowed:boolean):string|null{
+ if(!allowed||!today||!currentDateSnapshot(today,now)||!budget||!today.guidanceContextVersion||budget.guidanceContextVersion!==today.guidanceContextVersion||budget.localDate!==today.date||budget.timezone!==today.timezone)return null;
+ const projection=today.restOfDayProjection,anchor=projection.planningAnchorAt??projection.coverageAt;
+ // Match the existing planning clock, including legacy coverage-only snapshots.
+ const expiry=projection.planningExpiresAt?Date.parse(projection.planningExpiresAt):projection.coverageAt?Date.parse(projection.coverageAt)+30*60*1000:null;
+ if(projection.status==='stale'||(expiry!==null&&expiry<=now.getTime())||(anchor&&Date.parse(anchor)>now.getTime()))return null;
+ if(budget.budget.status==='unavailable')return budget.budget.reason;
+ if(Date.parse(budget.budget.expiresAt)<=now.getTime()||(budget.planningModel&&Date.parse(budget.planningModel.expiresAt)<=now.getTime()))return 'stale_expenditure';
+ return budget.planningUnavailableReason??null;
+}
+
+/** Food-linked scenarios have stronger requirements than the projected whole-day total. */
+export function eatingPlanningReason(reason?:string|null){
+ if(reason==='goal_not_configured')return 'Set your fitness goal to explore food-and-walking plans.';
+ if(reason==='expenditure_cutoff_unverified')return 'Your current burn data can’t yet link food totals with walking steps.';
+ if(reason==='expenditure_not_ready')return 'Food-and-walking planning needs current calorie-burn data.';
+ if(reason==='baseline_unqualified'||reason==='baseline_calibration_mismatch')return 'Your daily burn estimate can’t yet be used for a food-and-walking plan.';
+ if(reason==='walking_calibration_stale'||reason==='stale_expenditure')return 'Your food-and-walking estimate is out of date.';
+ if(reason==='walking_calibration_unavailable'||reason==='walking_calibration_unqualified'||reason==='qualified_activity_model_unavailable')return 'Your walking estimate can’t yet be used for a food-and-walking plan.';
+ if(reason==='step_alignment_unverified'||reason==='shared_step_alignment_unverified')return 'Food-and-walking planning needs matching steps and calorie-burn data.';
+ return 'Food-and-walking planning isn’t available yet.';
+}
+
 /** Separate estimate selector: never casts this basis into verified step/intake guidance. */
 export function selectProjectedEatingBudget(today:TodayResponse|null,budget:EatingBudgetResponse|null,now:Date,allowed:boolean){
  const p=budget?.projectedEstimate;
  if(!allowed||!today||!budget||!today.guidanceContextVersion||today.guidanceContextVersion!==budget.guidanceContextVersion||today.date!==budget.localDate||today.timezone!==budget.timezone||!currentDateSnapshot(today,now)||!p||p.status==='unavailable'||Date.parse(p.expiresAt)<=now.getTime()||p.projectedAdjustedBurnCalories!==projectedBurnGuidance(today,now,allowed))return null;
  return p;
+}
+
+
+/** Explain the displayed total's own basis, never a separate walking-plan failure. */
+export function selectEatingBudgetReason(today:TodayResponse|null,budget:EatingBudgetResponse|null,now:Date,allowed:boolean):string|null{
+ if(!allowed||!today||!currentDateSnapshot(today,now)||!budget||!today.guidanceContextVersion||budget.guidanceContextVersion!==today.guidanceContextVersion||budget.localDate!==today.date||budget.timezone!==today.timezone)return null;
+ const projected=budget.projectedEstimate;
+ if(projected){
+  if(projected.status==='unavailable')return projected.reason;
+  if(Date.parse(projected.expiresAt)<=now.getTime()||today.restOfDayProjection.status==='stale'||(today.restOfDayProjection.planningExpiresAt&&Date.parse(today.restOfDayProjection.planningExpiresAt)<=now.getTime()))return 'projected_burn_stale';
+  if(!selectProjectedEatingBudget(today,budget,now,allowed))return 'projected_burn_unavailable';
+  return projected.status==='non_positive'?'non_positive_projected_budget':null;
+ }
+ if(budget.budget.status==='unavailable')return budget.budget.reason;
+ return Date.parse(budget.budget.expiresAt)<=now.getTime()?'stale_expenditure':null;
 }

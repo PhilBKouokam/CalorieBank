@@ -3,7 +3,7 @@ import { FrostedView } from '@/components/caloriebank/FrostedSurface';
 import { calculateStepToBurnPlan, suggestNextStepTarget } from '@caloriebank/domain';
 import {useEffect,useRef,useState} from 'react';
 import {fetchEatingPlan,eatingBudgetEnabled} from '../../lib/api/eating-budget';
-import {selectEatingPlan,eatingBudgetReason} from '../../lib/today/eating-budget-guidance';
+import {selectEatingPlan,eatingPlanningReason,selectEatingPlanningReason} from '../../lib/today/eating-budget-guidance';
 import type {EatingBudgetResponse,EatPlanningResponse,TodayResponse} from '@caloriebank/schemas';
 import { Pressable, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import { Text } from './ScaleAwareText';
@@ -14,7 +14,7 @@ import { selectQuietWalkingForecast } from '../../lib/today/quiet-walking-foreca
 import { currentDateSnapshot } from '../../lib/today/current-date';
 
 /** Existing walking math only. No eating allowance without the qualified Budget path. */
-export function WalkingEatingCard({today,budget=null,pending,guidanceAllowed=true,onOpenDetails}:{budget?:EatingBudgetResponse|null;today:TodayResponse|null;pending:boolean;guidanceAllowed?:boolean;onOpenDetails:()=>void}) {
+export function WalkingEatingCard({today,budget=null,planningUnavailableReason,pending,guidanceAllowed=true,onOpenDetails}:{budget?:EatingBudgetResponse|null;planningUnavailableReason?:string|null;today:TodayResponse|null;pending:boolean;guidanceAllowed?:boolean;onOpenDetails:()=>void}) {
   const {fontScale}=useWindowDimensions();
   const forecast=today?.steps.quietWalkingForecast;
   const deadlines=[forecast?.status==='ready'?forecast.expiresAt:null,budget?.budget.status!=='unavailable'?budget?.budget.expiresAt:null,budget?.planningModel?.expiresAt].filter((v):v is string=>Boolean(v));
@@ -40,6 +40,17 @@ export function WalkingEatingCard({today,budget=null,pending,guidanceAllowed=tru
     const timer=setTimeout(()=>{void fetchEatingPlan({direction:'steps_to_intake',totalSteps:requestedSteps},budget.timezone).then(result=>{if(generation===requestGeneration.current)setEatingResponse(result);}).catch(()=>{if(generation===requestGeneration.current)setEatingResponse(null);});},300);
     return()=>{clearTimeout(timer);if(requestGeneration.current===generation)requestGeneration.current=generation+1;};
   },[ready,context,budget,requestedSteps,quiet]);
+  const walkingUnavailable=pending?'Updating your walking estimate…'
+    :!guidanceAllowed?'Walking planning isn’t available right now.'
+    :!current?'Refresh to see today’s walking estimate.'
+    :expired||(forecast?.status==='ready'&&Date.parse(forecast.expiresAt)<=now.getTime())||(current.steps.ordinaryProjection&&Date.parse(current.steps.ordinaryProjection.expiresAt)<=now.getTime())?'Your walking estimate is out of date.'
+    :ordinaryMode?'This estimate uses extra walking beyond your usual activity. See walking details to try it.'
+    :current.steps.planningSnapshotReady===false?'Refresh your activity data to update this walking estimate.'
+    :current.steps.status!=='ready'||current.steps.count===null||current.burned.status!=='ready'?'This walking estimate needs step and calorie-burn data.'
+    :!supportedBaseline?'Your daily burn estimate doesn’t support a total-step walking plan.'
+    :needsQuiet&&!quiet?'A matching walking estimate isn’t available for this daily burn estimate.'
+    :'This walking estimate needs step and calorie-burn data.';
+  const eatingUnavailable=pending?'Updating your food-and-walking estimate…':!eatingBudgetEnabled?'Eating planning isn’t available yet.':eatingPlanningReason(!guidanceAllowed||!current||expired?null:planningUnavailableReason??selectEatingPlanningReason(current,budget,now,guidanceAllowed));
   const eatingPlan=selectEatingPlan(current,budget,eatingResponse,requestedSteps,now,Boolean(ready)&&eatingBudgetEnabled);
   return <FrostedView style={styles.card}>
     <Text accessibilityRole="header" style={styles.heading}>If I walk…</Text>
@@ -51,11 +62,11 @@ export function WalkingEatingCard({today,budget=null,pending,guidanceAllowed=tru
     </View>
     <Text style={styles.detail}>Eating estimate</Text>
     <Text accessibilityLiveRegion="polite" style={eatingPlan?styles.value:styles.unavailable}>{eatingPlan?`${eatingPlan.totalIntakeCalories.toLocaleString()} kcal`:'Unavailable'}</Text>
-    <Text style={styles.detail}>{eatingPlan?'Hypothetical total intake today, while staying on track.':eatingBudgetReason(budget?.budget.status==='unavailable'?budget.budget.reason:budget?.planningUnavailableReason)}</Text>
+    <Text style={styles.detail}>{eatingPlan?'Hypothetical total intake today, while staying on track.':eatingUnavailable}</Text>
     {plan?<View accessibilityLiveRegion="polite" style={styles.estimate}>
       <Text style={styles.detail}>Estimated daily burn at this step total</Text>
       <Text style={styles.value}>{plan.projectedAdjustedBurnCalories.toLocaleString()} kcal</Text>
-    </View>:<Text style={styles.detail}>{pending?'Updating your walking estimate…':'Your walking estimate needs recent activity data.'}</Text>}
+    </View>:<Text style={styles.detail}>{walkingUnavailable}</Text>}
     <Pressable accessibilityRole="button" accessibilityHint="Opens your current steps and walking estimates." onPress={onOpenDetails} style={styles.action}>
       <Text style={styles.actionText}>See walking details</Text>
     </Pressable>

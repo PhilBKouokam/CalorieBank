@@ -34,7 +34,7 @@ describe('intentional total-day eating plan',()=>{
   const f=fixture();f.today.restOfDayProjection.projectedAdjustedBurnCalories=3000;
   const budget={...f.budget,projectedEstimate:{status:'ready',basis:'caloriebank_adjusted_projection',estimated:true,totalCalories:2200,projectedAdjustedBurnCalories:3000,expiresAt:expiry},planningAvailable:false,planningModel:null,budget:{status:'unavailable',reason:'expenditure_cutoff_unverified'},intake:{calories:null,semantic:'unknown'}} as EatingBudgetResponse;
   const props={today:f.today,budget,pending:false,allowed:false,projectionAllowed:true};
-  const view=await render(React.createElement(EatingPlanPanel,props));expect(text(view.root)).toContain('2,200 kcal');expect(text(view.root)).not.toContain('Remaining Today');
+  const view=await render(React.createElement(EatingPlanPanel,props));expect(text(view.root)).toContain('2,200 kcal');expect(text(view.root)).not.toContain('Remaining Today');expect(text(view.root)).toContain('Food-and-walking planning isn’t available yet.');expect(text(view.root)).not.toContain('Your burn data doesn’t yet support an eating estimate.');
   await act(async()=>view.root.findByProps({accessibilityLabel:'Planned total calories today'}).props.onChangeText('2500'));await act(async()=>{vi.advanceTimersByTime(301);});expect(controls.plan).not.toHaveBeenCalled();
   await act(async()=>view.update(React.createElement(EatingPlanPanel,{...props,pending:true})));expect(text(view.root)).not.toContain('2,200 kcal');
  });
@@ -112,4 +112,46 @@ it('does not relabel owner A cached Today after failed owner B read or late owne
  await act(async()=>setDraftSession('synthetic-B-owner','synthetic-B-session'));
  let state=view.root.findByType('Model' as never).props.state;expect(state.failed).toBe(true);expect(state.allowed).toBe(false);expect(state.today).toBeNull();
  await act(async()=>finishOld(f.today));state=view.root.findByType('Model' as never).props.state;expect(state.today).toBeNull();expect(state.budget.guidanceContextVersion).toBe(contextB);
+});
+
+
+it('keeps projected-total and food-linked unavailable explanations independent',async()=>{
+ const f=fixture();const budget={...f.budget,projectedEstimate:{status:'unavailable',basis:'caloriebank_adjusted_projection',estimated:true,reason:'projected_burn_unavailable'},budget:{status:'unavailable',reason:'expenditure_cutoff_unverified'},planningAvailable:false,planningModel:null} as EatingBudgetResponse;
+ const view=await render(React.createElement(EatingPlanPanel,{today:f.today,budget,pending:false,allowed:true}));
+ expect(text(view.root)).toContain('Your projected burn isn’t available for an eating estimate yet.');
+ expect(text(view.root)).toContain('Your current burn data can’t yet link food totals with walking steps.');
+ await act(async()=>view.update(React.createElement(EatingPlanPanel,{today:{...f.today,guidanceContextVersion:null},budget,pending:false,allowed:true})));
+ expect(text(view.root)).not.toContain('link food totals with walking steps');expect(text(view.root)).not.toContain('Your projected burn isn’t available for an eating estimate yet.');expect(controls.plan).not.toHaveBeenCalled();
+});
+
+it('retains independent walking burn and strict forward plan, then distinguishes ordinary, missing and stale walking inputs',async()=>{
+ const {WalkingEatingCard}=await import(resolve(__dirname,'../../mobile/components/caloriebank/WalkingEatingCard.tsx'));
+ const f=fixture();const before=JSON.stringify(f);controls.plan.mockResolvedValue(f.response);
+ const props={today:f.today,budget:f.budget,pending:false,onOpenDetails:vi.fn()};
+ const view=await render(React.createElement(WalkingEatingCard,props));
+ const input=view.root.findByProps({accessibilityLabel:'Walking plan total steps today'});
+ await act(async()=>input.props.onChangeText('24500'));await act(async()=>{vi.advanceTimersByTime(301);});
+ expect(text(view.root)).toContain('Hypothetical total intake today');expect(text(view.root)).toContain('Estimated daily burn at this step total');
+ expect(controls.plan).toHaveBeenLastCalledWith({direction:'steps_to_intake',totalSteps:24500},'UTC');controls.plan.mockClear();
+ await act(async()=>view.update(React.createElement(WalkingEatingCard,{...props,budget:null,planningUnavailableReason:'expenditure_cutoff_unverified'})));
+ expect(text(view.root)).toContain('2,000 kcal');expect(text(view.root)).toContain('link food totals with walking steps');expect(input.props.editable).toBe(true);
+ const ordinary={...f.today,steps:{...f.today.steps,ordinaryProjection:{expiresAt:expiry} as never}};
+ await act(async()=>view.update(React.createElement(WalkingEatingCard,{...props,today:ordinary})));await act(async()=>{vi.advanceTimersByTime(301);});
+ expect(text(view.root)).toContain('extra walking beyond your usual activity');expect(text(view.root)).not.toContain('2,000 kcal');expect(text(view.root)).not.toContain('needs step and calorie-burn data');expect(controls.plan).not.toHaveBeenCalled();
+ await act(async()=>view.update(React.createElement(WalkingEatingCard,{...props,today:{...f.today,steps:{...f.today.steps,count:null,status:'unavailable'}}})));
+ expect(text(view.root)).toContain('needs step and calorie-burn data');expect(text(view.root)).not.toContain('2,000 kcal');
+ await act(async()=>view.update(React.createElement(WalkingEatingCard,props)));await act(async()=>{vi.advanceTimersByTime(30*60*1000);});
+ expect(text(view.root)).toContain('Your walking estimate is out of date.');expect(text(view.root)).not.toContain('2,000 kcal');expect(JSON.stringify(f)).toBe(before);
+});
+
+
+it('suppresses supplied planning diagnostics when walking access, date or freshness changes',async()=>{
+ const {WalkingEatingCard}=await import(resolve(__dirname,'../../mobile/components/caloriebank/WalkingEatingCard.tsx'));
+ const f=fixture();const props={today:f.today,budget:null,planningUnavailableReason:'expenditure_cutoff_unverified',pending:false,onOpenDetails:vi.fn()};
+ const view=await render(React.createElement(WalkingEatingCard,props));expect(text(view.root)).toContain('link food totals with walking steps');
+ for(const change of [{guidanceAllowed:false},{today:{...f.today,date:'2026-02-09'}},{pending:true}]){
+  await act(async()=>view.update(React.createElement(WalkingEatingCard,{...props,...change})));
+  expect(text(view.root)).not.toContain('link food totals with walking steps');
+ }
+ await act(async()=>view.update(React.createElement(WalkingEatingCard,props)));await act(async()=>{vi.advanceTimersByTime(30*60*1000+1);});expect(text(view.root)).not.toContain('link food totals with walking steps');expect(controls.plan).not.toHaveBeenCalled();
 });
