@@ -63,7 +63,7 @@ exports.default = ({ config }) => {
         android: {
             ...config.android,
             permissions: [...(config.android?.permissions ?? []).filter((p) => !p.startsWith('android.permission.health.')), ...health.permissions],
-            blockedPermissions: [...new Set([...(config.android?.blockedPermissions ?? []), ...health.blockedPermissions])],
+            blockedPermissions: [...new Set([...(config.android?.blockedPermissions ?? []), ...health.blockedPermissions, 'android.permission.READ_MEDIA_IMAGES'])],
         },
         extra: { ...config.extra, healthConnectQualification: health.qualification },
         ios: {
