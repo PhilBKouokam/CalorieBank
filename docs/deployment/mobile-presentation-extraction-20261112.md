@@ -77,3 +77,16 @@ Local non-shipping exports: /private/tmp/caloriebank-release-all-bundles-2026111
 Disposable PostgreSQL cluster /private/tmp/caloriebank-release-gate-pg-20261112 is stopped (verified no server running). No production/server settings, credentials, live data, shared source or paid services changed. Backend, Prisma, shared runtime packages, API clients, draft ownership, Expo/EAS profiles and ordinary app IDs still match ba09e402.
 
 Remaining boundaries: full-app physical-device QA; cloud configuration/signing and approved private artifacts; store/privacy/rights/reviewer gates. Screenshot prompt supports iOS and Android API34+; the previously used Samsung API33 device cannot qualify the prompt. No native installation or paid build was attempted.
+
+## Signed private build attempt — 13 November
+
+The owner approved up to $3 of existing Expo credit for one medium iOS/Android pair. Live billing before submission showed $10/$45 used ($35 remaining); medium Android was $1/build and medium iOS $2/build. No plan, billing or public distribution change was made.
+
+Build profile preflight preserved ordinary IDs and existing beta API/Clerk auth. Both profiles explicitly enable Eating Budget, disable Health Connect qualification and local HTTP, pin Node20.20.2 and use medium workers. App config was converted to equivalent compiler-independent JavaScript after reproducing a missing-TypeScript loader failure. Focused policy tests and mobile typecheck passed. These changes are commit3d0537b.
+
+- iOS23: 967a1a58-9cf3-4c10-8aaa-d8d614d0293e, testflight profile, store-signed IPA target. Submitted with the intended config changes still uncommitted because a preceding git command used the wrong working directory. EAS therefore records4720247 with a dirty marker, not clean3d0537b. Cloud Read eas.json confirms the intended flags and Node version. Credential preparation, prebuild, pods and JS bundle passed; native compilation was underway at this entry.
+- Android22: d923fa2a-97c5-46b7-8746-17e79c798091, play-testing profile, store AAB target, clean3d0537b source. Still building at this entry.
+
+Neither artifact has been submitted to a store, installed or qualified on a device. The builds are not a public release.
+
+Post-submit dependency audit found expo-screen-capture declares READ_MEDIA_IMAGES for Android13, despite the app deliberately enabling screenshot prompts only on iOS and Android34+. This is an unnecessary merged-permission risk and a distribution hold until the built manifest is inspected. Commitce32939 explicitly blocks it;23 focused tests across3 suites pass. That fix is NOT included in Android22. No replacement build was started. Expo billing explains automatic waivers only for failures within3 minutes; the current job exceeded that duration, so a free replacement cannot be assumed.
