@@ -1,11 +1,11 @@
 import { compactGlassCard } from '@/constants/card-surface';
 import { FrostedView, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
 import { healthConnectQualificationEnabled } from '@/lib/health-connect/capabilities';
-import { useClerk } from '@clerk/expo';
+import { useClerk, useUser } from '@clerk/expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
 
 import { colors, spacing, typography } from '@/constants/caloriebank-theme';
@@ -22,10 +22,13 @@ const settingsRows: { href: Href; icon: keyof typeof Ionicons.glyphMap; label: s
   { href: '/morning-bank-update' as Href, icon: 'notifications-outline', label: 'Morning Bank Update', detail: 'Choose whether to receive your morning bank update.' },
 ];
 
-export default function SettingsScreen() {
+function AccountSettings() {
   const { signOut } = useClerk();
+  const { isLoaded, isSignedIn, user } = useUser();
+  const email = isLoaded && isSignedIn ? user.primaryEmailAddress?.emailAddress : null;
+  const emailDescription = !isLoaded ? 'Loading account…'
+    : !isSignedIn ? 'Not signed in' : email || 'Email unavailable';
   const router = useRouter();
-  const usesClerk = (process.env.EXPO_PUBLIC_AUTH_MODE ?? 'development') === 'clerk';
   const [signOutError, setSignOutError] = useState(false);
   const signingOutRef = useRef(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -43,6 +46,26 @@ export default function SettingsScreen() {
   }
 
   return (
+    <>
+      <Text style={styles.sectionLabel}>Account</Text>
+      <FrostedView style={styles.group}>
+        <View style={styles.accountInfo}>
+          <Text style={styles.accountLabel}>Email address</Text>
+          <Text selectable style={styles.accountEmail}>{emailDescription}</Text>
+        </View>
+        <SettingsRow title={signingOut ? 'Signing out…' : 'Sign Out'} disabled={signingOut} icon="log-out-outline" navigation={false} separator onPress={() => void signOutSafely()} />
+        <SettingsRow title="Delete Account" disabled={signingOut} icon="trash-outline" destructive onPress={() => router.push('/delete-account')} />
+      </FrostedView>
+      {signOutError ? <Text accessibilityLiveRegion="assertive" style={styles.signOutError}>We couldn’t finish signing you out. Please try again.</Text> : null}
+    </>
+  );
+}
+
+export default function SettingsScreen() {
+  const router = useRouter();
+  const usesClerk = (process.env.EXPO_PUBLIC_AUTH_MODE ?? 'development') === 'clerk';
+
+  return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Settings</Text>
@@ -56,14 +79,7 @@ export default function SettingsScreen() {
 
         {Platform.OS === 'android' && healthConnectQualificationEnabled() ? <SettingsRow title="Health Connect qualification" description="Read-only Android data checks." icon="construct-outline" onPress={() => router.push('/health-diagnostics')} /> : null}
 
-        {usesClerk ? <>
-          <Text style={styles.sectionLabel}>Account</Text>
-          <FrostedView style={styles.group}>
-            <SettingsRow title={signingOut ? 'Signing out…' : 'Sign Out'} disabled={signingOut} icon="log-out-outline" navigation={false} separator onPress={() => void signOutSafely()} />
-            <SettingsRow title="Delete Account" disabled={signingOut} icon="trash-outline" destructive onPress={() => router.push('/delete-account')} />
-          </FrostedView>
-          {signOutError ? <Text accessibilityLiveRegion="assertive" style={styles.signOutError}>We couldn’t finish signing you out. Please try again.</Text> : null}
-        </> : null}
+        {usesClerk ? <AccountSettings /> : null}
         <FrostedView style={styles.group}><PrivacyPolicyRow /></FrostedView>
       </ScrollView>
     </SafeAreaView>
