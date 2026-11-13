@@ -90,3 +90,11 @@ Build profile preflight preserved ordinary IDs and existing beta API/Clerk auth.
 Neither artifact has been submitted to a store, installed or qualified on a device. The builds are not a public release.
 
 Post-submit dependency audit found expo-screen-capture declares READ_MEDIA_IMAGES for Android13, despite the app deliberately enabling screenshot prompts only on iOS and Android34+. This is an unnecessary merged-permission risk and a distribution hold until the built manifest is inspected. Commitce32939 explicitly blocks it;23 focused tests across3 suites pass. That fix is NOT included in Android22. No replacement build was started. Expo billing explains automatic waivers only for failures within3 minutes; the current job exceeded that duration, so a free replacement cannot be assumed.
+
+### Artifact and private delivery results
+
+- iOS23 finished2026-11-13T04:54:52.930Z. IPA inspected locally: com.caloriebank.mobile1.0.0(23), iOS17 minimum, arbitrary loadsfalse, OTA updatesfalse, store provisioning (no ad-hoc device list, get-task-allowfalse), HealthKit entitlementtrue; profile expires2027-08-13. SHA256:7799952c0c9f19bae5e987738ef053a26b6672db8b189ce0d1d0e18f46c8f7c3.
+- Authorized private TestFlight upload succeeded, submission7651756a-1cb3-4a40-b184-04f4fec19dd1. Apple's05:09:39UTC email confirms1.0.0(23) available to test. Device app query still showed installed22; no23 device QA claimed.
+- Android22 finished2026-11-13T05:12:32.464Z. AAB downloaded and protobuf merged manifest inspected: ordinary com.caloriebank.mobile1.0.0(22), minSDK26,targetSDK36, READ_NUTRITION as sole health permission. SHA256:a33e15bb747853c6c187cb33989a1071df94f6ada9f35c1eebf77204ecb9bd55.
+- Android merged manifest DOES contain unnecessary READ_MEDIA_IMAGES with min/maxSDK33. Distribution remains held. Local Expo introspection ofce32939 confirms an explicit tools:node=remove entry for that permission. A corrected cloud build would need separate credit authorization beyond the original$3 pair. No retry initiated.
+- Mac reconnected, but iPhone Mirroring reports Mac locked and automatic unlock failed. UI installation/QA waits for manual Mac unlock. No public release, tester-list changes or device overwrite occurred.
