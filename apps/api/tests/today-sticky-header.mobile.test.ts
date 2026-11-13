@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 const h = vi.hoisted(() => ({
   keyboardVisible: false, keyboardListeners: {} as Record<string, () => void>, remove: vi.fn(),
-  navigate: vi.fn(), fontScale: 1, width: 390, fetch: vi.fn(), status: 'ready', expenditureStatus:'ready', budgetEnabled:false, budget:null as unknown, running: false,
+  showSteps: true, navigate: vi.fn(), fontScale: 1, width: 390, fetch: vi.fn(), status: 'ready', expenditureStatus:'ready', budgetEnabled:false, budget:null as unknown, running: false,
   activity: null as null | ((running: boolean) => void),
   completion: null as null | ((result: { detail: string | null }) => void),
 }));
@@ -29,13 +29,13 @@ vi.mock('../../mobile/lib/api/client', () => ({
   fetchBankSummary: async () => ({ openingBankStatus: 'initialized', availableBankCalories: 0, recoveryCalories: 0 }),
   fetchOnboardingStatus: async () => ({ completed: true, preparation: { history: 'complete' } }),
   updateDashboardPreferences: vi.fn(),
-  fetchDashboardPreferences: async () => ({ showTodaySoFar: true, showSteps:true, showCurrentGoal: true }),
+  fetchDashboardPreferences: async () => ({ showTodaySoFar: true, showSteps:h.showSteps, stepsVisibilitySource:'explicit', showCurrentGoal: true }),
 }));
 let screen: ReactTestRenderer;
 const model = (calories: number | null = null) => ({ date: new Date().toISOString().slice(0, 10), timezone: 'UTC',
   burned: { adjusted: null, raw: null, status: 'unavailable' }, eaten: { calories, status: calories === null ? 'unavailable' : 'ready', source: calories === null ? null : 'Cronometer' },
   steps: { count: null, status: 'unavailable' }, workouts: { items: [] }, restOfDayProjection: { status: 'insufficient_data' } });
-afterEach(async () => { if (screen) await act(async () => screen.unmount()); vi.useRealTimers();h.expenditureStatus='ready';h.budgetEnabled=false;h.budget=null;h.keyboardVisible=false;h.remove.mockClear(); });
+afterEach(async () => { if (screen) await act(async () => screen.unmount()); vi.useRealTimers();h.showSteps=true;h.expenditureStatus='ready';h.budgetEnabled=false;h.budget=null;h.keyboardVisible=false;h.remove.mockClear(); });
 async function mount() {
   h.fetch.mockResolvedValue(model());h.running=false;
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -107,4 +107,50 @@ it('keeps the activity rail transparent at rest and while pinned', async () => {
   expect(header().props.style.backgroundColor).toBe('transparent');
   expect(header().props.style.paddingHorizontal).toBe(16);
   expect(header().props.style.marginHorizontal).toBe(-16);
+});
+
+
+it('restores the approved distinct Today colors and contextual information icons', async () => {
+  await mount();
+  const style = (label: string) => {
+    const node = screen.root.findAll(node => String(node.type) === 'Text' && node.props.children === label)[0]!;
+    return Object.assign({}, ...[node.props.style].flat(Infinity).filter(Boolean));
+  };
+  expect(style('Burned').color).toBe('#B54708');
+  expect(style('Eaten').color).toBe('#245BA6');
+  expect(style('Projected burn').color).toBe('#8A5A12');
+  expect(style('Eating budget').color).toBe('#176E61');
+  for (const label of ['Why does CalorieBank use 80 percent?', 'What is my eating budget?']) {
+    const action = screen.root.find(node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === label);
+    expect(action.findByProps({ name: 'information-circle-outline' })).toBeTruthy();
+    const event = { stopPropagation: vi.fn() };
+    await act(async () => action.props.onPress(event));
+    expect(event.stopPropagation).toHaveBeenCalledOnce();
+  }
+  expect(screen.root.findAll(node => String(node.type) === 'Text' && node.props.children === 'Why 80%?')).toHaveLength(0);
+});
+it('keeps the burn target card visible even when the optional walking card is hidden or data is unavailable', async () => {
+  h.showSteps = false;
+  await mount();
+  expect(screen.root.findAll(node => String(node.type) === 'Text' && node.props.children === 'If I want to burn…')).toHaveLength(1);
+  expect(screen.root.findAll(node => String(node.type) === 'Text' && node.props.children === 'If I walk…')).toHaveLength(0);
+  const input = screen.root.find(node => String(node.type) === 'TextInput' && node.props.accessibilityLabel === 'Desired estimated actual calories burned today');
+  expect(input.props.selectTextOnFocus).toBe(true);
+});
+
+
+it('does not gate burn-only planning on the intake connection', async () => {
+  h.status = 'needs_attention';
+  try {
+    await mount();
+    h.fetch.mockResolvedValue({ ...model(), burned: { raw: 1200, adjusted: 960, adjustmentFactor: 0.8, status: 'ready', source: 'Fitbit' } });
+    await act(async () => h.completion!({ detail: null }));
+    const card = screen.root.find(node => typeof node.type === 'function' && node.type.name === 'StepPlanningCards');
+    expect(card.props.inverseOnly).toBe(true);
+    expect(card.props.guidanceAllowed).toBe(true);
+    const walking = screen.root.find(node => typeof node.type === 'function' && node.type.name === 'WalkingEatingCard');
+    expect(walking.props.guidanceAllowed).toBe(false);
+  } finally {
+    h.status = 'ready';
+  }
 });

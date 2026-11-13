@@ -58,7 +58,7 @@ Routes and conditional reuse are included even when currently hidden by enrollme
 | GoalConfigurationForm | Settings Fitness Goal; onboarding Fitness Goal | Numeric deficit/surplus; Save / Continue | Outer avoidance; Settings plain PlaceholderScreen | Shared scroll via keyboard-aware PlaceholderScreen / onboarding shared scroll |
 | DailyBankTargetInput | Settings Daily Bank Target; onboarding DailyBankTargetForm | Numeric target plus presets; Save / Continue | Settings automatic insets; onboarding outer avoidance | Shared scroll |
 | planned-treat | Settings Banking Goal | Text name and numeric calories; Save plan | Keyboard-aware PlaceholderScreen plus 250ms focus-scroll workaround | Shared scroll via PlaceholderScreen; timer removed |
-| StepPlanningCards | Steps detail; Today burn detail | Two numeric targets; live results | Separate automatic-inset scroll hosts | Shared scroll; card hierarchy and select-all-on-focus unchanged |
+| StepPlanningCards | Today (burn target); Steps detail; Today burn detail | Two numeric targets; live results | Separate automatic-inset scroll hosts | Shared scroll; card hierarchy and select-all-on-focus unchanged |
 | ManualEstimateEditor | manual-estimate route, select/usual/Today modes | Numeric estimate; Use estimate / Save / Reset / Cancel | Separate avoidance + scroll | Shared scroll; dormant enrollment remains off |
 | delete-account | Settings Delete account | Normal keyboard confirmation text; destructive action | Separate automatic-inset scroll | Shared scroll; physical QA must NOT submit deletion |
 

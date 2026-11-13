@@ -13,7 +13,7 @@ export function ScreenshotShareSheet({ uri, busy, error, onShare, onClose }: {
     <View style={styles.backdrop}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <View style={styles.sheet} accessibilityViewIsModal>
-          <Text accessibilityRole="header" style={styles.title}>Share this moment?</Text>
+          <Text accessibilityRole="header" style={styles.title}>Want to share your bank?</Text>
           <Text style={styles.description}>A fresh snapshot of this screen. Check what’s visible before sharing.</Text>
           <Image source={{ uri }} resizeMode="contain" style={styles.preview} accessible accessibilityLabel="Preview of the CalorieBank screen you are about to share" />
           <Text style={styles.privacy}>Only share details you’re comfortable making public. You choose the app and audience next.</Text>

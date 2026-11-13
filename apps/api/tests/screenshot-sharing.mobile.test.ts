@@ -47,3 +47,12 @@ it('suppresses double taps and keeps the image until an active share sheet finis
 it('capture failures leave the app usable without a share attempt', async () => {
  h.capture.mockRejectedValue(new Error('capture failed')); await mount(); await act(async () => h.callback()); expect(view.toJSON()).toBeNull(); expect(h.share).not.toHaveBeenCalled();
 });
+
+it('uses the requested bank headline and keeps preview consent before the native chooser', async () => {
+ await mount(); await act(async () => h.callback());
+ const header = view.root.findAllByType('Text' as never).find(n => n.props.accessibilityRole === 'header');
+ expect(header?.props.children).toBe('Want to share your bank?');
+ expect(view.root.findByType('Image' as never).props.source).toEqual({ uri: 'file:///temporary.png' });
+ expect(JSON.stringify(view.toJSON())).toContain('You choose the app and audience next.');
+ expect(h.share).not.toHaveBeenCalled();
+});

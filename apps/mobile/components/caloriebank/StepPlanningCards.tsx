@@ -28,21 +28,22 @@ function DeadlineNotice({ steps, today, now, pace }: {
   return result === 'insufficient_time' ? <Text accessibilityLiveRegion="polite" style={styles.detail}>At your estimated pace, these steps won’t fit before midnight.</Text> : null;
 }
 
-export function StepPlanningCards({ today }: { today: TodayResponse }) {
+export function StepPlanningCards({ today, inverseOnly = false, guidanceAllowed = true, pending = false }: { today: TodayResponse; inverseOnly?: boolean; guidanceAllowed?: boolean; pending?: boolean }) {
   const { fontScale } = useWindowDimensions();
   const ordinaryProjection = today.steps.ordinaryProjection;
   const quietProjection = today.steps.quietWalkingForecast;
   const { now, expired: coverageExpired } = usePlanningClock(today.restOfDayProjection, ordinaryProjection?.expiresAt ?? (quietProjection?.status === 'ready' ? quietProjection.expiresAt : undefined));
-  const quiet = selectQuietWalkingForecast(today, now);
-  const needsQuiet = !ordinaryProjection && today.restOfDayProjection.evidenceType === 'historical_low_activity_hours';
+  // Startup/older cached snapshots may not yet contain planning data.
+  const quiet = today.restOfDayProjection ? selectQuietWalkingForecast(today, now) : null;
+  const needsQuiet = !ordinaryProjection && today.restOfDayProjection?.evidenceType === 'historical_low_activity_hours';
   const ordinary = ordinaryProjection && now.getTime() < Date.parse(ordinaryProjection.expiresAt) ? ordinaryProjection : undefined;
   // Expiry is not evidence for changing the forecast model. Keep the supplied
   // model unavailable until refresh instead of silently substituting rest-only.
   const ordinaryExpired = Boolean(ordinaryProjection && !ordinary);
   const inputStyle = [styles.input, { width: 132 * Math.max(1, fontScale) }];
   // Old servers expose a nearest-10 value: its lower bound is safe for targets.
-  const displayedBaseline = today.restOfDayProjection.projectedProviderBurnCalories;
-  const restBaseline = today.restOfDayProjection.unroundedProjectedProviderBurnCalories
+  const displayedBaseline = today.restOfDayProjection?.projectedProviderBurnCalories ?? null;
+  const restBaseline = today.restOfDayProjection?.unroundedProjectedProviderBurnCalories
     ?? (displayedBaseline === null ? null : Math.max(0, displayedBaseline - 5));
   const baseline = ordinary?.rawProjectedBurnBeforeWalking ?? restBaseline;
   const caloriesPerStep = ordinary?.rawIncrementalKcalPerStep ?? (needsQuiet ? quiet?.rawIncrementalKcalPerStep ?? null : today.steps.caloriesPerStep);
@@ -52,31 +53,31 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
   const basis = ordinary?.basis === 'recorded_sessions_proxy'
     ? 'Based on recent low-activity hours. Sleep and awake time are not separated. Some exercise may be included.'
     : ordinary ? 'Based on recent burn outside exercise.'
-      : today.restOfDayProjection.evidenceType === 'historical_low_activity_hours' ? 'Based on recent low-activity hours.' : 'Rest-only estimate.';
+      : today.restOfDayProjection?.evidenceType === 'historical_low_activity_hours' ? 'Based on recent low-activity hours.' : 'Rest-only estimate.';
   const draft = useEditorDraft('step-planning', {
     burn: String(baseline === null ? 0 : Math.ceil((baseline * today.burned.adjustmentFactor + 1) / 500) * 500),
-    steps: String(today.steps.count === null ? 0 : ordinaryProjection
+    steps: String(today.steps.count == null ? 0 : ordinaryProjection
       ? suggestNextStepTarget(today.steps.count) - today.steps.count : suggestNextStepTarget(today.steps.count)),
   }, JSON.stringify([today.date, today.timezone, today.burned.source, today.steps.source, ordinaryProjection ? 'extra-walking' : 'total-steps']));
   const { burn, steps } = draft.value;
   const setBurn = (burn: string) => draft.update(v => ({ ...v, burn }));
   const setSteps = (steps: string) => draft.update(v => ({ ...v, steps }));
-  const ready = today.steps.status === 'ready' && today.burned.status === 'ready'
+  const ready = Boolean(today.restOfDayProjection) && guidanceAllowed && !pending && today.steps.status === 'ready' && today.burned.status === 'ready'
     && today.steps.planningSnapshotReady !== false
     && !ordinaryExpired
     && (!needsQuiet || quiet !== null)
-    && (ordinary || (!coverageExpired && today.restOfDayProjection.status === 'ready'))
-    && baseline !== null && today.steps.count !== null && caloriesPerStep !== null;
+    && (ordinary || (!coverageExpired && today.restOfDayProjection?.status === 'ready'))
+    && baseline !== null && Number.isFinite(baseline) && today.steps.count != null && caloriesPerStep != null;
   const shared = ready ? { currentSteps: today.steps.count!, providerCaloriesPerStep: caloriesPerStep!,
     projectedProviderBurnAtRest: baseline!, adjustmentFactor: today.burned.adjustmentFactor } : null;
   const snapshot = shared ? prepareStepPlanningSnapshot({ ...shared, reference: {
     version: JSON.stringify([today.date, today.timezone, today.burned.source,
-      today.restOfDayProjection.planningAnchorAt, today.burned.raw, baseline, caloriesPerStep]),
+      today.restOfDayProjection?.planningAnchorAt, today.burned.raw, baseline, caloriesPerStep]),
     kind: 'reported_reference', rawObservedProviderKcal: today.burned.raw ?? null,
-    referenceAt: today.restOfDayProjection.planningAnchorAt ?? today.restOfDayProjection.coverageAt ?? null,
+    referenceAt: today.restOfDayProjection?.planningAnchorAt ?? today.restOfDayProjection?.coverageAt ?? null,
     walkingEnergyBasis: needsQuiet && quiet ? 'matched_quiet_background_replacement' : undefined,
     baselineKind: ordinary ? 'ordinary_proxy'
-      : today.restOfDayProjection.evidenceType === 'historical_low_activity_hours' ? 'low_activity_total' : 'rest_only',
+      : today.restOfDayProjection?.evidenceType === 'historical_low_activity_hours' ? 'low_activity_total' : 'rest_only',
   } }) : null;
   // The wire has no verified current-step partition: do not invent uncovered walking.
   const inverse = snapshot ? traceBurnToStepPlan(snapshot, Number(burn) || 0).plan : null;
@@ -84,7 +85,7 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
   return <>
     <FrostedView style={styles.card}>
       <Text style={styles.title}>If I want to burn…</Text>
-      <View style={styles.inputRow}><TextInput accessibilityLabel="Desired estimated actual calories burned today" keyboardType="number-pad" maxLength={6} selectTextOnFocus
+      <View style={styles.inputRow}><TextInput accessibilityLabel="Desired estimated actual calories burned today" keyboardType="number-pad" maxLength={6} selectTextOnFocus editable={guidanceAllowed && !pending}
         {...draft.selection('burn')} value={burn} onChangeText={(v) => setBurn(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>calories</Text></View>
       {inverse ? <View accessibilityLiveRegion="polite" style={styles.results}>
@@ -95,11 +96,11 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         <WalkingTime steps={inverse.remainingSteps} pace={pace} />
         <DeadlineNotice steps={inverse.remainingSteps} today={today} now={now} pace={pace} />
         <Text style={styles.detail}>{basis}</Text>
-      </View> : <Text style={styles.detail}>{ordinaryExpired || coverageExpired || today.restOfDayProjection.coverageStatus === 'uncertain' ? 'Waiting for newer activity data.' : today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
+      </View> : <Text style={styles.detail}>{pending ? 'Updating your activity data…' : !guidanceAllowed ? 'Refresh your activity data to update this estimate.' : ordinaryExpired || coverageExpired || today.restOfDayProjection?.coverageStatus === 'uncertain' ? 'Waiting for newer activity data.' : today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
     </FrostedView>
-    <FrostedView style={styles.card}>
+    {!inverseOnly ? <FrostedView style={styles.card}>
       <Text style={styles.title}>If I walk…</Text>
-      <View style={styles.inputRow}><TextInput accessibilityLabel={ordinaryProjection ? 'Planned extra walking steps beyond usual activity' : 'Target total steps today'} keyboardType="number-pad" maxLength={6} selectTextOnFocus
+      <View style={styles.inputRow}><TextInput accessibilityLabel={ordinaryProjection ? 'Planned extra walking steps beyond usual activity' : 'Target total steps today'} keyboardType="number-pad" maxLength={6} selectTextOnFocus editable={guidanceAllowed && !pending}
         {...draft.selection('steps')} value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>{ordinaryProjection ? 'extra walking steps' : 'steps'}</Text></View>
       {forward ? <View accessibilityLiveRegion="polite" style={styles.results}>
@@ -114,8 +115,8 @@ export function StepPlanningCards({ today }: { today: TodayResponse }) {
         <Text style={styles.remainingSteps}>About {forward.additionalSteps.toLocaleString()} {ordinary ? 'extra walking steps beyond usual activity' : 'more steps'}</Text>
         <WalkingTime steps={forward.additionalSteps} pace={pace} />
         <DeadlineNotice steps={forward.additionalSteps} today={today} now={now} pace={pace} />
-      </View> : <Text style={styles.detail}>{ordinaryExpired || coverageExpired || today.restOfDayProjection.coverageStatus === 'uncertain' ? 'Waiting for newer activity data.' : today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
-    </FrostedView>
+      </View> : <Text style={styles.detail}>{pending ? 'Updating your activity data…' : !guidanceAllowed ? 'Refresh your activity data to update this estimate.' : ordinaryExpired || coverageExpired || today.restOfDayProjection?.coverageStatus === 'uncertain' ? 'Waiting for newer activity data.' : today.steps.planningSnapshotReady === false ? 'Refresh your activity data to update this estimate.' : 'This estimate needs recent step and calorie-burn data.'}</Text>}
+    </FrostedView> : null}
   </>;
 }
 const styles = StyleSheet.create({

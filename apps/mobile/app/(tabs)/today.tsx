@@ -1,3 +1,5 @@
+import { StepPlanningCards } from '@/components/caloriebank/StepPlanningCards';
+import { eatingBudgetDescription } from '@/lib/today/eating-budget-description';
 import { TodayActivityCards, canStickTodayActivityHeader } from '@/components/caloriebank/TodayStepsCard';
 import { compactGlassCard } from '@/constants/card-surface';
 import { FrostedView, FrostedPressable, FrostedScreen as SafeAreaView } from '@/components/caloriebank/FrostedSurface';
@@ -28,6 +30,7 @@ import {
   Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
@@ -148,7 +151,7 @@ export default function TodayScreen() {
   const [firstRunCheckPending, setFirstRunCheckPending] = useState(false);
   const [healthSyncDetail, setHealthSyncDetail] = useState<string | null>(null);
   const [refreshingHealth, setRefreshingHealth] = useState(false);
-  const [showWhyEighty, setShowWhyEighty] = useState(false);
+  const [information, setInformation] = useState<'burn' | 'budget' | null>(null);
   const readGeneration = useRef(0);
   const [guidanceReadCurrent,setGuidanceReadCurrent]=useState(false);
   const [budget,setBudget]=useState<EatingBudgetResponse|null>(null);
@@ -476,30 +479,30 @@ export default function TodayScreen() {
             <>
               <View style={[styles.todayMetrics, fontScale > 1.3 && { flexDirection: 'column' }]}>
                 <View style={styles.todayMetric}>
-                  <View style={styles.metricHeader}><Text style={styles.metricLabel}>Burned</Text></View>
-                  <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>
-                    {burnedValue}
-                  </Text>
-                  <View style={styles.burnDetailRow}>
-                    <Text style={[styles.metricDetail, styles.burnDetail]}>{burnedDetail}</Text>
-                    <Pressable
+                  <View style={styles.metricHeader}><View style={styles.sectionHeading}><Ionicons name="flame-outline" size={17} color="#B54708" /><Text style={[styles.metricLabel, { color: '#B54708' }]}>Burned</Text></View>                    <Pressable
                       accessibilityHint="Opens a short explanation without leaving Today."
                       accessibilityLabel="Why does CalorieBank use 80 percent?"
                       accessibilityRole="button"
                       hitSlop={8}
                       onPress={(event) => {
                         event.stopPropagation();
-                        setShowWhyEighty(true);
+                        setInformation('burn');
                       }}
                       style={({ pressed }) => [styles.whyButton, pressed && styles.pressedCard]}
                     >
-                      <Text style={styles.whyButtonText}>Why 80%?</Text>
-                    </Pressable>
+                      <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
+                    </Pressable></View>
+                  <Text adjustsFontSizeToFit numberOfLines={2} style={[styles.metricValue, { color: '#B54708' }]}>
+                    {burnedValue}
+                  </Text>
+                  <View style={styles.burnDetailRow}>
+                    <Text style={[styles.metricDetail, styles.burnDetail]}>{burnedDetail}</Text>
+
                   </View>
                 </View>
                 <View style={styles.todayMetric}>
                   <View style={styles.metricHeader}>
-                    <Text style={styles.metricLabel}>Eaten</Text>
+                    <View style={styles.sectionHeading}><Ionicons name="restaurant-outline" size={16} color="#245BA6" /><Text style={[styles.metricLabel, { color: '#245BA6' }]}>Eaten</Text></View>
                     {today ? <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={`Edit calories eaten. ${today.eaten.calories ?? 0} kilocalories. ${eatenDetail}.`}
@@ -507,22 +510,32 @@ export default function TodayScreen() {
                       style={({ pressed }) => [styles.editEstimateButton, pressed && styles.pressedCard]}
                     ><Ionicons name="pencil" size={18} color={colors.primary} /></Pressable> : null}
                   </View>
-                  <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>{eatenValue}</Text>
+                  <Text adjustsFontSizeToFit numberOfLines={2} style={[styles.metricValue, { color: '#245BA6' }]}>{eatenValue}</Text>
                   <Text style={styles.metricDetail}>{eatenDetail}</Text>
                 </View>
               </View>
+              <FrostedView style={styles.forecastSurface}>
+              <Text style={styles.forecastEyebrow}>END-OF-DAY ESTIMATES</Text>
               <View style={[styles.todayMetrics,fontScale>1.3&&{flexDirection:'column'}]}>
-                <Pressable accessibilityRole="button" accessibilityHint="Opens today's burn estimate." onPress={event=>{event.stopPropagation();router.push('/today-burn');}} style={styles.todayMetric}>
-                  <Text style={styles.metricLabel}>Projected burn</Text>
-                  <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>{projectedBurn===null?'Unavailable':`${projectedBurn.toLocaleString()} kcal`}</Text>
+                <Pressable accessibilityRole="button" accessibilityHint="Opens today’s burn, intake and step details." onPress={event=>{event.stopPropagation();router.push('/today-burn');}} style={styles.todayMetric}>
+                  <Text style={[styles.metricLabel, { color: '#8A5A12' }]}>Projected burn</Text>
+                  <Text adjustsFontSizeToFit numberOfLines={2} style={[styles.forecastValue, { color: '#8A5A12' }]}>{projectedBurn===null?'Unavailable':`${projectedBurn.toLocaleString()} kcal`}</Text>
                   <Text style={styles.metricDetail}>Estimated total today</Text>
                 </Pressable>
                 <Pressable accessibilityRole="button" accessibilityLabel="Eating budget and planning" accessibilityHint="Opens your daily eating estimate and a hypothetical walking plan." onPress={event=>{event.stopPropagation();router.push('/eat-planning');}} style={styles.todayMetric}>
-                  <Text style={styles.metricLabel}>Eating budget</Text>
-                  <Text adjustsFontSizeToFit numberOfLines={2} style={styles.metricValue}>{dailyBudget===null?'Unavailable':`${dailyBudget.toLocaleString()} kcal`}</Text>
+                  <View style={styles.metricHeader}>
+                    <Text style={[styles.metricLabel, { color: '#176E61' }]}>Eating budget</Text>
+                    <Pressable accessibilityRole="button" accessibilityLabel="What is my eating budget?" accessibilityHint="Opens a short explanation without leaving Today." hitSlop={8}
+                      onPress={event=>{event.stopPropagation();setInformation('budget');}} style={({pressed})=>[styles.whyButton,pressed&&styles.pressedCard]}>
+                      <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
+                    </Pressable>
+                  </View>
+                  <Text adjustsFontSizeToFit numberOfLines={2} style={[styles.forecastValue, { color: '#176E61' }]}>{dailyBudget===null?'Unavailable':`${dailyBudget.toLocaleString()} kcal`}</Text>
                   <Text style={styles.metricDetail}>{dailyBudget===null?eatingBudgetReason(selectEatingBudgetReason(today,budget,budgetClock.now,projectedBurnAllowed&&eatingBudgetEnabled)):'Estimated total intake today'}</Text>
                 </Pressable>
               </View>
+              </FrostedView>
+
               <Text style={styles.supportingText}>{formatRelativeSyncTime(latestSyncTime(today))}</Text>
               {!firstRunCheckPending && needsConnectionRecovery(providerSelection) ? (
                 <Pressable
@@ -542,6 +555,13 @@ export default function TodayScreen() {
         </FrostedPressable> : null}
 
         {showWalkingPlan ? <WalkingEatingCard budget={currentBudget} planningUnavailableReason={selectEatingPlanningReason(today,budget,budgetClock.now,projectedBurnAllowed&&eatingBudgetEnabled)} today={today} pending={todayStatus==='loading'||refreshingHealth||firstRunCheckPending} guidanceAllowed={walkingGuidanceAllowed} onOpenDetails={()=>router.push('/steps-detail')} /> : null}
+        {today ? <StepPlanningCards today={today} inverseOnly guidanceAllowed={projectedBurnAllowed && providerSelection?.activityContext?.status === 'ready'} pending={todayStatus === 'loading' || refreshingHealth || firstRunCheckPending} /> : (
+          <FrostedView style={styles.secondaryCard}>
+            <Text accessibilityRole="header" style={styles.burnPlanTitle}>If I want to burn…</Text>
+            <Text style={styles.supportingText}>{todayStatus === 'loading' ? 'Loading your activity data…' : 'This estimate needs recent step and calorie-burn data.'}</Text>
+          </FrostedView>
+        )}
+
 
 
 
@@ -593,15 +613,15 @@ export default function TodayScreen() {
       </KeyboardSafeScrollView>
       <Modal
         animationType="fade"
-        onRequestClose={() => setShowWhyEighty(false)}
+        onRequestClose={() => setInformation(null)}
         transparent
-        visible={showWhyEighty}
+        visible={information!==null}
       >
         <View style={styles.modalBackdrop}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close Why 80 percent explanation"
-            onPress={() => setShowWhyEighty(false)}
+            onPress={() => setInformation(null)}
             style={StyleSheet.absoluteFill}
           />
           <Pressable
@@ -609,17 +629,19 @@ export default function TodayScreen() {
             style={styles.whyModal}
           >
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Why 80%?</Text>
+              <Text style={styles.modalTitle}>{information==='budget'?'Eating budget':'Why 80%?'}</Text>
               <Pressable
                 accessibilityLabel="Close"
                 accessibilityRole="button"
                 hitSlop={8}
-                onPress={() => setShowWhyEighty(false)}
+                onPress={() => setInformation(null)}
                 style={({ pressed }) => [styles.modalClose, pressed && styles.pressedCard]}
               >
                 <Ionicons name="close" size={24} color={colors.text} />
               </Pressable>
             </View>
+            <ScrollView style={{flexShrink:1}} contentContainerStyle={{gap:spacing.md}}>
+            {information==='budget'?<Text style={styles.modalCopy}>{eatingBudgetDescription(budget)}</Text>:<>
             <Text style={styles.modalCopy}>
               CalorieBank’s founder trusted his watch burn during his cut but wasn’t losing weight.
             </Text>
@@ -628,6 +650,8 @@ export default function TodayScreen() {
               his watch burn — and started losing weight.
             </Text>
             <Text style={styles.modalCopy}>That’s why CalorieBank uses the 80% rule.</Text>
+            </>}
+            </ScrollView>
           </Pressable>
         </View>
       </Modal>
@@ -803,6 +827,11 @@ progressFill: {
     borderRadius: 999,
     backgroundColor: colors.primary,
   },
+sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
+forecastSurface: { backgroundColor: '#F3F4F8', borderRadius: 16, padding: 14, gap: 12 },
+forecastEyebrow: { color: '#616979', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+forecastValue: { fontSize: 21, fontWeight: '700', fontVariant: ['tabular-nums'] },
+burnPlanTitle: { color: '#B54708', fontSize: typography.subheading, fontWeight: '700' },
 todayMetrics: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -813,6 +842,7 @@ todayMetric: {
     gap: spacing.xs,
   },
 metricLabel: {
+    flexShrink: 1,
     color: colors.textMuted,
     fontSize: typography.caption,
     fontWeight: '800',
@@ -832,7 +862,7 @@ burnDetailRow: { alignItems: 'flex-start', gap: spacing.xs },
 burnDetail: { flexShrink: 1 },
 metricHeader: { minHeight: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 editEstimateButton: { width: 44, height: 44, marginVertical: -10, marginRight: -10, justifyContent: 'center', alignItems: 'center' },
-whyButton: { width: 44, minHeight: 44, marginVertical: -10, alignItems: 'flex-end', justifyContent: 'center' },
+whyButton: { width: 44, flexShrink: 0, minHeight: 44, marginVertical: -10, alignItems: 'flex-end', justifyContent: 'center' },
 whyButtonText: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '700' },
 modalBackdrop: {
     flex: 1,
@@ -896,8 +926,4 @@ settingsButton: {
     borderWidth: 1,
     borderColor: colors.border,
   },
-sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-forecastSurface: { backgroundColor: '#F3F4F8', borderRadius: 16, padding: 14, gap: 12 },
-forecastEyebrow: { color: '#616979', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-forecastValue: { fontSize: 21, fontWeight: '700', fontVariant: ['tabular-nums'] }
 });

@@ -119,3 +119,18 @@ it('renders the projected total eating estimate even when intake needs recovery'
  h.fetch.mockResolvedValue(ready);await mount();expect(output()).toContain('2,200 kcal');expect(output()).toContain('3,000 kcal');expect(output()).toContain('Review Health Connections');
  await act(async()=>h.activity?.(true));expect(output()).not.toContain('2,200 kcal');
 });
+
+
+it('keeps burn planning visible without a projection and recovers when planning data arrives', async () => {
+  h.status = 'ready'; h.running = false;
+  h.fetch.mockResolvedValue(model());
+  await mount();
+  expect(output()).toContain('If I want to burn…');
+  expect(output()).toMatch(/This estimate needs recent step and calorie-burn data.|Refresh your activity data to update this estimate./);
+  expect(output()).not.toContain('NaN');
+  const refreshed = { ...model(), restOfDayProjection: { status: 'insufficient_data' } };
+  h.fetch.mockResolvedValue(refreshed);
+  await act(async () => { h.activity!(false); h.completion!({ detail: null }); });
+  expect(output()).toContain('If I want to burn…');
+  expect(output()).not.toContain('NaN');
+});

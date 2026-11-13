@@ -4,7 +4,7 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
-  history: vi.fn(), detail: vi.fn(), sources: vi.fn(), change: vi.fn(), alert: vi.fn(),
+  focused: true, history: vi.fn(), detail: vi.fn(), sources: vi.fn(), change: vi.fn(), alert: vi.fn(),
 }));
 vi.mock('expo', () => ({ requireNativeModule: vi.fn() }));
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'history-review-request' }));
@@ -17,7 +17,7 @@ vi.mock('react-native', () => ({ useWindowDimensions: () => ({ width: 390, heigh
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
-  useFocusEffect: (callback: () => void) => React.useEffect(callback, [callback]),
+  useFocusEffect: (callback: () => void) => React.useEffect(() => h.focused ? callback() : undefined, [callback, h.focused]),
 }));
 vi.mock('../../mobile/lib/native-health/index.ios', () => ({ refreshNativeHealthForCurrentAccount: vi.fn() }));
 vi.mock('../../mobile/lib/api/client', () => ({
@@ -56,6 +56,7 @@ async function mount() {
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.clearAllMocks();
+  h.focused = true;
   vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-07T15:00:00Z'));
   h.history.mockResolvedValue(history);
   h.detail.mockImplementation(async (date: string) => history.days.find((entry) => entry.logDate === date));
@@ -97,8 +98,10 @@ it('preserves range and exact-day selection, including selected accessibility st
   await mount();
   expect(button('W').props.accessibilityState.selected).toBe(true);
   await act(async () => button('M').props.onPress());
-  expect(h.history).toHaveBeenLastCalledWith('M');
+  expect(h.history).toHaveBeenLastCalledWith('ALL');
   expect(button('M').props.accessibilityState.selected).toBe(true);
+  expect(button('2026-11-05, Enjoyed, -200 kcal')).toBeUndefined();
+  await act(async () => button('Nov 1 – Nov 7, +740 kcal').props.onPress());
   const enjoyed = button('2026-11-05, Enjoyed, -200 kcal');
   await act(async () => enjoyed.props.onPress());
   expect(h.detail).toHaveBeenLastCalledWith('2026-11-05');
@@ -174,4 +177,130 @@ it('keeps source selection cancelable and sends only the selected exact-date cha
     optionId: 'apple-health-source', expectedRevision: 3, idempotencyKey: 'history-review-request',
   });
   expect(view!.root.find((node) => String(node.type) === 'Modal').props.visible).toBe(false);
+});
+
+
+it('switches month, three-month and year into grouped totals instead of daily lists', async () => {
+  await mount();
+  for (const range of ['M', '3M', 'Y']) {
+    await act(async () => button(range).props.onPress());
+    expect(button('2026-11-06, Banked, +940 kcal')).toBeUndefined();
+    expect(texts(range === 'Y' ? 'Months' : 'Weeks')).toHaveLength(1);
+    expect(texts('3 completed days · 1 missing')).toHaveLength(1);
+    expect(texts('Net bank change · Incomplete')).toHaveLength(1);
+    expect(texts('Day details')).toHaveLength(0);
+  }
+});
+
+it('uses single-day navigation without changing or fabricating accounting data', async () => {
+  await mount();
+  await act(async () => button('D').props.onPress());
+  expect(button('2026-11-06, Banked, +940 kcal')).toBeDefined();
+  expect(button('2026-11-05, Enjoyed, -200 kcal')).toBeUndefined();
+  expect(button('Next period').props.disabled).toBe(true);
+  await act(async () => button('Previous period').props.onPress());
+  expect(button('2026-11-05, Enjoyed, -200 kcal')).toBeDefined();
+  expect(button('2026-11-06, Banked, +940 kcal')).toBeUndefined();
+  expect(texts('Day details')).toHaveLength(0);
+  expect(h.change).not.toHaveBeenCalled();
+});
+
+it('collapses a selected group and clears its day details', async () => {
+  await mount();
+  await act(async () => button('M').props.onPress());
+  await act(async () => button('Nov 1 – Nov 7, +740 kcal').props.onPress());
+  await act(async () => button('2026-11-05, Enjoyed, -200 kcal').props.onPress());
+  expect(texts('Day details')).toHaveLength(1);
+  await act(async () => button('Nov 1 – Nov 7, +740 kcal').props.onPress());
+  expect(texts('Day details')).toHaveLength(0);
+  expect(button('2026-11-05, Enjoyed, -200 kcal')).toBeUndefined();
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
+}
+const editableSources = (label: string) => ({
+  expenditure: { selected: { id: `${label}-current`, label }, options: [{ id: `${label}-current`, label }, { id: `${label}-alternative`, label: `${label} alternative` }], canChange: true, revision: 3 },
+  intake: { selected: { id: 'food', label: 'Cronometer' }, options: [], canChange: false, revision: 1 },
+});
+
+it.each(['resolve', 'reject'] as const)('ignores late initial day detail %s after selecting another day', async (outcome) => {
+  const initial = deferred<typeof day>();
+  h.detail.mockImplementation((date: string) => date === day.logDate ? initial.promise : Promise.resolve({ ...day, logDate: date, dailyBankChange: -200 }));
+  h.sources.mockImplementation(async (date: string) => editableSources(date === day.logDate ? 'Old source' : 'New source'));
+  await mount();
+  await act(async () => button('2026-11-05, Enjoyed, -200 kcal').props.onPress());
+  await act(async () => { if (outcome === 'resolve') initial.resolve(day); else initial.reject(new Error('Late failure')); });
+  expect(texts('Enjoyed 200 kcal')).toHaveLength(1);
+  expect(texts('New source burn')).toHaveLength(1);
+  expect(texts('Old source burn')).toHaveLength(0);
+  expect(texts('Bank history is unavailable.')).toHaveLength(0);
+});
+
+it('ignores an older manual selection after a newer selection completes', async () => {
+  await mount();
+  const old = deferred<typeof day>();
+  h.detail.mockImplementation((date: string) => date === '2026-11-05' ? old.promise : Promise.resolve({ ...day, logDate: date, dailyBankChange: 0 }));
+  let pending: Promise<void>;
+  await act(async () => { pending = button('2026-11-05, Enjoyed, -200 kcal').props.onPress(); });
+  await act(async () => button('2026-11-04, No change, 0 kcal').props.onPress());
+  await act(async () => { old.resolve({ ...day, logDate: '2026-11-05', dailyBankChange: -200 }); await pending; });
+  expect(texts('No change 0 kcal')).toHaveLength(1);
+  expect(texts('Enjoyed 200 kcal')).toHaveLength(0);
+});
+
+it.each(['resolve', 'reject'] as const)('does not apply canceled source-write %s to a newly selected day or picker', async (outcome) => {
+  h.sources.mockImplementation(async (date: string) => editableSources(date === day.logDate ? 'Old source' : 'New source'));
+  h.detail.mockImplementation(async (date: string) => ({ ...day, logDate: date, dailyBankChange: date === day.logDate ? 940 : -200, versions: [{ expenditureProvider: 'google_health_fitbit', intakeProvider: 'fatsecret' }] }));
+  const mutation = deferred<{ day: typeof day; sources: ReturnType<typeof editableSources> }>();
+  h.change.mockReturnValue(mutation.promise);
+  await mount();
+  await act(async () => button('Change calories burned source').props.onPress());
+  let pending: Promise<void>;
+  await act(async () => { pending = button('Old source alternative').props.onPress(); });
+  await act(async () => button('Cancel').props.onPress());
+  await act(async () => button('2026-11-05, Enjoyed, -200 kcal').props.onPress());
+  await act(async () => button('Change calories burned source').props.onPress());
+  const readsBeforeCompletion = h.history.mock.calls.length;
+  await act(async () => {
+    if (outcome === 'resolve') mutation.resolve({ day, sources: editableSources('Old result') });
+    else mutation.reject(new Error('Late save failure'));
+    await pending;
+  });
+  expect(texts('Enjoyed 200 kcal')).toHaveLength(1);
+  expect(texts('New source burn')).toHaveLength(1);
+  expect(view!.root.find((node) => String(node.type) === 'Modal').props.visible).toBe(true);
+  expect(button('New source alternative')).toBeDefined();
+  expect(button('Old result alternative')).toBeUndefined();
+  if (outcome === 'resolve') expect(h.history.mock.calls.length).toBe(readsBeforeCompletion + 1);
+  expect(h.change).toHaveBeenCalledExactlyOnceWith('2026-11-06', 'expenditure', {
+    optionId: 'Old source-alternative', expectedRevision: 3, idempotencyKey: 'history-review-request',
+  });
+});
+
+
+it('invalidates pending manual detail on blur and refocus', async () => {
+  await mount();
+  const old = deferred<typeof day>();
+  h.detail.mockImplementation((date: string) => date === '2026-11-05' ? old.promise : Promise.resolve(day));
+  let pending: Promise<void>;
+  await act(async () => { pending = button('2026-11-05, Enjoyed, -200 kcal').props.onPress(); });
+  const { default: Screen } = await import(resolve(__dirname, '../../mobile/app/(details)/bank-history.tsx'));
+  await act(async () => { h.focused = false; view!.update(React.createElement(Screen)); });
+  await act(async () => { h.focused = true; view!.update(React.createElement(Screen)); });
+  await act(async () => { old.resolve({ ...day, logDate: '2026-11-05', dailyBankChange: -200 }); await pending; });
+  expect(texts('Banked 940 kcal')).toHaveLength(1);
+  expect(texts('Enjoyed 200 kcal')).toHaveLength(0);
+});
+
+it('keeps chart zero tracks top-aligned independently of wrapped axis labels', async () => {
+  await mount();
+  await act(async () => button('M').props.onPress());
+  const chart = view!.root.findByProps({ accessibilityLabel: 'Signed bank changes; positive above zero, negative below' });
+  expect(style(chart.props.style).alignItems).toBe('flex-start');
+  const labels = chart.findAll(node => String(node.type) === 'Text').map(text).filter(Boolean);
+  expect(labels).toEqual(['1', '8', '15', '22', '29']);
 });

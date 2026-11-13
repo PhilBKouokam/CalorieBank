@@ -28,6 +28,7 @@ import {
   syncFatSecret,
   syncFitbit,
 } from '@/lib/api/client';
+import { historyPeriods, historyDateLabel, historyChart, movePeriod } from '@/lib/history/periods';
 import { historicalSourceChangeMessage } from '@/lib/history/source-change-errors';
 import { refreshNativeHealthForCurrentAccount } from '@/lib/native-health';
 import { getConsumerSourceName } from '@/lib/providers/presentation';
@@ -122,6 +123,12 @@ export default function BankHistoryScreen() {
   const [dayListWidth, setDayListWidth] = useState<number | null>(null);
   // Reserve readable columns rather than squeezing date/status around a scaled amount.
   const stackDayRows = ((dayListWidth ?? width - 32) - 34) / fontScale < 250;
+  const [periodAnchor, setPeriodAnchor] = useState<string | null>(null);
+  const [expandedPeriod, setExpandedPeriod] = useState<string | null>(null);
+  const detailRequest = useRef(0);
+  const focusOwner = useRef(0);
+  const historyRequest = useRef(0);
+  const pickerRequest = useRef(0);
   const [selectedRange, setSelectedRange] = useState<BankHistoryRange>('W');
   const [history, setHistory] = useState<BankHistoryResponse | null>(null);
   const [selectedLogDate, setSelectedLogDate] = useState<string | null>(null);
@@ -138,24 +145,32 @@ export default function BankHistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       let isMounted = true;
+      const focus = ++focusOwner.current;
+      const request = ++detailRequest.current;
+      const historyRead = ++historyRequest.current;
+      pickerRequest.current++;
+      setSourcePickerRole(null);
+      setSourceOptions(null);
+      setSelectedDay(null);
 
       async function loadHistory() {
         setStatus('loading');
         setDetailStatus('idle');
 
         try {
-          let nextHistory = await fetchBankHistory(selectedRange);
+          let nextHistory = await fetchBankHistory('ALL');
           if (
             !automaticGapRecoveryAttempted.current
             && nextHistory.missingDays.some((day) => day.canRetry)
           ) {
             automaticGapRecoveryAttempted.current = true;
             await refreshHistoricalSources().catch(() => undefined);
-            nextHistory = await fetchBankHistory(selectedRange).catch(() => nextHistory);
+            nextHistory = await fetchBankHistory('ALL').catch(() => nextHistory);
           }
-          if (!isMounted) return;
+          if (!isMounted || historyRead !== historyRequest.current) return;
 
           setHistory(nextHistory);
+          setPeriodAnchor(anchor => anchor ?? [...nextHistory.days, ...nextHistory.missingDays].map(day => day.logDate).sort().at(-1) ?? null);
 
           if (nextHistory.days.length === 0 && nextHistory.missingDays.length === 0) {
             setSelectedLogDate(null);
@@ -164,7 +179,9 @@ export default function BankHistoryScreen() {
             return;
           }
 
-          const nextSelectedLogDate = nextHistory.days[0]?.logDate ?? null;
+          const nextSelectedLogDate = (selectedRange === 'D' || selectedRange === 'W') ? nextHistory.days[0]?.logDate ?? null : null;
+          setSelectedDay(null);
+          setSourceOptions(null);
           setSelectedLogDate(nextSelectedLogDate);
           setStatus('ready');
 
@@ -174,13 +191,13 @@ export default function BankHistoryScreen() {
               fetchBankHistoryDay(nextSelectedLogDate),
               fetchHistoricalSourceOptions(nextSelectedLogDate),
             ]);
-            if (!isMounted) return;
+            if (!isMounted || request !== detailRequest.current) return;
             setSelectedDay(detail);
             setSourceOptions(sources);
             setDetailStatus('ready');
           }
         } catch {
-          if (!isMounted) return;
+          if (!isMounted || request !== detailRequest.current) return;
           setHistory(null);
           setSelectedLogDate(null);
           setSelectedDay(null);
@@ -193,6 +210,10 @@ export default function BankHistoryScreen() {
 
       return () => {
         isMounted = false;
+        if (focusOwner.current === focus) focusOwner.current++;
+        detailRequest.current++;
+        historyRequest.current++;
+        pickerRequest.current++;
       };
     // retryAttempt intentionally reruns the focused request without changing the selected range.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,6 +221,10 @@ export default function BankHistoryScreen() {
   );
 
   async function handleSelectDay(logDate: string) {
+    const request = ++detailRequest.current;
+    closeSourcePicker();
+    setSelectedDay(null);
+    setSourceOptions(null);
     setSelectedLogDate(logDate);
     setDetailStatus('loading');
 
@@ -208,17 +233,24 @@ export default function BankHistoryScreen() {
         fetchBankHistoryDay(logDate),
         fetchHistoricalSourceOptions(logDate),
       ]);
+      if (request !== detailRequest.current) return;
       setSelectedDay(detail);
       setSourceOptions(sources);
       setDetailStatus('ready');
     } catch {
+      if (request !== detailRequest.current) return;
       setSelectedDay(null);
       setDetailStatus('error');
     }
   }
 
   async function handleSourceChange(optionId: string) {
-    if (!selectedLogDate || !sourcePickerRole || !sourceOptions) return;
+    if (!selectedLogDate || !sourcePickerRole || !sourceOptions || detailStatus !== 'ready'
+      || selectedDay?.logDate !== selectedLogDate || sourceMutationStatus === 'saving') return;
+    const selection = detailRequest.current;
+    const picker = pickerRequest.current;
+    const focus = focusOwner.current;
+    const ownsPicker = () => selection === detailRequest.current && picker === pickerRequest.current && focus === focusOwner.current;
     setSourceMutationStatus('saving');
     setSourceMutationMessage(null);
     const selectedOption = sourceOptions[sourcePickerRole].options.find((option) => option.id === optionId);
@@ -229,12 +261,20 @@ export default function BankHistoryScreen() {
         expectedRevision: roleState.revision,
         idempotencyKey: Crypto.randomUUID(),
       });
-      setSelectedDay(result.day);
-      setSourceOptions(result.sources);
-      setSourcePickerRole(null);
-      setSourceMutationStatus('idle');
-      setHistory(await fetchBankHistory(selectedRange).catch(() => history));
+      if (ownsPicker()) {
+        setSelectedDay(result.day);
+        setSourceOptions(result.sources);
+        setSourcePickerRole(null);
+        setSourceMutationStatus('idle');
+      }
+      // Closing the sheet does not cancel a server write. Refresh its accounting
+      // result without applying the old day's detail to a newer selection.
+      if (focus !== focusOwner.current) return;
+      const refresh = ++historyRequest.current;
+      const updatedHistory = await fetchBankHistory('ALL').catch(() => null);
+      if (updatedHistory && focus === focusOwner.current && refresh === historyRequest.current) setHistory(updatedHistory);
     } catch (error) {
+      if (!ownsPicker()) return;
       setSourceMutationStatus('error');
       setSourceMutationMessage(sourceLabel(historicalSourceChangeMessage(
         error instanceof ApiHttpError ? error.code : null,
@@ -243,7 +283,16 @@ export default function BankHistoryScreen() {
     }
   }
 
+  function closeSourcePicker() {
+    pickerRequest.current++;
+    setSourcePickerRole(null);
+    setSourceMutationStatus('idle');
+    setSourceMutationMessage(null);
+  }
+
   function openSourcePicker(role: 'expenditure' | 'intake') {
+    if (detailStatus !== 'ready' || selectedDay?.logDate !== selectedLogDate) return;
+    pickerRequest.current++;
     setSourceMutationStatus('idle');
     setSourceMutationMessage(null);
     setSourcePickerRole(role);
@@ -277,6 +326,25 @@ export default function BankHistoryScreen() {
   const throughText = hasCompletedDays && history
     ? `Through ${formatDate(history.endDate ?? '')}`
     : 'Waiting for a complete day';
+
+  const period = history && periodAnchor ? historyPeriods(history, selectedRange, periodAnchor) : null;
+  const chart = history && periodAnchor ? historyChart(history, selectedRange, periodAnchor) : [];
+  const chartMaximum = Math.max(1, ...chart.map(point => Math.abs(point.total ?? 0)));
+  const latestDate = history ? [...history.days, ...history.missingDays].map(day => day.logDate).sort().at(-1) : undefined;
+  const earliestDate = history ? [...history.days, ...history.missingDays].map(day => day.logDate).sort()[0] : undefined;
+  const visibleItems = period?.grouped
+    ? period.buckets.find(bucket => bucket.id === expandedPeriod)?.items ?? []
+    : period?.visible ?? [];
+  const periodTotal = period?.visible.reduce((sum, item) => sum + (item.kind === 'calculated' ? item.day.dailyBankChange : 0), 0) ?? 0;
+  const calculatedCount = period?.visible.filter(item => item.kind === 'calculated').length ?? 0;
+  function changePeriod(direction: number) {
+    if (!periodAnchor) return;
+    detailRequest.current++;
+    closeSourcePicker();
+    setSourceOptions(null);
+    setPeriodAnchor(movePeriod(selectedRange, periodAnchor, direction));
+    setExpandedPeriod(null); setSelectedLogDate(null); setSelectedDay(null); setDetailStatus('idle');
+  }
 
   return (
     <PlaceholderScreen
@@ -313,7 +381,7 @@ export default function BankHistoryScreen() {
               accessibilityRole="button"
               accessibilityState={{ selected }}
               key={range.value}
-              onPress={() => setSelectedRange(range.value)}
+              onPress={() => { detailRequest.current++; closeSourcePicker(); setSourceOptions(null); setExpandedPeriod(null); setSelectedDay(null); setSelectedLogDate(null); setSelectedRange(range.value); }}
               style={[styles.rangeButton, selected && styles.selectedRangeButton]}
             >
               <Text style={[styles.rangeText, selected && styles.selectedRangeText]}>{range.label}</Text>
@@ -322,8 +390,47 @@ export default function BankHistoryScreen() {
         })}
       </View>
 
+      {period && status === 'ready' ? (
+        <FrostedView style={styles.periodPanel}>
+          <View style={styles.periodHeading}>
+            <Text style={[styles.sectionTitle, { flex: 1 }]}>{period.title}</Text>
+            {selectedRange !== 'ALL' ? <View style={styles.periodNavigation}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Previous period" accessibilityState={{ disabled: !earliestDate || period.start <= earliestDate }} disabled={!earliestDate || period.start <= earliestDate} onPress={() => changePeriod(-1)} style={styles.periodArrow}>
+                <Ionicons name="chevron-back" size={20} color={!earliestDate || period.start <= earliestDate ? '#A7B2AE' : colors.primary} />
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Next period" accessibilityState={{ disabled: !latestDate || period.end >= latestDate }} disabled={!latestDate || period.end >= latestDate} onPress={() => changePeriod(1)} style={styles.periodArrow}>
+                <Ionicons name="chevron-forward" size={20} color={!latestDate || period.end >= latestDate ? '#A7B2AE' : colors.primary} />
+              </Pressable>
+            </View> : null}
+          </View>
+          <Text style={[styles.changeText, periodTotal < 0 && styles.enjoyedText]}>{calculatedCount ? formatCalories(periodTotal) : 'Not calculated'}</Text>
+          <Text style={styles.mutedText}>Net bank change{period.visible.some(item => item.kind === 'missing') ? ' · Incomplete' : ''}</Text>
+          {chart.length ? <>
+            <View style={styles.periodChart} accessibilityLabel="Signed bank changes; positive above zero, negative below">
+              {chart.map((point, index) => {
+                const height = point.total === null ? 0 : Math.abs(point.total) / chartMaximum * 60;
+                const tickStride = Math.max(1, Math.ceil(44 * fontScale * chart.length / Math.max(180, width - 72)));
+                const showLabel = selectedRange === 'M' ? index % Math.max(7, tickStride) === 0
+                  : selectedRange === '3M' ? index === 0 || (point.label !== chart[index - 1]?.label && index >= tickStride)
+                    : index % tickStride === 0;
+                return <View key={point.id} style={styles.chartColumn} accessibilityLabel={`${point.id}, ${point.total === null ? 'Not calculated' : formatCalories(point.total)}`}>
+                  <View style={styles.chartTrack}>
+                    {point.total !== null && point.total >= 0 ? <View style={[styles.chartBar, { height: Math.max(2, height), backgroundColor: '#176C65' }]} /> : null}
+                  </View>
+                  <View style={styles.chartNegativeTrack}>
+                    {point.total !== null && point.total < 0 ? <View style={[styles.chartBar, { height, backgroundColor: '#70558D' }]} /> : null}
+                  </View>
+                  <Text style={styles.chartLabel}>{showLabel ? point.label : ''}</Text>
+                </View>;
+              })}
+            </View>
+            <Text style={styles.chartLegend}>Banked + · Enjoyed −</Text>
+          </> : null}
+        </FrostedView>
+      ) : null}
+
       <View style={styles.timelinePanel}>
-        <Text style={styles.sectionTitle}>Completed days</Text>
+        <Text style={styles.sectionTitle}>{period?.grouped ? selectedRange === 'Y' || selectedRange === 'ALL' ? 'Months' : 'Weeks' : 'Completed days'}</Text>
         <FrostedView style={styles.dayList} onLayout={event => setDayListWidth(event.nativeEvent.layout.width)}>
         {status === 'loading' ? <View style={styles.listState}><ActivityIndicator accessibilityLabel="Loading completed days" color={colors.primary} /></View> : null}
         {status === 'error' ? (
@@ -344,11 +451,20 @@ export default function BankHistoryScreen() {
             <Text style={styles.mutedText}>Your history will appear after CalorieBank receives a complete day of burn and food data.</Text>
           </View>
         ) : null}
+        {status === 'ready' && period?.grouped ? period.buckets.map(bucket => (
+          <Pressable key={bucket.id} accessibilityRole="button" accessibilityLabel={`${bucket.label}, ${bucket.total === null ? 'Not calculated' : formatCalories(bucket.total)}`} accessibilityState={{ expanded: expandedPeriod === bucket.id }} accessibilityHint="Shows the days included in this total." onPress={() => { detailRequest.current++; closeSourcePicker(); setSourceOptions(null); setExpandedPeriod(expandedPeriod === bucket.id ? null : bucket.id); setSelectedDay(null); setSelectedLogDate(null); setDetailStatus('idle'); }} style={({ pressed }) => [styles.dayRow, stackDayRows && styles.stackedDayRow, expandedPeriod === bucket.id && styles.selectedDayRow, pressed && styles.pressedRow]}>
+            <View style={styles.dayIdentity}>
+              <Text style={styles.dayDate}>{bucket.label}</Text>
+              <Text style={styles.mutedText}>{bucket.items.filter(item => item.kind === 'calculated').length} completed days{bucket.missingCount ? ` · ${bucket.missingCount} missing` : ''}</Text>
+            </View>
+            <Text style={[styles.dayChange, (bucket.total ?? 0) < 0 && styles.enjoyedText]}>{bucket.total === null ? 'Not calculated' : formatCalories(bucket.total)}</Text>
+            <Ionicons name={expandedPeriod === bucket.id ? 'chevron-up' : 'chevron-down'} size={16} color={colors.primary} />
+          </Pressable>
+        )) : null}
+        {status === 'ready' && period?.visible.length === 0 ? <View style={styles.listState}><Text style={styles.mutedText}>No completed days in this period.</Text></View> : null}
+        {status === 'ready' && expandedPeriod ? <Text style={styles.expandedHeading}>{period?.buckets.find(bucket => bucket.id === expandedPeriod)?.label} · Days</Text> : null}
         {status === 'ready'
-          ? [
-              ...(history?.days.map((day) => ({ kind: 'calculated' as const, day })) ?? []),
-              ...(history?.missingDays.map((day) => ({ kind: 'missing' as const, day })) ?? []),
-            ].sort((a, b) => b.day.logDate.localeCompare(a.day.logDate)).map((item) => {
+          ? visibleItems.map((item) => {
               if (item.kind === 'missing') {
                 return (
                   <Pressable
@@ -360,7 +476,7 @@ export default function BankHistoryScreen() {
                     style={({ pressed }) => [styles.dayRow, stackDayRows && styles.stackedDayRow, pressed && styles.pressedRow]}
                   >
                     <View style={[styles.dayIdentity, stackDayRows && styles.stackedDayIdentity]}>
-                      <Text style={styles.dayDate}>{formatDate(item.day.logDate)}</Text>
+                      <Text style={styles.dayDate}>{historyDateLabel(item.day.logDate, { weekday: 'short', month: 'short', day: 'numeric' })}</Text>
                       <Text style={styles.missingDayText}>{item.day.message}</Text>
                     </View>
                     <Ionicons style={stackDayRows ? styles.stackedDayIndicator : undefined} accessibilityElementsHidden importantForAccessibility="no" name="information-circle-outline" size={20} color={colors.textMuted} />
@@ -380,7 +496,7 @@ export default function BankHistoryScreen() {
                   style={({ pressed }) => [styles.dayRow, stackDayRows && styles.stackedDayRow, selected && styles.selectedDayRow, pressed && styles.pressedRow]}
                 >
                   <View style={[styles.dayIdentity, stackDayRows && styles.stackedDayIdentity]}>
-                    <Text style={styles.dayDate}>{formatDate(day.logDate)}</Text>
+                    <Text style={styles.dayDate}>{historyDateLabel(day.logDate, { weekday: 'short', month: 'short', day: 'numeric' })}</Text>
                     <Text style={[styles.dayOutcome, day.dailyBankChange < 0 && styles.enjoyedText]}>{contributionVerb(day.dailyBankChange)}</Text>
                   </View>
                   <View style={[styles.dayAmount, stackDayRows && styles.stackedDayAmount]}>
@@ -396,7 +512,7 @@ export default function BankHistoryScreen() {
         </FrostedView>
       </View>
 
-      <FrostedView style={styles.breakdownPanel}>
+      {selectedLogDate && visibleItems.some(item => item.day.logDate === selectedLogDate) ? <FrostedView style={styles.breakdownPanel}>
         <Text style={styles.sectionTitle}>Day details</Text>
         {detailStatus === 'idle' ? <Text style={styles.mutedText}>Select a completed day.</Text> : null}
         {detailStatus === 'loading' ? <ActivityIndicator color={colors.primary} /> : null}
@@ -469,15 +585,15 @@ export default function BankHistoryScreen() {
             </View>
           </>
         ) : null}
-      </FrostedView>
+      </FrostedView> : null}
 
       <Modal
         animationType="fade"
-        onRequestClose={() => setSourcePickerRole(null)}
+        onRequestClose={closeSourcePicker}
         transparent
         visible={sourcePickerRole !== null}
       >
-        <Pressable accessibilityRole="button" onPress={() => setSourcePickerRole(null)} style={styles.modalBackdrop}>
+        <Pressable accessibilityRole="button" onPress={closeSourcePicker} style={styles.modalBackdrop}>
           <Pressable accessibilityRole="none" onPress={(event) => event.stopPropagation()} style={styles.sourceSheet}>
             <Text style={styles.sourceSheetTitle}>
               {sourcePickerRole === 'expenditure' ? 'Calories burned' : 'Calories eaten'}
@@ -502,7 +618,7 @@ export default function BankHistoryScreen() {
             {sourceMutationStatus === 'error' && sourceMutationMessage
               ? <Text style={styles.errorText}>{sourceMutationMessage}</Text>
               : null}
-            <Pressable accessibilityRole="button" onPress={() => setSourcePickerRole(null)} style={styles.cancelButton}>
+            <Pressable accessibilityRole="button" onPress={closeSourcePicker} style={styles.cancelButton}>
               <Text style={styles.changeSourceText}>Cancel</Text>
             </Pressable>
           </Pressable>
@@ -592,6 +708,18 @@ const styles = StyleSheet.create({
     color: '#176C65',
     fontWeight: '800',
   },
+  periodPanel: { ...compactGlassCard, padding: 20, gap: 12 },
+  periodHeading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  periodNavigation: { flexDirection: 'row' },
+  periodArrow: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  periodChart: { flexDirection: 'row', alignItems: 'flex-start', gap: 4, paddingTop: 8 },
+  chartColumn: { flex: 1, minWidth: 0, alignItems: 'center' },
+  chartTrack: { height: 60, justifyContent: 'flex-end', width: '100%', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#B9C9C2' },
+  chartNegativeTrack: { height: 60, width: '100%', alignItems: 'center' },
+  chartLegend: { color: colors.textMuted, fontSize: 12 },
+  chartBar: { width: '75%', maxWidth: 24, borderRadius: 6 },
+  chartLabel: { color: colors.textMuted, fontSize: 10, textAlign: 'center', marginTop: 6, width: 44 },
+  expandedHeading: { padding: 16, color: colors.primary, fontWeight: '700' },
   timelinePanel: {
     gap: 12,
   },
