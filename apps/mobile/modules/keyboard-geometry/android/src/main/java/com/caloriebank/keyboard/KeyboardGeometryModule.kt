@@ -1,9 +1,11 @@
 package com.caloriebank.keyboard
 
+import com.facebook.react.uimanager.IllegalViewOperationException
 import android.graphics.Rect
 import android.os.Build
 import android.view.View
-import android.view.ViewTreeObserver
+import android.os.Handler
+import android.os.Looper
 import android.widget.ScrollView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -13,9 +15,15 @@ import expo.modules.kotlin.modules.ModuleDefinition
 
 /** Geometry only. Never reads text, changes window flags, or replaces inset listeners. */
 class KeyboardGeometryModule : Module() {
-  private data class Watch(val observer: ViewTreeObserver, val layout: ViewTreeObserver.OnGlobalLayoutListener,
-                           val focus: ViewTreeObserver.OnGlobalFocusChangeListener)
-  private val watches = mutableMapOf<Int, Watch>()
+  private val main = Handler(Looper.getMainLooper())
+  private val keyboardObservers by lazy {
+    KeyboardObserverRegistry({ appContext.currentActivity }, { tag ->
+      // RN 0.81.5 Fabric getView throws this specific exception for a not-yet-mounted tag.
+      try { appContext.findView<View>(tag) } catch (_: IllegalViewOperationException) { null }
+    }) { tag, owner ->
+      sendEvent("geometryChanged", mapOf("tag" to tag, "owner" to owner))
+    }
+  }
 
   private fun keyboardTop(view: View): Int? {
     val insets = ViewCompat.getRootWindowInsets(view) ?: return null
@@ -40,43 +48,15 @@ class KeyboardGeometryModule : Module() {
     return false
   }
 
-  private fun remove(tag: Int) {
-    val watch = watches.remove(tag) ?: return
-    if (watch.observer.isAlive) {
-      watch.observer.removeOnGlobalLayoutListener(watch.layout)
-      watch.observer.removeOnGlobalFocusChangeListener(watch.focus)
-    }
-  }
-
   override fun definition() = ModuleDefinition {
     Name("CalorieBankKeyboardGeometry")
     Events("geometryChanged")
-    AsyncFunction("watch") { tag: Int ->
-      remove(tag)
-      val view = runCatching { appContext.findView<View>(tag) }.getOrNull() ?: return@AsyncFunction
-      var previous: List<Int?>? = null
-      fun notifyGeometry() {
-        val location = IntArray(2)
-        view.getLocationOnScreen(location)
-        val focus = view.findFocus()
-        val signature = listOf(location[0], location[1], view.width, view.height,
-          keyboardTop(view), focus?.id)
-        if (signature != previous) {
-          previous = signature
-          sendEvent("geometryChanged", mapOf("tag" to tag))
-        }
-      }
-      val layout = ViewTreeObserver.OnGlobalLayoutListener { notifyGeometry() }
-      val focus = ViewTreeObserver.OnGlobalFocusChangeListener { _, _ -> notifyGeometry() }
-      view.viewTreeObserver.addOnGlobalLayoutListener(layout)
-      view.viewTreeObserver.addOnGlobalFocusChangeListener(focus)
-      watches[tag] = Watch(view.viewTreeObserver, layout, focus)
-      notifyGeometry()
-    }.runOnQueue(Queues.MAIN)
-    AsyncFunction("unwatch") { tag: Int -> remove(tag) }.runOnQueue(Queues.MAIN)
-    AsyncFunction("measure") { outerTag: Int, scrollTag: Int ->
+    AsyncFunction("watch") { tag: Int, owner: String -> keyboardObservers.watch(tag, owner) }.runOnQueue(Queues.MAIN)
+    AsyncFunction("unwatch") { tag: Int, owner: String -> keyboardObservers.unwatch(tag, owner) }.runOnQueue(Queues.MAIN)
+    AsyncFunction("measure") { outerTag: Int, scrollTag: Int, owner: String ->
       val outer = runCatching { appContext.findView<View>(outerTag) }.getOrNull() ?: return@AsyncFunction null
       val scroll = runCatching { appContext.findView<View>(scrollTag) }.getOrNull() as? ScrollView ?: return@AsyncFunction null
+      if (!keyboardObservers.owns(outerTag, owner, outer) || !scroll.isAttachedToWindow || !contains(outer, scroll)) return@AsyncFunction null
       val density = outer.resources.displayMetrics.density.toDouble()
       val outerLocation = IntArray(2).also { outer.getLocationOnScreen(it) }
       val scrollLocation = IntArray(2).also { scroll.getLocationOnScreen(it) }
@@ -93,8 +73,7 @@ class KeyboardGeometryModule : Module() {
         "scrollY" to scroll.scrollY / density
       )
     }.runOnQueue(Queues.MAIN)
-    OnDestroy {
-      appContext.currentActivity?.runOnUiThread { watches.keys.toList().forEach { remove(it) } }
-    }
+    OnActivityDestroys { main.post { keyboardObservers.clearDestroyedActivities() } }
+    OnDestroy { main.post { keyboardObservers.clear() } }
   }
 }

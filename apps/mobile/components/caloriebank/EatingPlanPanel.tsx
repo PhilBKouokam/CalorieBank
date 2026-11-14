@@ -39,7 +39,7 @@ export function EatingPlanPanel({today,budget,pending,allowed,projectionAllowed=
   <FrostedView style={styles.card}>
    <Text accessibilityRole="header" style={styles.title}>If I eat…</Text>
    <Text style={styles.detail}>Total calories for the day</Text>
-   <TextInput accessibilityLabel="Planned total calories today" keyboardType="number-pad" maxLength={6} selectTextOnFocus placeholder="Calories" editable={enabled&&!pending} value={draft.value.calories} {...draft.selection('calories')} onChangeText={calories=>draft.update({calories:calories.replace(/\D/g,'')})} style={styles.input}/>
+   <TextInput underlineColorAndroid="transparent" accessibilityLabel="Planned total calories today" keyboardType="number-pad" maxLength={6} selectTextOnFocus placeholder="Calories" editable={enabled&&!pending} value={draft.value.calories} {...draft.selection('calories')} onChangeText={calories=>draft.update({calories:calories.replace(/\D/g,'')})} style={styles.input}/>
    {plan?<View accessibilityLiveRegion="polite">
     <Text style={styles.label}>Estimated total steps today</Text>
     <Text style={styles.value}>{plan.totalSteps.toLocaleString()}</Text>

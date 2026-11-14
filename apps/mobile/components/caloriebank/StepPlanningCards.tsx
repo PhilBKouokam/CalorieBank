@@ -85,7 +85,7 @@ export function StepPlanningCards({ today, inverseOnly = false, guidanceAllowed 
   return <>
     <FrostedView style={styles.card}>
       <Text style={styles.title}>If I want to burn…</Text>
-      <View style={styles.inputRow}><TextInput accessibilityLabel="Desired estimated actual calories burned today" keyboardType="number-pad" maxLength={6} selectTextOnFocus editable={guidanceAllowed && !pending}
+      <View style={styles.inputRow}><TextInput underlineColorAndroid="transparent" accessibilityLabel="Desired estimated actual calories burned today" keyboardType="number-pad" maxLength={6} selectTextOnFocus editable={guidanceAllowed && !pending}
         {...draft.selection('burn')} value={burn} onChangeText={(v) => setBurn(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>calories</Text></View>
       {inverse ? <View accessibilityLiveRegion="polite" style={styles.results}>
@@ -100,7 +100,7 @@ export function StepPlanningCards({ today, inverseOnly = false, guidanceAllowed 
     </FrostedView>
     {!inverseOnly ? <FrostedView style={styles.card}>
       <Text style={styles.title}>If I walk…</Text>
-      <View style={styles.inputRow}><TextInput accessibilityLabel={ordinaryProjection ? 'Planned extra walking steps beyond usual activity' : 'Target total steps today'} keyboardType="number-pad" maxLength={6} selectTextOnFocus editable={guidanceAllowed && !pending}
+      <View style={styles.inputRow}><TextInput underlineColorAndroid="transparent" accessibilityLabel={ordinaryProjection ? 'Planned extra walking steps beyond usual activity' : 'Target total steps today'} keyboardType="number-pad" maxLength={6} selectTextOnFocus editable={guidanceAllowed && !pending}
         {...draft.selection('steps')} value={steps} onChangeText={(v) => setSteps(v.replace(/\D/g, ''))} style={inputStyle} />
       <Text style={styles.unit}>{ordinaryProjection ? 'extra walking steps' : 'steps'}</Text></View>
       {forward ? <View accessibilityLiveRegion="polite" style={styles.results}>

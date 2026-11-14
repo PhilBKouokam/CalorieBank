@@ -166,7 +166,7 @@ export default function PlannedTreatScreen() {
             ) : null}
 
             <Text style={styles.label}>Treat name</Text>
-            <TextInput
+            <TextInput underlineColorAndroid="transparent"
               accessibilityLabel="Banking Goal name"
               autoCapitalize="sentences"
               onChangeText={setName}
@@ -177,7 +177,7 @@ export default function PlannedTreatScreen() {
             />
 
             <Text style={styles.label}>Required calories</Text>
-            <TextInput
+            <TextInput underlineColorAndroid="transparent"
               accessibilityLabel="Required calories"
               keyboardType="number-pad"
               onChangeText={setRequiredCalories}
