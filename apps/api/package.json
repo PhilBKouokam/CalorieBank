@@ -18,9 +18,9 @@
     "inspect:provider-provenance": "tsx src/scripts/inspect-bank-provider-provenance.ts",
     "auth:link-existing": "tsx src/scripts/link-existing-auth-identity.ts",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "pretypecheck": "npm --workspace @caloriebank/domain run build && npm --workspace @caloriebank/schemas run build",
+    "pretypecheck": "npm --workspace @caloriebank/domain run build && npm --workspace @caloriebank/schemas run build && prisma generate",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "pretest": "npm --workspace @caloriebank/domain run build && npm --workspace @caloriebank/schemas run build",
+    "pretest": "npm --workspace @caloriebank/domain run build && npm --workspace @caloriebank/schemas run build && prisma generate",
     "test": "vitest run"
   },
   "dependencies": {
