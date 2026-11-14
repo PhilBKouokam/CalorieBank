@@ -136,6 +136,7 @@ model User {
   deletionRequestedAt           DateTime?                           @map("deletion_requested_at") @db.Timestamptz
   profile                       UserProfile?
   goalConfiguration             GoalConfiguration?
+  goalConfigurationVersions     GoalConfigurationVersion[]
   plannedTreat                  PlannedTreat?
   finalizedDailyBankRecords     FinalizedDailyBankRecord[]
   calorieLedgerTransactions     CalorieLedgerTransaction[]
@@ -491,6 +492,23 @@ model GoalConfiguration {
   updatedAt                 DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("goal_configurations")
+}
+
+/// Append-only record of the goal active from effectiveFrom. Rows are never updated.
+model GoalConfigurationVersion {
+  id                        String           @id @default(uuid()) @db.Uuid
+  userId                    String           @map("user_id") @db.Uuid
+  effectiveFrom             DateTime         @map("effective_from") @db.Date
+  goalMode                  GoalMode         @map("goal_mode")
+  dailyEnergyAdjustment     Int              @map("daily_energy_adjustment")
+  adjustmentSource          AdjustmentSource @map("adjustment_source")
+  desiredWeeklyWeightChange Decimal?         @map("desired_weekly_weight_change") @db.Decimal(4, 2)
+  recordedAt                DateTime         @default(now()) @map("recorded_at") @db.Timestamptz
+  createdAt                 DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  user                      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, effectiveFrom, recordedAt])
+  @@map("goal_configuration_versions")
 }
 
 model PlannedTreat {

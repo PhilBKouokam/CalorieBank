@@ -10,6 +10,7 @@ import {
   getPreviousCompletedLocalDates,
   getProvisionalLockAt,
   resolveAuthoritativeProviderRecord,
+  selectGoalActiveOnDate,
   selectOpeningBankPeriod,
   type BankGoalMode,
 } from '@caloriebank/domain';
@@ -139,6 +140,34 @@ function toDateOnly(value: Date) {
 
 function parseLogDate(logDate: string) {
   return new Date(`${logDate}T00:00:00.000Z`);
+}
+
+/**
+ * Goal that was active on logDate.
+ * Version rows win. A never-edited live goal with no versions still applies,
+ * so existing rows posted before this history existed keep their previous behavior.
+ * An edited live goal with no covering version is missing, not zero.
+ */
+async function goalActiveOnDate(
+  transaction: Prisma.TransactionClient,
+  userId: string,
+  logDate: string,
+) {
+  const versions = await transaction.goalConfigurationVersion.findMany({
+    where: { userId },
+    orderBy: [{ effectiveFrom: 'asc' }, { recordedAt: 'asc' }],
+  });
+  const selected = selectGoalActiveOnDate(versions.map((version) => ({
+    effectiveFrom: toDateOnly(version.effectiveFrom),
+    recordedAt: version.recordedAt,
+    goalMode: version.goalMode,
+    dailyEnergyAdjustment: version.dailyEnergyAdjustment,
+  })), logDate);
+  if (selected) return selected;
+  if (versions.length > 0) return null;
+  const live = await transaction.goalConfiguration.findUnique({ where: { userId } });
+  if (!live || live.updatedAt.getTime() !== live.createdAt.getTime()) return null;
+  return { goalMode: live.goalMode, dailyEnergyAdjustment: live.dailyEnergyAdjustment };
 }
 
 function inclusiveLocalDates(start: Date, end: Date) {
@@ -452,8 +481,6 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       this.db.goalConfiguration.findUnique({ where: { userId } }),
     ]);
     if (!initialization?.accountingStartsOn || !initialization.timezone || !user || !goal) return;
-    // Without goal-version history, late posting is safe only when the configured goal has never changed.
-    if (goal.updatedAt.getTime() !== goal.createdAt.getTime()) return;
 
     const currentLocalDate = getLocalDateForTimezone(initialization.timezone, this.now());
     const candidates = completedLocalDates(toDateOnly(initialization.accountingStartsOn), currentLocalDate)
@@ -1247,12 +1274,10 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
       const providerFilter = this.options.allowSyntheticProviders
         ? {}
         : { provider: { not: 'development' } };
-      const [goal, authority] = await Promise.all([
-        transaction.goalConfiguration.findUnique({ where: { userId: user.id } }),
-        this.options.allowSyntheticProviders
-          ? null
-          : resolveDaySourceAuthority(transaction, user.id, date, timezone),
-      ]);
+      const authority = this.options.allowSyntheticProviders
+        ? null
+        : await resolveDaySourceAuthority(transaction, user.id, date, timezone);
+      const datedGoal = existing ? null : await goalActiveOnDate(transaction, user.id, logDate);
       let expenditure = authority?.selectedExpenditure?.record ?? null;
       let intake = authority?.selectedIntake?.record ?? null;
       if (this.options.allowSyntheticProviders) {
@@ -1272,7 +1297,7 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
           allowFallback: false,
         });
       }
-      if (!expenditure || !intake || (!goal && !existing)) {
+      if (!expenditure || !intake || (!existing && !datedGoal)) {
         return { outcome: 'not_ready', detail: existing ? toDetail(await this.recordWithSnapshots(transaction, existing.id)) : null };
       }
 
@@ -1312,10 +1337,10 @@ export class PrismaBankHistoryRepository implements BankHistoryRepository {
         }
       }
 
-      const goalMode = (existing?.goalMode ?? goal?.goalMode) as BankGoalMode;
+      const goalMode = (existing?.goalMode ?? datedGoal?.goalMode) as BankGoalMode;
       const goalAdjustmentCalories = existing
         ? existing.goalAdjustmentCalories
-        : Math.abs(goal?.dailyEnergyAdjustment ?? 0);
+        : Math.abs(datedGoal?.dailyEnergyAdjustment ?? 0);
       return this.postOrReconcile(
         transaction,
         user,
