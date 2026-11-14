@@ -49,3 +49,17 @@ it('keeps fixed chart dates with null gaps and signed real-zero values', async (
   expect(historyChart(fixture([]), 'M', '2024-02-10')).toHaveLength(29);
   expect(historyChart(fixture([]), 'Y', '2026-11-01')).toHaveLength(12);
 });
+
+
+it('offers calorie editing only for D-1/D-2 in the recorded timezone before locking', async () => {
+  const { canEditHistoricalIntake } = await import('../../mobile/lib/history/periods');
+  const now = Date.parse('2026-11-09T05:59:59Z'); // Still Nov 8 in Chicago.
+  const base = { provenance: 'finalized', status: 'provisional', timezone: 'America/Chicago', locksAt: '2026-11-09T06:00:00Z' };
+  expect(canEditHistoricalIntake({ ...base, logDate: '2026-11-07' }, now)).toBe(true);
+  expect(canEditHistoricalIntake({ ...base, logDate: '2026-11-06' }, now)).toBe(true);
+  expect(canEditHistoricalIntake({ ...base, logDate: '2026-11-05' }, now)).toBe(false);
+  expect(canEditHistoricalIntake({ ...base, logDate: '2026-11-08' }, now)).toBe(false);
+  expect(canEditHistoricalIntake({ ...base, logDate: '2026-11-06' }, now + 1000)).toBe(false);
+  expect(canEditHistoricalIntake({ ...base, logDate: '2026-11-07', provenance: 'opening' }, now)).toBe(false);
+  expect(canEditHistoricalIntake({ ...base, logDate: '2026-11-07', status: 'locked' }, now)).toBe(false);
+});

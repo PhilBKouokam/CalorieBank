@@ -4,17 +4,19 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
 import type { IntakeAdjustmentState } from '@caloriebank/schemas';
 import { KeyboardSafeScrollView } from './KeyboardSafeScrollView';
-import { ApiHttpError, saveIntakeAdjustment } from '@/lib/api/client';
+import { ApiHttpError, saveIntakeAdjustment, saveHistoricalIntakeAdjustment } from '@/lib/api/client';
 import { colors } from '@/constants/caloriebank-theme';
 
-export function IntakeAdjustmentEditor({ state, onSaved, onCancel }: {
-  state: IntakeAdjustmentState; onSaved: () => void; onCancel: () => void;
+export function IntakeAdjustmentEditor({ state, onSaved, onCancel, historical = false }: {
+  state: IntakeAdjustmentState; historical?: boolean; onSaved: (savedState: IntakeAdjustmentState) => void; onCancel: () => void;
 }) {
+  const totalLabel = historical ? 'This day’s total' : 'Today’s total';
+  const dayLabel = new Intl.DateTimeFormat(undefined, { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${state.localDate}T12:00:00Z`));
   const draft = useEditorDraft('calorie-correction', {
     mode: state.adjustment?.mode ?? 'add' as 'add' | 'replace',
     addition: state.adjustment?.mode === 'add' ? String(state.adjustment.calories) : '',
     replacement: String(state.calories ?? ''),
-  }, JSON.stringify([state.localDate, state.source, state.selectionRevision]),
+  }, JSON.stringify([historical, state.localDate, state.source, state.selectionRevision]),
   JSON.stringify([state.revision, state.manualRevision]));
   const { mode, addition, replacement } = draft.value;
   const setMode = (mode: 'add' | 'replace') => draft.update(v => ({ ...v, mode }));
@@ -33,16 +35,16 @@ export function IntakeAdjustmentEditor({ state, onSaved, onCancel }: {
       setError('Enter a whole number from 0 to 100,000.'); return;
     }
     if (!remove && mode === 'add' && state.baseCalories === null) {
-      setError('Wait for tracker calories, or replace today’s total.'); return;
+      setError(historical ? 'Wait for tracker calories, or replace this day’s total.' : 'Wait for tracker calories, or replace today’s total.'); return;
     }
     if (!draft.beginSave()) return;
     locked.current = true; setSaving(true); setError('');
     try {
-      await saveIntakeAdjustment({ localDate: state.localDate, expectedRevision: state.revision,
+      const savedState = await (historical ? saveHistoricalIntakeAdjustment : saveIntakeAdjustment)({ localDate: state.localDate, expectedRevision: state.revision,
         selectionRevision: state.selectionRevision, manualRevision: state.manualRevision,
         mode: remove ? 'none' : mode, calories: remove ? 0 : calories });
       draft.clear('saved');
-      if (alive.current && draft.isCurrent()) onSaved();
+      if (alive.current && draft.isCurrent()) onSaved(savedState);
     } catch (failure) {
       if (alive.current) setError(failure instanceof ApiHttpError && failure.kind === 'update_required' ? failure.message
         : failure instanceof ApiHttpError && failure.kind === 'conflict' ? 'Your day, source, or adjustment changed. Close this editor and try again.'
@@ -50,18 +52,18 @@ export function IntakeAdjustmentEditor({ state, onSaved, onCancel }: {
     } finally { draft.endSave(); locked.current = false; if (alive.current) setSaving(false); }
   }
   return <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
-    <Text accessibilityRole="header" style={styles.title}>Calories eaten today</Text>
+    <Text accessibilityRole="header" style={styles.title}>{historical ? `Calories eaten · ${dayLabel}` : 'Calories eaten today'}</Text>
     <Text style={styles.detail}>{state.source}{state.baseCalories === null ? ': no calories yet' : `: ${state.baseCalories.toLocaleString()} kcal`}</Text>
     {(['add', 'replace'] as const).map(choice => <Pressable key={choice} accessibilityRole="radio" accessibilityState={{ checked: mode === choice, disabled: saving }} disabled={saving}
       onPress={() => { setMode(choice); setError(''); }} style={[styles.choice, mode === choice && styles.selected]}>
-      <Text style={styles.choiceText}>{mode === choice ? '● ' : '○ '}{choice === 'add' ? 'Add untracked calories' : 'Replace today’s total'}</Text>
+      <Text style={styles.choiceText}>{mode === choice ? '● ' : '○ '}{choice === 'add' ? 'Add untracked calories' : historical ? 'Replace this day’s total' : 'Replace today’s total'}</Text>
     </Pressable>)}
-    <Text style={styles.detail}>{mode === 'add' ? 'Your addition stays on top as your source updates.' : 'This total stays fixed until you remove it.'} Only for today.</Text>
-    <Text style={styles.label}>{mode === 'add' ? 'Untracked calories (kcal)' : 'Today’s total (kcal)'}</Text>
-    <View style={styles.inputFrame}><TextInput accessibilityLabel={mode === 'add' ? 'Untracked calories, kilocalories' : 'Today’s total, kilocalories'}
+    <Text style={styles.detail}>{mode === 'add' ? 'Your addition stays on top as your source updates.' : 'This total stays fixed until you remove it.'} {historical ? 'Only for this day. Saving updates its bank contribution.' : 'Only for today.'}</Text>
+    <Text style={styles.label}>{mode === 'add' ? 'Untracked calories (kcal)' : `${totalLabel} (kcal)`}</Text>
+    <View style={styles.inputFrame}><TextInput accessibilityLabel={mode === 'add' ? 'Untracked calories, kilocalories' : `${totalLabel}, kilocalories`}
       keyboardType="number-pad" underlineColorAndroid="transparent" selectTextOnFocus {...draft.selection(mode)} value={text}
       onChangeText={mode === 'add' ? setAddition : setReplacement} editable={!saving} style={styles.input} /></View>
-    {Number.isSafeInteger(total) && total >= 0 ? <Text accessibilityLiveRegion="polite" style={styles.result}>{mode === 'add' ? `${state.baseCalories!.toLocaleString()} + ${calories.toLocaleString()} = ` : 'Today’s total: '}{total.toLocaleString()} kcal</Text> : null}
+    {Number.isSafeInteger(total) && total >= 0 ? <Text accessibilityLiveRegion="polite" style={styles.result}>{mode === 'add' ? `${state.baseCalories!.toLocaleString()} + ${calories.toLocaleString()} = ` : `${totalLabel}: `}{total.toLocaleString()} kcal</Text> : null}
     {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
     <Pressable accessibilityRole="button" disabled={saving} style={styles.save} onPress={() => void save()}><Text style={styles.saveText}>{saving ? 'Saving…' : 'Save'}</Text></Pressable>
     {state.adjustment ? <Pressable accessibilityRole="button" disabled={saving} style={styles.action} onPress={() => void save(true)}><Text style={styles.link}>Remove adjustment</Text></Pressable> : null}

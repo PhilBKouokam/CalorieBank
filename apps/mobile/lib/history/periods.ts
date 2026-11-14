@@ -91,3 +91,16 @@ export function historyChart(history: BankHistoryResponse, range: BankHistoryRan
   }
   return [...groups.values()];
 }
+
+
+export function canEditHistoricalIntake(day: {
+  provenance: string; status: string; logDate: string; timezone: string; locksAt: string;
+}, now = Date.now()) {
+  if (day.provenance !== 'finalized' || day.status !== 'provisional' || !(Date.parse(day.locksAt) > now)) return false;
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: day.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(now));
+    const part = (type: string) => parts.find(value => value.type === type)?.value;
+    const today = `${part('year')}-${part('month')}-${part('day')}`;
+    return day.logDate === shiftDate(today, -1) || day.logDate === shiftDate(today, -2);
+  } catch { return false; }
+}

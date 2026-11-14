@@ -4,17 +4,17 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { IntakeAdjustmentState } from '@caloriebank/schemas';
 vi.mock('expo', () => ({ requireNativeModule: vi.fn() }));
-const api = vi.hoisted(() => ({ save: vi.fn() }));
+const api = vi.hoisted(() => ({ save: vi.fn(), historicalSave: vi.fn() }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', TextInput: 'TextInput', View: 'View', StyleSheet: { create: <T,>(x: T) => x } }));
-vi.mock('../../mobile/lib/api/client', () => ({ saveIntakeAdjustment: api.save, ApiHttpError: class extends Error {} }));
+vi.mock('../../mobile/lib/api/client', () => ({ saveIntakeAdjustment: api.save, saveHistoricalIntakeAdjustment: api.historicalSave, ApiHttpError: class extends Error {} }));
 const state: IntakeAdjustmentState = { localDate: '2026-10-13', revision: 0, selectionRevision: null, manualRevision: 0, source: 'Cronometer', baseCalories: 1800, calories: 1800, adjustment: null };
 let view: ReactTestRenderer;
 const saved = vi.fn(), cancel = vi.fn();
 beforeEach(() => { Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); vi.clearAllMocks(); api.save.mockResolvedValue({}); });
 afterEach(async () => { if (view) await act(async () => view.unmount()); });
-async function mount(s = state) {
+async function mount(s = state, historical = false) {
   const { IntakeAdjustmentEditor } = await import(resolve(__dirname, '../../mobile/components/caloriebank/IntakeAdjustmentEditor.tsx'));
-  await act(async () => { view = create(React.createElement(IntakeAdjustmentEditor, { state: s, onSaved: saved, onCancel: cancel })); });
+  await act(async () => { view = create(React.createElement(IntakeAdjustmentEditor, { state: s, historical, onSaved: saved, onCancel: cancel })); });
 }
 async function press(label: string) {
   const button = view.root.findAll(node => String(node.type) === 'Pressable').find(node => node.findAll(child => String(child.type) === 'Text').some(child => child.children.join('').endsWith(label)));
@@ -57,4 +57,26 @@ it('retains an offline addition and retries the identical request without accumu
   await press('Save');
   expect(api.save.mock.calls[1]?.[0]).toEqual(api.save.mock.calls[0]?.[0]);
   expect(saved).toHaveBeenCalledOnce();
+});
+
+
+it('saves a historical replacement to the exact historical endpoint and never Today', async () => {
+  await mount(state, true);
+  expect(JSON.stringify(view.toJSON())).toContain('October 13, 2026');
+  expect(JSON.stringify(view.toJSON())).not.toContain('Only for today');
+  await press('Replace this day’s total');
+  await act(async () => field().props.onChangeText('2400'));
+  await press('Save');
+  expect(api.historicalSave).toHaveBeenCalledWith({ localDate: state.localDate, expectedRevision: 0, selectionRevision: null, manualRevision: 0, mode: 'replace', calories: 2400 });
+  expect(api.save).not.toHaveBeenCalled();
+});
+
+it('retains historical input on failed save and removes only that day’s adjustment', async () => {
+  await mount({ ...state, revision: 1, adjustment: { mode: 'add', calories: 300 } }, true);
+  api.historicalSave.mockRejectedValueOnce(new Error('offline'));
+  await press('Save'); expect(field().props.value).toBe('300'); expect(saved).not.toHaveBeenCalled();
+  api.historicalSave.mockResolvedValueOnce({});
+  await press('Remove adjustment');
+  expect(api.historicalSave).toHaveBeenLastCalledWith(expect.objectContaining({ localDate: state.localDate, expectedRevision: 1, mode: 'none', calories: 0 }));
+  expect(api.save).not.toHaveBeenCalled();
 });

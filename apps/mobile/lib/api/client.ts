@@ -897,3 +897,18 @@ export async function saveIntakeAdjustment(input: IntakeAdjustmentMutation) {
   if (!response.ok) throw await responseError(response);
   return intakeAdjustmentStateSchema.parse(await response.json());
 }
+
+
+export async function fetchHistoricalIntakeAdjustment(localDate: string) {
+  const response = await apiRequest(`/v1/me/intake-adjustment/history/${encodeURIComponent(localDate)}`);
+  if (!response.ok) throw await responseError(response);
+  return intakeAdjustmentStateSchema.parse(await response.json());
+}
+export async function saveHistoricalIntakeAdjustment(input: IntakeAdjustmentMutation) {
+  const parsed = intakeAdjustmentMutationSchema.parse(input);
+  const response = await apiRequest(`/v1/me/intake-adjustment/history/${encodeURIComponent(parsed.localDate)}`, {
+    method: 'PUT', body: JSON.stringify(parsed),
+  });
+  if (!response.ok) throw await responseError(response);
+  return intakeAdjustmentStateSchema.parse(await response.json());
+}

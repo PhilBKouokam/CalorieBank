@@ -10,7 +10,7 @@ import type {
 } from '@caloriebank/schemas';
 import * as Crypto from 'expo-crypto';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Text } from '@/components/caloriebank/ScaleAwareText';
@@ -28,7 +28,7 @@ import {
   syncFatSecret,
   syncFitbit,
 } from '@/lib/api/client';
-import { historyPeriods, historyDateLabel, historyChart, movePeriod } from '@/lib/history/periods';
+import { historyPeriods, historyDateLabel, historyChart, movePeriod, canEditHistoricalIntake } from '@/lib/history/periods';
 import { historicalSourceChangeMessage } from '@/lib/history/source-change-errors';
 import { refreshNativeHealthForCurrentAccount } from '@/lib/native-health';
 import { getConsumerSourceName } from '@/lib/providers/presentation';
@@ -89,10 +89,12 @@ function DetailRow({ label, value, tone }: {
   value: string;
   tone?: 'burned' | 'eaten';
 }) {
+  const { width, fontScale } = useWindowDimensions();
+  const stacked = (width - 72) / fontScale < 250;
   return (
-    <View style={styles.detailRow}>
-      <Text style={[styles.detailLabel, tone === 'burned' && styles.burnedText, tone === 'eaten' && styles.eatenText]}>{label}</Text>
-      <Text style={[styles.detailValue, tone === 'burned' && styles.burnedText, tone === 'eaten' && styles.eatenText]}>
+    <View style={[styles.detailRow, stacked && styles.stackedDetailRow]}>
+      <Text style={[styles.detailLabel, stacked && styles.stackedDetailLabel, tone === 'burned' && styles.burnedText, tone === 'eaten' && styles.eatenText]}>{label}</Text>
+      <Text style={[styles.detailValue, stacked && styles.stackedDetailValue, tone === 'burned' && styles.burnedText, tone === 'eaten' && styles.eatenText]}>
         {value}
       </Text>
     </View>
@@ -119,6 +121,7 @@ async function refreshHistoricalSources() {
 }
 
 export default function BankHistoryScreen() {
+  const router = useRouter();
   const { width, fontScale } = useWindowDimensions();
   const [dayListWidth, setDayListWidth] = useState<number | null>(null);
   // Reserve readable columns rather than squeezing date/status around a scaled amount.
@@ -126,6 +129,7 @@ export default function BankHistoryScreen() {
   const [periodAnchor, setPeriodAnchor] = useState<string | null>(null);
   const [expandedPeriod, setExpandedPeriod] = useState<string | null>(null);
   const detailRequest = useRef(0);
+  const selectedDateRef = useRef<string | null>(null);
   const focusOwner = useRef(0);
   const historyRequest = useRef(0);
   const pickerRequest = useRef(0);
@@ -173,15 +177,17 @@ export default function BankHistoryScreen() {
           setPeriodAnchor(anchor => anchor ?? [...nextHistory.days, ...nextHistory.missingDays].map(day => day.logDate).sort().at(-1) ?? null);
 
           if (nextHistory.days.length === 0 && nextHistory.missingDays.length === 0) {
-            setSelectedLogDate(null);
+            setSelectedLogDate(null); selectedDateRef.current = null;
             setSelectedDay(null);
             setStatus('empty');
             return;
           }
 
-          const nextSelectedLogDate = (selectedRange === 'D' || selectedRange === 'W') ? nextHistory.days[0]?.logDate ?? null : null;
+          const nextSelectedLogDate = nextHistory.days.find(day => day.logDate === selectedDateRef.current)?.logDate
+            ?? ((selectedRange === 'D' || selectedRange === 'W') ? nextHistory.days[0]?.logDate ?? null : null);
           setSelectedDay(null);
           setSourceOptions(null);
+          selectedDateRef.current = nextSelectedLogDate;
           setSelectedLogDate(nextSelectedLogDate);
           setStatus('ready');
 
@@ -199,7 +205,7 @@ export default function BankHistoryScreen() {
         } catch {
           if (!isMounted || request !== detailRequest.current) return;
           setHistory(null);
-          setSelectedLogDate(null);
+          setSelectedLogDate(null); selectedDateRef.current = null;
           setSelectedDay(null);
           setStatus('error');
           setDetailStatus('error');
@@ -225,6 +231,7 @@ export default function BankHistoryScreen() {
     closeSourcePicker();
     setSelectedDay(null);
     setSourceOptions(null);
+    selectedDateRef.current = logDate;
     setSelectedLogDate(logDate);
     setDetailStatus('loading');
 
@@ -343,7 +350,7 @@ export default function BankHistoryScreen() {
     closeSourcePicker();
     setSourceOptions(null);
     setPeriodAnchor(movePeriod(selectedRange, periodAnchor, direction));
-    setExpandedPeriod(null); setSelectedLogDate(null); setSelectedDay(null); setDetailStatus('idle');
+    setExpandedPeriod(null); setSelectedLogDate(null); selectedDateRef.current = null; setSelectedDay(null); setDetailStatus('idle');
   }
 
   return (
@@ -381,7 +388,7 @@ export default function BankHistoryScreen() {
               accessibilityRole="button"
               accessibilityState={{ selected }}
               key={range.value}
-              onPress={() => { detailRequest.current++; closeSourcePicker(); setSourceOptions(null); setExpandedPeriod(null); setSelectedDay(null); setSelectedLogDate(null); setSelectedRange(range.value); }}
+              onPress={() => { detailRequest.current++; closeSourcePicker(); setSourceOptions(null); setExpandedPeriod(null); setSelectedDay(null); setSelectedLogDate(null); selectedDateRef.current = null; setSelectedRange(range.value); }}
               style={[styles.rangeButton, selected && styles.selectedRangeButton]}
             >
               <Text style={[styles.rangeText, selected && styles.selectedRangeText]}>{range.label}</Text>
@@ -452,7 +459,7 @@ export default function BankHistoryScreen() {
           </View>
         ) : null}
         {status === 'ready' && period?.grouped ? period.buckets.map(bucket => (
-          <Pressable key={bucket.id} accessibilityRole="button" accessibilityLabel={`${bucket.label}, ${bucket.total === null ? 'Not calculated' : formatCalories(bucket.total)}`} accessibilityState={{ expanded: expandedPeriod === bucket.id }} accessibilityHint="Shows the days included in this total." onPress={() => { detailRequest.current++; closeSourcePicker(); setSourceOptions(null); setExpandedPeriod(expandedPeriod === bucket.id ? null : bucket.id); setSelectedDay(null); setSelectedLogDate(null); setDetailStatus('idle'); }} style={({ pressed }) => [styles.dayRow, stackDayRows && styles.stackedDayRow, expandedPeriod === bucket.id && styles.selectedDayRow, pressed && styles.pressedRow]}>
+          <Pressable key={bucket.id} accessibilityRole="button" accessibilityLabel={`${bucket.label}, ${bucket.total === null ? 'Not calculated' : formatCalories(bucket.total)}`} accessibilityState={{ expanded: expandedPeriod === bucket.id }} accessibilityHint="Shows the days included in this total." onPress={() => { detailRequest.current++; closeSourcePicker(); setSourceOptions(null); setExpandedPeriod(expandedPeriod === bucket.id ? null : bucket.id); setSelectedDay(null); setSelectedLogDate(null); selectedDateRef.current = null; setDetailStatus('idle'); }} style={({ pressed }) => [styles.dayRow, stackDayRows && styles.stackedDayRow, expandedPeriod === bucket.id && styles.selectedDayRow, pressed && styles.pressedRow]}>
             <View style={styles.dayIdentity}>
               <Text style={styles.dayDate}>{bucket.label}</Text>
               <Text style={styles.mutedText}>{bucket.items.filter(item => item.kind === 'calculated').length} completed days{bucket.missingCount ? ` · ${bucket.missingCount} missing` : ''}</Text>
@@ -542,7 +549,9 @@ export default function BankHistoryScreen() {
               <DetailRow label="Goal" value={goalAdjustmentText(selectedDay)} />
               <View style={styles.eatenRow}>
                 <View style={styles.eatenValue}><DetailRow label="Eaten" tone="eaten" value={`${selectedDay.importedCalorieIntake.toLocaleString()} kcal`} /></View>
-
+                {canEditHistoricalIntake(selectedDay) ? <Pressable accessibilityRole="button" accessibilityLabel="Edit calories eaten for this day" style={styles.editButton} onPress={() => router.push({ pathname: '/edit-calories', params: { localDate: selectedDay.logDate } })}>
+                  <Ionicons name="pencil" size={18} color="#345FAD" />
+                </Pressable> : null}
               </View>
             </View>
 
@@ -901,6 +910,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
+  stackedDetailRow: { flexDirection: 'column', gap: 4 },
+  stackedDetailLabel: { flexBasis: 'auto', width: '100%', flexShrink: 1 },
+  stackedDetailValue: { flex: 0, flexShrink: 1, width: '100%' },
   detailLabel: {
     flexBasis: '48%',
     flexShrink: 0,
@@ -909,6 +921,8 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   detailValue: {
+    minWidth: 0,
+    flexShrink: 1,
     color: colors.text,
     flex: 1,
     fontSize: 15,

@@ -4,19 +4,19 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
-  focused: true, history: vi.fn(), detail: vi.fn(), sources: vi.fn(), change: vi.fn(), alert: vi.fn(),
+  width: 390, fontScale: 1, push: vi.fn(), focused: true, history: vi.fn(), detail: vi.fn(), sources: vi.fn(), change: vi.fn(), alert: vi.fn(),
 }));
 vi.mock('expo', () => ({ requireNativeModule: vi.fn() }));
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'history-review-request' }));
 vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
-vi.mock('react-native', () => ({ useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 1 }),
+vi.mock('react-native', () => ({ useWindowDimensions: () => ({ width: h.width, height: 844, fontScale: h.fontScale, scale: 1 }),
   ActivityIndicator: 'ActivityIndicator', Alert: { alert: h.alert }, Modal: 'Modal',
   Platform: { OS: 'ios' }, Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View',
   StyleSheet: { flatten: (value: unknown) => Object.assign({}, ...[value].flat(Infinity).filter(Boolean)), create: <T,>(value: T) => value },
 }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: h.push }),
   useFocusEffect: (callback: () => void) => React.useEffect(() => h.focused ? callback() : undefined, [callback, h.focused]),
 }));
 vi.mock('../../mobile/lib/native-health/index.ios', () => ({ refreshNativeHealthForCurrentAccount: vi.fn() }));
@@ -56,7 +56,7 @@ async function mount() {
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.clearAllMocks();
-  h.focused = true;
+  h.focused = true; h.width = 390; h.fontScale = 1;
   vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-07T15:00:00Z'));
   h.history.mockResolvedValue(history);
   h.detail.mockImplementation(async (date: string) => history.days.find((entry) => entry.logDate === date));
@@ -290,9 +290,10 @@ it('invalidates pending manual detail on blur and refocus', async () => {
   await act(async () => { pending = button('2026-11-05, Enjoyed, -200 kcal').props.onPress(); });
   const { default: Screen } = await import(resolve(__dirname, '../../mobile/app/(details)/bank-history.tsx'));
   await act(async () => { h.focused = false; view!.update(React.createElement(Screen)); });
-  await act(async () => { h.focused = true; view!.update(React.createElement(Screen)); });
   await act(async () => { old.resolve({ ...day, logDate: '2026-11-05', dailyBankChange: -200 }); await pending; });
-  expect(texts('Banked 940 kcal')).toHaveLength(1);
+  h.detail.mockImplementation(async (date: string) => ({ ...day, logDate: date, dailyBankChange: -100 }));
+  await act(async () => { h.focused = true; view!.update(React.createElement(Screen)); });
+  expect(texts('Enjoyed 100 kcal')).toHaveLength(1);
   expect(texts('Enjoyed 200 kcal')).toHaveLength(0);
 });
 
@@ -304,3 +305,37 @@ it('keeps chart zero tracks top-aligned independently of wrapped axis labels', a
   const labels = chart.findAll(node => String(node.type) === 'Text').map(text).filter(Boolean);
   expect(labels).toEqual(['1', '8', '15', '22', '29']);
 });
+
+
+it('opens the exact previous-day calorie editor and preserves selection on return', async () => {
+  await mount();
+  await act(async () => button('2026-11-05, Enjoyed, -200 kcal').props.onPress());
+  await act(async () => button('Edit calories eaten for this day').props.onPress());
+  expect(h.push).toHaveBeenCalledWith({ pathname: '/edit-calories', params: { localDate: '2026-11-05' } });
+  const { default: Screen } = await import(resolve(__dirname, '../../mobile/app/(details)/bank-history.tsx'));
+  await act(async () => { h.focused = false; view!.update(React.createElement(Screen)); });
+  await act(async () => { h.focused = true; view!.update(React.createElement(Screen)); });
+  expect(h.detail).toHaveBeenLastCalledWith('2026-11-05');
+  expect(button('2026-11-05, Enjoyed, -200 kcal').props.accessibilityState.selected).toBe(true);
+});
+
+
+it('stacks detail values at 320px and 2x text without truncation or losing the Eaten editor', async () => {
+  h.width = 320; h.fontScale = 2;
+  await mount();
+  const goal = texts('Maintenance')[0]!;
+  expect(style(goalRow().props.style).flexDirection).toBe('column');
+  expect(style(goal.props.style)).toMatchObject({ width: '100%', minWidth: 0, flexShrink: 1 });
+  expect(goal.props.numberOfLines).toBeUndefined();
+  const edit = button('Edit calories eaten for this day');
+  expect(style(edit.props.style)).toMatchObject({ minWidth: 44, minHeight: 44 });
+});
+
+it('keeps normal-sized History detail labels and values in columns', async () => {
+  await mount();
+  expect(style(goalRow().props.style).flexDirection).toBe('row');
+});
+
+function goalRow() {
+  return view!.root.findAll(node => String(node.type) === 'View' && node.findAll(child => String(child.type) === 'Text' && text(child) === 'Goal').length > 0 && node.findAll(child => String(child.type) === 'Text' && text(child) === 'Maintenance').length > 0).at(-1)!;
+}

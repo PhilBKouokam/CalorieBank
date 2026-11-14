@@ -274,3 +274,7 @@ The field, hypothetical result and Refresh estimate action share that scroll hos
 from Home's walking input; no input is keyed by font scale or written as intake.
 Current inventory is eleven TextInputs across nine input-owning files; prior surfaces are unchanged.
 Rendered font-scale/width checks do not replace physical device keyboard qualification.
+
+
+### History calorie correction entry point — 2026-11-13
+History's eligible completed-day Eaten pencil opens the existing `(settings)/edit-calories` route with an exact `localDate`. It reuses the same single `IntakeAdjustmentEditor` numeric input and `KeyboardSafeScrollView` owner. Date-specific save uses the historical endpoint; Today keeps its existing endpoint. This adds no keyboard primitive or new TextInput. Physical keyboard qualification is not implied by component/synthetic preview checks.
