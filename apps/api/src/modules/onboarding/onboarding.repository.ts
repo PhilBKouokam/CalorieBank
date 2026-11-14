@@ -7,6 +7,7 @@ import type {
 import type { PrismaClient } from '@prisma/client';
 import { deriveSourceState } from '@caloriebank/schemas';
 
+import { requireExistingRequestAccount } from '../../auth/existing-account';
 import { AppError } from '../../errors';
 import type { BankHistoryRepository } from '../bank-history/bank-history.repository';
 import type { DevelopmentUser } from '../goal-configuration/goal-configuration.repository';
@@ -103,12 +104,15 @@ export class PrismaOnboardingRepository implements OnboardingRepository {
   ) {}
 
   private async facts(user: DevelopmentUser): Promise<OnboardingFacts> {
-    const [profile, providerSelection, goal, bankSummary] = await Promise.all([
-      this.db.userProfile.upsert({
+    const profile = await this.db.$transaction(async (tx) => {
+      await requireExistingRequestAccount(tx, user);
+      return tx.userProfile.upsert({
         where: { userId: user.id },
         update: {},
         create: { userId: user.id },
-      }),
+      });
+    });
+    const [providerSelection, goal, bankSummary] = await Promise.all([
       this.providers.get(user.id),
       this.db.goalConfiguration.findUnique({ where: { userId: user.id }, select: { userId: true } }),
       this.bankHistory.getSummary(user.id),
@@ -185,10 +189,13 @@ export class PrismaOnboardingRepository implements OnboardingRepository {
   }
 
   async completeWelcome(user: DevelopmentUser) {
-    await this.db.userProfile.upsert({
-      where: { userId: user.id },
-      update: { onboardingWelcomeCompleted: true },
-      create: { userId: user.id, onboardingWelcomeCompleted: true },
+    await this.db.$transaction(async (tx) => {
+      await requireExistingRequestAccount(tx, user);
+      await tx.userProfile.upsert({
+        where: { userId: user.id },
+        update: { onboardingWelcomeCompleted: true },
+        create: { userId: user.id, onboardingWelcomeCompleted: true },
+      });
     });
     return this.getStatus(user);
   }
@@ -198,9 +205,12 @@ export class PrismaOnboardingRepository implements OnboardingRepository {
     if (current.stage !== 'ready' && current.stage !== 'complete') {
       throw new AppError('Setup is not ready to complete.', 409);
     }
-    await this.db.userProfile.update({
-      where: { userId: user.id },
-      data: { onboardingWelcomeCompleted: true, onboardingCompletedAt: new Date() },
+    await this.db.$transaction(async (tx) => {
+      await requireExistingRequestAccount(tx, user);
+      await tx.userProfile.update({
+        where: { userId: user.id },
+        data: { onboardingWelcomeCompleted: true, onboardingCompletedAt: new Date() },
+      });
     });
     return this.getStatus(user);
   }
