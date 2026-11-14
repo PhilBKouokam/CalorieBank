@@ -230,6 +230,44 @@ export function getPreviousCompletedLocalDates(
   return dates;
 }
 
+/** First saved goal covers every earlier date. Later edits use their own effective date. */
+export const INITIAL_GOAL_EFFECTIVE_FROM = '1970-01-01';
+
+export type DatedGoalVersion = {
+  effectiveFrom: string;
+  recordedAt: Date;
+};
+
+/**
+ * Goal active on a calendar date: the latest version whose effective date is on
+ * or before that date. A version dated later is not applied backward. Versions
+ * recorded on the same effective date resolve to the latest recordedAt.
+ * Returns null when no version was active yet. Does not treat a missing goal as zero.
+ */
+export function selectGoalActiveOnDate<T extends DatedGoalVersion>(
+  versions: readonly T[],
+  logDate: string,
+): T | null {
+  assertDateOnly(logDate, 'logDate');
+  let selected: T | null = null;
+  for (const version of versions) {
+    assertDateOnly(version.effectiveFrom, 'effectiveFrom');
+    if (!Number.isFinite(version.recordedAt.getTime())) {
+      throw new BankCalculationError('recordedAt must be a valid time.');
+    }
+    if (version.effectiveFrom > logDate) continue;
+    if (
+      selected === null ||
+      version.effectiveFrom > selected.effectiveFrom ||
+      (version.effectiveFrom === selected.effectiveFrom &&
+        version.recordedAt.getTime() >= selected.recordedAt.getTime())
+    ) {
+      selected = version;
+    }
+  }
+  return selected;
+}
+
 export type CurrentDayAdjustedExpenditureInput = {
   rawImportedExpenditureCalories: number;
   expenditureAdjustmentRate: number;
