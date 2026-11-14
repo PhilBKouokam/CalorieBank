@@ -363,3 +363,25 @@ Rendered font-scale/width checks do not replace physical device keyboard qualifi
 
 ### History calorie correction entry point — 2026-11-13
 History's eligible completed-day Eaten pencil opens the existing `(settings)/edit-calories` route with an exact `localDate`. It reuses the same single `IntakeAdjustmentEditor` numeric input and `KeyboardSafeScrollView` owner. Date-specific save uses the historical endpoint; Today keeps its existing endpoint. This adds no keyboard primitive or new TextInput. Physical keyboard qualification is not implied by component/synthetic preview checks.
+
+## Android custom-border input underline invariant
+
+Every currently reachable app-owned TextInput uses a custom border, either on the
+input or its surrounding frame. Each must explicitly set
+`underlineColorAndroid="transparent"`, matching the calorie-correction and
+manual-estimate editors. Keep the native component and existing props; a wrapper
+is unnecessary for this presentation-only setting.
+
+Current inventory is eleven TextInputs across nine input-owning files: Fitness
+Goal (1), Daily Bank Target (1), Banking Goal name and calories (2), Step Planning
+burn and steps (2), calorie correction (1), manual estimate (1), deletion
+confirmation (1), Eating plan calories (1), and the walking-plan step input (1).
+Correction and manual estimate were already compliant. The other nine now set the
+same prop, including Eating plan and the walking plan, which were added after the
+original private-beta correction. Deletion confirmation remains excluded from
+draft restoration. The input-inventory AST regression checks all eleven inputs.
+No style, validation, keyboard ownership, selection, draft, Save/Cancel, Step
+Planning hierarchy, or accounting code changes accompany this setting.
+
+Corrected underline appearance is not physically verified on this branch. No
+underline-only build is authorized by this port.

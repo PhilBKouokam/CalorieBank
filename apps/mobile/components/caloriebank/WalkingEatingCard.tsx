@@ -55,7 +55,7 @@ export function WalkingEatingCard({today,budget=null,planningUnavailableReason,p
   return <FrostedView style={styles.card}>
     <Text accessibilityRole="header" style={styles.heading}>If I walk…</Text>
     <View style={styles.inputRow}>
-      <TextInput accessibilityLabel="Walking plan total steps today" keyboardType="number-pad" maxLength={6} selectTextOnFocus editable={Boolean(current)&&!pending&&guidanceAllowed} placeholder="Steps"
+      <TextInput underlineColorAndroid="transparent" accessibilityLabel="Walking plan total steps today" keyboardType="number-pad" maxLength={6} selectTextOnFocus editable={Boolean(current)&&!pending&&guidanceAllowed} placeholder="Steps"
         {...draft.selection('steps')} value={draft.value.steps} onChangeText={steps=>draft.update({steps:steps.replace(/\D/g,'')})}
         style={[styles.input,{width:132*Math.max(1,fontScale)}]} />
       <Text style={styles.unit}>total steps today</Text>
