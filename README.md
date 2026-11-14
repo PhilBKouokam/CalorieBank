@@ -55,7 +55,11 @@ npm run typecheck
 npm run test
 ```
 
-`npm run test` currently runs only workspaces that define a test script.
+`npm run lint` lints the Expo app. `npm run typecheck` and `npm test` run in every workspace that defines those scripts.
+
+`@caloriebank/domain` and `@caloriebank/schemas` are plain TypeScript ESM packages and use Vitest 4. Vitest runs those tests directly, and Vitest 4 still supports the root Node engine (`>=20.19.0`). Vitest 5 requires Node `^22.12.0`, so it is not the runner for this repo.
+
+The mobile app uses Jest with the `jest-expo` preset. That is the runner Expo SDK 54 supports for React Native. Vitest does not transform the native app.
 
 ## Legacy Prototype
 
